@@ -1,0 +1,709 @@
+import { useEffect, useState, useCallback, useRef } from "react";
+import { apiCall, API_CONFIG } from "../../../utils/api";
+import type {
+  TipoNotificacion,
+  Involved,
+  ActoAdminData,
+} from "../../../types/index";
+import ActoAdmin from "./ActoAdmin/ActoAdmin";
+import Documentos from "./Document/Document";
+import DataStageDecision from "./Decision/DataStageDecision";
+import DeleteStageModal from "./Decision/DeleteStageModal";
+
+type DocumentoData = {
+  id: number;
+  nombre: string;
+  url_documento: string;
+  fecha_subida: string;
+};
+
+type Props = {
+  radicado: string;
+  idAuxiliar: number;
+  onStageUpdate: (stage: string) => void;
+  setToast: (toast: {
+    id: number;
+    message: string;
+    type: "success" | "error";
+  }) => void;
+  isEditable?: boolean;
+  inicio_proceso: any;
+  tiposNotificacion: TipoNotificacion[];
+  involucrados: Involved[];
+};
+
+const STAGE_NAME = "DECISION DE FONDO";
+const TIPOS_DOCUMENTO = ["Recurso"];
+
+export default function SubstantiveDecision({
+  radicado,
+  idAuxiliar,
+  setToast,
+  onStageUpdate,
+  isEditable = true,
+  inicio_proceso,
+  tiposNotificacion = [],
+  involucrados = [],
+}: Props) {
+  const [isCreatingStage, setIsCreatingStage] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [showLoading, setShowLoading] = useState(false);
+  const [localDecision, setLocalDecision] = useState(inicio_proceso || null);
+  const [existActoAdmin, setExistActoAdmin] = useState<boolean>(false);
+  const [existActoAdminRecurso, setExistActoAdminRecurso] =
+    useState<boolean>(false);
+  const [documentos, setDocumentos] = useState<DocumentoData[]>([]);
+  const [showDeleteEtapaModal, setShowDeleteEtapaModal] = useState(false);
+  const [isDeletingActoEtapa, setIsDeletingActoEtapa] = useState(false);
+  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchDecision = useCallback(async () => {
+    if (!radicado) {
+      setIsLoadingData(false);
+      return;
+    }
+
+    try {
+      setIsLoadingData(true);
+
+      loadingTimerRef.current = setTimeout(() => {
+        setShowLoading(true);
+      }, 300);
+
+      const res = await apiCall(API_CONFIG.ENDPOINTS.FILE_DECISION(radicado), {
+        method: "GET",
+      });
+
+      if (res.ok) {
+        console.log(res);
+        setLocalDecision(res.decision_fondo);
+        setDocumentos(res.decision_fondo?.documento || []);
+
+        if (res.decision_fondo?.acto_admin?.id) {
+          setExistActoAdmin(true);
+        } else {
+          setExistActoAdmin(false);
+        }
+
+        if (res.decision_fondo?.acto_admin_recurso?.id) {
+          setExistActoAdminRecurso(true);
+        } else {
+          setExistActoAdminRecurso(false);
+        }
+      } else {
+        setToast({
+          id: Date.now(),
+          message: res.detail || "Error al cargar decisión de fondo.",
+          type: "error",
+        });
+      }
+    } catch (e) {
+      console.error("Error fetching decision:", e);
+      setToast({
+        id: Date.now(),
+        message: "Error al cargar decisión de fondo.",
+        type: "error",
+      });
+    } finally {
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+      }
+      setShowLoading(false);
+      setIsLoadingData(false);
+    }
+  }, [radicado, setToast]);
+
+  useEffect(() => {
+    fetchDecision();
+    return () => {
+      if (loadingTimerRef.current) {
+        clearTimeout(loadingTimerRef.current);
+      }
+    };
+  }, [fetchDecision]);
+
+  const decisionData = localDecision?.decision_fondo || localDecision;
+  const stageExists = decisionData && decisionData.etapa_id;
+  const tipoEtapaId =
+    decisionData?.tipo_etapa_id || localDecision?.tipo_etapa_id || null;
+  const creable = decisionData?.creable ||
+    localDecision?.creable || { status: true, msg: "" };
+  const creableActoRecurso = decisionData?.creable_acto_recurso || {
+    status: false,
+    msg: "Debe subir un documento de tipo 'Recurso' para crear este acto.",
+  };
+
+  // Validar si hay al menos una persona notificada exitosamente
+  const hasNotificacionExitosa = () => {
+    if (!decisionData?.acto_admin?.notificacion) return false;
+    const involucrados = decisionData.acto_admin.notificacion.involucrados || [];
+    return involucrados.some((inv: any) => inv.notificacion_exitosa === true);
+  };
+
+  // Combinar condiciones para mostrar acto de recurso
+  const canCreateActoRecurso = creableActoRecurso.status && hasNotificacionExitosa();
+  const actorRecursoMessage = !isEditable 
+    ? "No disponible" 
+    : !creableActoRecurso.status 
+    ? creableActoRecurso.msg 
+    : !hasNotificacionExitosa()
+    ? "Debe existir al menos una persona notificada exitosamente en el acto administrativo principal para crear este acto."
+    : "";
+
+  const createStage = async () => {
+    if (!radicado) {
+      setToast({
+        id: Date.now(),
+        message: "No se ha seleccionado un expediente.",
+        type: "error",
+      });
+      return;
+    }
+
+    if (!tipoEtapaId) {
+      setToast({
+        id: Date.now(),
+        message: "No se pudo obtener el tipo de etapa.",
+        type: "error",
+      });
+      return;
+    }
+
+    try {
+      setIsCreatingStage(true);
+
+      const res = await apiCall(
+        API_CONFIG.ENDPOINTS.FILE_CREATE_STAGE(radicado, tipoEtapaId),
+        { method: "POST" }
+      );
+
+      if (res.ok && res.etapa_id) {
+        const nuevaDecision = {
+          etapa_id: res.etapa_id,
+          informacion: {},
+          acto_admin: {},
+          acto_admin_recurso: {},
+          documento: [],
+          tipo_etapa_id: tipoEtapaId,
+          creable: { status: true, msg: "" },
+          creable_recurso: {
+            status: false,
+            msg: "Debe subir un documento de tipo 'Recurso' para crear este acto.",
+          },
+        };
+        setLocalDecision(nuevaDecision);
+        setDocumentos([]);
+        setExistActoAdmin(false);
+        setExistActoAdminRecurso(false);
+        onStageUpdate(STAGE_NAME);
+
+        setToast({
+          id: Date.now(),
+          message: "Etapa creada exitosamente.",
+          type: "success",
+        });
+      } else {
+        setToast({
+          id: Date.now(),
+          message: res.detail || "Error al crear la etapa.",
+          type: "error",
+        });
+      }
+    } catch (e) {
+      console.error("Error creando etapa:", e);
+      setToast({
+        id: Date.now(),
+        message: "Error al crear la etapa.",
+        type: "error",
+      });
+    } finally {
+      setIsCreatingStage(false);
+    }
+  };
+
+  const handleDocumentosUpdate = useCallback(
+    (updatedDocumentos: DocumentoData[]) => {
+      setDocumentos(updatedDocumentos);
+      fetchDecision();
+    },
+    [fetchDecision]
+  );
+
+  const handleDataUpdated = useCallback(() => {
+    fetchDecision();
+  }, [fetchDecision]);
+
+  // Handler para cuando se actualiza el acto admin de etapa
+  const handleActoAdminEtapaUpdate = (actoAdmin: ActoAdminData) => {
+    const updatedDecision = {
+      ...decisionData,
+      acto_admin: { ...actoAdmin }, // Crear copia profunda
+    };
+    
+    // Crear nuevo objeto completamente para forzar re-render
+    setLocalDecision({ ...updatedDecision });
+
+    if (actoAdmin && Object.keys(actoAdmin).length > 0) {
+      setExistActoAdmin(true);
+    } else {
+      setExistActoAdmin(false);
+    }
+  };
+
+  // Handler interceptor para eliminar acto de etapa
+  const handleDeleteActoEtapa = async () => {
+    // Si existe acto de recurso, mostrar modal de confirmación
+    if (existActoAdminRecurso && decisionData?.acto_admin_recurso?.id) {
+      setShowDeleteEtapaModal(true);
+      return;
+    }
+
+    // Si no existe acto de recurso, eliminar directamente
+    await executeDeleteActoEtapa();
+  };
+
+  // Ejecutar eliminación de acto de etapa (y recurso si existe)
+  const executeDeleteActoEtapa = async () => {
+    setShowDeleteEtapaModal(false);
+    setIsDeletingActoEtapa(true);
+
+    try {
+      // Eliminar acto de recurso primero si existe
+      if (existActoAdminRecurso && decisionData?.acto_admin_recurso?.id) {
+        const resRecurso = await apiCall(
+          API_CONFIG.ENDPOINTS.FILE_ACTO_ADMIN_DELETE(
+            decisionData.acto_admin_recurso.id
+          ),
+          { method: "DELETE" }
+        );
+
+        if (!resRecurso.ok) {
+          console.error("Error eliminando acto de recurso:", resRecurso);
+          setToast({
+            id: Date.now(),
+            message: "Error al eliminar el acto administrativo de recurso.",
+            type: "error",
+          });
+          setIsDeletingActoEtapa(false);
+          return;
+        }
+      }
+
+      // Ahora eliminar el acto de etapa
+      if (decisionData?.acto_admin?.id) {
+        const resEtapa = await apiCall(
+          API_CONFIG.ENDPOINTS.FILE_ACTO_ADMIN_DELETE(
+            decisionData.acto_admin.id
+          ),
+          { method: "DELETE" }
+        );
+
+        if (resEtapa.ok) {
+          setToast({
+            id: Date.now(),
+            message: existActoAdminRecurso
+              ? "Actos administrativos eliminados exitosamente."
+              : "Acto administrativo eliminado exitosamente.",
+            type: "success",
+          });
+          await fetchDecision();
+        } else {
+          setToast({
+            id: Date.now(),
+            message:
+              resEtapa.detail || "Error al eliminar el acto administrativo.",
+            type: "error",
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Error eliminando actos administrativos:", e);
+      setToast({
+        id: Date.now(),
+        message: "Error al eliminar los actos administrativos.",
+        type: "error",
+      });
+    } finally {
+      setIsDeletingActoEtapa(false);
+    }
+  };
+
+  // Actualizar acto de recurso
+  const handleActoAdminRecursoUpdate = async (actoAdmin: ActoAdminData) => {
+    const updatedDecision = {
+      ...decisionData,
+      acto_admin_recurso: { ...actoAdmin }, // Crear copia profunda
+    };
+    
+    // Crear nuevo objeto completamente para forzar re-render
+    setLocalDecision({ ...updatedDecision });
+
+    if (actoAdmin && Object.keys(actoAdmin).length > 0) {
+      setExistActoAdminRecurso(true);
+    } else {
+      setExistActoAdminRecurso(false);
+    }
+  };
+
+  if (isLoadingData && showLoading) {
+    return (
+      <div className="card bg-base-100 shadow-xl w-full border border-gray-200">
+        <div className="card-body">
+          <div className="flex flex-col items-center justify-center py-12 space-y-4">
+            <span className="loading loading-spinner loading-lg text-primary"></span>
+            <p className="text-gray-600 font-medium">Cargando datos...</p>
+            <p className="text-sm text-gray-500">
+              Obteniendo información de la decisión de fondo
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!radicado) {
+    return (
+      <div className="card bg-base-100 shadow w-full">
+        <div className="card-body flex items-center justify-center text-gray-500">
+          <p>
+            Seleccione un expediente para ver {isEditable ? "o editar" : ""} sus
+            datos
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoadingData) {
+    return <div className="min-h-[200px]" />;
+  }
+
+  if (!creable.status && isEditable) {
+    return (
+      <div className="card bg-base-100 shadow-xl w-full border border-warning/30">
+        <div className="card-body">
+          <div className="flex flex-col items-center justify-center py-8 space-y-6">
+            <div className="bg-gradient-to-br from-warning to-orange-500 rounded-full p-4 shadow-lg">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-16 w-16 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+            </div>
+
+            <div className="text-center space-y-3">
+              <h3 className="text-lg font-semibold">
+                No es posible gestionar o crear esta etapa
+              </h3>
+              <div className="bg-warning/10 border border-amber-200 rounded-lg p-4 max-w-lg mx-auto">
+                <p className="text-sm font-medium">
+                  <span className="font-semibold text-warning">Motivo:</span>{" "}
+                  {creable.msg}
+                </p>
+              </div>
+              <p className="text-sm opacity-70 max-w-md mx-auto mt-4">
+                Por favor, complete los requisitos necesarios antes de crear
+                esta etapa.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!stageExists && !isEditable) {
+    return (
+      <div className="card bg-base-100 shadow-xl w-full border border-gray-200">
+        <div className="card-body">
+          <div className="flex flex-col items-center justify-center py-8 space-y-6">
+            <div className="bg-gradient-to-br from-gray-400 to-gray-500 rounded-full p-4 shadow-lg">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-16 w-16 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+
+            <div className="text-center space-y-3">
+              <p className="text-gray-600 max-w-md mx-auto">
+                Este expediente aún no tiene la etapa de{" "}
+                <span className="font-semibold text-gray-700 whitespace-nowrap">
+                  "{STAGE_NAME}"
+                </span>
+                .
+              </p>
+              <p className="text-sm text-gray-500 max-w-md mx-auto">
+                No hay información disponible para visualizar en esta etapa.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!stageExists && isEditable && creable.status) {
+    return (
+      <div className="card bg-base-100 shadow-xl w-full border border-blue-200">
+        <div className="card-body">
+          <div className="flex flex-col items-center justify-center py-8 space-y-6">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-full p-4 shadow-lg">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-16 w-16 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+
+            <div className="text-center space-y-3">
+              <p className="text-gray-600 max-w-md mx-auto">
+                Este expediente aún no tiene la etapa de{" "}
+                <span className="font-semibold text-blue-400 whitespace-nowrap">
+                  "{STAGE_NAME}"
+                </span>
+                .
+              </p>
+              <p className="text-sm text-gray-500 max-w-md mx-auto">
+                Para continuar, debe crear esta etapa y así poder gestionar la
+                decisión de fondo correspondiente.
+              </p>
+            </div>
+
+            <button
+              className="btn btn-success text-white btn-lg gap-2 shadow-md hover:shadow-lg transition-all"
+              onClick={createStage}
+              disabled={isCreatingStage}
+            >
+              {isCreatingStage ? (
+                <>
+                  <span className="loading loading-spinner loading-sm"></span>
+                  Creando etapa...
+                </>
+              ) : (
+                <>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Crear Etapa
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (stageExists) {
+    return (
+      <>
+        <div className="space-y-6">
+          {/* Acto Administrativo Principal de Etapa */}
+          <ActoAdmin
+            radicado={radicado}
+            idAuxiliar={idAuxiliar}
+            actoAdmin={decisionData.acto_admin || {}}
+            etapaId={decisionData.etapa_id}
+            tipoEtapa="decision_fondo"
+            setToast={setToast}
+            tipoActo="notificacion"
+            isEditable={isEditable}
+            involucrados={involucrados}
+            tiposNotificacion={tiposNotificacion}
+            setExistActoAdmin={setExistActoAdmin}
+            onActoAdminUpdate={handleActoAdminEtapaUpdate}
+            customDeleteHandler={handleDeleteActoEtapa}
+          />
+
+          {/* Información de la Decisión - Solo si existe acto admin de etapa */}
+          {existActoAdmin && (
+            <DataStageDecision
+              data={decisionData.informacion || null}
+              tipoSancion={decisionData.informacion?.tipo_sancion || []}
+              setToast={setToast}
+              etapaId={decisionData.etapa_id}
+              onDataUpdated={handleDataUpdated}
+              isEditable={isEditable}
+            />
+          )}
+
+          {/* Documentos - Solo si existe acto admin de etapa */}
+          {existActoAdmin ? (
+            <Documentos
+              documentos={documentos}
+              etapaId={decisionData.etapa_id}
+              radicado={radicado}
+              idAuxiliar={idAuxiliar}
+              tipoEtapa="decision_fondo"
+              tiposDocumento={TIPOS_DOCUMENTO}
+              setToast={setToast}
+              isEditable={isEditable}
+              onDocumentosUpdate={handleDocumentosUpdate}
+            />
+          ) : (
+            isEditable && (
+              <div className="card bg-base-100 shadow-xl w-full border border-warning/30">
+                <div className="card-body">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-warning/10 rounded-full p-3">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-8 w-8 text-warning"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                        />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">
+                        Documentos no disponibles
+                      </h3>
+                      <p className="text-sm text-base-content/70 mt-1">
+                        Debe crear un acto administrativo antes de subir
+                        documentos.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          )}
+
+          {/* Acto Administrativo de Recurso */}
+          {canCreateActoRecurso && existActoAdmin ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 px-1">
+                <div className="w-10 h-10 bg-purple-500/10 rounded-lg flex items-center justify-center">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5 text-purple-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800">
+                    Acto Administrativo de Recurso
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    Gestión del acto administrativo relacionado al recurso
+                    interpuesto
+                  </p>
+                </div>
+              </div>
+
+              <ActoAdmin
+                radicado={radicado}
+                idAuxiliar={idAuxiliar}
+                actoAdmin={decisionData.acto_admin_recurso || {}}
+                etapaId={decisionData.etapa_id}
+                tipoEtapa="decision_fondo"
+                setToast={setToast}
+                tipoActo="notificacion"
+                isEditable={isEditable}
+                involucrados={involucrados}
+                tiposNotificacion={tiposNotificacion}
+                setExistActoAdmin={setExistActoAdminRecurso}
+                onActoAdminUpdate={handleActoAdminRecursoUpdate}
+                nivelAuxiliar={true}
+              />
+            </div>
+          ) : (
+            <div className="card bg-base-100 shadow-xl w-full border border-info/30">
+              <div className="card-body">
+                <div className="flex items-center gap-4">
+                  <div className="bg-info/10 rounded-full p-3">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-8 w-8 text-info"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">
+                      Acto Administrativo de Recurso no disponible
+                    </h3>
+                    <p className="text-sm text-base-content/70 mt-1">
+                      {actorRecursoMessage}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Modal de confirmación para eliminar acto de etapa */}
+        <DeleteStageModal
+          isOpen={showDeleteEtapaModal}
+          isDeleting={isDeletingActoEtapa}
+          onClose={() => setShowDeleteEtapaModal(false)}
+          onConfirm={executeDeleteActoEtapa}
+        />
+      </>
+    );
+  }
+
+  return null;
+}
