@@ -10,6 +10,8 @@ import os
 import time
 import json
 
+from utils.funtions import get_current_user_smart, invalidate_token_cache, is_circuit_open, record_failure, record_success
+
 load_dotenv()
 SECRET_GATEWAY = os.getenv("SECRET_GATEWAY")
 SECRET_KEY_GATEWAY = os.getenv("SECRET_KEY_GATEWAY")
@@ -40,18 +42,6 @@ PUBLIC_ROUTES = {
     "email/send-bulk",
     "email/send-alert-report"
 }
-
-NO_CACHE_PATHS = {
-    "auth/logout",
-    "user/delete",
-    "admin/"
-}
-
-TOKEN_CACHE = {}
-TOKEN_CACHE_TTL = 120
-CIRCUIT_BREAKER = {}
-CIRCUIT_BREAKER_THRESHOLD = 5
-CIRCUIT_BREAKER_TIMEOUT = 30
 
 app = FastAPI()
 
@@ -103,91 +93,14 @@ EXCLUDED_RESPONSE_HEADERS = {
 }
 
 
-def decode_jwt_token(access_token: str):
-    """
-    Decodifica el token JWT y extrae user_id y permisos.
-    Retorna un dict con 'user_id' y 'permissions' (lista de nombres de permisos).
-    """
-    if not access_token:
-        raise HTTPException(401, "No token")
-    
-    try:
-        payload = jwt.decode(access_token, SECRET_KEY_GATEWAY, algorithms=[JWT_ALGORITHM])
-        user_id = payload.get("id")
-        permisos = payload.get("permisos", [])
-        
-        # Extraer solo los nombres de permisos (lista de strings)
-        permission_names = [p.get("name") for p in permisos if isinstance(p, dict) and "name" in p]
-        
-        return {
-            "user_id": user_id,
-            "permissions": permission_names
-        }
-    except JWTError as e:
-        raise HTTPException(401, f"Invalid token: {str(e)}")
-
-
-def get_current_user_cached(access_token: str):
-    if not access_token:
-        raise HTTPException(401, "No token")
-    
-    if access_token in TOKEN_CACHE:
-        cached_data, timestamp = TOKEN_CACHE[access_token]
-        if time.time() - timestamp < TOKEN_CACHE_TTL:
-            return cached_data
-    
-    # Decodificar token para obtener user_id y permisos
-    token_data = decode_jwt_token(access_token)
-    TOKEN_CACHE[access_token] = (token_data, time.time())
-    
-    if len(TOKEN_CACHE) > 500:
-        TOKEN_CACHE.clear()
-    
-    return token_data
-
-
-def invalidate_token_cache(access_token: str):
-    TOKEN_CACHE.pop(access_token, None)
-
-
-def get_current_user_smart(access_token: str, path: str):
-    if any(path.startswith(critical) for critical in NO_CACHE_PATHS):
-        return decode_jwt_token(access_token)
-    return get_current_user_cached(access_token)
-
-
-def is_circuit_open(service: str) -> bool:
-    if service not in CIRCUIT_BREAKER:
-        return False
-    
-    failures, last_failure = CIRCUIT_BREAKER[service]
-    
-    if datetime.now() - last_failure > timedelta(seconds=CIRCUIT_BREAKER_TIMEOUT):
-        del CIRCUIT_BREAKER[service]
-        return False
-    
-    return failures >= CIRCUIT_BREAKER_THRESHOLD
-
-
-def record_failure(service: str):
-    if service not in CIRCUIT_BREAKER:
-        CIRCUIT_BREAKER[service] = (1, datetime.now())
-    else:
-        failures, _ = CIRCUIT_BREAKER[service]
-        CIRCUIT_BREAKER[service] = (failures + 1, datetime.now())
-
-
-def record_success(service: str):
-    if service in CIRCUIT_BREAKER:
-        del CIRCUIT_BREAKER[service]
-
 
 @app.api_route("/{service}/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def proxy(
     service: str, 
     path: str, 
     request: Request, 
-    access_token: str = Cookie(None)
+    access_token: str = Cookie(None),
+    token: str = None  # Query parameter para SSE
 ):
     if service not in MICROSERVICES:
         raise HTTPException(status_code=404, detail="Service not found")
@@ -202,7 +115,9 @@ async def proxy(
 
     token_data = None
     if not is_public:
-        token_data = get_current_user_smart(access_token, path)
+        # Para SSE, permitir token via query parameter (EventSource no puede enviar headers)
+        final_token = token if token and "notification/stream" in path else access_token
+        token_data = get_current_user_smart(final_token, path)
 
     headers = {
         "X-Gateway-Token": SECRET_GATEWAY,
@@ -227,12 +142,16 @@ async def proxy(
         body = await request.body()
 
     try:
+        # Para SSE, usar timeout más largo y no esperar la respuesta completa
+        timeout_config = httpx.Timeout(300.0, connect=5.0) if "notification/stream" in path else httpx.Timeout(20.0, connect=5.0)
+        
         backend_resp = await http_client.request(
             request.method,
             target_url,
             headers=headers,
             params=request.query_params,
             content=body,
+            timeout=timeout_config,
         )
         record_success(service)
     except httpx.TimeoutException:
@@ -252,13 +171,19 @@ async def proxy(
         if key.lower() not in EXCLUDED_RESPONSE_HEADERS and value:
             response_headers[key] = value
 
+    # Detectar SSE (Server-Sent Events) o archivos grandes y usar streaming
+    content_type = backend_resp.headers.get("content-type", "")
     content_length = backend_resp.headers.get("content-length")
-    if content_length and int(content_length) > 1_000_000:
+    
+    is_sse = "text/event-stream" in content_type
+    is_large_file = content_length and int(content_length) > 1_000_000
+    
+    if is_sse or is_large_file:
         return StreamingResponse(
             backend_resp.aiter_bytes(),
             status_code=backend_resp.status_code,
             headers=response_headers,
-            media_type=backend_resp.headers.get("content-type")
+            media_type=content_type or backend_resp.headers.get("content-type")
         )
 
     if path == "auth/logout":

@@ -52,7 +52,7 @@ export default function ActoAdmin({
   nivelAuxiliar = null,
 }: Props) {
   const [localActoAdmin, setLocalActoAdmin] = useState<ActoAdminData | {}>(
-    actoAdmin
+    actoAdmin,
   );
   const [showActoModal, setShowActoModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -67,13 +67,13 @@ export default function ActoAdmin({
   const isComunicacion = tipoActo === "comunicacion";
 
   const handleSaveActoAdmin = async (
-    formData: FormData
+    formData: FormData,
   ): Promise<{ ok: boolean; error?: string }> => {
     try {
       const isEditing = hasActoAdmin && "id" in localActoAdmin;
       const endpoint = isEditing
         ? API_CONFIG.ENDPOINTS.FILE_ACTO_ADMIN_UPDATE(
-            (localActoAdmin as ActoAdminData).id
+            (localActoAdmin as ActoAdminData).id,
           )
         : API_CONFIG.ENDPOINTS.FILE_ACTO_ADMIN;
 
@@ -90,7 +90,7 @@ export default function ActoAdmin({
       // Manejar nivel_auxiliar con prioridad: FormData > Prop > localActoAdmin > actoAdmin
       if (!formData.has("nivel_auxiliar")) {
         let nivel: boolean | null | undefined = undefined;
-        
+
         // Prioridad 1: nivelAuxiliar prop
         if (nivelAuxiliar !== null && nivelAuxiliar !== undefined) {
           nivel = nivelAuxiliar;
@@ -103,7 +103,7 @@ export default function ActoAdmin({
         else if (actoAdmin && "nivel_auxiliar" in actoAdmin) {
           nivel = (actoAdmin as ActoAdminData).nivel_auxiliar;
         }
-        
+
         if (nivel !== null && nivel !== undefined) {
           formData.append("nivel_auxiliar", nivel.toString());
         }
@@ -113,9 +113,24 @@ export default function ActoAdmin({
 
       if (res.ok) {
         const updatedActoAdmin = res.data;
-        setLocalActoAdmin(updatedActoAdmin);
 
-        if (onActoAdminUpdate) onActoAdminUpdate(updatedActoAdmin);
+        // Preservar notificaciones y comunicaciones existentes al actualizar
+        const mergedActoAdmin =
+          isEditing && hasActoAdmin
+            ? {
+                ...updatedActoAdmin,
+                notificacion:
+                  (localActoAdmin as ActoAdminData).notificacion ||
+                  updatedActoAdmin.notificacion,
+                comunicacion:
+                  (localActoAdmin as ActoAdminData).comunicacion ||
+                  updatedActoAdmin.comunicacion,
+              }
+            : updatedActoAdmin;
+
+        setLocalActoAdmin(mergedActoAdmin);
+
+        if (onActoAdminUpdate) onActoAdminUpdate(mergedActoAdmin);
         if (setExistActoAdmin) setExistActoAdmin(true);
 
         setToast({
@@ -159,9 +174,9 @@ export default function ActoAdmin({
 
       const res = await apiCall(
         API_CONFIG.ENDPOINTS.FILE_ACTO_ADMIN_DELETE(
-          (localActoAdmin as ActoAdminData).id
+          (localActoAdmin as ActoAdminData).id,
         ),
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
 
       if (res.ok) {
@@ -244,11 +259,14 @@ export default function ActoAdmin({
   };
 
   const handleSaveNotificacion = async (
-    formData: FormData
+    formData: FormData,
   ): Promise<{ ok: boolean; error?: string }> => {
     const isEditing = editingNotificacion !== null;
-    console.log("[handleSaveNotificacion] Modo:", isEditing ? "EDICIÓN" : "CREACIÓN");
-    
+    console.log(
+      "[handleSaveNotificacion] Modo:",
+      isEditing ? "EDICIÓN" : "CREACIÓN",
+    );
+
     try {
       if (!hasActoAdmin || !("id" in localActoAdmin)) {
         console.error("[handleSaveNotificacion] No hay acto administrativo");
@@ -271,7 +289,10 @@ export default function ActoAdmin({
         });
 
         if (!notifRes.ok) {
-          console.error("[handleSaveNotificacion] Error creando notificación base:", notifRes);
+          console.error(
+            "[handleSaveNotificacion] Error creando notificación base:",
+            notifRes,
+          );
           return {
             ok: false,
             error: notifRes.detail || "Error al crear notificación base",
@@ -287,7 +308,10 @@ export default function ActoAdmin({
         }
 
         notificacionId = notifRes.data.id;
-        console.log("[handleSaveNotificacion] Notificación base creada, ID:", notificacionId);
+        console.log(
+          "[handleSaveNotificacion] Notificación base creada, ID:",
+          notificacionId,
+        );
 
         const updatedActo = {
           ...actoAdminCasted,
@@ -297,7 +321,10 @@ export default function ActoAdmin({
         if (onActoAdminUpdate) onActoAdminUpdate(updatedActo);
       } else {
         notificacionId = actoAdminCasted.notificacion.id;
-        console.log("[handleSaveNotificacion] Usando notificación existente, ID:", notificacionId);
+        console.log(
+          "[handleSaveNotificacion] Usando notificación existente, ID:",
+          notificacionId,
+        );
       }
 
       // Agregar datos comunes al FormData
@@ -309,15 +336,15 @@ export default function ActoAdmin({
       // Determinar endpoint y método según si es edición o creación
       const endpoint = isEditing
         ? API_CONFIG.ENDPOINTS.FILE_INVOLUCRADO_NOTIFICACION_UPDATE(
-            editingNotificacion!.id
+            editingNotificacion!.id,
           )
         : API_CONFIG.ENDPOINTS.FILE_INVOLUCRADO_NOTIFICACION;
-      
+
       const method = isEditing ? "PUT" : "POST";
-      
+
       console.log("[handleSaveNotificacion] Llamando endpoint:", endpoint);
       console.log("[handleSaveNotificacion] Método:", method);
-      
+
       // Ejecutar la petición
       const res = await apiCall(endpoint, { method, body: formData });
       console.log("[handleSaveNotificacion] Respuesta completa:", res);
@@ -357,7 +384,9 @@ export default function ActoAdmin({
       const currentActo = localActoAdmin as ActoAdminData;
 
       if (!currentActo.notificacion) {
-        console.error("[handleSaveNotificacion] No existe notificación en acto actual");
+        console.error(
+          "[handleSaveNotificacion] No existe notificación en acto actual",
+        );
         return { ok: false, error: "Error al actualizar notificación" };
       }
 
@@ -367,9 +396,11 @@ export default function ActoAdmin({
         : [];
 
       if (isEditing) {
-        console.log("[handleSaveNotificacion] Actualizando involucrado existente");
+        console.log(
+          "[handleSaveNotificacion] Actualizando involucrado existente",
+        );
         updatedInvolucrados = updatedInvolucrados.map((inv) =>
-          inv.id === res.data.id ? res.data : inv
+          inv.id === res.data.id ? res.data : inv,
         );
       } else {
         console.log("[handleSaveNotificacion] Agregando nuevo involucrado");
@@ -399,10 +430,12 @@ export default function ActoAdmin({
 
       console.log("[handleSaveNotificacion] Retornando ok: true");
       return { ok: true };
-      
     } catch (e) {
       console.error("[handleSaveNotificacion] Excepción capturada:", e);
-      const errorMsg = e instanceof Error ? e.message : "Error de conexión al guardar notificación";
+      const errorMsg =
+        e instanceof Error
+          ? e.message
+          : "Error de conexión al guardar notificación";
       return { ok: false, error: errorMsg };
     }
   };
@@ -411,9 +444,9 @@ export default function ActoAdmin({
     try {
       const res = await apiCall(
         API_CONFIG.ENDPOINTS.FILE_INVOLUCRADO_NOTIFICACION_DELETE(
-          invNotificacionId
+          invNotificacionId,
         ) + `?radicado=${radicado}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
       );
 
       if (res.ok) {
@@ -421,10 +454,10 @@ export default function ActoAdmin({
         const currentNotificacion = currentActo.notificacion!;
 
         const updatedInvolucrados = Array.isArray(
-          currentNotificacion.involucrados
+          currentNotificacion.involucrados,
         )
           ? currentNotificacion.involucrados.filter(
-              (inv) => inv.id !== invNotificacionId
+              (inv) => inv.id !== invNotificacionId,
             )
           : [];
 
