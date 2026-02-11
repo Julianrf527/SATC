@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, insert
 from datetime import datetime
 from pydantic import BaseModel
 from zoneinfo import ZoneInfo
 import logging
+import asyncio
+import json
 
 #----- DB -----
 from db.deps import get_db
@@ -354,4 +356,99 @@ async def borrar_todas_notificaciones_usuario(
     except Exception as e:
         await db.rollback()
         logger.exception(f"Error al eliminar todas las notificaciones del usuario {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Error en el servidor")
+
+
+@router.get("/stream/{id_user}")
+async def stream_notificaciones(
+    request: Request,
+    id_user: int,
+):
+    """
+    Endpoint SSE (Server-Sent Events) para notificaciones en tiempo real.
+    Mantiene una conexión abierta y envía actualizaciones cada 30 segundos.
+    """
+    try:
+        user_id = verify_gateway_token(request)
+        if id_user != user_id:
+            raise HTTPException(status_code=401, detail="No cuenta con los permisos")
+        
+        async def event_generator():
+            from db.database import SessionLocal
+            
+            try:
+                logger.info(f"Iniciando stream SSE para usuario {user_id}")
+                
+                while True:
+                    # Verificar si el cliente cerró la conexión
+                    if await request.is_disconnected():
+                        logger.info(f"Cliente {user_id} desconectado del stream SSE")
+                        break
+                    
+                    # Crear una nueva sesión para cada consulta
+                    async with SessionLocal() as db:
+                        # Obtener notificaciones actuales
+                        stmt = select(
+                            Notificacion.id,
+                            Notificacion.mensaje,
+                            Notificacion.id_vinculada,
+                            Notificacion.tipo,
+                        ).where(
+                            Notificacion.usuario_id == user_id
+                        ).order_by(
+                            Notificacion.creado.desc()
+                        )
+                        
+                        result = await db.execute(stmt)
+                        notificaciones = result.all()
+                        
+                        notificaciones_list = [
+                            {
+                                "id": n.id,
+                                "mensaje": n.mensaje,
+                                "id_vinculada": n.id_vinculada,
+                                "tipo": n.tipo,
+                            }
+                            for n in notificaciones
+                        ]
+                    
+                    # Enviar datos en formato SSE
+                    data = json.dumps({"notifications": notificaciones_list})
+                    yield f"data: {data}\n\n"
+                    
+                    # Enviar heartbeat cada 15 segundos para mantener la conexión viva
+                    # Dividir el sleep de 30s en 2 partes con heartbeat
+                    for _ in range(3):  # 3 x 10s = 30s total
+                        await asyncio.sleep(10)
+                        
+                        # Verificar desconexión antes del heartbeat
+                        if await request.is_disconnected():
+                            logger.info(f"Cliente {user_id} desconectado durante heartbeat")
+                            return
+                        
+                        # Enviar comentario como heartbeat (los comentarios en SSE empiezan con :)
+                        yield ": heartbeat\n\n"
+                    
+            except asyncio.CancelledError:
+                logger.info(f"Stream SSE cancelado para usuario {user_id}")
+            except Exception as e:
+                logger.error(f"Error en stream SSE para usuario {user_id}: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+                yield f"data: {json.dumps({'error': 'Error interno del servidor'})}\n\n"
+        
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # Para nginx
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error al iniciar stream SSE para usuario {id_user}: {e}")
         raise HTTPException(status_code=500, detail="Error en el servidor")

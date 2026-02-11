@@ -31,7 +31,7 @@ export default function Header({ userId, setTheme, permission }: Props) {
   const navigate = useNavigate();
 
   const formatPermissions = (
-    perms: { name: string; path: string }[]
+    perms: { name: string; path: string }[],
   ): FormattedPermission[] => {
     return perms.map((perm) => {
       const parts = perm.name.split("_");
@@ -98,7 +98,7 @@ export default function Header({ userId, setTheme, permission }: Props) {
       (perm) =>
         perm.action.toLowerCase().includes(searchLower) ||
         perm.module.toLowerCase().includes(searchLower) ||
-        perm.original.toLowerCase().includes(searchLower)
+        perm.original.toLowerCase().includes(searchLower),
     );
 
     setFilteredPermissions(filtered);
@@ -133,14 +133,30 @@ export default function Header({ userId, setTheme, permission }: Props) {
       }
     }
 
+    // Cargar notificaciones iniciales
     GetNotifications(userId);
 
-    // Polling cada 10 segundos para actualizaciones rápidas
+    // Polling cada 60 segundos (optimizado para reducir carga)
     const interval = setInterval(() => {
-      GetNotifications(userId);
-    }, 10000);
+      // Solo hacer polling si la pestaña está visible
+      if (!document.hidden) {
+        GetNotifications(userId);
+      }
+    }, 60000); // 60 segundos
 
-    return () => clearInterval(interval);
+    // Listener para cargar notificaciones cuando el usuario vuelve a la pestaña
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        GetNotifications(userId);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, [userId]);
 
   const logout = async () => {
