@@ -12,25 +12,30 @@
 ## 📚 Tabla de Contenidos
 
 ### [1. Arquitectura](#1-arquitectura)
+
 - [1.1 Visión General](#11-visión-general)
 - [1.2 Microservicios](#12-microservicios)
 - [1.3 Comunicación](#13-comunicación-entre-servicios)
 
 ### [2. Seguridad](#2-seguridad)
+
 - [2.1 Sistema JWT](#21-sistema-jwt-dual-key)
 - [2.2 Flujo de Autenticación](#22-flujo-de-autenticación)
 - [2.3 Control de Permisos](#23-control-de-permisos)
 
 ### [3. Base de Datos](#3-base-de-datos)
+
 - [3.1 Arquitectura](#31-arquitectura-de-datos)
 - [3.2 Esquemas](#32-esquemas-por-microservicio)
 - [3.3 Optimizaciones](#33-optimizaciones)
 
 ### [4. Flujos de Negocio](#4-flujos-de-negocio)
+
 - [4.1 Gestión Documental](#41-gestión-documental)
 - [4.2 Expedientes Sancionatorios](#42-expedientes-sancionatorios)
 
 ### [5. Implementación](#5-implementación)
+
 - [5.1 Stack Tecnológico](#51-stack-tecnológico)
 - [5.2 Instalación](#52-instalación)
 - [5.3 Configuración](#53-configuración)
@@ -100,6 +105,7 @@ flowchart TB
 ```
 
 **Principios de Diseño:**
+
 - **Separación de Responsabilidades**: Cada microservicio gestiona su dominio de negocio
 - **Database per Service**: Cada servicio posee su propia base de datos aislada
 - **API Gateway Pattern**: Punto único de entrada, autenticación y enrutamiento
@@ -109,11 +115,13 @@ flowchart TB
 - **Desacoplamiento**: Sin dependencias directas entre bases de datos de servicios
 
 **Leyenda de Conectores:**
+
 - **Líneas sólidas (→)**: Comunicación HTTP/REST directa
 - **Líneas punteadas (⋯→)**: Comunicación inter-servicio vía Gateway
-- **X-Gateway-***: Headers personalizados (User-Id, Token, Permissions)
+- **X-Gateway-\***: Headers personalizados (User-Id, Token, Permissions)
 
-**Nota de Implementación:** 
+**Nota de Implementación:**
+
 > Aunque en el entorno actual las 3 bases de datos PostgreSQL están en el mismo servidor (localhost), la arquitectura está diseñada para permitir la distribución de cada base de datos en servidores independientes sin modificar el código de los microservicios. Cada servicio solo conoce su propia cadena de conexión.
 
 ---
@@ -121,6 +129,7 @@ flowchart TB
 ### 1.2 Microservicios
 
 #### app-users (Puerto 8002)
+
 **Dominio:** Identidad, Acceso y Comunicaciones
 
 ```
@@ -154,6 +163,7 @@ flowchart TB
 ---
 
 #### app-sancionatoria (Puerto 8001)
+
 **Dominio:** Expedientes y Procesos Legales
 
 ```
@@ -185,6 +195,7 @@ flowchart TB
 ---
 
 #### app-docs (Puerto 8003)
+
 **Dominio:** Control Documental y Versionamiento
 
 ```
@@ -214,6 +225,7 @@ flowchart TB
 **Base de Datos:** `documentos_db`
 
 **Estados del Documento:**
+
 ```
 en_revision → aprobado → finalizado
             ↘ rechazado → (nueva versión) → en_revision
@@ -222,6 +234,7 @@ en_revision → aprobado → finalizado
 ---
 
 #### api-gateway (Puerto 8000)
+
 **Dominio:** Enrutamiento y Seguridad
 
 ```
@@ -282,19 +295,21 @@ Microservicio ↔ Microservicio (via Gateway)
 
 #### Mapeo de Rutas
 
-| Prefijo | Destino | Puerto |
-|---------|---------|--------|
-| `/users/*` | app-users | 8002 |
-| `/sanctioning/*` | app-sancionatoria | 8001 |
-| `/documents/*` | app-docs | 8003 |
+| Prefijo          | Destino           | Puerto |
+| ---------------- | ----------------- | ------ |
+| `/users/*`       | app-users         | 8002   |
+| `/sanctioning/*` | app-sancionatoria | 8001   |
+| `/documents/*`   | app-docs          | 8003   |
 
 **Rutas Públicas** (sin autenticación):
+
 - `auth/login`
 - `auth/register`
 - `auth/recovery-code`
 - `auth/recovery`
 
 **Rutas sin Caché**:
+
 - `auth/logout`
 - `user/delete`
 - `admin/*`
@@ -328,6 +343,7 @@ ApiCorp implementa un sistema de seguridad con dos niveles de claves secretas:
 ```
 
 **Ventajas del Modelo Dual:**
+
 - ✅ Aislamiento de seguridad entre servicios
 - ✅ Tokens de autenticación validados solo por gateway
 - ✅ Reducción de superficie de ataque
@@ -467,12 +483,13 @@ from utils.verify_gateway_token import verify_permission
 async def manage_involved(request: Request):
     # Validación de permiso SIN consultar base de datos
     user_id = verify_permission(request, "expediente_gestionar involucrados")
-    
+
     # user_id ya está validado, continuar con lógica de negocio
     # ...
 ```
 
 **Proceso Interno de verify_permission:**
+
 ```
 1. Extraer header X-Gateway-Permissions
    └─ JSON.parse → ["perm_1", "perm_2", "perm_3"]
@@ -488,13 +505,13 @@ Tiempo de ejecución: ~0.1ms (solo operaciones en memoria)
 
 **Comparación con Modelo Tradicional:**
 
-| Aspecto | Modelo JWT (ApiCorp) | Modelo DB Query |
-|---------|---------------------|-----------------|
-| Latencia | ~0.1ms | ~5-50ms |
-| Carga DB | 0 queries/request | 1+ queries/request |
-| Escalabilidad | Alta (stateless) | Limitada (DB bottleneck) |
-| Actualización | Re-login | Tiempo real |
-| Seguridad | Alta (firmado) | Alta (centralizado) |
+| Aspecto       | Modelo JWT (ApiCorp) | Modelo DB Query          |
+| ------------- | -------------------- | ------------------------ |
+| Latencia      | ~0.1ms               | ~5-50ms                  |
+| Carga DB      | 0 queries/request    | 1+ queries/request       |
+| Escalabilidad | Alta (stateless)     | Limitada (DB bottleneck) |
+| Actualización | Re-login             | Tiempo real              |
+| Seguridad     | Alta (firmado)       | Alta (centralizado)      |
 
 ---
 
@@ -1120,6 +1137,7 @@ cd SATC
 MinIO no está incluido en el repositorio por su tamaño. Descárgalo manualmente:
 
 **Windows:**
+
 ```powershell
 # Descargar MinIO Server para Windows
 cd minio-server
@@ -1130,6 +1148,7 @@ Get-FileHash minio.exe -Algorithm SHA256
 ```
 
 **Linux:**
+
 ```bash
 cd minio-server
 wget https://dl.min.io/server/minio/release/linux-amd64/minio
@@ -1137,6 +1156,7 @@ chmod +x minio
 ```
 
 **macOS:**
+
 ```bash
 cd minio-server
 wget https://dl.min.io/server/minio/release/darwin-amd64/minio
@@ -1144,6 +1164,7 @@ chmod +x minio
 ```
 
 **Verificar instalación:**
+
 ```bash
 # Windows
 .\minio.exe --version
@@ -1209,6 +1230,7 @@ npm install
 #### Variables de Entorno
 
 **app-users/.env**
+
 ```env
 DATABASE_URL=postgresql+asyncpg://apicorp_user:secure_password@localhost:5432/user_db
 SECRET_KEY=<generar con: openssl rand -hex 32>
@@ -1223,6 +1245,7 @@ SMTP_PASSWORD=tu-app-password
 ```
 
 **app-sancionatoria/.env**
+
 ```env
 DATABASE_URL=postgresql+asyncpg://apicorp_user:secure_password@localhost:5432/sancionatoria_db
 SECRET_KEY=<generar única para este servicio>
@@ -1232,6 +1255,7 @@ GATEWAY_URL=http://localhost:8000
 ```
 
 **app-docs/.env**
+
 ```env
 DATABASE_URL=postgresql+asyncpg://apicorp_user:secure_password@localhost:5432/documentos_db
 SECRET_KEY=<generar única para este servicio>
@@ -1243,6 +1267,7 @@ PERMISO_REVISION_DOC=documento_revisar
 ```
 
 **api-gateway/.env**
+
 ```env
 SECRET_GATEWAY=<generar única>
 SECRET_KEY_GATEWAY=<MISMA QUE app-users>
@@ -1250,6 +1275,7 @@ JWT_ALGORITHM=HS256
 ```
 
 **frontend/.env** (opcional)
+
 ```env
 VITE_API_URL=http://localhost:8000
 ```
@@ -1296,6 +1322,7 @@ npm run dev
 ```
 
 **Acceder a:**
+
 - Frontend: http://localhost:5173
 - Gateway: http://localhost:8000
 - Swagger Users: http://localhost:8002/docs
@@ -1343,9 +1370,10 @@ cat api-gateway/.env | grep SECRET_KEY_GATEWAY
 ### Error 403: No tienes permiso
 
 **Diagnóstico:**
+
 ```sql
 -- Verificar permisos del usuario
-SELECT u.correo, r.name, p.name, p.path 
+SELECT u.correo, r.name, p.name, p.path
 FROM usuarios u
 JOIN roles r ON u.rol_id = r.id
 JOIN roles_permisos rp ON r.id = rp.rol_id
@@ -1356,6 +1384,7 @@ WHERE u.id = <user_id>;
 ### Frontend no conecta con Backend
 
 **Verificar CORS:**
+
 ```python
 # En main.py de cada servicio
 app.add_middleware(
