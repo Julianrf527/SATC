@@ -1100,17 +1100,56 @@ Vite:
 Windows 10/11, Linux (Ubuntu 20.04+), macOS
 
 # Software requerido
+Docker & Docker Compose 20+
 PostgreSQL 15+
 Python 3.11+
 Node.js 18+ y npm
 Git
+MinIO Server (ver instrucciones abajo)
 ```
 
 #### Clonar Repositorio
 
 ```bash
-git clone https://github.com/tu-org/apicorp.git
-cd apicorp
+git clone https://github.com/Julianrf527/SATC.git
+cd SATC
+```
+
+#### Instalar MinIO Server
+
+MinIO no está incluido en el repositorio por su tamaño. Descárgalo manualmente:
+
+**Windows:**
+```powershell
+# Descargar MinIO Server para Windows
+cd minio-server
+Invoke-WebRequest -Uri "https://dl.min.io/server/minio/release/windows-amd64/minio.exe" -OutFile "minio.exe"
+
+# Verificar descarga
+Get-FileHash minio.exe -Algorithm SHA256
+```
+
+**Linux:**
+```bash
+cd minio-server
+wget https://dl.min.io/server/minio/release/linux-amd64/minio
+chmod +x minio
+```
+
+**macOS:**
+```bash
+cd minio-server
+wget https://dl.min.io/server/minio/release/darwin-amd64/minio
+chmod +x minio
+```
+
+**Verificar instalación:**
+```bash
+# Windows
+.\minio.exe --version
+
+# Linux/macOS
+./minio --version
 ```
 
 #### Configurar Bases de Datos
