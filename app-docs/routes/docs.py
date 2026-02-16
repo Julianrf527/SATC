@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import selectinload
@@ -8,10 +8,9 @@ from datetime import datetime
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
-import shutil
 import logging
 import json
-import traceback
+import asyncio
 
 from db.deps import get_db
 from services.notificacion import (
@@ -24,6 +23,18 @@ from services.notificacion import (
 )
 from services.usuarios import obtener_usuarios_por_permiso, verificar_permiso_externo
 from utils.verify_gateway_token import verify_gateway_token
+from utils.minio_client import (
+    upload_file_to_minio,
+    upload_file_with_deduplication,
+    delete_file_from_minio,
+    get_file_from_minio,
+    init_minio,
+    MINIO_BUCKET
+)
+from utils.hash_utils import calcular_hash_uploadfile
+from utils.antivirus import escanear_archivo, verificar_clamav_disponible
+from utils.file_validator import validate_file_complete
+from utils.file_validator import validate_file_complete
 
 #--------- Modelos de BD ----------
 from db.models.documentos import Documento
@@ -44,6 +55,9 @@ GATEWAY_URL = os.getenv("GATEWAY_URL")
 # Nombres de permisos
 PERMISO_CREADOR = os.getenv("PERMISO_CREADOR_DOC")
 PERMISO_REVISOR = os.getenv("PERMISO_REVISION_DOC")
+
+# Inicializar MinIO
+init_minio()
 
 class DocumentoResumen(BaseModel):
     id: int
@@ -426,37 +440,96 @@ async def crear_documento(
                 detail=f"No se pudo verificar el usuario {revisor_id}"
             )
     
-    # Crear directorio si no existe
-    upload_dir = "uploads/documentos"
-    os.makedirs(upload_dir, exist_ok=True)
+    # 1. Calcular hash SHA256
+    logger.info(f"Calculando hash para archivo: {archivo.filename}")
+    file_hash, file_data = calcular_hash_uploadfile(archivo)
+    archivo_size = len(file_data)
     
-    # Guardar archivo
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    archivo_nombre = f"{timestamp}_{archivo.filename}"
-    archivo_path = os.path.join(upload_dir, archivo_nombre)
+    # 2. Validación completa de seguridad (Caso 8: 5 capas)
+    logger.info(f"Validando seguridad del archivo: {archivo.filename}")
+    max_size = int(os.getenv("MAX_FILE_SIZE_MB", "10"))
     
-    with open(archivo_path, "wb") as buffer:
-        shutil.copyfileobj(archivo.file, buffer)
+    try:
+        validation_result = await validate_file_complete(
+            file_data=file_data,
+            filename=archivo.filename,
+            max_size_mb=max_size
+        )
+        sanitized_filename = validation_result["sanitized_filename"]
+        mime_type = validation_result["mime_type"]
+        logger.info(f"Validacion exitosa: {validation_result}")
+    except HTTPException as e:
+        logger.error(f"Validacion de seguridad fallo: {e.detail}")
+        raise
     
-    archivo_size = os.path.getsize(archivo_path)
+    # 3. Verificar duplicados
+    # Buscar documentos del mismo usuario con el mismo hash
+    stmt_hash = select(VersionDocumento).join(
+        Documento, VersionDocumento.documento_id == Documento.id
+    ).where(
+        Documento.usuario_creador_id == usuario_creador_id
+    )
+    result_docs = await db.execute(stmt_hash)
+    versiones_existentes = result_docs.scalars().all()
     
-    # Crear documento en BD
+    for version_existente in versiones_existentes:
+        if file_hash in version_existente.archivo_url:
+            logger.warning(f"Archivo duplicado detectado: {file_hash}")
+            raise HTTPException(
+                status_code=409,
+                detail="Este archivo ya fue subido anteriormente"
+            )
+    
+    # 4. Escanear con ClamAV (Capa 4 de seguridad)
+    logger.info(f"Escaneando archivo con ClamAV: {archivo.filename}")
+    resultado_escaneo = escanear_archivo(file_data, archivo.filename)
+    
+    if not resultado_escaneo["ok"]:
+        logger.error(f"Archivo rechazado por antivirus: {resultado_escaneo['mensaje']}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Archivo rechazado: {resultado_escaneo['mensaje']}"
+        )
+    
+    # 5. Subir a MinIO con deduplicación (usar nombre sanitizado y MIME detectado)
+    logger.info(f"Subiendo archivo a MinIO con deduplicación")
+    resultado_upload = await upload_file_with_deduplication(
+        db=db,
+        file_data=file_data,
+        original_filename=sanitized_filename,  # Usar nombre sanitizado
+        content_type=mime_type  # Usar MIME detectado
+    )
+    
+    if not resultado_upload["ok"]:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error subiendo archivo: {resultado_upload.get('message', 'Error desconocido')}"
+        )
+    
+    archivo_url = resultado_upload["url"]
+    
+    if resultado_upload.get("deduplicated"):
+        logger.info(f"Archivo duplicado - URL reutilizada: {archivo_url}")
+    else:
+        logger.info(f"Archivo nuevo subido: {archivo_url}")
+    
+    # 5. Crear documento en BD
     nuevo_documento = Documento(
         nombre=nombre,
         descripcion=descripcion,
         tipo_archivo=tipo_archivo,
         usuario_creador_id=usuario_creador_id,
         estado='en_revision',
-        version_actual=1  # ← Asegurar que empiece en 1
+        version_actual=1
     )
     db.add(nuevo_documento)
     await db.flush()
     
-    # Crear primera versión
+    # 6. Crear primera versión
     nueva_version = VersionDocumento(
         documento_id=nuevo_documento.id,
         numero_version=1,
-        archivo_url=archivo_path,
+        archivo_url=archivo_url,
         archivo_nombre_original=archivo.filename,
         archivo_size=archivo_size,
         usuario_subida_id=usuario_creador_id,
@@ -464,7 +537,7 @@ async def crear_documento(
     )
     db.add(nueva_version)
     
-    # Asignar revisores y enviar notificaciones
+    # 7. Asignar revisores y enviar notificaciones
     for revisor_id in revisores_list:
         asignacion = AsignacionRevisor(
             documento_id=nuevo_documento.id,
@@ -474,7 +547,7 @@ async def crear_documento(
         db.add(asignacion)
         
         # Enviar notificación usando función helper
-        logger.info(f">>> Intentando notificar a revisor {revisor_id} del documento {nuevo_documento.id}")
+        logger.info(f"Notificando a revisor {revisor_id} del documento {nuevo_documento.id}")
         try:
             resultado_notif = await notificar_asignacion_revisor(
                 documento_id=nuevo_documento.id,
@@ -482,26 +555,29 @@ async def crear_documento(
                 revisor_id=revisor_id,
                 version_actual=1
             )
-            logger.info(f">>> Resultado notificación para revisor {revisor_id}: {resultado_notif}")
+            logger.info(f"Notificación enviada a revisor {revisor_id}: {resultado_notif}")
         except Exception as e:
-            logger.error(f">>> ERROR al notificar revisor {revisor_id}: {e}")
-            logger.error(f">>> Traceback: {traceback.format_exc()}")
+            logger.error(f"Error al notificar revisor {revisor_id}: {e}")
     
-    # Registrar en auditoría (UNA SOLA VEZ)
+    # 8. Registrar en auditoría
     auditoria = AuditoriaDocumento(
         documento_id=nuevo_documento.id,
         usuario_id=usuario_creador_id,
         accion='crear',
         descripcion=f'Documento creado con {len(revisores_list)} revisor(es)',
-        datos_adicionales={'revisores': revisores_list}
+        datos_adicionales={'revisores': revisores_list, 'hash': file_hash[:16]}
     )
     db.add(auditoria)
     
     await db.commit()
     
+    logger.info(f"Documento creado exitosamente: {nuevo_documento.id}")
+    
     return {
         "ok": True,
         "documento_id": nuevo_documento.id,
+        "hash": file_hash,
+        "antivirus_escaneado": resultado_escaneo["escaneado"],
         "message": "Documento creado exitosamente"
     }
 
@@ -542,26 +618,82 @@ async def subir_nueva_version(
                 detail="Solo puedes subir una nueva versión cuando el documento ha sido devuelto"
             )
         
-        # Guardar archivo
-        upload_dir = "uploads/documentos"
-        os.makedirs(upload_dir, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        archivo_nombre = f"{timestamp}_{archivo.filename}"
-        archivo_path = os.path.join(upload_dir, archivo_nombre)
+        # 1. Calcular hash SHA256
+        logger.info(f"Calculando hash para nueva versión: {archivo.filename}")
+        file_hash, file_data = calcular_hash_uploadfile(archivo)
+        archivo_size = len(file_data)
         
-        # Leer el contenido del archivo antes de que se cierre
-        contenido = await archivo.read()
-        with open(archivo_path, "wb") as buffer:
-            buffer.write(contenido)
+        # 2. Validación completa de seguridad (Caso 8: 5 capas)
+        logger.info(f"Validando seguridad del archivo: {archivo.filename}")
+        max_size = int(os.getenv("MAX_FILE_SIZE_MB", "10"))
         
-        archivo_size = os.path.getsize(archivo_path)
+        try:
+            validation_result = await validate_file_complete(
+                file_data=file_data,
+                filename=archivo.filename,
+                max_size_mb=max_size
+            )
+            sanitized_filename = validation_result["sanitized_filename"]
+            mime_type = validation_result["mime_type"]
+            logger.info(f"Validacion exitosa: {validation_result}")
+        except HTTPException as e:
+            logger.error(f"Validacion de seguridad fallo: {e.detail}")
+            raise
         
-        # Crear nueva versión
+        # 3. Verificar duplicados
+        stmt_hash = select(VersionDocumento).where(
+            VersionDocumento.documento_id == documento_id
+        )
+        result_versions = await db.execute(stmt_hash)
+        versiones_existentes = result_versions.scalars().all()
+        
+        for version_existente in versiones_existentes:
+            if file_hash in version_existente.archivo_url:
+                logger.warning(f"Archivo duplicado detectado: {file_hash}")
+                raise HTTPException(
+                    status_code=409,
+                    detail="Esta versión del archivo ya existe en el documento"
+                )
+        
+        # 4. Escanear con ClamAV (Capa 4 de seguridad)
+        logger.info(f"Escaneando archivo con ClamAV: {archivo.filename}")
+        resultado_escaneo = escanear_archivo(file_data, archivo.filename)
+        
+        if not resultado_escaneo["ok"]:
+            logger.error(f"Archivo rechazado por antivirus: {resultado_escaneo['mensaje']}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Archivo rechazado: {resultado_escaneo['mensaje']}"
+            )
+        
+        # 5. Subir a MinIO con deduplicación (usar nombre sanitizado y MIME detectado)
+        logger.info(f"Subiendo nueva versión a MinIO con deduplicación")
+        resultado_upload = await upload_file_with_deduplication(
+            db=db,
+            file_data=file_data,
+            original_filename=sanitized_filename,  # Usar nombre sanitizado
+            content_type=mime_type  # Usar MIME detectado
+        )
+        
+        if not resultado_upload["ok"]:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error subiendo archivo: {resultado_upload.get('message', 'Error desconocido')}"
+            )
+        
+        archivo_url = resultado_upload["url"]
+        
+        if resultado_upload.get("deduplicated"):
+            logger.info(f"Archivo duplicado - URL reutilizada: {archivo_url}")
+        else:
+            logger.info(f"Archivo nuevo subido: {archivo_url}")
+        
+        # 5. Crear nueva versión
         nueva_version_num = documento.version_actual + 1
         nueva_version = VersionDocumento(
             documento_id=documento_id,
             numero_version=nueva_version_num,
-            archivo_url=archivo_path,
+            archivo_url=archivo_url,
             archivo_nombre_original=archivo.filename,
             archivo_size=archivo_size,
             usuario_subida_id=usuario_id,
@@ -569,12 +701,12 @@ async def subir_nueva_version(
         )
         db.add(nueva_version)
         
-        # Actualizar documento
+        # 6. Actualizar documento
         documento.version_actual = nueva_version_num
         documento.estado = 'en_revision'
         documento.fecha_ultima_actualizacion = datetime.now()
         
-        # Notificar a revisores usando función helper
+        # 7. Notificar a revisores
         stmt_revisores = select(AsignacionRevisor).where(
             AsignacionRevisor.documento_id == documento_id
         )
@@ -591,9 +723,13 @@ async def subir_nueva_version(
         
         await db.commit()
         
+        logger.info(f"Nueva version subida exitosamente: v{nueva_version_num}")
+        
         return {
             "ok": True, 
-            "version": nueva_version_num, 
+            "version": nueva_version_num,
+            "hash": file_hash,
+            "antivirus_escaneado": resultado_escaneo["escaneado"],
             "message": "Versión subida exitosamente"
         }
     
@@ -601,7 +737,6 @@ async def subir_nueva_version(
         raise
     except Exception as e:
         logger.error(f"Error al subir versión: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
         await db.rollback()
         raise HTTPException(
             status_code=500,
@@ -737,45 +872,75 @@ async def descargar_archivo(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Descarga un archivo de una versión específica.
+    Descarga un archivo de una versión específica desde MinIO.
     Valida permisos antes de permitir la descarga.
     """
-    usuario_id = verify_gateway_token(request)
+    try:
+        usuario_id = verify_gateway_token(request)
 
-    stmt = select(VersionDocumento).where(VersionDocumento.id == version_id)
-    result = await db.execute(stmt)
-    version = result.scalar_one_or_none()
-    
-    if not version:
-        raise HTTPException(status_code=404, detail="Versión no encontrada")
-    
-    # Verificar permisos
-    stmt_doc = select(Documento).where(Documento.id == version.documento_id)
-    result_doc = await db.execute(stmt_doc)
-    documento = result_doc.scalar_one_or_none()
-    
-    es_creador = documento.usuario_creador_id == usuario_id
-    
-    stmt_revisor = select(AsignacionRevisor).where(
-        and_(
-            AsignacionRevisor.documento_id == version.documento_id,
-            AsignacionRevisor.revisor_id == usuario_id
+        stmt = select(VersionDocumento).where(VersionDocumento.id == version_id)
+        result = await db.execute(stmt)
+        version = result.scalar_one_or_none()
+        
+        if not version:
+            raise HTTPException(status_code=404, detail="Versión no encontrada")
+        
+        # Verificar permisos
+        stmt_doc = select(Documento).where(Documento.id == version.documento_id)
+        result_doc = await db.execute(stmt_doc)
+        documento = result_doc.scalar_one_or_none()
+        
+        es_creador = documento.usuario_creador_id == usuario_id
+        
+        stmt_revisor = select(AsignacionRevisor).where(
+            and_(
+                AsignacionRevisor.documento_id == version.documento_id,
+                AsignacionRevisor.revisor_id == usuario_id
+            )
         )
-    )
-    result_revisor = await db.execute(stmt_revisor)
-    es_revisor = result_revisor.scalar_one_or_none() is not None
+        result_revisor = await db.execute(stmt_revisor)
+        es_revisor = result_revisor.scalar_one_or_none() is not None
+        
+        if not (es_creador or es_revisor):
+            raise HTTPException(status_code=403, detail="No tienes permiso para descargar este archivo")
+        
+        # Descargar de MinIO
+        # Quitar prefijo del bucket si existe
+        file_path = version.archivo_url
+        if file_path.startswith(MINIO_BUCKET + "/"):
+            file_path = file_path.replace(MINIO_BUCKET + "/", "", 1)
+        
+        logger.info(f"Descargando archivo de MinIO: {file_path}")
+        resultado = get_file_from_minio(file_path)
+        
+        if not resultado["ok"]:
+            logger.error(f"Error descargando de MinIO: {resultado.get('message')}")
+            raise HTTPException(status_code=404, detail="Archivo no encontrado en MinIO")
+        
+        file_data = resultado["data"]
+        
+        # Detectar content type
+        content_types = {
+            'pdf': 'application/pdf',
+            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'doc': 'application/msword'
+        }
+        content_type = content_types.get(documento.tipo_archivo, 'application/octet-stream')
+        
+        # Devolver archivo para descarga
+        return StreamingResponse(
+            iter([file_data]),
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{version.archivo_nombre_original}"'
+            }
+        )
     
-    if not (es_creador or es_revisor):
-        raise HTTPException(status_code=403, detail="No tienes permiso para descargar este archivo")
-    
-    if not os.path.exists(version.archivo_url):
-        raise HTTPException(status_code=404, detail="Archivo no encontrado en el servidor")
-    
-    return FileResponse(
-        version.archivo_url,
-        filename=version.archivo_nombre_original,
-        media_type='application/octet-stream'
-    )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error al descargar archivo: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al descargar archivo: {str(e)}")
 
 @router.get("/stats")
 async def obtener_estadisticas(

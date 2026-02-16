@@ -142,7 +142,7 @@ export default function Header({ userId, setTheme, permission }: Props) {
       if (!document.hidden) {
         GetNotifications(userId);
       }
-    }, 60000); // 60 segundos
+    }, 30000); // 30 segundos
 
     // Listener para cargar notificaciones cuando el usuario vuelve a la pestaña
     const handleVisibilityChange = () => {
@@ -174,9 +174,20 @@ export default function Header({ userId, setTheme, permission }: Props) {
 
   const handleThemeToggle = () => {
     const newTheme = isDark ? "emerald" : "dark";
+    console.log(
+      "[Header] Cambiando tema de",
+      isDark ? "dark" : "emerald",
+      "a",
+      newTheme,
+    );
     setTheme(newTheme);
     setIsDark(!isDark);
     localStorage.setItem("theme", newTheme);
+    // Disparar evento para que los modales detecten el cambio
+    console.log("[Header] Disparando evento themeChange con tema:", newTheme);
+    window.dispatchEvent(
+      new CustomEvent("themeChange", { detail: { theme: newTheme } }),
+    );
   };
 
   const handleNavigate = (path: string) => {

@@ -130,7 +130,7 @@ export default function DocumentModal({
   };
 
   const handleNombrePersonalizadoChange = (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const valor = e.target.value;
     setNombrePersonalizado(valor);
@@ -138,22 +138,22 @@ export default function DocumentModal({
     // Validación en tiempo real
     if (valor.trim()) {
       const nombreNormalizado = valor.trim().toLowerCase();
-      
-        // Validar si existe en los tipos predefinidos
-        const existeEnTipos = tiposDocumento.some(
-          (tipo) => tipo.toLowerCase() === nombreNormalizado
-        );
 
-        if (existeEnTipos) {
-          setErrors((prev) => ({
-            ...prev,
-            nombre:
-              "Este nombre ya existe en los tipos de documento. Use el selector.",
-          }));
-        } else if (errors.nombre) {
-          setErrors((prev) => ({ ...prev, nombre: "" }));
-        }
-      } else if (
+      // Validar si existe en los tipos predefinidos
+      const existeEnTipos = tiposDocumento.some(
+        (tipo) => tipo.toLowerCase() === nombreNormalizado,
+      );
+
+      if (existeEnTipos) {
+        setErrors((prev) => ({
+          ...prev,
+          nombre:
+            "Este nombre ya existe en los tipos de documento. Use el selector.",
+        }));
+      } else if (errors.nombre) {
+        setErrors((prev) => ({ ...prev, nombre: "" }));
+      }
+    } else if (
       errors.nombre &&
       errors.nombre !== "Debe ingresar un nombre para el documento"
     ) {
@@ -184,18 +184,17 @@ export default function DocumentModal({
         isValid = false;
       } else {
         const nombreNormalizado = nombrePersonalizado.trim().toLowerCase();
-        
 
-          // Validar que el nombre no exista en los tipos predefinidos
-          const existeEnTipos = tiposDocumento.some(
-            (tipo) => tipo.toLowerCase() === nombreNormalizado
-          );
+        // Validar que el nombre no exista en los tipos predefinidos
+        const existeEnTipos = tiposDocumento.some(
+          (tipo) => tipo.toLowerCase() === nombreNormalizado,
+        );
 
-          if (existeEnTipos) {
-            newErrors.nombre =
-              "Este nombre ya existe en los tipos de documento. Use el selector.";
-            isValid = false;
-          }
+        if (existeEnTipos) {
+          newErrors.nombre =
+            "Este nombre ya existe en los tipos de documento. Use el selector.";
+          isValid = false;
+        }
       }
     }
 
@@ -294,26 +293,6 @@ export default function DocumentModal({
         <h3 className="font-bold text-lg mb-4 text-base-content">
           {isEditing ? "Editar Documento" : "Nuevo Documento"}
         </h3>
-
-        {/* Error general */}
-        {errors.general && (
-          <div className="alert alert-error mb-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="stroke-current shrink-0 h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span>{errors.general}</span>
-          </div>
-        )}
 
         <form onSubmit={handleSave} className="space-y-4 select-none">
           {/* Tipo de Documento */}
@@ -417,6 +396,26 @@ export default function DocumentModal({
               </p>
             )}
           </div>
+
+          {/* Error general */}
+          {errors.general && (
+            <div className="alert alert-error">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="stroke-current shrink-0 h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span>{errors.general}</span>
+            </div>
+          )}
 
           {/* Botones */}
           <div className="flex justify-end space-x-2 mt-6">

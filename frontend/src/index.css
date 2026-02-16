@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: light --default, dark --prefersdark, emerald;
+  themes:
+    light --default,
+    dark --prefersdark,
+    emerald;
 }
 
 input:-webkit-autofill,
@@ -13,6 +16,7 @@ select:-webkit-autofill {
   background-color: transparent !important;
   transition: background-color 9999s ease-in-out 0s;
 }
+
 .drawer-overlay {
   background-color: rgba(0, 0, 0, 0.4) !important;
   backdrop-filter: blur(4px);

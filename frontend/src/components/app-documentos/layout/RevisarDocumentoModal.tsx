@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { API_CONFIG, apiCall } from "../../../utils/api";
-import { useAuth } from "../../../context/AuthContext";
 import { X, CheckCircle, XCircle, Eye } from "lucide-react";
 
 type Props = {
@@ -20,7 +19,7 @@ export default function RevisarDocumentoModal({
   onSuccess,
 }: Props) {
   const [estadoRevision, setEstadoRevision] = useState<"aprobado" | "devuelto">(
-    "aprobado"
+    "aprobado",
   );
   const [comentarios, setComentarios] = useState("");
   const [theme, setTheme] = useState<string>("emerald");
@@ -29,10 +28,6 @@ export default function RevisarDocumentoModal({
     general: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Obtener usuario actual del contexto
-  const { user } = useAuth();
-  const usuarioActualId = user?.id || 0;
 
   // Detectar tema
   useEffect(() => {

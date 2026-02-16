@@ -1,5 +1,5 @@
 from fastapi import UploadFile, File, Request, APIRouter, Depends, HTTPException, Form, Body, Query, Path as PathParam
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_, func, desc, cast, String
@@ -15,6 +15,8 @@ import shutil
 import logging
 import os
 import pytz
+import traceback
+import io
 
 #----- DB -----
 
@@ -162,6 +164,15 @@ class FiltroAvanzado(BaseModel):
 #----------- FUNCIONES ------------
 
 from utils.verify_gateway_token import verify_gateway_token
+from utils.minio_client import (
+    upload_file_to_minio,
+    upload_file_with_deduplication,
+    delete_file_from_minio,
+    get_file_from_minio,
+    copy_file_in_minio,
+    init_minio,
+    MINIO_BUCKET
+)
 from services.usuarios import obtener_info_usuarios, obtener_usuarios_por_permiso, crear_notificacion_usuario, verificar_permiso_externo
 from services.alertas import calcular_alertas_expediente
 
@@ -178,8 +189,60 @@ from services.crud_file_operations import (
     insert_log_auditoria,
 )
 
+# Inicializar MinIO al cargar el módulo
+init_minio()
+
 
 # ---------- ENDPOINTS ----------
+
+# Endpoint para servir archivos desde MinIO
+@router.get("/download/{bucket}/{path:path}")
+async def download_file_from_minio(
+    request: Request,
+    bucket: str,
+    path: str,
+):
+    """
+    Descarga un archivo desde MinIO
+    """
+    try:
+        verify_gateway_token(request)
+        
+        # Construir el nombre del objeto
+        object_name = f"{path}"
+        
+        # Obtener archivo de MinIO
+        result = get_file_from_minio(object_name)
+        
+        if not result["ok"]:
+            raise HTTPException(status_code=404, detail="Archivo no encontrado")
+        
+        file_data = result["data"]
+        
+        # Detectar content type basado en la extensión
+        ext = Path(path).suffix.lower()
+        content_type = "application/octet-stream"
+        if ext == ".pdf":
+            content_type = "application/pdf"
+        elif ext in [".jpg", ".jpeg"]:
+            content_type = "image/jpeg"
+        elif ext == ".png":
+            content_type = "image/png"
+        
+        # Retornar como StreamingResponse
+        return StreamingResponse(
+            io.BytesIO(file_data),
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f'inline; filename="{Path(path).name}"'
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error descargando archivo: {e}")
+        raise HTTPException(status_code=500, detail="Error descargando archivo")
 
 @router.get("/get")
 async def obtener_expedientes(
@@ -1147,6 +1210,16 @@ async def obtener_expedientes_completo_por_radicado(
                 "involucrados": involucrados_map.get(radicado, []),
             }
 
+        # 8) Obtener las etapas que tiene el expediente (tipo_etapa_id)
+        stmt_etapas = (
+            select(TipoEtapa.id)
+            .join(Etapa, Etapa.tipo_etapa_id == TipoEtapa.id)
+            .where(Etapa.expediente_radicado == radicado)
+            .distinct()
+        )
+        res_etapas = await db.execute(stmt_etapas)
+        etapas_existentes = [etapa_id for (etapa_id,) in res_etapas.all()]
+
         stmt = select(TipoNotificacion)
         res = await db.execute(stmt)
         tnotificaciones = res.scalars().all()
@@ -1156,7 +1229,8 @@ async def obtener_expedientes_completo_por_radicado(
             content={
                 "ok": True, 
                 "data": exp_dict,
-                "tipo_notificacion": tnotificaciones_list
+                "tipo_notificacion": tnotificaciones_list,
+                "etapas_existentes": etapas_existentes
             }, 
             status_code=200
         )
@@ -1751,8 +1825,6 @@ async def create_formulation(
     request: Request,
     etapa_id: int = Form(...),
     descargos: str = Form(...),
-    id_auxiliar: int = Form(...),
-    tipo_etapa: str = Form(...),
     file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
 
@@ -1787,7 +1859,7 @@ async def create_formulation(
         # Variable para la URL del documento
         url_documento = None
 
-        # Guardar archivo si existe
+        # Guardar archivo si existe en MinIO
         if file and file.filename:
             if file.content_type != "application/pdf":
                 raise HTTPException(status_code=400, detail="El archivo debe ser PDF")
@@ -1800,20 +1872,24 @@ async def create_formulation(
             if file_size > 10 * 1024 * 1024:  # 10MB en bytes
                 raise HTTPException(status_code=400, detail="El archivo no debe superar los 10MB")
             
-            # Crear directorio usando ruta absoluta
-            expediente_path = DOCS_DIR / str(id_auxiliar)
-            etapa_path = expediente_path / tipo_etapa
-            etapa_path.mkdir(parents=True, exist_ok=True)
+            # Leer contenido del archivo
+            file_data = await file.read()
             
-            # Generar nombre de archivo con timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            file_name = f"FormulacionCargos_{timestamp}.pdf"
-            file_path = etapa_path / file_name
+            # Subir a MinIO con deduplicación (ruta automática basada en hash)
+            result = await upload_file_with_deduplication(
+                db=db,
+                file_data=file_data,
+                original_filename=file.filename,
+                content_type="application/pdf"
+            )
+            if not result["ok"]:
+                raise HTTPException(status_code=500, detail=f"Error subiendo archivo: {result['message']}")
             
-            with file_path.open("wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-            
-            url_documento = f"uploads/expedientes/{id_auxiliar}/{tipo_etapa}/{file_name}"
+            url_documento = result["url"]
+            if result.get("deduplicated"):
+                logger.info(f"Archivo duplicado - FormulacionCargos - URL reutilizada: {url_documento}")
+            else:
+                logger.info(f"Archivo nuevo - FormulacionCargos: {url_documento}")
 
         # Insertar formulación
         stmt = (
@@ -1880,8 +1956,6 @@ async def update_formulation(
     formulation_id: int,
     etapa_id: int = Form(...),
     descargos: str = Form(...),
-    id_auxiliar: int = Form(...),
-    tipo_etapa: str = Form(...),
     file: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1930,7 +2004,7 @@ async def update_formulation(
         # Mantener URL anterior por defecto
         url_documento = registro.url_documento
 
-        # Si se envió un nuevo archivo, procesarlo
+        # Si se envió un nuevo archivo, procesarlo en MinIO
         if file and file.filename:
             if file.content_type != "application/pdf":
                 raise HTTPException(status_code=400, detail="El archivo debe ser PDF")
@@ -1943,29 +2017,30 @@ async def update_formulation(
             if file_size > 10 * 1024 * 1024:
                 raise HTTPException(status_code=400, detail="El archivo no debe superar los 10MB")
             
-            # Crear directorio usando ruta absoluta
-            expediente_path = DOCS_DIR / str(id_auxiliar)
-            etapa_path = expediente_path / tipo_etapa
-            etapa_path.mkdir(parents=True, exist_ok=True)
-            
-            # Eliminar archivo anterior si existe
+            # Eliminar archivo anterior si existe en MinIO
             if registro.url_documento:
-                old_file_path = DOCS_DIR.parent / registro.url_documento
-                if old_file_path.exists():
-                    try:
-                        old_file_path.unlink()
-                    except Exception as e:
-                        logger.warning(f"No se pudo eliminar el archivo anterior: {e}")
+                delete_result = delete_file_from_minio(registro.url_documento)
+                if not delete_result["ok"]:
+                    logger.warning(f"No se pudo eliminar el archivo anterior: {delete_result['message']}")
             
-            # Generar nombre de archivo con timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            file_name = f"FormulacionCargos_{timestamp}.pdf"
-            file_path = etapa_path / file_name
+            # Leer contenido del archivo
+            file_data = await file.read()
             
-            with file_path.open("wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+            # Subir a MinIO con deduplicación (ruta automática basada en hash)
+            result = await upload_file_with_deduplication(
+                db=db,
+                file_data=file_data,
+                original_filename=file.filename,
+                content_type="application/pdf"
+            )
+            if not result["ok"]:
+                raise HTTPException(status_code=500, detail=f"Error subiendo archivo: {result['message']}")
             
-            url_documento = f"uploads/expedientes/{id_auxiliar}/{tipo_etapa}/{file_name}"
+            url_documento = result["url"]
+            if result.get("deduplicated"):
+                logger.info(f"Archivo duplicado - FormulacionCargos Update - URL reutilizada: {url_documento}")
+            else:
+                logger.info(f"Archivo nuevo - FormulacionCargos Update: {url_documento}")
 
         # Actualizar registro
         stmt = (
@@ -2524,8 +2599,6 @@ async def crear_ejecucion(
     etapa_id: int = Form(...),
     auto_admin: str = Form(...),
     fecha_auto: str = Form(...),
-    id_auxiliar: int = Form(...),
-    tipo_etapa: str = Form(...),
     
     # Campos booleanos
     cobro_coactivo: str = Form("false"),
@@ -2619,13 +2692,8 @@ async def crear_ejecucion(
         memorando_url = None
         auto_url = None
         
-        # Crear directorio base
-        expediente_path = DOCS_DIR / str(id_auxiliar)
-        etapa_path = expediente_path / tipo_etapa
-        etapa_path.mkdir(parents=True, exist_ok=True)
-        
-        # Función auxiliar para guardar archivos
-        async def save_pdf(file: UploadFile, prefix: str) -> str:
+        # Función auxiliar para guardar archivos en MinIO
+        async def save_pdf_minio(file: UploadFile, prefix: str) -> str:
             if file.content_type != "application/pdf":
                 raise HTTPException(
                     status_code=400,
@@ -2643,28 +2711,33 @@ async def crear_ejecucion(
                     detail=f"El archivo {prefix} no debe superar los 10MB"
                 )
             
-            # Generar nombre de archivo con timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            file_name = f"{prefix}_{timestamp}.pdf"
-            file_path = etapa_path / file_name
+            # Leer contenido del archivo
+            file_data = await file.read()
             
-            with file_path.open("wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+            # Subir a MinIO con deduplicación (ruta automática basada en hash)
+            result = await upload_file_with_deduplication(
+                db=db,
+                file_data=file_data,
+                original_filename=file.filename,
+                content_type="application/pdf"
+            )
+            if not result["ok"]:
+                raise HTTPException(status_code=500, detail=f"Error subiendo archivo {prefix}: {result['message']}")
             
-            return f"uploads/expedientes/{id_auxiliar}/{tipo_etapa}/{file_name}"
+            return result["url"]
         
         # Guardar archivos si existen
         if cobro_coactivo_doc and cobro_coactivo_doc.filename:
-            cobro_coactivo_url = await save_pdf(cobro_coactivo_doc, "CobroCoactivo")
+            cobro_coactivo_url = await save_pdf_minio(cobro_coactivo_doc, "CobroCoactivo")
         
         if ruia_doc and ruia_doc.filename:
-            ruia_url = await save_pdf(ruia_doc, "RUIA")
+            ruia_url = await save_pdf_minio(ruia_doc, "RUIA")
         
         if memorando_doc and memorando_doc.filename:
-            memorando_url = await save_pdf(memorando_doc, "Memorando")
+            memorando_url = await save_pdf_minio(memorando_doc, "Memorando")
         
         if auto_doc and auto_doc.filename:
-            auto_url = await save_pdf(auto_doc, "Auto")
+            auto_url = await save_pdf_minio(auto_doc, "Auto")
         
         # Insertar ejecución
         stmt = (
@@ -2753,8 +2826,6 @@ async def actualizar_ejecucion(
     etapa_id: int = Form(...),
     auto_admin: str = Form(...),
     fecha_auto: str = Form(...),
-    id_auxiliar: int = Form(...),
-    tipo_etapa: str = Form(...),
     
     # Campos booleanos
     cobro_coactivo: str = Form("false"),
@@ -2869,13 +2940,8 @@ async def actualizar_ejecucion(
         memorando_url = registro.memorando_doc_url
         auto_url = registro.auto_doc_url
         
-        # Crear directorio base
-        expediente_path = DOCS_DIR / str(id_auxiliar)
-        etapa_path = expediente_path / tipo_etapa
-        etapa_path.mkdir(parents=True, exist_ok=True)
-        
-        # Función auxiliar para actualizar archivos
-        async def update_pdf(file: UploadFile, prefix: str, old_url: str | None) -> str:
+        # Función auxiliar para actualizar archivos en MinIO
+        async def update_pdf_minio(file: UploadFile, prefix: str, old_url: str | None) -> str:
             if file.content_type != "application/pdf":
                 raise HTTPException(
                     status_code=400,
@@ -2893,49 +2959,51 @@ async def actualizar_ejecucion(
                     detail=f"El archivo {prefix} no debe superar los 10MB"
                 )
             
-            # Eliminar archivo anterior si existe
+            # Eliminar archivo anterior si existe en MinIO
             if old_url:
-                old_file_path = DOCS_DIR.parent / old_url
-                if old_file_path.exists():
-                    try:
-                        old_file_path.unlink()
-                    except Exception as e:
-                        logger.warning(f"No se pudo eliminar el archivo anterior: {e}")
+                delete_result = delete_file_from_minio(old_url)
+                if not delete_result["ok"]:
+                    logger.warning(f"No se pudo eliminar el archivo anterior: {delete_result['message']}")
             
-            # Generar nombre de archivo con timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            file_name = f"{prefix}_{timestamp}.pdf"
-            file_path = etapa_path / file_name
+            # Leer contenido del archivo
+            file_data = await file.read()
             
-            with file_path.open("wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+            # Subir a MinIO con deduplicación (ruta automática basada en hash)
+            result = await upload_file_with_deduplication(
+                db=db,
+                file_data=file_data,
+                original_filename=file.filename,
+                content_type="application/pdf"
+            )
+            if not result["ok"]:
+                raise HTTPException(status_code=500, detail=f"Error subiendo archivo {prefix}: {result['message']}")
             
-            return f"uploads/expedientes/{id_auxiliar}/{tipo_etapa}/{file_name}"
+            return result["url"]
         
         # Actualizar archivos solo si se enviaron nuevos
         if cobro_coactivo_doc and cobro_coactivo_doc.filename:
-            cobro_coactivo_url = await update_pdf(
+            cobro_coactivo_url = await update_pdf_minio(
                 cobro_coactivo_doc,
                 "CobroCoactivo",
                 registro.cobro_coactivo_doc_url
             )
         
         if ruia_doc and ruia_doc.filename:
-            ruia_url = await update_pdf(
+            ruia_url = await update_pdf_minio(
                 ruia_doc,
                 "RUIA",
                 registro.ruia_doc_url
             )
         
         if memorando_doc and memorando_doc.filename:
-            memorando_url = await update_pdf(
+            memorando_url = await update_pdf_minio(
                 memorando_doc,
                 "Memorando",
                 registro.memorando_doc_url
             )
         
         if auto_doc and auto_doc.filename:
-            auto_url = await update_pdf(
+            auto_url = await update_pdf_minio(
                 auto_doc,
                 "Auto",
                 registro.auto_doc_url
@@ -3026,10 +3094,8 @@ async def crear_acto_admin(
     radicado_expediente: str = Form(...),
     etapa_id: int = Form(...),
     tipo_acto: str = Form(...),
-    id_auxiliar: int = Form(...),
     numerado: int= Form(...),
     fecha_numerado: str = Form(...),
-    tipo_etapa: str = Form(...),
     nivel_auxiliar: bool = Form(None),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
@@ -3118,17 +3184,20 @@ async def crear_acto_admin(
                     detail="Debe crear primero el acto administrativo de etapa antes de crear el acto de recurso"
                 )
 
-        expediente_path = DOCS_DIR / str(id_auxiliar)
-        etapa_path = expediente_path / tipo_etapa 
-        etapa_path.mkdir(parents=True, exist_ok=True)
-
-        file_name = f"{tipo_acto}_{numerado}_{fecha_numerado.replace('-', '')}.pdf"
-        file_path = etapa_path / file_name
-
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        url_acto_normalizada = f"uploads/expedientes/{id_auxiliar}/{tipo_etapa}/{file_name}"
+        # Leer contenido del archivo
+        file_data = await file.read()
+        
+        # Subir a MinIO con deduplicación (ruta automática basada en hash)
+        result = await upload_file_with_deduplication(
+            db=db,
+            file_data=file_data,
+            original_filename=file.filename,
+            content_type="application/pdf"
+        )
+        if not result["ok"]:
+            raise HTTPException(status_code=500, detail=f"Error subiendo archivo: {result['message']}")
+        
+        url_acto_normalizada = result["url"]
 
         nuevo_acto = ActoAdmin(
             etapa_id=etapa_id,
@@ -3203,11 +3272,9 @@ async def actualizar_acto_admin(
     acto_id: int,
     radicado_expediente: str = Form(...),
     etapa_id: int = Form(...),
-    id_auxiliar: int = Form(...),
     tipo_acto: str = Form(...),
     numerado: str = Form(...),
     fecha_numerado: str = Form(...),
-    tipo_etapa: str = Form(...),
     nivel_auxiliar: bool = Form(None), 
     file: UploadFile = File(None),
     db: AsyncSession = Depends(get_db),
@@ -3308,21 +3375,25 @@ async def actualizar_acto_admin(
             if file.content_type != "application/pdf":
                 raise HTTPException(status_code=400, detail="Solo se permiten archivos PDF")
 
-            old_file_path = BASE_DIR / acto_admin.url_acto
-            if old_file_path.exists():
-                old_file_path.unlink()
+            # Eliminar archivo antiguo de MinIO
+            delete_result = delete_file_from_minio(acto_admin.url_acto)
+            if not delete_result["ok"]:
+                logger.warning(f"No se pudo eliminar archivo antiguo: {delete_result['message']}")
 
-            expediente_path = DOCS_DIR / str(id_auxiliar)
-            etapa_path = expediente_path / tipo_etapa  
-            etapa_path.mkdir(parents=True, exist_ok=True)
-
-            file_name = f"{tipo_acto}_{numerado}_{fecha_numerado.replace('-', '')}.pdf"
-            file_path = etapa_path / file_name
-
-            with file_path.open("wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-
-            url_acto = f"uploads/expedientes/{id_auxiliar}/{tipo_etapa}/{file_name}"
+            # Leer contenido del archivo
+            file_data = await file.read()
+            
+            # Subir a MinIO con deduplicación (ruta automática basada en hash)
+            result = await upload_file_with_deduplication(
+                db=db,
+                file_data=file_data,
+                original_filename=file.filename,
+                content_type="application/pdf"
+            )
+            if not result["ok"]:
+                raise HTTPException(status_code=500, detail=f"Error subiendo archivo: {result['message']}")
+            
+            url_acto = result["url"]
 
         acto_admin.tipo_acto = tipo_acto
         acto_admin.numerado = int(numerado)
@@ -3488,12 +3559,10 @@ async def delete_acto_admin(
             await db.execute(delete(Comunicacion).where(Comunicacion.id == comunicacion.id))
 
         if acto_admin.url_acto:
-            file_path = BASE_DIR / acto_admin.url_acto
-            if file_path.exists():
-                try:
-                    file_path.unlink()
-                except Exception as e:
-                    logger.warning(f"No se pudo eliminar el archivo: {e}")
+            # Eliminar archivo de MinIO
+            delete_result = delete_file_from_minio(acto_admin.url_acto)
+            if not delete_result["ok"]:
+                logger.warning(f"No se pudo eliminar el archivo: {delete_result['message']}")
 
         await db.execute(delete(ActoAdmin).where(ActoAdmin.id == acto_id))
         await db.flush()
@@ -3562,11 +3631,9 @@ async def crear_comunicacion(
     request:Request,
     radicado: str = Form(...),
     acto_admin_id: int = Form(...),
-    id_auxiliar: int = Form(...),
     numerado: str = Form(...),
     fecha_numerado: str = Form(...),
     fecha_envio: str = Form(...),
-    tipo_etapa: str = Form(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
@@ -3630,27 +3697,20 @@ async def crear_comunicacion(
                 )
         # Para años ≤ 2012: se permite duplicados en el mismo expediente, no validar
 
-        # Crear directorio y guardar archivo
-        expediente_path = DOCS_DIR / str(id_auxiliar)
-        etapa_path = expediente_path / tipo_etapa
-        etapa_path.mkdir(parents=True, exist_ok=True)
-
-        # Determinar extensión del archivo
-        extension = ""
-        if file.content_type == "application/pdf":
-            extension = "pdf"
-        elif file.content_type == "image/jpeg":
-            extension = "jpg"
-        elif file.content_type == "image/png":
-            extension = "png"
-
-        file_name = f"COMUNICACION_{numerado}_{fecha_numerado.replace('-', '')}.{extension}"
-        file_path = etapa_path / file_name
-
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        url_documento_normalizada = f"uploads/expedientes/{id_auxiliar}/{tipo_etapa}/{file_name}"
+        # Leer contenido del archivo
+        file_data = await file.read()
+        
+        # Subir a MinIO con deduplicación (ruta automática basada en hash)
+        result = await upload_file_with_deduplication(
+            db=db,
+            file_data=file_data,
+            original_filename=file.filename,
+            content_type=file.content_type
+        )
+        if not result["ok"]:
+            raise HTTPException(status_code=500, detail=f"Error subiendo archivo: {result['message']}")
+        
+        url_documento_normalizada = result["url"]
 
         # Crear comunicación
         nueva_comunicacion = Comunicacion(
@@ -3728,11 +3788,9 @@ async def actualizar_comunicacion(
     request:Request,
     comunicacion_id: int,
     radicado: str = Form(...),
-    id_auxiliar: int = Form(...),
     numerado: str = Form(...),
     fecha_numerado: str = Form(...),
     fecha_envio: str = Form(...),
-    tipo_etapa: str = Form(...),
     file: UploadFile = File(None),
     db: AsyncSession = Depends(get_db),
 ):
@@ -3818,33 +3876,31 @@ async def actualizar_comunicacion(
                     detail="Solo se permiten archivos PDF, JPG o PNG"
                 )
 
-            # Eliminar archivo antiguo
+            # Eliminar archivo antiguo de MinIO
             if comunicacion.url_documento:
-                old_file_path = BASE_DIR / comunicacion.url_documento
-                if old_file_path.exists():
-                    old_file_path.unlink()
+                delete_result = delete_file_from_minio(comunicacion.url_documento)
+                if not delete_result["ok"]:
+                    logger.warning(f"No se pudo eliminar archivo antiguo: {delete_result['message']}")
 
-            # Crear directorio y guardar nuevo archivo
-            expediente_path = DOCS_DIR / str(id_auxiliar)
-            etapa_path = expediente_path / tipo_etapa
-            etapa_path.mkdir(parents=True, exist_ok=True)
-
+            # Guardar nuevo archivo en MinIO
             # Determinar extensión del archivo
             extension = ""
             if file.content_type == "application/pdf":
                 extension = "pdf"
-            elif file.content_type == "image/jpeg":
-                extension = "jpg"
-            elif file.content_type == "image/png":
-                extension = "png"
-
-            file_name = f"COMUNICACION_{numerado}_{fecha_numerado.replace('-', '')}.{extension}"
-            file_path = etapa_path / file_name
-
-            with file_path.open("wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-
-            url_documento = f"uploads/expedientes/{id_auxiliar}/{tipo_etapa}/{file_name}"
+            # Leer contenido del archivo
+            file_data = await file.read()
+            
+            # Subir a MinIO con deduplicación (ruta automática basada en hash)
+            result = await upload_file_with_deduplication(
+                db=db,
+                file_data=file_data,
+                original_filename=file.filename,
+                content_type=file.content_type
+            )
+            if not result["ok"]:
+                raise HTTPException(status_code=500, detail=f"Error subiendo archivo: {result['message']}")
+            
+            url_documento = result["url"]
 
         # Actualizar comunicación
         comunicacion.numerado = int(numerado)
@@ -3962,14 +4018,11 @@ async def eliminar_comunicacion(
                 detail="No tiene permisos para eliminar esta comunicación"
             )
         
-        # Eliminar archivo físico si existe
+        # Eliminar archivo de MinIO si existe
         if comunicacion.url_documento:
-            file_path = BASE_DIR / comunicacion.url_documento
-            if file_path.exists():
-                try:
-                    file_path.unlink()
-                except Exception as e:
-                    logger.warning(f"No se pudo eliminar el archivo: {e}")
+            delete_result = delete_file_from_minio(comunicacion.url_documento)
+            if not delete_result["ok"]:
+                logger.warning(f"No se pudo eliminar el archivo: {delete_result['message']}")
         
         # Eliminar comunicación de la base de datos
         await db.delete(comunicacion)
@@ -4126,12 +4179,11 @@ async def actualizar_involucrado_notificacion(
     numerado: int = Form(...),
     fecha_numerado: str = Form(...),
     fecha_envio_citacion: str = Form(...),
-    id_auxiliar: int = Form(...),
-    tipo_etapa: str = Form(...),
     fecha_constancia_citacion: str = Form(None),
     notificacion_exitosa: bool = Form(False),
     tipo_notificacion_id: int = Form(None),
     file: UploadFile = File(None),
+    file_citacion: UploadFile = File(None),
     db: AsyncSession = Depends(get_db)
 ):
     try:
@@ -4196,7 +4248,8 @@ async def actualizar_involucrado_notificacion(
             "notificacion_exitosa": inv_not.notificacion_exitosa,
             "fecha_notificacion": str(inv_not.fecha_notificacion) if inv_not.fecha_notificacion else None,
             "tipo_notificacion_id": inv_not.tipo_notificacion_id,
-            "url_documento": inv_not.url_documento
+            "url_documento": inv_not.url_documento,
+            "url_doc_citacion": inv_not.url_doc_citacion
         }
 
         # Validación de numerado + fecha_numerado según año
@@ -4222,6 +4275,52 @@ async def actualizar_involucrado_notificacion(
         # Para años ≤ 2012: se permite duplicados en el mismo expediente, no validar
 
         url_documento = inv_not.url_documento
+        url_doc_citacion = inv_not.url_doc_citacion
+
+        # Si se proporciona nuevo archivo de citación
+        if file_citacion and file_citacion.filename:
+            valid_types = ["application/pdf", "image/jpeg", "image/png", "image/jpg"]
+            if file_citacion.content_type not in valid_types:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Solo se permiten archivos PDF, JPG o PNG para citación"
+                )
+
+            # Validar tamaño
+            file_citacion.file.seek(0, 2)
+            file_citacion_size = file_citacion.file.tell()
+            file_citacion.file.seek(0)
+            
+            if file_citacion_size > 10 * 1024 * 1024:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El archivo de citación no debe superar los 10MB"
+                )
+
+            # Eliminar archivo de citación antiguo si existe en MinIO
+            if inv_not.url_doc_citacion:
+                delete_result = delete_file_from_minio(inv_not.url_doc_citacion)
+                if not delete_result["ok"]:
+                    logger.warning(f"No se pudo eliminar archivo de citación antiguo: {delete_result['message']}")
+
+            # Leer contenido del archivo
+            file_citacion_data = await file_citacion.read()
+            
+            # Subir a MinIO con deduplicación (ruta automática basada en hash)
+            result_citacion = await upload_file_with_deduplication(
+                db=db,
+                file_data=file_citacion_data,
+                original_filename=file_citacion.filename,
+                content_type=file_citacion.content_type
+            )
+            if not result_citacion["ok"]:
+                raise HTTPException(status_code=500, detail=f"Error subiendo archivo de citación: {result_citacion['message']}")
+            
+            url_doc_citacion = result_citacion["url"]
+            if result_citacion.get("deduplicated"):
+                logger.info(f"Archivo duplicado - Citación - URL reutilizada: {url_doc_citacion}")
+            else:
+                logger.info(f"Archivo nuevo - Citación: {url_doc_citacion}")
 
         # Si se proporciona nuevo archivo
         if file and file.filename:
@@ -4243,33 +4342,31 @@ async def actualizar_involucrado_notificacion(
                     detail="El archivo no debe superar los 10MB"
                 )
 
-            # Eliminar archivo antiguo si existe
+            # Eliminar archivo antiguo si existe en MinIO
             if inv_not.url_documento:
-                old_file_path = BASE_DIR / inv_not.url_documento
-                if old_file_path.exists():
-                    try:
-                        old_file_path.unlink()
-                    except Exception as e:
-                        print(f"Error al eliminar archivo antiguo: {e}")
+                delete_result = delete_file_from_minio(inv_not.url_documento)
+                if not delete_result["ok"]:
+                    logger.warning(f"No se pudo eliminar archivo antiguo: {delete_result['message']}")
 
-            # Guardar nuevo archivo
-            expediente_path = DOCS_DIR / str(id_auxiliar)
-            etapa_path = expediente_path / tipo_etapa / "notificaciones"
-            etapa_path.mkdir(parents=True, exist_ok=True)
-
-            extension = "pdf"
-            if file.content_type in ["image/jpeg", "image/jpg"]:
-                extension = "jpg"
-            elif file.content_type == "image/png":
-                extension = "png"
-
-            file_name = f"NOT_{numerado}_{fecha_numerado.replace('-', '')}_{inv_not.involucrado_id}.{extension}"
-            file_path = etapa_path / file_name
-
-            with file_path.open("wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-
-            url_documento = f"uploads/expedientes/{id_auxiliar}/{tipo_etapa}/notificaciones/{file_name}"
+            # Guardar nuevo archivo en MinIO con deduplicación
+            # Leer contenido del archivo
+            file_data = await file.read()
+            
+            # Subir a MinIO con deduplicación (ruta automática basada en hash)
+            result = await upload_file_with_deduplication(
+                db=db,
+                file_data=file_data,
+                original_filename=file.filename,
+                content_type=file.content_type
+            )
+            if not result["ok"]:
+                raise HTTPException(status_code=500, detail=f"Error subiendo archivo: {result['message']}")
+            
+            url_documento = result["url"]
+            if result.get("deduplicated"):
+                logger.info(f"Archivo duplicado - Notificación - URL reutilizada: {url_documento}")
+            else:
+                logger.info(f"Archivo nuevo - Notificación: {url_documento}")
 
         # Actualizar campos
         inv_not.numerado = numerado
@@ -4279,6 +4376,7 @@ async def actualizar_involucrado_notificacion(
         inv_not.notificacion_exitosa = notificacion_exitosa
         inv_not.tipo_notificacion_id = tipo_notificacion_id if tipo_notificacion_id else None
         inv_not.url_documento = url_documento
+        inv_not.url_doc_citacion = url_doc_citacion
         if notificacion_exitosa:
             inv_not.fecha_notificacion = datetime.now(ZoneInfo("America/Bogota")).date()
 
@@ -4295,7 +4393,8 @@ async def actualizar_involucrado_notificacion(
             "fecha_constancia_citacion": str(inv_not.fecha_constancia_citacion) if inv_not.fecha_constancia_citacion else None,
             "notificacion_exitosa": inv_not.notificacion_exitosa,
             "tipo_notificacion_id": inv_not.tipo_notificacion_id,
-            "url_documento": inv_not.url_documento
+            "url_documento": inv_not.url_documento,
+            "url_doc_citacion": inv_not.url_doc_citacion
         }
 
         # Guardar auditoría
@@ -4334,6 +4433,7 @@ async def actualizar_involucrado_notificacion(
                     "fecha_constancia_citacion": str(inv_not.fecha_constancia_citacion) if inv_not.fecha_constancia_citacion else None,
                     "notificacion_exitosa": inv_not.notificacion_exitosa,
                     "url_documento": inv_not.url_documento,
+                    "url_doc_citacion": inv_not.url_doc_citacion,
                     "tipo_notificacion_id": inv_not.tipo_notificacion_id
                 }
             },
@@ -4485,12 +4585,13 @@ async def crear_involucrado_notificacion(
     numerado: int = Form(...),
     fecha_numerado: str = Form(...),
     fecha_envio_citacion: str = Form(...),
-    id_auxiliar: int = Form(...),
-    tipo_etapa: str = Form(...),
     fecha_constancia_citacion: str = Form(None),
     notificacion_exitosa: bool = Form(False),
     tipo_notificacion_id: int = Form(None),
-    file: UploadFile = File(...),
+    file: UploadFile = File(None),
+    file_citacion: UploadFile = File(None),
+    url_documento_origen: str = Form(None),
+    url_citacion_origen: str = Form(None),
     db: AsyncSession = Depends(get_db)
 ):
 
@@ -4510,21 +4611,26 @@ async def crear_involucrado_notificacion(
             logger.warning("Error validando numerado")
             raise HTTPException(status_code=400, detail="El numerado debe tener como maximo 4 dígitos")
 
-        # Validación tipo archivo
-        valid_types = ["application/pdf", "image/jpeg", "image/png", "image/jpg"]
-        if file.content_type not in valid_types:
-            logger.warning("Archivo con tipo inválido")
-            raise HTTPException(status_code=400, detail="Solo se permiten archivos PDF, JPG o PNG")
+        # Validar que se proporcione file o url_documento_origen
+        if not file and not url_documento_origen:
+            raise HTTPException(status_code=400, detail="Debe proporcionar un archivo o una URL de origen")
 
-        # Tamaño archivo
-        file.file.seek(0, 2)
-        file_size = file.file.tell()
-        file.file.seek(0)
-        logger.info(f"Tamaño archivo: {file_size} bytes")
+        # Validación tipo archivo si se proporciona
+        if file and file.filename:
+            valid_types = ["application/pdf", "image/jpeg", "image/png", "image/jpg"]
+            if file.content_type not in valid_types:
+                logger.warning("Archivo con tipo inválido")
+                raise HTTPException(status_code=400, detail="Solo se permiten archivos PDF, JPG o PNG")
 
-        if file_size > 10 * 1024 * 1024:
-            logger.warning("Archivo excede 10MB")
-            raise HTTPException(status_code=400, detail="El archivo no debe superar los 10MB")
+            # Tamaño archivo
+            file.file.seek(0, 2)
+            file_size = file.file.tell()
+            file.file.seek(0)
+            logger.info(f"Tamaño archivo: {file_size} bytes")
+
+            if file_size > 10 * 1024 * 1024:
+                logger.warning("Archivo excede 10MB")
+                raise HTTPException(status_code=400, detail="El archivo no debe superar los 10MB")
 
         # Verificar encargado
         stmt = select(Expediente.encargado_id).where(Expediente.radicado == radicado)
@@ -4595,28 +4701,80 @@ async def crear_involucrado_notificacion(
         else:
             logger.info("Año ≤ 2012 - se permite duplicado en mismo expediente")
 
-        # Guardar archivo
-        logger.info("Guardando archivo...")
+        # Guardar o copiar archivo en MinIO
+        logger.info("Procesando archivo de notificación...")
+        
+        if file and file.filename:
+            # Subir nuevo archivo
+            # Leer contenido del archivo
+            file_data = await file.read()
+            
+            # Subir a MinIO con deduplicación (ruta automática basada en hash)
+            result = await upload_file_with_deduplication(
+                db=db,
+                file_data=file_data,
+                original_filename=file.filename,
+                content_type=file.content_type
+            )
+            if not result["ok"]:
+                raise HTTPException(status_code=500, detail=f"Error subiendo archivo: {result['message']}")
+            
+            url_documento = result["url"]
+            if result.get("deduplicated"):
+                logger.info(f"Archivo duplicado detectado - URL reutilizada: {url_documento} (Hash: {result.get('file_hash')})")
+            else:
+                logger.info(f"Archivo nuevo guardado en MinIO: {url_documento} (Hash: {result.get('file_hash')})")
+            
+        elif url_documento_origen:
+            # Reutilizar URL existente sin duplicar archivo
+            url_documento = url_documento_origen
+            logger.info(f"Reutilizando URL de documento existente: {url_documento}")
+        else:
+            raise HTTPException(status_code=400, detail="Debe proporcionar un archivo o una URL de origen")
 
-        expediente_path = DOCS_DIR / str(id_auxiliar)
-        etapa_path = expediente_path / tipo_etapa / "notificaciones"
-        etapa_path.mkdir(parents=True, exist_ok=True)
+        # Procesar documento de citación si existe
+        url_doc_citacion = None
+        if file_citacion and file_citacion.filename:
+            # Validación tipo archivo citación
+            valid_types = ["application/pdf", "image/jpeg", "image/png", "image/jpg"]
+            if file_citacion.content_type not in valid_types:
+                logger.warning("Archivo de citación con tipo inválido")
+                raise HTTPException(status_code=400, detail="Solo se permiten archivos PDF, JPG o PNG para citación")
 
-        extension = "pdf"
-        if file.content_type in ["image/jpeg", "image/jpg"]:
-            extension = "jpg"
-        elif file.content_type == "image/png":
-            extension = "png"
+            # Tamaño archivo citación
+            file_citacion.file.seek(0, 2)
+            file_citacion_size = file_citacion.file.tell()
+            file_citacion.file.seek(0)
+            
+            if file_citacion_size > 10 * 1024 * 1024:
+                logger.warning("Archivo de citación excede 10MB")
+                raise HTTPException(status_code=400, detail="El archivo de citación no debe superar los 10MB")
 
-        file_name = f"NOT_{numerado}_{fecha_numerado.replace('-', '')}_{involucrado_id}.{extension}"
-        file_path = etapa_path / file_name
-
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        logger.info(f"Archivo guardado en: {file_path}")
-
-        url_documento = f"uploads/expedientes/{id_auxiliar}/{tipo_etapa}/notificaciones/{file_name}"
+            # Guardar archivo de citación en MinIO
+            # Leer contenido del archivo de citación
+            file_citacion_data = await file_citacion.read()
+            
+            # Subir a MinIO con deduplicación (ruta automática basada en hash)
+            result_citacion = await upload_file_with_deduplication(
+                db=db,
+                file_data=file_citacion_data,
+                original_filename=file_citacion.filename,
+                content_type=file_citacion.content_type
+            )
+            if not result_citacion["ok"]:
+                raise HTTPException(status_code=500, detail=f"Error subiendo archivo de citación: {result_citacion['message']}")
+            
+            url_doc_citacion = result_citacion["url"]
+            if result_citacion.get("deduplicated"):
+                logger.info(f"Archivo de citación duplicado - URL reutilizada: {url_doc_citacion} (Hash: {result_citacion.get('file_hash')})")
+            else:
+                logger.info(f"Archivo de citación nuevo guardado en MinIO: {url_doc_citacion} (Hash: {result_citacion.get('file_hash')})")
+            logger.info(f"Archivo de citación guardado en MinIO: {url_doc_citacion}")
+            
+        elif url_citacion_origen:
+            # Reutilizar URL existente sin duplicar archivo
+            url_doc_citacion = url_citacion_origen
+            logger.info(f"Reutilizando URL de citación existente: {url_doc_citacion}")
 
         # Crear registro
         nuevo_inv_not = InvolucradoNotificacion(
@@ -4629,7 +4787,8 @@ async def crear_involucrado_notificacion(
             notificacion_exitosa=notificacion_exitosa,
             fecha_notificacion=datetime.now(ZoneInfo("America/Bogota")).date() if notificacion_exitosa else None,
             tipo_notificacion_id=tipo_notificacion_id,
-            url_documento=url_documento
+            url_documento=url_documento,
+            url_doc_citacion=url_doc_citacion
         )
 
         db.add(nuevo_inv_not)
@@ -4655,6 +4814,7 @@ async def crear_involucrado_notificacion(
                     "fecha_constancia_citacion": str(nuevo_inv_not.fecha_constancia_citacion) if nuevo_inv_not.fecha_constancia_citacion else None,
                     "notificacion_exitosa": nuevo_inv_not.notificacion_exitosa,
                     "url_documento": nuevo_inv_not.url_documento,
+                    "url_doc_citacion": nuevo_inv_not.url_doc_citacion,
                     "tipo_notificacion_id": nuevo_inv_not.tipo_notificacion_id
                 }
             },
@@ -5128,4 +5288,5 @@ async def obtener_alertas_expediente(
             status_code=500,
             detail=f"Error interno del servidor al obtener alertas del expediente {radicado}"
         )
+
 

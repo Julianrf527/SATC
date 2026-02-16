@@ -1,4 +1,10 @@
-const BASE_URL = import.meta.env.VITE_API_URL;
+// Configuración de la URL base del API
+// En desarrollo usa import.meta.env.VITE_API_URL
+// En producción (Docker) usa window.ENV.VITE_API_URL inyectado en runtime
+const BASE_URL =
+  (window as any).ENV?.VITE_API_URL ||
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:8000";
 
 export const API_CONFIG = {
   ENDPOINTS: {
@@ -57,7 +63,7 @@ export const API_CONFIG = {
     INVOLVED_EXPEDIENTE_UNLINK: (
       radicado: string,
       numeroDocumento: number,
-      tipoDocumento: string
+      tipoDocumento: string,
     ) =>
       `/sanctioning/involved/involved-file/${radicado}/${numeroDocumento}/${tipoDocumento}`,
     EXPEDIENTE_INVOLVED_LIST: (radicado: string) =>
@@ -68,8 +74,10 @@ export const API_CONFIG = {
     FILE_DOCUMENTO_DELETE: (id: number) => `/sanctioning/document/${id}`,
     FILE_DOWNLOAD: (filePath: string) =>
       `/sanctioning/document/download?file_path=${encodeURIComponent(
-        filePath
+        filePath,
       )}`,
+    FILE_DOWNLOAD_ALL: (radicado: string) =>
+      `/sanctioning/document/download-all/${radicado}`,
     /*file route*/
     FILE_CREATE_STAGE: (radicado: string, type?: number) =>
       `/sanctioning/file/${radicado}/stage/${type}`,
@@ -129,8 +137,7 @@ export const API_CONFIG = {
     FILE_EXECUTION_CREATE: "/sanctioning/file/execution",
     FILE_EXECUTION_UPDATE: (ejecucion_id: number) =>
       `/sanctioning/file/execution/${ejecucion_id}`,
-    FILE_ARCHIVE: (radicado: string) =>
-      `/sanctioning/file/${radicado}/archive`,
+    FILE_ARCHIVE: (radicado: string) => `/sanctioning/file/${radicado}/archive`,
 
     FILE_ACTO_ADMIN: `/sanctioning/file/acto-admin`,
     FILE_ACTO_ADMIN_UPDATE: (id: number) =>
@@ -181,7 +188,7 @@ const showSessionExpiredToast = () => {
 
 export const apiCall = async (
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<any> => {
   // Preparar headers
   const headers: Record<string, string> = { ...options.headers } as Record<

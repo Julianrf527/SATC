@@ -4,19 +4,19 @@ import { API_CONFIG, apiCall } from "../../utils/api";
 
 const Information = lazy(() => import("./Stages/InformationStage"));
 const PreliminaryInvestigation = lazy(
-  () => import("./Stages/PreliminaryInvestigation")
+  () => import("./Stages/PreliminaryInvestigation"),
 );
 const PreventiveMeasure = lazy(() => import("./Stages/PreventiveMeasure"));
 const StartSanctioningProcess = lazy(
-  () => import("./Stages/StartSanctioningProcess")
+  () => import("./Stages/StartSanctioningProcess"),
 );
 const CessationStage = lazy(() => import("./Stages/CessationStage"));
 const FormulationCharges = lazy(() => import("./Stages/FormulationCharges"));
 const OpeningProbationaryPeriod = lazy(
-  () => import("./Stages/OpeningProbationaryPeriod")
+  () => import("./Stages/OpeningProbationaryPeriod"),
 );
 const ClosingProbationaryPeriod = lazy(
-  () => import("./Stages/ClosingProbationaryPeriod")
+  () => import("./Stages/ClosingProbationaryPeriod"),
 );
 const SubstantiveDecision = lazy(() => import("./Stages/SubstantiveDecision"));
 const Resource = lazy(() => import("./Stages/Resource"));
@@ -59,6 +59,8 @@ export default function FileDetail({
   const [tipoNotificacion, setTipoNotificacion] =
     useState<TipoNotificacion | null>(null);
   const [isTabsCollapsed, setIsTabsCollapsed] = useState(false);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const [etapasExistentes, setEtapasExistentes] = useState<number[]>([]);
 
   // Sincronizar cuando cambia el file desde el padre
   useEffect(() => {
@@ -76,7 +78,7 @@ export default function FileDetail({
       setLoading(true);
       try {
         const response = await apiCall(
-          API_CONFIG.ENDPOINTS.FILE_FUll(file.radicado)
+          API_CONFIG.ENDPOINTS.FILE_FUll(file.radicado),
         );
 
         if (!response.ok) {
@@ -85,6 +87,7 @@ export default function FileDetail({
 
         if (response.ok && response.data) {
           setTipoNotificacion(response.tipo_notificacion);
+          setEtapasExistentes(response.etapas_existentes || []);
           const information = response.data;
 
           const completeFile: File = {
@@ -131,6 +134,21 @@ export default function FileDetail({
 
     fetchAndCombineFileData();
   }, [file, setToast]);
+
+  // Mapping de tab.id a tipo_etapa_id
+  const tabToEtapaMap: { [key: string]: number | null } = {
+    info: null, // Información siempre visible
+    indagacion: 2,
+    detalle: 1, // Medida Preventiva
+    inicio: 9,
+    cesacion: 10,
+    cargos: 4,
+    apertura_ep: 5,
+    cierre_ep: 11,
+    decision: 6,
+    recurso: 12,
+    ejecucion: 7,
+  };
 
   const tabs: Tab[] = [
     {
@@ -201,8 +219,31 @@ export default function FileDetail({
     },
   ];
 
+  // Verificar si una etapa existe en el expediente
+  const isEtapaDisponible = (tabId: string): boolean => {
+    const etapaId = tabToEtapaMap[tabId];
+    if (etapaId === null) return true; // Info siempre disponible
+    if (!isEditable) {
+      // En modo consulta, verificar disponibilidad solo si hay datos de etapas
+      if (etapasExistentes.length === 0) {
+        // Si no hay datos de etapas existentes, permitir acceso a todas (carga inicial)
+        return true;
+      }
+      // Si hay datos, solo permitir acceso a las etapas que existen
+      return etapasExistentes.includes(etapaId);
+    }
+    return true; // En modo editable, todas disponibles
+  };
+
   const handleTabClick = (tabId: string) => {
     if (!currentFile) return;
+    // Verificar disponibilidad antes de cambiar
+    if (!isEtapaDisponible(tabId)) {
+      console.log(
+        `[FileDetail] Intento de acceder a etapa no disponible: ${tabId}`,
+      );
+      return;
+    }
     setActiveTab(tabId);
   };
 
@@ -231,6 +272,33 @@ export default function FileDetail({
       ultima_etapa: stage,
     };
     setFullFile(updatedFile);
+  };
+
+  const handleDownloadAll = async () => {
+    if (!currentFile) return;
+
+    setIsDownloadingAll(true);
+
+    const BASE_URL =
+      (window as any).ENV?.VITE_API_URL ||
+      import.meta.env.VITE_API_URL ||
+      "http://localhost:8000";
+    const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD_ALL(
+      currentFile.radicado,
+    )}`;
+
+    // Usar window.open igual que otras descargas - envía cookies automáticamente
+    window.open(url, "_blank");
+
+    // Simular progreso y mostrar mensaje después de un momento
+    setTimeout(() => {
+      setIsDownloadingAll(false);
+      setToast({
+        id: Date.now(),
+        message: "Descarga iniciada exitosamente",
+        type: "success",
+      });
+    }, 1500);
   };
 
   const renderTabContent = () => {
@@ -329,9 +397,31 @@ export default function FileDetail({
               </div>
             </div>
             {!isEditable && currentFile && (
-              <div className="badge badge-success text-white badge-lg gap-2 px-4 py-3 shadow-md">
-                <i className="bx bx-show text-base"></i>
-                Solo lectura
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleDownloadAll}
+                  disabled={isDownloadingAll}
+                  className="btn btn-success gap-2 shadow-lg text-white font-medium hover:scale-105 transition-transform"
+                  title="Descargar todos los documentos del expediente"
+                >
+                  {isDownloadingAll ? (
+                    <>
+                      <span className="loading loading-spinner loading-sm"></span>
+                      Generando PDF...
+                    </>
+                  ) : (
+                    <>
+                      <i className="bx bx-download text-lg"></i>
+                      Descargar Expediente
+                    </>
+                  )}
+                </button>
+                <button
+                  className="btn btn-success text-white shadow-lg hover:scale-105 transition-transform"
+                  title="Solo lectura"
+                >
+                  <i className="bx bx-show text-xl"></i>
+                </button>
               </div>
             )}
           </div>
@@ -393,16 +483,24 @@ export default function FileDetail({
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2">
                   {tabs.map((tab) => {
                     const isActive = activeTab === tab.id;
+                    const disponible = isEtapaDisponible(tab.id);
                     return (
                       <button
                         key={tab.id}
                         onClick={() => handleTabClick(tab.id)}
+                        disabled={!disponible}
                         className={`relative flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
-                          isActive
-                            ? "bg-success text-white shadow-md"
-                            : "bg-base-200 text-base-content/70 hover:bg-base-300 hover:text-base-content"
+                          !disponible
+                            ? "bg-base-300/50 text-base-content/30 cursor-not-allowed opacity-50"
+                            : isActive
+                              ? "bg-success text-white shadow-md"
+                              : "bg-base-200 text-base-content/70 hover:bg-base-300 hover:text-base-content"
                         }`}
-                        title={tab.label}
+                        title={
+                          disponible
+                            ? tab.label
+                            : `${tab.label} (No disponible)`
+                        }
                       >
                         <div
                           className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${

@@ -1,0 +1,7 @@
+# Dockerignore específico para API Gateway
+__pycache__/
+*.py[cod]
+.venv/
+.env
+*.md
+.git/

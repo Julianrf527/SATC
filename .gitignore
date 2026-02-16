@@ -129,6 +129,10 @@ desktop.ini
 htmlcov/
 .tox/
 .nox/
+test/
+*.html
+*.csv
+*.log
 
 # MyPy
 .mypy_cache/

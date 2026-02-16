@@ -880,30 +880,6 @@ ALTER TABLE public.vereda ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 ALTER TABLE ONLY public.log_auditoria ALTER COLUMN id SET DEFAULT nextval('public.log_auditoria_id_seq'::regclass);
 
 
---
--- TOC entry 5267 (class 0 OID 17881)
--- Dependencies: 219
--- Data for Name: acto_admin; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.acto_admin (id, numerado, fecha_numerado, url_acto, fecha_creacion, tipo_acto, etapa_id, nivel_auxiliar) FROM stdin;
-32	5123	2025-12-24 00:00:00-05	uploads/expedientes/9/decision_fondo/RES_5123_20251224.pdf	2025-12-23	RES	25	t
-6	101	2018-03-16 00:00:00-05	uploads/expedientes/7/inicio_proceso_sancionatorio/RES_101_20180316.pdf	2025-12-08	RES	10	f
-7	1012	2025-12-08 00:00:00-05	uploads/expedientes/7/formulacion/AUTO_1012_20251208.pdf	2025-12-08	AUTO	11	f
-8	509	2018-05-10 00:00:00-05	uploads/expedientes/7/apertura_etapa_probatoria/AUTO_509_20180510.pdf	2025-12-08	AUTO	12	f
-19	1111	2009-02-10 00:00:00-05	uploads/expedientes/9/detalle_medida_preventiva/AUTO_1111_20090210.pdf	2025-12-09	AUTO	20	f
-20	1111	2010-02-17 00:00:00-05	uploads/expedientes/9/inicio_proceso_sancionatorio/AUTO_1111_20100217.pdf	2025-12-09	AUTO	21	f
-21	1111	2010-02-17 00:00:00-05	uploads/expedientes/9/formulacion/AUTO_1111_20100217.pdf	2025-12-09	AUTO	22	f
-22	1111	2010-03-17 00:00:00-05	uploads/expedientes/9/apertura_etapa_probatoria/AUTO_1111_20100317.pdf	2025-12-09	AUTO	23	f
-23	1111	2010-04-08 00:00:00-05	uploads/expedientes/9/cierre_etapa_probatoria/AUTO_1111_20100408.pdf	2025-12-09	AUTO	24	f
-24	373	2010-05-25 00:00:00-05	uploads/expedientes/9/decision_fondo/AUTO_1111_20100408.pdf	2025-12-09	AUTO	25	f
-25	8	2013-01-08 00:00:00-05	uploads/expedientes/10/detalle_medida_preventiva/AUTO_8_20130108.pdf	2025-12-10	AUTO	26	f
-28	1212	2025-12-09 00:00:00-05	uploads/expedientes/10/inicio_proceso_sancionatorio/AUTO_1212_20251209.pdf	2025-12-11	AUTO	29	f
-29	1212	2013-05-15 00:00:00-05	uploads/expedientes/10/formulacion/AUTO_1212_20130515.pdf	2025-12-11	AUTO	30	f
-30	280	2023-03-06 00:00:00-05	uploads/expedientes/11/indagacion_preliminar/AUTO_280_20230306.pdf	2025-12-11	AUTO	31	f
-31	4123	2025-12-23 00:00:00-05	uploads/expedientes/7/cierre_etapa_probatoria/RES_4123_20251223.pdf	2025-12-23	RES	13	f
-\.
-
 
 --
 -- TOC entry 5270 (class 0 OID 17889)
@@ -915,18 +891,6 @@ COPY public.cesacion (id, tipo_cesacion_id, etapa_id) FROM stdin;
 \.
 
 
---
--- TOC entry 5271 (class 0 OID 17893)
--- Dependencies: 223
--- Data for Name: comunicacion; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.comunicacion (id, numerado, fecha_envio, acto_admin_id, fecha_numerado, fecha_creacion, url_documento) FROM stdin;
-2	985	2009-02-10	19	2009-02-10	2025-12-09	uploads/expedientes/9/detalle_medida_preventiva/COMUNICACION_0985_20090210.pdf
-3	9	2013-01-08	25	2013-01-08	2025-12-10	uploads/expedientes/10/detalle_medida_preventiva/COMUNICACION_0009_20130108.pdf
-4	1970	2023-03-08	30	2023-03-08	2025-12-11	uploads/expedientes/11/indagacion_preliminar/COMUNICACION_1970_20230308.pdf
-\.
-
 
 --
 -- TOC entry 5274 (class 0 OID 17901)
@@ -937,276 +901,6 @@ COPY public.comunicacion (id, numerado, fecha_envio, acto_admin_id, fecha_numera
 COPY public.decision_fondo (id, tipo_sancion_id, detalle, etapa_id) FROM stdin;
 \.
 
-
---
--- TOC entry 5276 (class 0 OID 17908)
--- Dependencies: 228
--- Data for Name: documento; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.documento (id, nombre, url_documento, fecha_subida, etapa_id) FROM stdin;
-2	Recurso	uploads/expedientes/7/apertura_etapa_probatoria/Recurso_20251208_011608.pdf	2025-12-08 00:00:00-05	12
-8	Recurso	uploads/expedientes/9/decision_fondo/Recurso_20251223_142221.pdf	2025-12-23 00:00:00-05	25
-\.
-
-
---
--- TOC entry 5279 (class 0 OID 17916)
--- Dependencies: 231
--- Data for Name: ejecucion_sancion; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.ejecucion_sancion (id, cobro_coactivo, disposicion, ruia, etapa_id, auto_admin, fecha_auto, cobro_coactivo_doc_url, ruia_doc_url, auto_doc_url, memorando_doc_url, memorando) FROM stdin;
-1	f	f	f	32	RES5123	2025-12-23	\N	\N	uploads/expedientes/9/ejecucion_sancion/Auto_20251223_180835.pdf	\N	f
-\.
-
-
---
--- TOC entry 5281 (class 0 OID 17923)
--- Dependencies: 233
--- Data for Name: etapa; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.etapa (id, expediente_radicado, tipo_etapa_id, fecha_inicio) FROM stdin;
-10	2018EE0823	9	2025-12-08 00:00:02.057498
-11	2018EE0823	4	2025-12-08 00:45:55.242928
-12	2018EE0823	5	2025-12-08 01:08:35.511112
-13	2018EE0823	11	2025-12-08 01:16:26.7199
-20	2009ER0022	1	2025-12-09 14:40:50.097691
-21	2009ER0022	9	2025-12-09 14:58:09.518093
-22	2009ER0022	4	2025-12-09 15:30:01.343533
-23	2009ER0022	5	2025-12-09 15:50:15.460931
-24	2009ER0022	11	2025-12-09 16:47:57.840244
-25	2009ER0022	6	2025-12-09 16:51:12.142042
-26	2010ER4870	1	2025-12-10 23:10:03.581642
-29	2010ER4870	9	2025-12-11 09:35:41.116328
-30	2010ER4870	4	2025-12-11 09:37:19.374274
-31	2022ER4571	2	2025-12-11 10:47:01.936414
-32	2009ER0022	7	2025-12-23 18:01:20.086204
-\.
-
-
---
--- TOC entry 5283 (class 0 OID 17930)
--- Dependencies: 235
--- Data for Name: expediente; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.expediente (radicado, nombre_expediente, motivo_afectacion, fecha_creacion, encargado_id, direccion, vereda_id, id_auxiliar, archivado, fecha_archivado) FROM stdin;
-2010ER4870	Q003-13	Incumplimiento acto administrativo que otorga	2025-12-10 22:59:50.335481-05	1233506795	N/A	233	10	f	\N
-2022ER4571	Q019-23	Incumplimiento al acto administrativo que otorga	2025-12-11 10:46:02.922449-05	1233506795	N/A	377	11	f	\N
-2018EE0823	Q004-18	Incumplimiento a lo establecido en la resolución 0233 del 21 de abril de 2014 por medio de cual se aprueba el PSMV	2025-12-07 23:54:57.740579-05	1233506795	N/A	125	7	f	\N
-2009ER0022	Q003-10	Afectación al suelo y emisiones atmosféricas 	2025-12-09 14:38:12.344433-05	1233506795	N/A	171	9	t	2026-01-29 16:43:59.879602-05
-\.
-
-
---
--- TOC entry 5285 (class 0 OID 17937)
--- Dependencies: 237
--- Data for Name: expediente_recurso; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.expediente_recurso (expediente_radicado, recurso_id) FROM stdin;
-2018EE0823	1
-2018EE0823	6
-2009ER0022	6
-2009ER0022	1
-2010ER4870	6
-2010ER4870	1
-2010ER4870	5
-2022ER4571	1
-2022ER4571	6
-2022ER4571	2
-\.
-
-
---
--- TOC entry 5286 (class 0 OID 17944)
--- Dependencies: 238
--- Data for Name: formulacion_cargos; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.formulacion_cargos (id, descargos, etapa_id, url_documento) FROM stdin;
-1	t	11	uploads/expedientes/7/formulacion/FormulacionCargos_20251208_010724.pdf
-2	t	22	uploads/expedientes/9/formulacion/FormulacionCargos_20251209_153730.pdf
-\.
-
-
---
--- TOC entry 5288 (class 0 OID 17951)
--- Dependencies: 240
--- Data for Name: involucrado; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.involucrado (id, numero_documento, tipo_documento, nombre, celular, correo, digito_verificacion) FROM stdin;
-1	1233506795	CC	Julian David Rodriguez Fernandez	3214875446	julianrf527@gmail.com	\N
-2	1233506796	CC	Julian David Rodriguez Fernandez	3214875446	julianrf527@gmail.com	\N
-3	1234567	CC	Joan Amaya	3132020132	pepefernandez730@gmail.com	\N
-4	1233506793	CC	Julian Rodriguez	3003133213	ejemplo@gmail.com	\N
-5	1056688846	CC	Cesar Mora	3112758002	cesarmaro95@gmail.com	\N
-6	1233561	NIT	Empresa 1	30033333030	juliadrf527@gmail.com	\N
-9	900371611	NIT	Servimarquez	6017405555	servimarquez@gmail.com	6
-10	80013683	NIT	Municipio De Guateque	3136754782	contactenos@alcaldiaguateque.gov.co	9
-11	23682341	CC	Bertha Ines Marquez De Salomon	3002410022	bertha123@gmail.com	\N
-12	23601723	CC	Ricardo Salomon Marquez	3112851302	ricardo4123@gmail.com	\N
-13	860058831	NIT	Legal De Avícola Los Cambulos S.a	6014143120	avicambulos@avicambulos.com.co	4
-\.
-
-
---
--- TOC entry 5289 (class 0 OID 17955)
--- Dependencies: 241
--- Data for Name: involucrado_expediente; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.involucrado_expediente (involucrado_id, expediente_radicado) FROM stdin;
-10	2018EE0823
-11	2009ER0022
-12	2009ER0022
-13	2010ER4870
-\.
-
-
---
--- TOC entry 5291 (class 0 OID 17963)
--- Dependencies: 243
--- Data for Name: involucrado_notificacion; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.involucrado_notificacion (id, notificacion_id, involucrado_id, numerado, fecha_envio_citacion, fecha_constancia_citacion, notificacion_exitosa, fecha_numerado, url_documento, tipo_notificacion_id, fecha_notificacion) FROM stdin;
-13	3	10	5121	2025-12-08	2025-12-08	t	2025-12-08	uploads/expedientes/7/inicio_proceso_sancionatorio/notificaciones/NOT_5121_20251208_10.pdf	1	\N
-14	4	10	5123	2025-12-11	2025-12-18	t	2025-12-10	uploads/expedientes/7/formulacion/notificaciones/NOT_5123_20251210_10.pdf	1	\N
-15	5	10	3199	2018-05-10	2018-05-15	t	2018-05-10	uploads/expedientes/7/apertura_etapa_probatoria/notificaciones/NOT_3199_20180510_10.pdf	1	\N
-25	14	11	1221	2010-02-18	2010-02-21	t	2010-02-18	uploads/expedientes/9/inicio_proceso_sancionatorio/notificaciones/NOT_1221_20100218_11.pdf	1	\N
-26	14	12	1221	2010-02-18	2010-02-21	t	2010-02-18	uploads/expedientes/9/inicio_proceso_sancionatorio/notificaciones/NOT_1221_20100218_12.pdf	1	\N
-27	15	11	1221	2010-02-18	2010-02-21	t	2010-02-18	uploads/expedientes/9/formulacion/notificaciones/NOT_1221_20100218_11.pdf	1	\N
-28	15	12	1221	2010-02-18	2010-02-21	t	2010-02-18	uploads/expedientes/9/formulacion/notificaciones/NOT_1221_20100218_12.pdf	1	\N
-29	16	11	1211	2010-03-21	2010-03-24	t	2010-03-21	uploads/expedientes/9/apertura_etapa_probatoria/notificaciones/NOT_1211_20100321_11.pdf	1	\N
-34	17	11	1111	2010-04-08	2010-04-08	t	2010-04-08	uploads/expedientes/9/cierre_etapa_probatoria/notificaciones/NOT_1111_20100408_11.pdf	1	\N
-35	17	12	1111	2010-04-08	2010-04-08	t	2010-04-08	uploads/expedientes/9/cierre_etapa_probatoria/notificaciones/NOT_1111_20100408_12.pdf	1	\N
-39	21	13	2018	2013-03-19	2013-03-23	t	2013-03-19	uploads/expedientes/10/inicio_proceso_sancionatorio/notificaciones/NOT_2018_20130319_13.pdf	1	\N
-41	16	12	1211	2010-03-21	2010-03-24	t	2010-03-21	uploads/expedientes/9/apertura_etapa_probatoria/notificaciones/NOT_1211_20100321_12.pdf	1	\N
-42	22	13	4123	2025-12-11	2025-12-11	t	2025-12-11	uploads/expedientes/10/formulacion/notificaciones/NOT_4123_20251211_13.pdf	1	2025-12-11
-43	23	11	1231	2026-01-31	2025-12-31	t	2025-12-31	uploads/expedientes/9/decision_fondo/notificaciones/NOT_1231_20251231_11.pdf	1	2025-12-23
-44	18	12	1231	2025-12-23	2025-12-23	t	2025-12-23	uploads/expedientes/9/decision_fondo/notificaciones/NOT_1231_20251223_12.pdf	2	2025-12-23
-\.
-
-
---
--- TOC entry 5294 (class 0 OID 17971)
--- Dependencies: 246
--- Data for Name: log_auditoria; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.log_auditoria (id, expediente_radicado, tabla_afectada, id_registro, tipo_operacion, usuario_id, fecha, descripcion, datos_anteriores, datos_nuevos) FROM stdin;
-45	2018EE0823	expediente	2018EE0823	INSERT	1233506795	2025-12-08 04:54:57.759018	Creación de expediente 2018EE0823	null	{"radicado": "2018EE0823", "recursos": [1, 6], "direccion": "N/A", "vereda_id": 125, "encargado_id": 1233506795, "motivo_afectacion": "Incumplimiento a lo establecido en la resolución 0233 del 21 de abril de 2014", "nombre_expediente": "Q004-18"}
-46	2018EE0823	expediente	2018EE0823	UPDATE	1233506795	2025-12-08 04:56:15.342408	Actualización de expediente '2018EE0823' a '2018EE0823'	{"radicado": "2018EE0823", "recursos": [1, 6], "direccion": "N/A", "vereda_id": 125, "motivo_afectacion": "Incumplimiento a lo establecido en la resolución 0233 del 21 de abril de 2014", "nombre_expediente": "Q004-18"}	{"radicado": "2018EE0823", "recursos": [1, 6], "direccion": "N/A", "vereda_id": 125, "motivo_afectacion": "Incumplimiento a lo establecido en la resolución 0233 del 21 de abril de 2014 por medio de cual se aprueba el PSMV", "nombre_expediente": "Q004-18"}
-49	2018EE0823	etapa	10	INSERT	1233506795	2025-12-08 05:00:02.068647	Creación de etapa tipo 9	null	{"id": 10, "fecha_inicio": "2025-12-08 00:00:02.068490", "tipo_etapa_id": 9, "expediente_radicado": "2018EE0823"}
-50	2018EE0823	acto_admin	6	INSERT	1233506795	2025-12-08 05:18:33.904809	Creación de acto administrativo RES 101None	null	{"id": 6, "etapa_id": 10, "numerado": 101, "url_acto": "uploads/expedientes/7/inicio_proceso_sancionatorio/RES_101_20180316.pdf", "tipo_acto": "RES", "fecha_creacion": "2025-12-08 00:18:33.865529-05:00", "fecha_radicado": "2018-03-16", "nivel_auxiliar": null}
-51	2018EE0823	notificacion	3	INSERT	1233506795	2025-12-08 05:42:07.533822	Creación de notificación para acto admin 6	null	{"id": 3, "acto_admin_id": 6, "fecha_creacion": "2025-12-08"}
-52	2018EE0823	etapa	11	INSERT	1233506795	2025-12-08 05:45:55.249941	Creación de etapa tipo 4	null	{"id": 11, "fecha_inicio": "2025-12-08 00:45:55.249658", "tipo_etapa_id": 4, "expediente_radicado": "2018EE0823"}
-53	2018EE0823	acto_admin	7	INSERT	1233506795	2025-12-08 06:01:59.393542	Creación de acto administrativo AUTO 1012None	null	{"id": 7, "etapa_id": 11, "numerado": 1012, "url_acto": "uploads/expedientes/7/formulacion/AUTO_1012_20251208.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-08 01:01:59.388415-05:00", "fecha_radicado": "2025-12-08", "nivel_auxiliar": null}
-54	2018EE0823	notificacion	4	INSERT	1233506795	2025-12-08 06:03:53.51175	Creación de notificación para acto admin 7	null	{"id": 4, "acto_admin_id": 7, "fecha_creacion": "2025-12-08"}
-55	2018EE0823	involucrado_notificacion	11	DELETE	1233506795	2025-12-08 06:05:29.815405	Eliminación de notificación 1690 para involucrado 10	{"id": 11, "numerado": 1690, "url_documento": "uploads/expedientes/7/inicio_proceso_sancionatorio/notificaciones/NOT_1690_20180316_10.pdf", "fecha_numerado": "2018-03-16", "involucrado_id": 10, "notificacion_id": 3, "fecha_envio_citacion": "2018-03-16", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2018-03-26"}	{}
-56	2018EE0823	involucrado_notificacion	12	DELETE	1233506795	2025-12-08 06:06:26.599646	Eliminación de notificación 5123 para involucrado 10	{"id": 12, "numerado": 5123, "url_documento": "uploads/expedientes/7/formulacion/notificaciones/NOT_5123_20251208_10.pdf", "fecha_numerado": "2025-12-08", "involucrado_id": 10, "notificacion_id": 4, "fecha_envio_citacion": "2025-12-08", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2025-12-08"}	{}
-57	2018EE0823	FormulacionCargos	1	INSERT	1233506795	2025-12-08 06:07:24.911559	Creación de formulación de cargos ID 1	null	{"id": 1, "etapa_id": 11, "descargos": true, "url_documento": "uploads/expedientes/7/formulacion/FormulacionCargos_20251208_010724.pdf"}
-58	2018EE0823	etapa	12	INSERT	1233506795	2025-12-08 06:08:35.516346	Creación de etapa tipo 5	null	{"id": 12, "fecha_inicio": "2025-12-08 01:08:35.516251", "tipo_etapa_id": 5, "expediente_radicado": "2018EE0823"}
-59	2018EE0823	acto_admin	8	INSERT	1233506795	2025-12-08 06:09:42.657086	Creación de acto administrativo AUTO 509None	null	{"id": 8, "etapa_id": 12, "numerado": 509, "url_acto": "uploads/expedientes/7/apertura_etapa_probatoria/AUTO_509_20180510.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-08 01:09:42.652650-05:00", "fecha_radicado": "2018-05-10", "nivel_auxiliar": null}
-60	2018EE0823	notificacion	5	INSERT	1233506795	2025-12-08 06:11:02.471478	Creación de notificación para acto admin 8	null	{"id": 5, "acto_admin_id": 8, "fecha_creacion": "2025-12-08"}
-61	2018EE0823	etapa	13	INSERT	1233506795	2025-12-08 06:16:26.724061	Creación de etapa tipo 11	null	{"id": 13, "fecha_inicio": "2025-12-08 01:16:26.723948", "tipo_etapa_id": 11, "expediente_radicado": "2018EE0823"}
-62	2018EE0823	acto_admin	9	INSERT	1233506795	2025-12-08 06:17:13.216358	Creación de acto administrativo AUTO 770None	null	{"id": 9, "etapa_id": 13, "numerado": 770, "url_acto": "uploads/expedientes/7/cierre_etapa_probatoria/AUTO_770_20200718.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-08 01:17:13.213448-05:00", "fecha_radicado": "2020-07-18", "nivel_auxiliar": null}
-63	2018EE0823	notificacion	6	INSERT	1233506795	2025-12-08 06:18:14.653087	Creación de notificación para acto admin 9	null	{"id": 6, "acto_admin_id": 9, "fecha_creacion": "2025-12-08"}
-64	2018EE0823	involucrado_notificacion	16	UPDATE	1233506795	2025-12-08 06:18:31.885622	Actualización de notificación 6221 para involucrado 10	{"id": 16, "numerado": 6221, "url_documento": "uploads/expedientes/7/cierre_etapa_probatoria/notificaciones/NOT_6221_20180710_10.pdf", "fecha_numerado": "2018-07-10", "involucrado_id": 10, "notificacion_id": 6, "fecha_envio_citacion": "2018-07-10", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2018-07-25"}	{"id": 16, "numerado": 6221, "url_documento": "uploads/expedientes/7/cierre_etapa_probatoria/notificaciones/NOT_6221_20180710_10.pdf", "fecha_numerado": "2018-07-10", "involucrado_id": 10, "notificacion_id": 6, "fecha_envio_citacion": "2018-07-10", "notificacion_exitosa": true, "tipo_notificacion_id": 3, "fecha_constancia_citacion": "2018-07-25"}
-65	2018EE0823	involucrado_notificacion	16	UPDATE	1233506795	2025-12-08 06:19:11.720488	Actualización de notificación 6221 para involucrado 10	{"id": 16, "numerado": 6221, "url_documento": "uploads/expedientes/7/cierre_etapa_probatoria/notificaciones/NOT_6221_20180710_10.pdf", "fecha_numerado": "2018-07-10", "involucrado_id": 10, "notificacion_id": 6, "fecha_envio_citacion": "2018-07-10", "notificacion_exitosa": true, "tipo_notificacion_id": 3, "fecha_constancia_citacion": "2018-07-25"}	{"id": 16, "numerado": 6221, "url_documento": "uploads/expedientes/7/cierre_etapa_probatoria/notificaciones/NOT_6221_20180710_10.pdf", "fecha_numerado": "2018-07-10", "involucrado_id": 10, "notificacion_id": 6, "fecha_envio_citacion": "2018-07-10", "notificacion_exitosa": true, "tipo_notificacion_id": 3, "fecha_constancia_citacion": "2018-07-25"}
-66	2018EE0823	etapa	14	INSERT	1233506795	2025-12-08 06:19:43.135826	Creación de etapa tipo 6	null	{"id": 14, "fecha_inicio": "2025-12-08 01:19:43.135734", "tipo_etapa_id": 6, "expediente_radicado": "2018EE0823"}
-67	2018EE0823	acto_admin	10	INSERT	1233506795	2025-12-08 06:20:06.013367	Creación de acto administrativo RES 1014None	null	{"id": 10, "etapa_id": 14, "numerado": 1014, "url_acto": "uploads/expedientes/7/decision_fondo/RES_1014_20191224.pdf", "tipo_acto": "RES", "fecha_creacion": "2025-12-08 01:20:06.011586-05:00", "fecha_radicado": "2019-12-24", "nivel_auxiliar": null}
-68	2018EE0823	notificacion	7	INSERT	1233506795	2025-12-08 06:22:56.714596	Creación de notificación para acto admin 10	null	{"id": 7, "acto_admin_id": 10, "fecha_creacion": "2025-12-08"}
-69	2018EE0823	DecisionFondo	1	INSERT	1233506795	2025-12-08 06:26:31.763509	Creación de decisión de fondo ID 1	null	{"id": 1, "detalle": "Imposición sanción monetaria 91'134.607", "etapa_id": 14, "tipo_sancion_id": 1}
-70	2018EE0823	DecisionFondo	1	UPDATE	1233506795	2025-12-08 06:26:41.794083	Actualización de decisión de fondo ID 1	{"id": 1, "detalle": "Imposición sanción monetaria 91'134.607", "etapa_id": 14, "tipo_sancion_id": 1}	{"id": 1, "detalle": "Imposición sanción monetaria $91'134.607", "etapa_id": 14, "tipo_sancion_id": 1}
-71	2018EE0823	documento	3	DELETE	1233506795	2025-12-08 07:02:30.865353	Eliminación de documento ID 3: 'Recurso'	{"id": 3, "nombre": "Recurso", "etapa_id": 14, "fecha_subida": "2025-12-08 05:00:00+00:00", "url_documento": "uploads/expedientes/7/decision_fondo/Recurso_20251208_012947.pdf"}	null
-72	2018EE0823	documento	4	DELETE	1233506795	2025-12-08 07:02:52.306542	Eliminación de documento ID 4: 'Recurso'	{"id": 4, "nombre": "Recurso", "etapa_id": 14, "fecha_subida": "2025-12-08 05:00:00+00:00", "url_documento": "uploads/expedientes/7/decision_fondo/Recurso_20251208_020241.pdf"}	null
-104	2009ER0022	expediente	2009ER0022	INSERT	1233506795	2025-12-09 19:38:12.353606	Creación de expediente 2009ER0022	null	{"radicado": "2009ER0022", "recursos": [6, 1], "direccion": "N/A", "vereda_id": 171, "encargado_id": 1233506795, "motivo_afectacion": "Afectación al suelo y emisiones atmosféricas ", "nombre_expediente": "Q003-10"}
-109	2009ER0022	etapa	20	INSERT	1233506795	2025-12-09 19:40:50.105687	Creación de etapa tipo 1	null	{"id": 20, "fecha_inicio": "2025-12-09 14:40:50.105494", "tipo_etapa_id": 1, "expediente_radicado": "2009ER0022"}
-111	2009ER0022	medida_preventiva	1	INSERT	1233506795	2025-12-09 19:53:37.627782	Creación de medida preventiva ID 1	null	{"id": 1, "especie": "N/A", "cantidad": "0 und", "etapa_id": 20, "estado_medida": true, "tipo_medida_id": 10}
-113	2009ER0022	etapa	21	INSERT	1233506795	2025-12-09 19:58:09.525472	Creación de etapa tipo 9	null	{"id": 21, "fecha_inicio": "2025-12-09 14:58:09.525252", "tipo_etapa_id": 9, "expediente_radicado": "2009ER0022"}
-115	2009ER0022	notificacion	14	INSERT	1233506795	2025-12-09 20:04:50.828657	Creación de notificación para acto admin 20	null	{"id": 14, "acto_admin_id": 20, "fecha_creacion": "2025-12-09"}
-117	2009ER0022	acto_admin	21	INSERT	1233506795	2025-12-09 20:31:07.971198	Creación de acto administrativo AUTO 1111None	null	{"id": 21, "etapa_id": 22, "numerado": 1111, "url_acto": "uploads/expedientes/9/formulacion/AUTO_1111_20100217.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-09 15:31:07.967353-05:00", "fecha_radicado": "2010-02-17", "nivel_auxiliar": null}
-120	2009ER0022	etapa	23	INSERT	1233506795	2025-12-09 20:50:15.464677	Creación de etapa tipo 5	null	{"id": 23, "fecha_inicio": "2025-12-09 15:50:15.464558", "tipo_etapa_id": 5, "expediente_radicado": "2009ER0022"}
-110	2009ER0022	acto_admin	19	INSERT	1233506795	2025-12-09 19:41:37.153232	Creación de acto administrativo AUTO 1111None	null	{"id": 19, "etapa_id": 20, "numerado": 1111, "url_acto": "uploads/expedientes/9/detalle_medida_preventiva/AUTO_1111_20090210.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-09 14:41:37.147462-05:00", "fecha_radicado": "2009-02-10", "nivel_auxiliar": null}
-112	2009ER0022	comunicacion	2	INSERT	1233506795	2025-12-09 19:56:15.801314	Creación de comunicación 0985 para acto admin 19	null	{"id": 2, "numerado": 985, "fecha_envio": "2009-02-10", "acto_admin_id": 19, "url_documento": "uploads/expedientes/9/detalle_medida_preventiva/COMUNICACION_0985_20090210.pdf", "fecha_creacion": "2025-12-09", "fecha_numerado": "2009-02-10"}
-114	2009ER0022	acto_admin	20	INSERT	1233506795	2025-12-09 20:00:03.552955	Creación de acto administrativo AUTO 1111None	null	{"id": 20, "etapa_id": 21, "numerado": 1111, "url_acto": "uploads/expedientes/9/inicio_proceso_sancionatorio/AUTO_1111_20100217.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-09 15:00:03.549597-05:00", "fecha_radicado": "2010-02-17", "nivel_auxiliar": null}
-116	2009ER0022	etapa	22	INSERT	1233506795	2025-12-09 20:30:01.351131	Creación de etapa tipo 4	null	{"id": 22, "fecha_inicio": "2025-12-09 15:30:01.350981", "tipo_etapa_id": 4, "expediente_radicado": "2009ER0022"}
-121	2009ER0022	acto_admin	22	INSERT	1233506795	2025-12-09 20:54:57.514334	Creación de acto administrativo AUTO 1111None	null	{"id": 22, "etapa_id": 23, "numerado": 1111, "url_acto": "uploads/expedientes/9/apertura_etapa_probatoria/AUTO_1111_20100317.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-09 15:54:57.510371-05:00", "fecha_radicado": "2010-03-17", "nivel_auxiliar": null}
-122	2009ER0022	notificacion	16	INSERT	1233506795	2025-12-09 20:56:17.505303	Creación de notificación para acto admin 22	null	{"id": 16, "acto_admin_id": 22, "fecha_creacion": "2025-12-09"}
-118	2009ER0022	notificacion	15	INSERT	1233506795	2025-12-09 20:32:02.585212	Creación de notificación para acto admin 21	null	{"id": 15, "acto_admin_id": 21, "fecha_creacion": "2025-12-09"}
-119	2009ER0022	FormulacionCargos	2	INSERT	1233506795	2025-12-09 20:37:30.120978	Creación de formulación de cargos ID 2	null	{"id": 2, "etapa_id": 22, "descargos": true, "url_documento": "uploads/expedientes/9/formulacion/FormulacionCargos_20251209_153730.pdf"}
-123	2009ER0022	involucrado_notificacion	30	DELETE	1233506795	2025-12-09 21:10:00.199559	Eliminación de notificación 1211 para involucrado 12	{"id": 30, "numerado": 1211, "url_documento": "uploads/expedientes/9/apertura_etapa_probatoria/notificaciones/NOT_1211_20100321_12.pdf", "fecha_numerado": "2010-03-21", "involucrado_id": 12, "notificacion_id": 16, "fecha_envio_citacion": "2010-03-21", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2010-03-24"}	{}
-124	2009ER0022	involucrado_notificacion	31	DELETE	1233506795	2025-12-09 21:35:47.927886	Eliminación de notificación 1211 para involucrado 12	{"id": 31, "numerado": 1211, "url_documento": "uploads/expedientes/9/apertura_etapa_probatoria/notificaciones/NOT_1211_20100321_12.pdf", "fecha_numerado": "2010-03-21", "involucrado_id": 12, "notificacion_id": 16, "fecha_envio_citacion": "2010-03-21", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2010-03-24"}	{}
-125	2009ER0022	involucrado_notificacion	32	DELETE	1233506795	2025-12-09 21:44:14.898708	Eliminación de notificación 1211 para involucrado 12	{"id": 32, "numerado": 1211, "url_documento": "uploads/expedientes/9/apertura_etapa_probatoria/notificaciones/NOT_1211_20100321_12.pdf", "fecha_numerado": "2010-03-21", "involucrado_id": 12, "notificacion_id": 16, "fecha_envio_citacion": "2010-03-21", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2010-03-24"}	{}
-126	2009ER0022	etapa	24	INSERT	1233506795	2025-12-09 21:47:57.844369	Creación de etapa tipo 11	null	{"id": 24, "fecha_inicio": "2025-12-09 16:47:57.844286", "tipo_etapa_id": 11, "expediente_radicado": "2009ER0022"}
-127	2009ER0022	acto_admin	23	INSERT	1233506795	2025-12-09 21:49:05.423732	Creación de acto administrativo AUTO 1111None	null	{"id": 23, "etapa_id": 24, "numerado": 1111, "url_acto": "uploads/expedientes/9/cierre_etapa_probatoria/AUTO_1111_20100408.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-09 16:49:05.419382-05:00", "fecha_radicado": "2010-04-08", "nivel_auxiliar": null}
-128	2009ER0022	notificacion	17	INSERT	1233506795	2025-12-09 21:50:08.656242	Creación de notificación para acto admin 23	null	{"id": 17, "acto_admin_id": 23, "fecha_creacion": "2025-12-09"}
-129	2009ER0022	etapa	25	INSERT	1233506795	2025-12-09 21:51:12.146298	Creación de etapa tipo 6	null	{"id": 25, "fecha_inicio": "2025-12-09 16:51:12.146208", "tipo_etapa_id": 6, "expediente_radicado": "2009ER0022"}
-130	2009ER0022	acto_admin	24	INSERT	1233506795	2025-12-09 21:54:13.90921	Creación de acto administrativo AUTO 1111None	null	{"id": 24, "etapa_id": 25, "numerado": 1111, "url_acto": "uploads/expedientes/9/decision_fondo/AUTO_1111_20100408.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-09 16:54:13.906796-05:00", "fecha_radicado": "2010-04-08", "nivel_auxiliar": null}
-131	2009ER0022	acto_admin	24	UPDATE	1233506795	2025-12-09 22:03:22.226991	Actualización de acto administrativo AUTO 0373None	{"id": 24, "etapa_id": 25, "numerado": 1111, "url_acto": "uploads/expedientes/9/decision_fondo/AUTO_1111_20100408.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-09", "fecha_numerado": "2010-04-08 05:00:00+00:00", "nivel_auxiliar": null}	{"id": 24, "etapa_id": 25, "numerado": 373, "url_acto": "uploads/expedientes/9/decision_fondo/AUTO_1111_20100408.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-09", "fecha_numerado": "2010-05-25", "nivel_auxiliar": null}
-132	2009ER0022	notificacion	18	INSERT	1233506795	2025-12-09 22:04:13.693793	Creación de notificación para acto admin 24	null	{"id": 18, "acto_admin_id": 24, "fecha_creacion": "2025-12-09"}
-133	2009ER0022	involucrado_notificacion	36	UPDATE	1233506795	2025-12-09 22:04:57.192575	Actualización de notificación 1231 para involucrado 11	{"id": 36, "numerado": 1231, "url_documento": "uploads/expedientes/9/decision_fondo/notificaciones/NOT_1231_20251209_11.pdf", "fecha_numerado": "2025-12-09", "involucrado_id": 11, "notificacion_id": 18, "fecha_envio_citacion": "2025-12-09", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2025-11-09"}	{"id": 36, "numerado": 1231, "url_documento": "uploads/expedientes/9/decision_fondo/notificaciones/NOT_1231_20251209_11.pdf", "fecha_numerado": "2025-12-09", "involucrado_id": 11, "notificacion_id": 18, "fecha_envio_citacion": "2025-12-09", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2025-12-01"}
-134	2009ER0022	involucrado_notificacion	36	DELETE	1233506795	2025-12-09 22:05:19.004507	Eliminación de notificación 1231 para involucrado 11	{"id": 36, "numerado": 1231, "url_documento": "uploads/expedientes/9/decision_fondo/notificaciones/NOT_1231_20251209_11.pdf", "fecha_numerado": "2025-12-09", "involucrado_id": 11, "notificacion_id": 18, "fecha_envio_citacion": "2025-12-09", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2025-12-01"}	{}
-136	2010ER4870	expediente	2010ER4870	INSERT	1233506795	2025-12-11 03:59:50.354746	Creación de expediente 2010ER4870	null	{"radicado": "2010ER4870", "recursos": [6, 1], "direccion": "N/A", "vereda_id": 242, "encargado_id": 1233506795, "motivo_afectacion": "Incumplimiento acto administrativo que otorga", "nombre_expediente": "Q003-13"}
-137	2010ER4870	expediente	2010ER4870	UPDATE	1233506795	2025-12-11 04:01:22.624317	Actualización de expediente '2010ER4870' a '2010ER4870'	{"radicado": "2010ER4870", "recursos": [6, 1], "direccion": "N/A", "vereda_id": 242, "motivo_afectacion": "Incumplimiento acto administrativo que otorga", "nombre_expediente": "Q003-13"}	{"radicado": "2010ER4870", "recursos": [6, 1], "direccion": "N/A", "vereda_id": 233, "motivo_afectacion": "Incumplimiento acto administrativo que otorga", "nombre_expediente": "Q003-13"}
-140	2010ER4870	etapa	26	INSERT	1233506795	2025-12-11 04:10:03.608371	Creación de etapa tipo 1	null	{"id": 26, "fecha_inicio": "2025-12-10 23:10:03.607889", "tipo_etapa_id": 1, "expediente_radicado": "2010ER4870"}
-141	2010ER4870	acto_admin	25	INSERT	1233506795	2025-12-11 04:10:43.663019	Creación de acto administrativo AUTO 8None	null	{"id": 25, "etapa_id": 26, "numerado": 8, "url_acto": "uploads/expedientes/10/detalle_medida_preventiva/AUTO_8_20130108.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-10 23:10:43.653966-05:00", "fecha_radicado": "2013-01-08", "nivel_auxiliar": null}
-143	2010ER4870	medida_preventiva	2	INSERT	1233506795	2025-12-11 04:19:32.88525	Creación de medida preventiva ID 2	null	{"id": 2, "especie": "N/A", "cantidad": "0 und", "etapa_id": 26, "estado_medida": null, "tipo_medida_id": 4}
-144	2010ER4870	etapa	27	INSERT	1233506795	2025-12-11 04:21:10.689875	Creación de etapa tipo 9	null	{"id": 27, "fecha_inicio": "2025-12-10 23:21:10.689763", "tipo_etapa_id": 9, "expediente_radicado": "2010ER4870"}
-146	2010ER4870	notificacion	19	INSERT	1233506795	2025-12-11 04:23:14.509522	Creación de notificación para acto admin 26	null	{"id": 19, "acto_admin_id": 26, "fecha_creacion": "2025-12-10"}
-147	2010ER4870	etapa	28	INSERT	1233506795	2025-12-11 04:25:44.0989	Creación de etapa tipo 4	null	{"id": 28, "fecha_inicio": "2025-12-10 23:25:44.098738", "tipo_etapa_id": 4, "expediente_radicado": "2010ER4870"}
-152	2010ER4870	involucrado_notificacion	37	DELETE	1233506795	2025-12-11 04:35:31.281381	Eliminación de notificación 2018 para involucrado 13	{"id": 37, "numerado": 2018, "url_documento": "uploads/expedientes/10/inicio_proceso_sancionatorio/notificaciones/NOT_2018_20190310_13.pdf", "fecha_numerado": "2019-03-10", "involucrado_id": 13, "notificacion_id": 19, "fecha_envio_citacion": "2019-03-10", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2013-04-03"}	{}
-153	2010ER4870	acto_admin	26	DELETE	1233506795	2025-12-11 04:36:04.329757	Eliminación de acto administrativo AUTO 1111	{"acto_admin": {"id": 26, "etapa_id": 27, "numerado": 1111, "url_acto": "uploads/expedientes/10/inicio_proceso_sancionatorio/AUTO_1111_20130319.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-10", "fecha_numerado": "2013-03-19 05:00:00+00:00"}, "comunicacion": null, "notificaciones": [], "involucrados_notificacion": []}	{}
-154	2018EE0823	acto_admin	10	DELETE	1233506795	2025-12-11 04:39:56.77175	Eliminación de acto administrativo RES 1014	{"acto_admin": {"id": 10, "etapa_id": 14, "numerado": 1014, "url_acto": "uploads/expedientes/7/decision_fondo/RES_1014_20191224.pdf", "tipo_acto": "RES", "fecha_creacion": "2025-12-08", "fecha_numerado": "2019-12-24 05:00:00+00:00"}, "comunicacion": null, "notificaciones": [], "involucrados_notificacion": []}	{}
-142	2010ER4870	comunicacion	3	INSERT	1233506795	2025-12-11 04:15:49.153456	Creación de comunicación 0009 para acto admin 25	null	{"id": 3, "numerado": 9, "fecha_envio": "2013-01-08", "acto_admin_id": 25, "url_documento": "uploads/expedientes/10/detalle_medida_preventiva/COMUNICACION_0009_20130108.pdf", "fecha_creacion": "2025-12-10", "fecha_numerado": "2013-01-08"}
-149	2010ER4870	notificacion	20	INSERT	1233506795	2025-12-11 04:28:27.729987	Creación de notificación para acto admin 27	null	{"id": 20, "acto_admin_id": 27, "fecha_creacion": "2025-12-10"}
-151	2010ER4870	acto_admin	27	DELETE	1233506795	2025-12-11 04:35:14.857939	Eliminación de acto administrativo AUTO 1111	{"acto_admin": {"id": 27, "etapa_id": 28, "numerado": 1111, "url_acto": "uploads/expedientes/10/formulacion/AUTO_1111_20130515.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-10", "fecha_numerado": "2013-05-15 05:00:00+00:00"}, "comunicacion": null, "notificaciones": [], "involucrados_notificacion": []}	{}
-145	2010ER4870	acto_admin	26	INSERT	1233506795	2025-12-11 04:21:26.297367	Creación de acto administrativo AUTO 1111None	null	{"id": 26, "etapa_id": 27, "numerado": 1111, "url_acto": "uploads/expedientes/10/inicio_proceso_sancionatorio/AUTO_1111_20130319.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-10 23:21:26.292795-05:00", "fecha_radicado": "2013-03-19", "nivel_auxiliar": null}
-148	2010ER4870	acto_admin	27	INSERT	1233506795	2025-12-11 04:26:04.89398	Creación de acto administrativo AUTO 1111None	null	{"id": 27, "etapa_id": 28, "numerado": 1111, "url_acto": "uploads/expedientes/10/formulacion/AUTO_1111_20130515.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-10 23:26:04.891858-05:00", "fecha_radicado": "2013-05-15", "nivel_auxiliar": null}
-150	2010ER4870	involucrado_notificacion	38	DELETE	1233506795	2025-12-11 04:35:11.915217	Eliminación de notificación 4370 para involucrado 13	{"id": 38, "numerado": 4370, "url_documento": "uploads/expedientes/10/formulacion/notificaciones/NOT_4370_20130516_13.pdf", "fecha_numerado": "2013-05-16", "involucrado_id": 13, "notificacion_id": 20, "fecha_envio_citacion": "2013-05-16", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2013-05-21"}	{}
-155	2010ER4870	expediente	2010ER4870	UPDATE	1233506795	2025-12-11 14:26:14.196306	Actualización de expediente '2010ER4870' a '2010ER4870'	{"radicado": "2010ER4870", "recursos": [6, 1], "direccion": "N/A", "vereda_id": 233, "motivo_afectacion": "Incumplimiento acto administrativo que otorga", "nombre_expediente": "Q003-13"}	{"radicado": "2010ER4870", "recursos": [6, 1, 5], "direccion": "N/A", "vereda_id": 233, "motivo_afectacion": "Incumplimiento acto administrativo que otorga", "nombre_expediente": "Q003-13"}
-156	2010ER4870	etapa	29	INSERT	1233506795	2025-12-11 14:35:41.123024	Creación de etapa tipo 9	null	{"id": 29, "fecha_inicio": "2025-12-11 09:35:41.122824", "tipo_etapa_id": 9, "expediente_radicado": "2010ER4870"}
-157	2010ER4870	acto_admin	28	INSERT	1233506795	2025-12-11 14:36:31.345164	Creación de acto administrativo AUTO 1212None	null	{"id": 28, "etapa_id": 29, "numerado": 1212, "url_acto": "uploads/expedientes/10/inicio_proceso_sancionatorio/AUTO_1212_20251209.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-11 09:36:31.327490-05:00", "fecha_radicado": "2025-12-09", "nivel_auxiliar": null}
-158	2010ER4870	notificacion	21	INSERT	1233506795	2025-12-11 14:37:00.045876	Creación de notificación para acto admin 28	null	{"id": 21, "acto_admin_id": 28, "fecha_creacion": "2025-12-11"}
-159	2010ER4870	etapa	30	INSERT	1233506795	2025-12-11 14:37:19.378043	Creación de etapa tipo 4	null	{"id": 30, "fecha_inicio": "2025-12-11 09:37:19.377952", "tipo_etapa_id": 4, "expediente_radicado": "2010ER4870"}
-160	2010ER4870	acto_admin	29	INSERT	1233506795	2025-12-11 14:38:13.037721	Creación de acto administrativo AUTO 1212None	null	{"id": 29, "etapa_id": 30, "numerado": 1212, "url_acto": "uploads/expedientes/10/formulacion/AUTO_1212_20130515.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-11 09:38:13.033705-05:00", "fecha_radicado": "2013-05-15", "nivel_auxiliar": null}
-161	2010ER4870	notificacion	22	INSERT	1233506795	2025-12-11 14:39:11.673534	Creación de notificación para acto admin 29	null	{"id": 22, "acto_admin_id": 29, "fecha_creacion": "2025-12-11"}
-162	2018EE0823	expediente	2018EE0823	UPDATE	1233506795	2025-12-11 15:35:17.172609	Actualización de encargado del expediente 2018EE0823	{"radicado": "2018EE0823", "encargado_id": 1233506795}	{"radicado": "2018EE0823", "encargado_id": 1233506796}
-163	2022ER4571	expediente	2022ER4571	INSERT	1233506795	2025-12-11 15:46:02.926172	Creación de expediente 2022ER4571	null	{"radicado": "2022ER4571", "recursos": [1, 6, 2], "direccion": "N/A", "vereda_id": 377, "encargado_id": 1233506795, "motivo_afectacion": "Incumplimiento al acto administrativo que otorga", "nombre_expediente": "Q019-23"}
-164	2022ER4571	etapa	31	INSERT	1233506795	2025-12-11 15:47:01.942913	Creación de etapa tipo 2	null	{"id": 31, "fecha_inicio": "2025-12-11 10:47:01.942795", "tipo_etapa_id": 2, "expediente_radicado": "2022ER4571"}
-165	2022ER4571	acto_admin	30	INSERT	1233506795	2025-12-11 15:49:14.324181	Creación de acto administrativo AUTO 280None	null	{"id": 30, "etapa_id": 31, "numerado": 280, "url_acto": "uploads/expedientes/11/indagacion_preliminar/AUTO_280_20230306.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-11 10:49:14.321363-05:00", "fecha_radicado": "2023-03-06", "nivel_auxiliar": null}
-166	2022ER4571	comunicacion	4	INSERT	1233506795	2025-12-11 15:51:23.855727	Creación de comunicación 1970 para acto admin 30	null	{"id": 4, "numerado": 1970, "fecha_envio": "2023-03-08", "acto_admin_id": 30, "url_documento": "uploads/expedientes/11/indagacion_preliminar/COMUNICACION_1970_20230308.pdf", "fecha_creacion": "2025-12-11", "fecha_numerado": "2023-03-08"}
-167	2018EE0823	expediente	2018EE0823	UPDATE	1233506795	2025-12-11 15:52:54.057373	Actualización de encargado del expediente 2018EE0823	{"radicado": "2018EE0823", "encargado_id": 1233506796}	{"radicado": "2018EE0823", "encargado_id": 1233506795}
-168	2009ER0022	involucrado_notificacion	33	DELETE	1233506795	2025-12-11 15:56:51.737451	Eliminación de notificación 1211 para involucrado 12	{"id": 33, "numerado": 1211, "url_documento": "uploads/expedientes/9/apertura_etapa_probatoria/notificaciones/NOT_1211_20100321_12.pdf", "fecha_numerado": "2010-03-21", "involucrado_id": 12, "notificacion_id": 16, "fecha_envio_citacion": "2010-03-21", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2010-03-24"}	{}
-169	2010ER4870	involucrado_notificacion	40	DELETE	1233506795	2025-12-11 20:57:46.818408	Eliminación de notificación 4370 para involucrado 13	{"id": 40, "numerado": 4370, "url_documento": "uploads/expedientes/10/formulacion/notificaciones/NOT_4370_20130516_13.pdf", "fecha_numerado": "2013-05-16", "involucrado_id": 13, "notificacion_id": 22, "fecha_envio_citacion": "2013-05-16", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2013-05-21"}	{}
-170	2010ER4870	involucrado_notificacion	40	DELETE	1233506795	2025-12-11 20:57:46.829198	Eliminación de notificación 4370 para involucrado 13	{"id": 40, "numerado": 4370, "url_documento": "uploads/expedientes/10/formulacion/notificaciones/NOT_4370_20130516_13.pdf", "fecha_numerado": "2013-05-16", "involucrado_id": 13, "notificacion_id": 22, "fecha_envio_citacion": "2013-05-16", "notificacion_exitosa": true, "tipo_notificacion_id": 1, "fecha_constancia_citacion": "2013-05-21"}	{}
-171	2009ER0022	documento	7	DELETE	1233506795	2025-12-23 19:22:05.900618	Eliminación de documento ID 7: 'Recurso'	{"id": 7, "nombre": "Recurso", "etapa_id": 25, "fecha_subida": "2025-12-09 05:00:00+00:00", "url_documento": "uploads/expedientes/9/decision_fondo/Recurso_20251209_170538.pdf"}	null
-172	2018EE0823	acto_admin	9	DELETE	1233506795	2025-12-23 19:35:50.576433	Eliminación de acto administrativo AUTO 770	{"acto_admin": {"id": 9, "etapa_id": 13, "numerado": 770, "url_acto": "uploads/expedientes/7/cierre_etapa_probatoria/AUTO_770_20200718.pdf", "tipo_acto": "AUTO", "fecha_creacion": "2025-12-08", "fecha_numerado": "2020-07-18 05:00:00+00:00"}, "comunicacion": null, "notificaciones": [], "involucrados_notificacion": []}	{}
-173	2018EE0823	acto_admin	31	INSERT	1233506795	2025-12-23 19:36:04.301567	Creación de acto administrativo RES 4123None	null	{"id": 31, "etapa_id": 13, "numerado": 4123, "url_acto": "uploads/expedientes/7/cierre_etapa_probatoria/RES_4123_20251223.pdf", "tipo_acto": "RES", "fecha_creacion": "2025-12-23 14:36:04.294593-05:00", "fecha_radicado": "2025-12-23", "nivel_auxiliar": null}
-174	2009ER0022	acto_admin	32	INSERT	1233506795	2025-12-23 20:55:02.163832	Creación de acto administrativo RES 5123True	null	{"id": 32, "etapa_id": 25, "numerado": 5123, "url_acto": "uploads/expedientes/9/decision_fondo/RES_5123_20251224.pdf", "tipo_acto": "RES", "fecha_creacion": "2025-12-23 15:55:02.153362-05:00", "fecha_radicado": "2025-12-24", "nivel_auxiliar": true}
-175	2009ER0022	notificacion	23	INSERT	1233506795	2025-12-23 20:56:21.477879	Creación de notificación para acto admin 32	null	{"id": 23, "acto_admin_id": 32, "fecha_creacion": "2025-12-23"}
-176	2009ER0022	etapa	32	INSERT	1233506795	2025-12-23 23:01:20.111974	Creación de etapa tipo 7	null	{"id": 32, "fecha_inicio": "2025-12-23 18:01:20.111793", "tipo_etapa_id": 7, "expediente_radicado": "2009ER0022"}
-177	2009ER0022	EjecucionSancion	1	INSERT	1233506795	2025-12-23 23:08:35.625127	Creación de ejecución de sanción ID 1	null	{"id": 1, "ruia": false, "etapa_id": 32, "memorando": false, "auto_admin": "RES5123", "fecha_auto": "2025-12-23", "disposicion": false, "auto_doc_url": "uploads/expedientes/9/ejecucion_sancion/Auto_20251223_180835.pdf", "ruia_doc_url": null, "cobro_coactivo": false, "memorando_doc_url": null, "cobro_coactivo_doc_url": null}
-178	2009ER0022	expediente	2009ER0022	UPDATE	1233506795	2026-01-29 19:40:32.863562	Archivado del expediente 2009ER0022	{"radicado": "2009ER0022", "archivado": false}	{"radicado": "2009ER0022", "archivado": true}
-179	2009ER0022	expediente	2009ER0022	UPDATE	1233506795	2026-01-29 21:43:59.885967	Archivado del expediente 2009ER0022	{"radicado": "2009ER0022", "archivado": false}	{"radicado": "2009ER0022", "archivado": true}
-\.
-
-
---
--- TOC entry 5296 (class 0 OID 17981)
--- Dependencies: 248
--- Data for Name: medida_preventiva; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.medida_preventiva (id, tipo_medida_id, cantidad, especie, estado_medida, etapa_id) FROM stdin;
-1	10	0 und	N/A	t	20
-2	4	0 und	N/A	\N	26
-\.
 
 
 --
@@ -1254,28 +948,6 @@ COPY public.nivel_acto (id, nombre) FROM stdin;
 1	recurso
 2	decision
 \.
-
-
---
--- TOC entry 5302 (class 0 OID 17998)
--- Dependencies: 254
--- Data for Name: notificacion; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.notificacion (id, fecha_creacion, acto_admin_id) FROM stdin;
-3	2025-12-08	6
-4	2025-12-08	7
-5	2025-12-08	8
-14	2025-12-09	20
-15	2025-12-09	21
-16	2025-12-09	22
-17	2025-12-09	23
-18	2025-12-09	24
-21	2025-12-11	28
-22	2025-12-11	29
-23	2025-12-23	32
-\.
-
 
 --
 -- TOC entry 5304 (class 0 OID 18003)
@@ -1859,7 +1531,7 @@ SELECT pg_catalog.setval('public.acto_admin_id_seq', 1, false);
 -- Name: acto_admin_id_seq1; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.acto_admin_id_seq1', 32, true);
+SELECT pg_catalog.setval('public.acto_admin_id_seq1', 1, false);
 
 
 --
@@ -1877,7 +1549,7 @@ SELECT pg_catalog.setval('public.comunicacion_id_seq', 1, false);
 -- Name: comunicacion_id_seq1; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.comunicacion_id_seq1', 4, true);
+SELECT pg_catalog.setval('public.comunicacion_id_seq1', 1, false);
 
 
 --
@@ -1886,7 +1558,7 @@ SELECT pg_catalog.setval('public.comunicacion_id_seq1', 4, true);
 -- Name: decision_fondo_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.decision_fondo_id_seq', 1, true);
+SELECT pg_catalog.setval('public.decision_fondo_id_seq', 1, false);
 
 
 --
@@ -1904,7 +1576,7 @@ SELECT pg_catalog.setval('public.documento_id_seq', 1, false);
 -- Name: documento_id_seq1; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.documento_id_seq1', 8, true);
+SELECT pg_catalog.setval('public.documento_id_seq1', 1, false);
 
 
 --
@@ -1913,7 +1585,7 @@ SELECT pg_catalog.setval('public.documento_id_seq1', 8, true);
 -- Name: ejecucion_sancion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.ejecucion_sancion_id_seq', 1, true);
+SELECT pg_catalog.setval('public.ejecucion_sancion_id_seq', 1, false);
 
 
 --
@@ -1922,7 +1594,7 @@ SELECT pg_catalog.setval('public.ejecucion_sancion_id_seq', 1, true);
 -- Name: etapa_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.etapa_id_seq', 32, true);
+SELECT pg_catalog.setval('public.etapa_id_seq', 1, false);
 
 
 --
@@ -1931,7 +1603,7 @@ SELECT pg_catalog.setval('public.etapa_id_seq', 32, true);
 -- Name: expediente_id_auxiliar_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.expediente_id_auxiliar_seq', 11, true);
+SELECT pg_catalog.setval('public.expediente_id_auxiliar_seq', 1, false);
 
 
 --
@@ -1940,7 +1612,7 @@ SELECT pg_catalog.setval('public.expediente_id_auxiliar_seq', 11, true);
 -- Name: formulacion_cargos_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.formulacion_cargos_id_seq', 2, true);
+SELECT pg_catalog.setval('public.formulacion_cargos_id_seq', 1, false);
 
 
 --
@@ -1949,7 +1621,7 @@ SELECT pg_catalog.setval('public.formulacion_cargos_id_seq', 2, true);
 -- Name: involucrado_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.involucrado_id_seq', 13, true);
+SELECT pg_catalog.setval('public.involucrado_id_seq', 1, false);
 
 
 --
@@ -1958,7 +1630,7 @@ SELECT pg_catalog.setval('public.involucrado_id_seq', 13, true);
 -- Name: involucrado_notificacion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.involucrado_notificacion_id_seq', 44, true);
+SELECT pg_catalog.setval('public.involucrado_notificacion_id_seq', 1, false);
 
 
 --
@@ -1976,7 +1648,7 @@ SELECT pg_catalog.setval('public.ley_1333_2009_id_seq', 1, false);
 -- Name: log_auditoria_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.log_auditoria_id_seq', 179, true);
+SELECT pg_catalog.setval('public.log_auditoria_id_seq', 1, false);
 
 
 --
@@ -1985,7 +1657,7 @@ SELECT pg_catalog.setval('public.log_auditoria_id_seq', 179, true);
 -- Name: medida_preventiva_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.medida_preventiva_id_seq', 2, true);
+SELECT pg_catalog.setval('public.medida_preventiva_id_seq', 1, false);
 
 
 --
@@ -2012,7 +1684,7 @@ SELECT pg_catalog.setval('public.nivel_acto_id_seq', 2, true);
 -- Name: proceso_notificacion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.proceso_notificacion_id_seq', 23, true);
+SELECT pg_catalog.setval('public.proceso_notificacion_id_seq', 1, false);
 
 
 --
@@ -2021,7 +1693,7 @@ SELECT pg_catalog.setval('public.proceso_notificacion_id_seq', 23, true);
 -- Name: recurso_afectado_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.recurso_afectado_id_seq', 3, true);
+SELECT pg_catalog.setval('public.recurso_afectado_id_seq', 6, true);
 
 
 --
@@ -2030,7 +1702,7 @@ SELECT pg_catalog.setval('public.recurso_afectado_id_seq', 3, true);
 -- Name: recurso_afectado_id_seq1; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.recurso_afectado_id_seq1', 1, true);
+SELECT pg_catalog.setval('public.recurso_afectado_id_seq1', 1, false);
 
 
 --
@@ -2039,7 +1711,7 @@ SELECT pg_catalog.setval('public.recurso_afectado_id_seq1', 1, true);
 -- Name: tipo_cesacion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.tipo_cesacion_id_seq', 1, false);
+SELECT pg_catalog.setval('public.tipo_cesacion_id_seq', 4, true);
 
 
 --
@@ -3013,6 +2685,61 @@ ALTER TABLE ONLY public.notificacion
 
 ALTER TABLE ONLY public.vereda
     ADD CONSTRAINT vereda_municipio_id_fkey FOREIGN KEY (municipio_id) REFERENCES public.municipio(id);
+
+
+--
+-- TOC entry - Tabla file_hash para deduplicación de archivos
+-- Name: file_hash; Type: TABLE; Schema: public; Owner: postgres
+--
+
+-- Migración: Crear tabla file_hash para deduplicación de archivos
+-- Fecha: 2026-02-12
+-- Descripción: Esta tabla almacena hashes SHA256 de archivos para evitar duplicados en MinIO
+
+-- Crear tabla file_hash
+CREATE TABLE IF NOT EXISTS public.file_hash (
+    id SERIAL PRIMARY KEY,
+    file_hash VARCHAR(64) NOT NULL UNIQUE,  -- Hash SHA256 (64 caracteres hexadecimales)
+    file_url TEXT NOT NULL,                 -- URL del archivo en MinIO (bucket/path)
+    original_filename VARCHAR(255),         -- Nombre original del primer archivo con este hash
+    content_type VARCHAR(100),              -- MIME type del archivo (application/pdf, image/jpeg, etc.)
+    file_size INTEGER,                      -- Tamaño del archivo en bytes
+    reference_count INTEGER DEFAULT 1,      -- Contador de referencias (cuántas veces se usa)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    last_referenced_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+ALTER TABLE public.file_hash OWNER TO postgres;
+
+-- Crear índice único para búsquedas rápidas por hash
+CREATE UNIQUE INDEX IF NOT EXISTS ix_file_hash_unique ON public.file_hash(file_hash);
+
+-- Crear índice para búsquedas de archivos huérfanos (sin referencias)
+CREATE INDEX IF NOT EXISTS ix_file_hash_ref_count ON public.file_hash(reference_count);
+
+-- Crear índice para búsquedas por fecha de creación
+CREATE INDEX IF NOT EXISTS ix_file_hash_created ON public.file_hash(created_at);
+
+-- Comentarios para documentación
+COMMENT ON TABLE public.file_hash IS 'Tabla de deduplicación de archivos. Almacena hashes SHA256 para evitar duplicados en MinIO';
+COMMENT ON COLUMN public.file_hash.file_hash IS 'Hash SHA256 del contenido del archivo (64 caracteres hexadecimales)';
+COMMENT ON COLUMN public.file_hash.file_url IS 'URL del archivo en MinIO en formato bucket/path';
+COMMENT ON COLUMN public.file_hash.reference_count IS 'Número de veces que este archivo está siendo referenciado. 0 = archivo huérfano que puede ser eliminado';
+COMMENT ON COLUMN public.file_hash.last_referenced_at IS 'Última vez que se creó o reutilizó una referencia a este archivo';
+
+-- Función para actualizar last_referenced_at y reference_count cuando se reutiliza un archivo
+CREATE OR REPLACE FUNCTION update_file_hash_reference()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.last_referenced_at = CURRENT_TIMESTAMP;
+    NEW.reference_count = COALESCE(NEW.reference_count, 0) + 1;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Permisos
+GRANT SELECT, INSERT, UPDATE ON public.file_hash TO PUBLIC;
+GRANT USAGE ON SEQUENCE public.file_hash_id_seq TO PUBLIC;
 
 
 -- Completed on 2026-02-10 09:11:16

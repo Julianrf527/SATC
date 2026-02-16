@@ -26,7 +26,6 @@ export default function DataStageFormulation({
   data,
   setToast,
   etapaId,
-  idAuxiliar,
   onDataUpdated,
   isEditable = true,
 }: Props) {
@@ -34,7 +33,7 @@ export default function DataStageFormulation({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [descargosValue, setDescargosValue] = useState<string>(
-    data?.descargos === null ? "null" : data?.descargos?.toString() || "null"
+    data?.descargos === null ? "null" : data?.descargos?.toString() || "null",
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -119,11 +118,9 @@ export default function DataStageFormulation({
       const formData = new FormData();
       formData.append(
         "descargos",
-        descargosBoolean !== null ? descargosBoolean.toString() : "null"
+        descargosBoolean !== null ? descargosBoolean.toString() : "null",
       );
       formData.append("etapa_id", etapaId.toString());
-      formData.append("id_auxiliar", idAuxiliar.toString());
-      formData.append("tipo_etapa", "formulacion");
 
       if (selectedFile) {
         formData.append("file", selectedFile);
@@ -136,7 +133,7 @@ export default function DataStageFormulation({
           {
             method: "PUT",
             body: formData,
-          }
+          },
         );
       } else {
         res = await apiCall(API_CONFIG.ENDPOINTS.FILE_FORMULATION_CREATE, {
@@ -188,7 +185,7 @@ export default function DataStageFormulation({
       setDescargosValue(
         data?.descargos === null
           ? "null"
-          : data?.descargos?.toString() || "null"
+          : data?.descargos?.toString() || "null",
       );
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -200,7 +197,7 @@ export default function DataStageFormulation({
     if (data?.url_documento) {
       const BASE_URL = import.meta.env.VITE_API_URL;
       const fullUrl = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
-        data.url_documento
+        data.url_documento,
       )}`;
       window.open(fullUrl, "_blank");
     }
@@ -239,8 +236,8 @@ export default function DataStageFormulation({
                 {data
                   ? "Información sobre descargos y documento"
                   : isEditable
-                  ? "Registra información de formulación"
-                  : "No hay información registrada"}
+                    ? "Registra información de formulación"
+                    : "No hay información registrada"}
               </p>
             </div>
           </div>
@@ -300,7 +297,7 @@ export default function DataStageFormulation({
                   </p>
                   <span
                     className={`badge text-white ${getDescargosBadgeClass(
-                      data.descargos
+                      data.descargos,
                     )} badge-sm mt-1`}
                   >
                     {getDescargosLabel(data.descargos)}

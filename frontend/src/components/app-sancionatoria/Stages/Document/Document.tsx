@@ -30,8 +30,6 @@ export default function Document({
   documentos,
   etapaId,
   radicado,
-  idAuxiliar,
-  tipoEtapa,
   tiposDocumento,
   setToast,
   isEditable = true,
@@ -68,13 +66,13 @@ export default function Document({
   const handleViewFile = (urlDocumento: string) => {
     const BASE_URL = import.meta.env.VITE_API_URL;
     const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
-      urlDocumento
+      urlDocumento,
     )}`;
     window.open(url, "_blank");
   };
 
   const handleSaveDocumento = async (
-    formData: FormData
+    formData: FormData,
   ): Promise<{ ok: boolean; error?: string }> => {
     try {
       const isEditing = !!editingDocumento;
@@ -91,12 +89,6 @@ export default function Document({
       if (!formData.has("radicado")) {
         formData.append("radicado", radicado);
       }
-      if (!formData.has("id_auxiliar")) {
-        formData.append("id_auxiliar", idAuxiliar.toString());
-      }
-      if (!formData.has("tipo_etapa")) {
-        formData.append("tipo_etapa", tipoEtapa);
-      }
 
       const res = await apiCall(endpoint, {
         method,
@@ -110,7 +102,7 @@ export default function Document({
         let updatedDocumentos: DocumentoData[];
         if (isEditing) {
           updatedDocumentos = localDocumentos.map((doc) =>
-            doc.id === documentoData.id ? documentoData : doc
+            doc.id === documentoData.id ? documentoData : doc,
           );
         } else {
           updatedDocumentos = [documentoData, ...localDocumentos];
@@ -159,13 +151,13 @@ export default function Document({
         `${API_CONFIG.ENDPOINTS.FILE_DOCUMENTO_DELETE(deletingDocumento.id)}?radicado=${radicado}`,
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (res.ok) {
         // Actualizar estado local
         const updatedDocumentos = localDocumentos.filter(
-          (doc) => doc.id !== deletingDocumento.id
+          (doc) => doc.id !== deletingDocumento.id,
         );
         setLocalDocumentos(updatedDocumentos);
 
@@ -216,7 +208,7 @@ export default function Document({
   // Ordenar documentos por fecha de subida (más reciente primero)
   const sortedDocumentos = [...localDocumentos].sort(
     (a, b) =>
-      new Date(b.fecha_subida).getTime() - new Date(a.fecha_subida).getTime()
+      new Date(b.fecha_subida).getTime() - new Date(a.fecha_subida).getTime(),
   );
 
   return (
@@ -338,16 +330,19 @@ export default function Document({
 
                   <button
                     onClick={() => handleViewFile(documento.url_documento)}
-                    className="btn btn-ghost btn-sm hover:bg-error/10"
-                    title="Ver documento PDF"
+                    className="btn btn-success btn-sm gap-1 px-2 tooltip"
+                    data-tip="Ver documento PDF"
                   >
                     <svg
-                      className="w-8 h-8 text-error"
+                      className="w-4 h-4 text-white"
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
                       <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M15.5,15.5L13,19L11.5,15.5L8,14L11.5,12.5L13,9L14.5,12.5L18,14L15.5,15.5M13,3.5L17.5,8H13V3.5Z" />
                     </svg>
+                    <span className="text-xs font-medium text-white">
+                      Documento
+                    </span>
                   </button>
                 </div>
               </div>

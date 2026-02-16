@@ -14,6 +14,7 @@ class InvolucradoNotificacion(Base):
     fecha_envio_citacion = Column(Date)
     fecha_constancia_citacion = Column(Date)
     url_documento = Column(Text)
+    url_doc_citacion = Column(Text)
     notificacion_exitosa = Column(Boolean)
     fecha_notificacion = Column(Date)
     tipo_notificacion_id = Column(Integer, ForeignKey("tipo_notificacion.id", ondelete="SET NULL", onupdate="CASCADE"))

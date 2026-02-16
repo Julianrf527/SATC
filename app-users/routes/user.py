@@ -126,6 +126,52 @@ from utils.verify_gateway_token import verify_gateway_token
 from utils.insertLog import insert_auditoria
 from utils.verify_token_service import verify_service_jwt
 
+async def get_user_permissions(user_id: int, db: AsyncSession) -> set[int]:
+    """
+    Obtiene el conjunto de IDs de permisos que posee un usuario.
+    
+    Args:
+        user_id: Número de documento del usuario
+        db: Sesión de base de datos
+    
+    Returns:
+        set[int]: Conjunto de IDs de permisos del usuario
+    """
+    stmt = (
+        select(Permiso.id)
+        .select_from(RolPermiso)
+        .join(Permiso, Permiso.id == RolPermiso.permiso_id)
+        .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
+        .where(Usuario.numero_documento == user_id)
+    )
+    
+    result = await db.execute(stmt)
+    permission_ids = result.scalars().all()
+    
+    return set(permission_ids)
+
+
+async def get_role_permissions(rol_id: int, db: AsyncSession) -> set[int]:
+    """
+    Obtiene el conjunto de IDs de permisos que tiene un rol.
+    
+    Args:
+        rol_id: ID del rol
+        db: Sesión de base de datos
+    
+    Returns:
+        set[int]: Conjunto de IDs de permisos del rol
+    """
+    stmt = (
+        select(RolPermiso.permiso_id)
+        .where(RolPermiso.rol_id == rol_id)
+    )
+    
+    result = await db.execute(stmt)
+    permission_ids = result.scalars().all()
+    
+    return set(permission_ids)
+
 # ---------- ENDPOINTS ----------
 
 @router.post("/register")
@@ -154,6 +200,32 @@ async def registrar_usuario(
 
         if not tiene_permiso:
             raise HTTPException(status_code=403, detail="No cuenta con permisos")
+
+        # VALIDACIÓN DE ESCALADA DE PRIVILEGIOS:
+        # El rol asignado no debe tener permisos superiores a los del usuario creador
+        rol = data.rol
+        
+        # Verificar que el rol existe
+        rol_exists = await db.execute(select(exists().where(Rol.id == rol)))
+        if not rol_exists.scalar():
+            raise HTTPException(status_code=404, detail="El rol seleccionado no existe")
+        
+        # Obtener permisos del usuario creador y del rol a asignar
+        user_permissions = await get_user_permissions(user_id, db)
+        role_permissions = await get_role_permissions(rol, db)
+        
+        # Verificar que el rol no tenga permisos superiores
+        permisos_no_autorizados = role_permissions - user_permissions
+        
+        if permisos_no_autorizados:
+            stmt = select(Permiso.nombre).where(Permiso.id.in_(permisos_no_autorizados))
+            result = await db.execute(stmt)
+            nombres_permisos = result.scalars().all()
+            
+            raise HTTPException(
+                status_code=403,
+                detail=f"No puede asignar un rol con permisos que no posee: {', '.join(nombres_permisos)}"
+            )
 
         # Capitalizar nombres (por si acaso no se hizo en frontend)
         def capitalize_name(name: str) -> str:
@@ -198,11 +270,6 @@ async def registrar_usuario(
         exist_email = await db.execute(select(exists().where(Usuario.correo == email)))
         if exist_email.scalar():
             raise HTTPException(status_code=409, detail="El correo electrónico ya está registrado")
-
-        # Verificar que el rol existe
-        rol_exists = await db.execute(select(exists().where(Rol.id == rol)))
-        if not rol_exists.scalar():
-            raise HTTPException(status_code=404, detail="El rol seleccionado no existe")
 
         # Insertar usuario
         stmt = insert(Usuario).values(
@@ -458,6 +525,30 @@ async def actualizar_rol(
 
         if not tiene_permiso:
             raise HTTPException(status_code=403, detail="No cuenta con permisos")
+
+        # VALIDACIÓN DE ESCALADA DE PRIVILEGIOS:
+        # El rol asignado no debe tener permisos superiores a los del usuario que hace el cambio
+        # Verificar que el rol existe
+        rol_exists = await db.execute(select(exists().where(Rol.id == rol_id)))
+        if not rol_exists.scalar():
+            raise HTTPException(status_code=404, detail="El rol seleccionado no existe")
+        
+        # Obtener permisos del usuario que hace el cambio y del rol a asignar
+        user_permissions = await get_user_permissions(user_id, db)
+        role_permissions = await get_role_permissions(rol_id, db)
+        
+        # Verificar que el rol no tenga permisos superiores
+        permisos_no_autorizados = role_permissions - user_permissions
+        
+        if permisos_no_autorizados:
+            stmt = select(Permiso.nombre).where(Permiso.id.in_(permisos_no_autorizados))
+            result = await db.execute(stmt)
+            nombres_permisos = result.scalars().all()
+            
+            raise HTTPException(
+                status_code=403,
+                detail=f"No puede asignar un rol con permisos que no posee: {', '.join(nombres_permisos)}"
+            )
 
         stmr = select(Usuario).where(Usuario.numero_documento == document)
         result = await db.execute(stmr)

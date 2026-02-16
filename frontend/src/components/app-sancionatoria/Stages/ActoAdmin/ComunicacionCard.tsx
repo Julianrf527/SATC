@@ -76,7 +76,7 @@ export default function ComunicacionCard({
     if (comunicacion?.url_documento) {
       const BASE_URL = import.meta.env.VITE_API_URL;
       const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
-        comunicacion.url_documento
+        comunicacion.url_documento,
       )}`;
       window.open(url, "_blank");
     }
@@ -97,7 +97,7 @@ export default function ComunicacionCard({
           method: "DELETE",
           body: JSON.stringify({ radicado }),
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
 
       if (res.ok) {
@@ -230,12 +230,12 @@ export default function ComunicacionCard({
             {comunicacion.url_documento && (
               <button
                 onClick={openDocument}
-                className="btn btn-ghost btn-sm btn-square"
-                title="Ver documento"
+                className="btn btn-success btn-sm gap-1 px-2 tooltip"
+                data-tip="Ver documento"
               >
                 {isPdfUrl(comunicacion.url_documento) ? (
                   <svg
-                    className="w-5 h-5 text-error"
+                    className="w-4 h-4 text-white"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >
@@ -243,7 +243,7 @@ export default function ComunicacionCard({
                   </svg>
                 ) : (
                   <svg
-                    className="w-5 h-5 text-info"
+                    className="w-4 h-4 text-white"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -256,6 +256,9 @@ export default function ComunicacionCard({
                     />
                   </svg>
                 )}
+                <span className="text-xs font-medium text-white">
+                  Comunicación
+                </span>
               </button>
             )}
 
@@ -362,7 +365,7 @@ export default function ComunicacionCard({
                 src={`${
                   import.meta.env.VITE_API_URL
                 }${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
-                  comunicacion.url_documento
+                  comunicacion.url_documento,
                 )}`}
                 alt="Vista previa del documento"
                 className="max-w-full max-h-[90vh] rounded-lg shadow-2xl"

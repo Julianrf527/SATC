@@ -281,94 +281,6 @@ CREATE VIEW public.vista_documentos_detalle AS
 
 ALTER VIEW public.vista_documentos_detalle OWNER TO postgres;
 
---
--- TOC entry 5086 (class 0 OID 17752)
--- Dependencies: 219
--- Data for Name: asignaciones_revisores; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.asignaciones_revisores (id, documento_id, revisor_id, fecha_asignacion, notificado) FROM stdin;
-12	16	1233506796	2025-12-07 21:32:01.453659	t
-13	17	1233506796	2025-12-11 11:01:52.894003	t
-14	18	1233506796	2025-12-11 11:09:45.550225	t
-\.
-
-
---
--- TOC entry 5088 (class 0 OID 17761)
--- Dependencies: 221
--- Data for Name: auditoria_documentos; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.auditoria_documentos (id, documento_id, usuario_id, accion, descripcion, datos_adicionales, fecha_accion, ip_address) FROM stdin;
-55	16	1233506795	crear	Documento creado	\N	2025-12-07 21:32:00.282006	\N
-56	16	1233506795	crear	Documento creado con 1 revisor(es)	{"revisores": [1233506796]}	2025-12-07 21:32:01.465238	\N
-57	16	1233506795	devolver	Estado cambiado de en_revision a rechazado	\N	2025-12-07 21:33:17.396092	\N
-58	16	1233506796	devolver	Estado cambiado de en_revision a rechazado, rechazos 1/3	{"version": 1, "comentarios": "No cumple con x criterios"}	2025-12-07 21:33:18.363865	\N
-59	16	1233506795	actualizar	Estado cambiado de rechazado a en_revision	\N	2025-12-07 21:35:04.298216	\N
-60	16	1233506795	aprobar	Estado cambiado de en_revision a aprobado	\N	2025-12-07 21:35:40.546589	\N
-61	16	1233506796	aprobar	Documento aprobado exitosamente	{"version": 2, "comentarios": "Aprobado"}	2025-12-07 21:35:41.763196	\N
-62	17	1233506795	crear	Documento creado	\N	2025-12-11 11:01:51.80451	\N
-63	17	1233506795	crear	Documento creado con 1 revisor(es)	{"revisores": [1233506796]}	2025-12-11 11:01:52.900243	\N
-64	17	1233506795	devolver	Estado cambiado de en_revision a rechazado	\N	2025-12-11 11:03:12.123854	\N
-65	17	1233506796	devolver	Estado cambiado de en_revision a rechazado, rechazos 1/3	{"version": 1, "comentarios": "Falto una firma"}	2025-12-11 11:03:13.136841	\N
-66	17	1233506795	actualizar	Estado cambiado de rechazado a en_revision	\N	2025-12-11 11:04:20.626414	\N
-67	17	1233506795	devolver	Estado cambiado de en_revision a rechazado	\N	2025-12-11 11:05:03.040281	\N
-68	17	1233506796	devolver	Estado cambiado de en_revision a rechazado, rechazos 2/3	{"version": 2, "comentarios": "Falto x"}	2025-12-11 11:05:03.812221	\N
-69	17	1233506795	actualizar	Estado cambiado de rechazado a en_revision	\N	2025-12-11 11:05:52.078102	\N
-70	17	1233506795	finalizar	Estado cambiado de en_revision a finalizado	\N	2025-12-11 11:06:26.635194	\N
-71	17	1233506796	finalizar	Documento finalizado tras 3 devoluciones	{"version": 3, "comentarios": "Falto x"}	2025-12-11 11:06:27.394445	\N
-72	18	1233506795	crear	Documento creado	\N	2025-12-11 11:09:44.762533	\N
-73	18	1233506795	crear	Documento creado con 1 revisor(es)	{"revisores": [1233506796]}	2025-12-11 11:09:45.552148	\N
-74	18	1233506795	aprobar	Estado cambiado de en_revision a aprobado	\N	2025-12-11 11:10:05.824439	\N
-75	18	1233506796	aprobar	Documento aprobado exitosamente	{"version": 1, "comentarios": "Bien"}	2025-12-11 11:10:06.674938	\N
-\.
-
-
---
--- TOC entry 5090 (class 0 OID 17772)
--- Dependencies: 223
--- Data for Name: documentos; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.documentos (id, nombre, descripcion, tipo_archivo, usuario_creador_id, fecha_creacion, estado, version_actual, numero_devoluciones, fecha_ultima_actualizacion) FROM stdin;
-16	Contrato X	Este documetno x	pdf	1233506795	2025-12-07 21:32:00.281547	aprobado	2	1	2025-12-07 21:35:41.753039
-17	Notificaicon	\N	pdf	1233506795	2025-12-11 11:01:51.804015	finalizado	3	3	2025-12-11 11:06:27.38784
-18	Comunicacion	\N	pdf	1233506795	2025-12-11 11:09:44.762209	aprobado	1	0	2025-12-11 11:10:06.671109
-\.
-
-
---
--- TOC entry 5092 (class 0 OID 17791)
--- Dependencies: 225
--- Data for Name: revisiones; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.revisiones (id, documento_id, version_revisada, revisor_id, estado_revision, comentarios, fecha_revision) FROM stdin;
-8	16	1	1233506796	devuelto	No cumple con x criterios	2025-12-07 21:33:18.368412
-9	16	2	1233506796	aprobado	Aprobado	2025-12-07 21:35:41.766556
-10	17	1	1233506796	devuelto	Falto una firma	2025-12-11 11:03:13.140193
-11	17	2	1233506796	devuelto	Falto x	2025-12-11 11:05:03.813273
-12	17	3	1233506796	devuelto	Falto x	2025-12-11 11:06:27.396868
-13	18	1	1233506796	aprobado	Bien	2025-12-11 11:10:06.675945
-\.
-
-
---
--- TOC entry 5094 (class 0 OID 17804)
--- Dependencies: 227
--- Data for Name: versiones_documento; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.versiones_documento (id, documento_id, numero_version, archivo_url, archivo_nombre_original, archivo_size, usuario_subida_id, fecha_subida, comentario) FROM stdin;
-16	16	1	uploads/documentos\\20251207_213200_Propuesta Solución.pdf	Propuesta Solución.pdf	2970609	1233506795	2025-12-07 21:32:01.476845	Versión inicial
-17	16	2	uploads/documentos\\20251207_213504_imc3smdnx08py-parcial-2-discretas-ii-pdf-application-pdf (1).pdf	imc3smdnx08py-parcial-2-discretas-ii-pdf-application-pdf (1).pdf	335317	1233506795	2025-12-07 21:35:04.3238	Corregido x cosas
-18	17	1	uploads/documentos\\20251211_110151_hoja_77_hoja_95.pdf	hoja_77_hoja_95.pdf	9990883	1233506795	2025-12-11 11:01:52.926588	Versión inicial
-19	17	2	uploads/documentos\\20251211_110420_hoja_77_hoja_95.pdf	hoja_77_hoja_95.pdf	9990883	1233506795	2025-12-11 11:04:20.67099	Cambios realizados
-20	17	3	uploads/documentos\\20251211_110552_hoja_5_hoja_10.pdf	hoja_5_hoja_10.pdf	2508428	1233506795	2025-12-11 11:05:52.093673	x
-21	18	1	uploads/documentos\\20251211_110944_hoja_206_hoja_208.pdf	hoja_206_hoja_208.pdf	818764	1233506795	2025-12-11 11:09:45.552983	Versión inicial
-\.
-
 
 --
 -- TOC entry 5101 (class 0 OID 0)
@@ -376,7 +288,7 @@ COPY public.versiones_documento (id, documento_id, numero_version, archivo_url, 
 -- Name: asignaciones_revisores_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.asignaciones_revisores_id_seq', 14, true);
+SELECT pg_catalog.setval('public.asignaciones_revisores_id_seq', 1, false);
 
 
 --
@@ -385,7 +297,7 @@ SELECT pg_catalog.setval('public.asignaciones_revisores_id_seq', 14, true);
 -- Name: auditoria_documentos_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.auditoria_documentos_id_seq', 75, true);
+SELECT pg_catalog.setval('public.auditoria_documentos_id_seq', 1, false);
 
 
 --
@@ -394,7 +306,7 @@ SELECT pg_catalog.setval('public.auditoria_documentos_id_seq', 75, true);
 -- Name: documentos_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.documentos_id_seq', 18, true);
+SELECT pg_catalog.setval('public.documentos_id_seq', 1, false);
 
 
 --
@@ -403,7 +315,7 @@ SELECT pg_catalog.setval('public.documentos_id_seq', 18, true);
 -- Name: revisiones_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.revisiones_id_seq', 13, true);
+SELECT pg_catalog.setval('public.revisiones_id_seq', 1, false);
 
 
 --
@@ -412,7 +324,7 @@ SELECT pg_catalog.setval('public.revisiones_id_seq', 13, true);
 -- Name: versiones_documento_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.versiones_documento_id_seq', 21, true);
+SELECT pg_catalog.setval('public.versiones_documento_id_seq', 1, false);
 
 
 --
@@ -712,6 +624,61 @@ ALTER TABLE ONLY public.revisiones
 
 ALTER TABLE ONLY public.versiones_documento
     ADD CONSTRAINT versiones_documento_documento_id_fkey FOREIGN KEY (documento_id) REFERENCES public.documentos(id) ON DELETE CASCADE;
+
+
+--
+-- TOC entry - Tabla file_hash para deduplicación de archivos
+-- Name: file_hash; Type: TABLE; Schema: public; Owner: postgres
+--
+
+-- Migración: Crear tabla file_hash para deduplicación de archivos
+-- Fecha: 2026-02-12
+-- Descripción: Esta tabla almacena hashes SHA256 de archivos para evitar duplicados en MinIO
+
+-- Crear tabla file_hash
+CREATE TABLE IF NOT EXISTS public.file_hash (
+    id SERIAL PRIMARY KEY,
+    file_hash VARCHAR(64) NOT NULL UNIQUE,  -- Hash SHA256 (64 caracteres hexadecimales)
+    file_url TEXT NOT NULL,                 -- URL del archivo en MinIO (bucket/path)
+    original_filename VARCHAR(255),         -- Nombre original del primer archivo con este hash
+    content_type VARCHAR(100),              -- MIME type del archivo (application/pdf, image/jpeg, etc.)
+    file_size INTEGER,                      -- Tamaño del archivo en bytes
+    reference_count INTEGER DEFAULT 1,      -- Contador de referencias (cuántas veces se usa)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    last_referenced_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+ALTER TABLE public.file_hash OWNER TO postgres;
+
+-- Crear índice único para búsquedas rápidas por hash
+CREATE UNIQUE INDEX IF NOT EXISTS ix_file_hash_unique ON public.file_hash(file_hash);
+
+-- Crear índice para búsquedas de archivos huérfanos (sin referencias)
+CREATE INDEX IF NOT EXISTS ix_file_hash_ref_count ON public.file_hash(reference_count);
+
+-- Crear índice para búsquedas por fecha de creación
+CREATE INDEX IF NOT EXISTS ix_file_hash_created ON public.file_hash(created_at);
+
+-- Comentarios para documentación
+COMMENT ON TABLE public.file_hash IS 'Tabla de deduplicación de archivos. Almacena hashes SHA256 para evitar duplicados en MinIO';
+COMMENT ON COLUMN public.file_hash.file_hash IS 'Hash SHA256 del contenido del archivo (64 caracteres hexadecimales)';
+COMMENT ON COLUMN public.file_hash.file_url IS 'URL del archivo en MinIO en formato bucket/path';
+COMMENT ON COLUMN public.file_hash.reference_count IS 'Número de veces que este archivo está siendo referenciado. 0 = archivo huérfano que puede ser eliminado';
+COMMENT ON COLUMN public.file_hash.last_referenced_at IS 'Última vez que se creó o reutilizó una referencia a este archivo';
+
+-- Función para actualizar last_referenced_at y reference_count cuando se reutiliza un archivo
+CREATE OR REPLACE FUNCTION update_file_hash_reference()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.last_referenced_at = CURRENT_TIMESTAMP;
+    NEW.reference_count = COALESCE(NEW.reference_count, 0) + 1;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Permisos
+GRANT SELECT, INSERT, UPDATE ON public.file_hash TO PUBLIC;
+GRANT USAGE ON SEQUENCE public.file_hash_id_seq TO PUBLIC;
 
 
 -- Completed on 2026-02-10 09:11:38

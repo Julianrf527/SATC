@@ -1,6 +1,6 @@
 # Setup de Bases de Datos - SATC
 
-Este directorio contiene los scripts necesarios para recrear las bases de datos del sistema SATC.
+Este directorio contiene los scripts necesarios para configurar y migrar las bases de datos del sistema SATC usando Docker.
 
 ## Bases de Datos
 
@@ -12,47 +12,56 @@ El sistema utiliza 3 bases de datos PostgreSQL:
 
 ## Archivos
 
-- `setup_databases.sql` - Script SQL que elimina y crea las bases de datos vacías
+### Scripts SQL
+
 - `user_db.sql` - Dump completo de la base de datos de usuarios
 - `expedientes_db.sql` - Dump completo de la base de datos de expedientes
 - `documentos_db.sql` - Dump completo de la base de datos de documentos
-- `recreate_all_databases.ps1` - Script PowerShell para automatizar todo el proceso
-- `recreate_all_databases.bat` - Script Batch alternativo para automatizar el proceso
+
+### Migraciones
+
+- `create_sesiones_activas.sql` - Migración para tabla de sesiones activas
+- `add_url_doc_citacion_column.sql` - Migración para agregar columna url_doc_citacion
+
+### Scripts de Automatización
+
+- `apply_all_migrations.ps1` - Script principal para aplicar todas las migraciones en contenedores Docker
 
 ## Uso
 
-### Opción 1: Script PowerShell (Recomendado)
+### 🐳 Aplicar Migraciones con Docker
+
+**Prerrequisitos:**
+
+- Docker Desktop debe estar ejecutándose
+- Los contenedores PostgreSQL deben estar activos
 
 ```powershell
 cd db-script
-.\recreate_all_databases.ps1
+.\apply_all_migrations.ps1
 ```
 
-### Opción 2: Script Batch
+### Qué hace el script:
 
-```cmd
-cd db-script
-recreate_all_databases.bat
-```
+1. ✅ Verifica que Docker esté corriendo
+2. ✅ Verifica que los contenedores de PostgreSQL estén activos:
+   - `satc-postgres-users`
+   - `satc-postgres-sanctioning`
+   - `satc-postgres-docs`
+3. ✅ Aplica los dumps de las 3 bases de datos
+4. ✅ Aplica todas las migraciones adicionales
+5. ✅ Verifica que las tablas se crearon correctamente
 
-### Opción 3: Manual con psql
-
-```bash
-# 1. Crear las bases de datos
-psql -h localhost -U postgres -d postgres -f setup_databases.sql
-
-# 2. Restaurar cada base de datos
-psql -h localhost -U postgres -d user_db -f user_db.sql
-psql -h localhost -U postgres -d expedientes_db -f expedientes_db.sql
-psql -h localhost -U postgres -d documentos_db -f documentos_db.sql
-```
+**Tiempo estimado**: 30-60 segundos
 
 ## Requisitos
 
-- PostgreSQL 12 o superior instalado
-- Usuario `postgres` con privilegios de superusuario
-- Herramienta `psql` disponible en el PATH del sistema
-- Contraseña del usuario postgres
+- Docker Desktop instalado y ejecutándose
+- PowerShell 5.1 o superior
+- Contenedores de PostgreSQL activos:
+  - `satc-postgres-users` (puerto 5433)
+  - `satc-postgres-sanctioning` (puerto 5434)
+  - `satc-postgres-docs` (puerto 5435)
 
 ## Notas Importantes
 
@@ -60,41 +69,55 @@ psql -h localhost -U postgres -d documentos_db -f documentos_db.sql
 
 ### El proceso realiza:
 
-1. Termina todas las conexiones activas a las bases de datos
-2. Elimina las bases de datos si existen
-3. Crea las bases de datos nuevas
-4. Restaura todas las tablas, funciones, vistas y datos desde los archivos SQL
-
-### Tiempo estimado
-
-El proceso completo toma aproximadamente 1-2 minutos dependiendo del tamaño de los datos.
+1. Aplica los dumps completos de las 3 bases de datos
+2. Crea la tabla `sesion_activa` para control de sesiones únicas
+3. Agrega la columna `url_doc_citacion` para documentos de citación
+4. Verifica que todas las tablas se crearon correctamente
 
 ## Solución de Problemas
 
-### Error: "psql no se reconoce como comando"
+### Error: "Docker no está ejecutándose"
 
-Asegúrate de que PostgreSQL esté instalado y que `psql` esté en tu PATH. Para agregarlo:
+Asegúrate de que Docker Desktop esté abierto y corriendo:
 
 ```powershell
-$env:Path += ";C:\Program Files\PostgreSQL\15\bin"
+# Verificar estado de Docker
+docker ps
 ```
 
-### Error: "no se pudo conectar al servidor"
+### Error: "Contenedor no encontrado"
 
-- Verifica que PostgreSQL esté ejecutándose
-- Confirma el host y puerto en la configuración del script
-- Verifica las credenciales del usuario
-
-### Error: "permiso denegado"
-
-Asegúrate de ejecutar el script con un usuario que tenga privilegios suficientes (típicamente el usuario `postgres`).
-
-## Configuración
-
-Si tu configuración de PostgreSQL es diferente, edita las variables al inicio del script:
+Verifica que los contenedores de PostgreSQL estén activos:
 
 ```powershell
-$PG_HOST = "localhost"     # Host de PostgreSQL
-$PG_PORT = "5432"          # Puerto de PostgreSQL
-$PG_USER = "postgres"      # Usuario de PostgreSQL
+# Listar contenedores activos
+docker ps | Select-String "postgres"
+```
+
+Si los contenedores no están activos, inícilaos con:
+
+```powershell
+docker-compose up -d
+```
+
+### Error al aplicar migraciones
+
+Si una migración falla, puedes aplicarla manualmente:
+
+```powershell
+# Ejemplo para crear la tabla de sesiones activas
+Get-Content create_sesiones_activas.sql | docker exec -i satc-postgres-users psql -U admin -d user_db
+```
+
+## Estructura del Directorio
+
+```
+db-script/
+├── apply_all_migrations.ps1          # Script principal
+├── user_db.sql                        # Dump: Base de datos de usuarios
+├── expedientes_db.sql                 # Dump: Base de datos de expedientes
+├── documentos_db.sql                  # Dump: Base de datos de documentos
+├── create_sesiones_activas.sql        # Migración: Tabla sesiones
+├── add_url_doc_citacion_column.sql    # Migración: Columna citación
+└── README_SETUP.md                    # Este archivo
 ```

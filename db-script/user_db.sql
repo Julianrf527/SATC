@@ -12,7 +12,7 @@
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
+-- SET transaction_timeout = 0;  -- Comentado: requiere PostgreSQL 17+, contenedor usa PG 15
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -214,213 +214,6 @@ CREATE TABLE public.usuario (
 
 ALTER TABLE public.usuario OWNER TO postgres;
 
---
--- TOC entry 5059 (class 0 OID 18287)
--- Dependencies: 219
--- Data for Name: auditoria; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.auditoria (id, tabla_afectada, id_registro, tipo_operacion, usuario_id, fecha, descripcion, datos_anteriores, datos_nuevos) FROM stdin;
-1	permiso	11	INSERT	1233506795	2025-11-16 11:12:39.331277-05	Creacion de permioso ID 11 con nombre 'add'	null	{"id": 11, "nombre": "add", "menu_path": "add"}
-2	permiso	12	INSERT	1233506795	2025-11-16 11:23:08.919707-05	Creacion de permioso ID 12 con nombre 'algo'	null	{"id": 12, "nombre": "algo", "menu_path": "algo"}
-3	usuario	1233506796	INSERT	1233506795	2025-11-16 17:13:24.02097-05	Creación de usuario Julian Rodriguez con documento 1233506796	null	{"numero_documento": 1233506796, "nombre_completo": "Julian Rodriguez", "primer_nombre": "Julian", "segundo_nombre": null, "primer_apellido": "Rodriguez", "segundo_apellido": null, "correo": "juliandrf527@gmail.com", "rol_id": 1, "activo": true}
-4	usuario	1233506795	UPDATE	1233506795	2025-11-16 17:43:12.725644-05	Actualización de datos del usuario Julian Rodriguez	{"numero_documento": 1233506795, "primer_nombre": "Julian", "segundo_nombre": "David", "primer_apellido": "Rodriguez", "segundo_apellido": "Fernandez", "correo": "julianrf527@gmail.com"}	{"numero_documento": 1233506795, "nombre_completo": "Julian Rodriguez", "primer_nombre": "Julian", "segundo_nombre": null, "primer_apellido": "Rodriguez", "segundo_apellido": null, "correo": "julianrf527@gmail.com"}
-5	usuario	1233506795	UPDATE	1233506795	2025-11-16 18:45:53.887194-05	Actualización de datos del usuario Julian Rodriguez	{"numero_documento": 1233506795, "primer_nombre": "Julian", "segundo_nombre": null, "primer_apellido": "Rodriguez", "segundo_apellido": null, "correo": "julianrf527@gmail.com"}	{"numero_documento": 1233506795, "nombre_completo": "Julian Rodriguez", "primer_nombre": "Julian", "segundo_nombre": null, "primer_apellido": "Rodriguez", "segundo_apellido": null, "correo": "julianrf527@gmail.com"}
-6	usuario	1233506796	UPDATE	1233506795	2025-11-16 22:24:21.457964-05	Cambio de estado de usuario 1233506796: True → False	{"numero_documento": 1233506796, "activo": true}	{"numero_documento": 1233506796, "activo": false}
-7	usuario	1233506796	UPDATE	1233506795	2025-11-16 22:24:25.108093-05	Cambio de estado de usuario 1233506796: False → True	{"numero_documento": 1233506796, "activo": false}	{"numero_documento": 1233506796, "activo": true}
-8	usuario	1030695776	INSERT	1233506795	2025-11-16 22:41:05.599228-05	Creación de usuario Andres Bolivar con documento 1030695776	null	{"numero_documento": 1030695776, "nombre_completo": "Andres Bolivar", "primer_nombre": "Andres", "segundo_nombre": null, "primer_apellido": "Bolivar", "segundo_apellido": null, "correo": "andresfelbol@gmail.com", "rol_id": 1, "activo": true}
-9	usuario	1030695776	UPDATE	1233506795	2025-11-16 22:41:38.250772-05	Cambio de estado de usuario 1030695776: True → False	{"numero_documento": 1030695776, "activo": true}	{"numero_documento": 1030695776, "activo": false}
-10	usuario	1233506795	UPDATE	1233506795	2025-11-16 22:43:28.076827-05	Actualización de datos del usuario Julian David Rodriguez Fernandez	{"numero_documento": 1233506795, "primer_nombre": "Julian", "segundo_nombre": null, "primer_apellido": "Rodriguez", "segundo_apellido": null, "correo": "julianrf527@gmail.com"}	{"numero_documento": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "primer_nombre": "Julian", "segundo_nombre": "David", "primer_apellido": "Rodriguez", "segundo_apellido": "Fernandez", "correo": "julianrf527@gmail.com"}
-11	codigo_recuperacion	7	INSERT	1233506795	2025-11-16 23:32:25.007746-05	Solicitud de código de recuperación para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_solicitud": "2025-11-16T23:32:25.005976-05:00", "expiracion_minutos": 10}
-12	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:33:29.005557-05	Recuperación de contraseña exitosa para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_recuperacion": "2025-11-16T23:33:29.004824-05:00", "password_temporal_enviado": true}
-13	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:33:55.540716-05	Inicio de sesión de usuario Julian David Rodriguez Fernandez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-16T23:33:55.540069-05:00"}
-14	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:34:09.201627-05	Cambio de contraseña del usuario 1233506795	null	{"numero_documento": 1233506795, "accion": "cambio_contrasena"}
-15	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:34:11.215072-05	Cierre de sesión de usuario Julian David Rodriguez Fernandez	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-16T23:34:11.214397-05:00"}	null
-16	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:34:17.527749-05	Inicio de sesión de usuario Julian David Rodriguez Fernandez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-16T23:34:17.527254-05:00"}
-17	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:36:20.482585-05	Cierre de sesión de usuario Julian David Rodriguez Fernandez	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-16T23:36:20.381772-05:00"}	null
-18	codigo_recuperacion	8	INSERT	1233506795	2025-11-16 23:36:34.502782-05	Solicitud de código de recuperación para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_solicitud": "2025-11-16T23:36:34.501750-05:00", "expiracion_minutos": 10}
-19	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:37:08.524929-05	Recuperación de contraseña exitosa para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_recuperacion": "2025-11-16T23:37:08.524220-05:00", "password_temporal_enviado": true}
-20	codigo_recuperacion	9	INSERT	1233506795	2025-11-16 23:41:59.310545-05	Solicitud de código de recuperación para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_solicitud": "2025-11-16T23:41:59.307064-05:00", "expiracion_minutos": 10}
-21	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:42:06.960244-05	Recuperación de contraseña exitosa para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_recuperacion": "2025-11-16T23:42:06.959564-05:00", "password_temporal_enviado": true}
-22	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:42:36.569978-05	Inicio de sesión de usuario Julian David Rodriguez Fernandez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-16T23:42:36.569561-05:00"}
-23	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:42:56.324354-05	Cambio de contraseña del usuario 1233506795	null	{"numero_documento": 1233506795, "accion": "cambio_contrasena"}
-24	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:42:58.336413-05	Cierre de sesión de usuario Julian David Rodriguez Fernandez	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-16T23:42:58.335854-05:00"}	null
-75	usuario	1233506795	UPDATE	1233506795	2025-11-25 00:43:30.972343-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-25T00:43:30.969839-05:00"}	null
-25	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:43:03.975779-05	Inicio de sesión de usuario Julian David Rodriguez Fernandez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-16T23:43:03.975254-05:00"}
-26	usuario	1233506797	INSERT	1233506795	2025-11-16 23:43:29.348287-05	Creación de usuario Julian David Rodriguez Fernandez con documento 1233506797	null	{"numero_documento": 1233506797, "nombre_completo": "Julian David Rodriguez Fernandez", "primer_nombre": "Julian", "segundo_nombre": "David", "primer_apellido": "Rodriguez", "segundo_apellido": "Fernandez", "correo": "morofake527@gmail.com", "rol_id": 1, "activo": true}
-27	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:45:38.068336-05	Cierre de sesión de usuario Julian David Rodriguez Fernandez	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-16T23:45:37.961610-05:00"}	null
-28	codigo_recuperacion	10	INSERT	1233506795	2025-11-16 23:45:45.757106-05	Solicitud de código de recuperación para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_solicitud": "2025-11-16T23:45:45.756535-05:00", "expiracion_minutos": 10}
-29	codigo_recuperacion	11	INSERT	1233506795	2025-11-16 23:48:31.993326-05	Solicitud de código de recuperación para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_solicitud": "2025-11-16T23:48:31.991152-05:00", "expiracion_minutos": 10}
-30	codigo_recuperacion	12	INSERT	1233506795	2025-11-16 23:50:33.614535-05	Solicitud de código de recuperación para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_solicitud": "2025-11-16T23:50:33.612510-05:00", "expiracion_minutos": 10}
-31	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:50:51.138807-05	Recuperación de contraseña exitosa para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_recuperacion": "2025-11-16T23:50:51.137953-05:00", "password_temporal_enviado": true}
-32	codigo_recuperacion	13	INSERT	1233506795	2025-11-16 23:54:45.665046-05	Solicitud de código de recuperación para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_solicitud": "2025-11-16T23:54:45.662054-05:00", "expiracion_minutos": 10}
-33	codigo_recuperacion	14	INSERT	1233506795	2025-11-16 23:57:22.602034-05	Solicitud de código de recuperación para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_solicitud": "2025-11-16T23:57:22.598329-05:00", "expiracion_minutos": 10}
-34	codigo_recuperacion	15	INSERT	1233506795	2025-11-16 23:58:28.381311-05	Solicitud de código de recuperación para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_solicitud": "2025-11-16T23:58:28.378330-05:00", "expiracion_minutos": 10}
-35	usuario	1233506795	UPDATE	1233506795	2025-11-16 23:59:02.918446-05	Recuperación de contraseña exitosa para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_recuperacion": "2025-11-16T23:59:02.915588-05:00", "password_temporal_enviado": true}
-36	codigo_recuperacion	16	INSERT	1233506795	2025-11-16 23:59:58.495105-05	Solicitud de código de recuperación para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_solicitud": "2025-11-16T23:59:58.492505-05:00", "expiracion_minutos": 10}
-37	usuario	1233506795	UPDATE	1233506795	2025-11-17 00:00:06.48186-05	Recuperación de contraseña exitosa para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_recuperacion": "2025-11-17T00:00:06.481130-05:00", "password_temporal_enviado": true}
-38	usuario	1233506795	UPDATE	1233506795	2025-11-17 00:00:18.769805-05	Inicio de sesión de usuario Julian David Rodriguez Fernandez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-17T00:00:18.769393-05:00"}
-39	usuario	1233506795	UPDATE	1233506795	2025-11-17 21:10:20.459634-05	Cierre de sesión de usuario Julian David Rodriguez Fernandez	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-17T21:10:20.456578-05:00"}	null
-40	codigo_recuperacion	17	INSERT	1233506795	2025-11-17 21:10:42.4715-05	Solicitud de código de recuperación para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_solicitud": "2025-11-17T21:10:42.470646-05:00", "expiracion_minutos": 10}
-41	usuario	1233506795	UPDATE	1233506795	2025-11-17 21:10:52.891892-05	Recuperación de contraseña exitosa para julianrf527@gmail.com	null	{"correo": "julianrf527@gmail.com", "usuario_id": 1233506795, "fecha_recuperacion": "2025-11-17T21:10:52.891397-05:00", "password_temporal_enviado": true}
-42	usuario	1233506795	UPDATE	1233506795	2025-11-17 21:11:03.535324-05	Inicio de sesión de usuario Julian David Rodriguez Fernandez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-17T21:11:03.534678-05:00"}
-43	usuario	1233506795	UPDATE	1233506795	2025-11-17 21:11:20.868113-05	Cambio de contraseña del usuario 1233506795	null	{"numero_documento": 1233506795, "accion": "cambio_contrasena"}
-44	usuario	1233506795	UPDATE	1233506795	2025-11-17 21:11:22.890707-05	Cierre de sesión de usuario Julian David Rodriguez Fernandez	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-17T21:11:22.889799-05:00"}	null
-45	usuario	1233506795	UPDATE	1233506795	2025-11-17 21:11:28.520724-05	Inicio de sesión de usuario Julian David Rodriguez Fernandez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-17T21:11:28.520059-05:00"}
-46	usuario	1233506795	UPDATE	1233506795	2025-11-17 21:40:24.064299-05	Inicio de sesión de usuario Julian David Rodriguez Fernandez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-17T21:40:24.063696-05:00"}
-47	usuario	1233506795	UPDATE	1233506795	2025-11-18 00:33:22.624901-05	Inicio de sesión de usuario Julian David Rodriguez Fernandez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-18T00:33:22.621990-05:00"}
-48	usuario	1233506795	UPDATE	1233506795	2025-11-18 00:35:25.345467-05	Inicio de sesión de usuario Julian David Rodriguez Fernandez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-18T00:35:25.342555-05:00"}
-76	usuario	1233506795	UPDATE	1233506795	2025-11-25 00:43:37.160501-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-25T00:43:37.160043-05:00"}
-49	usuario	1233506795	UPDATE	1233506795	2025-11-18 01:28:20.008901-05	Inicio de sesión de usuario Julian David Rodriguez Fernandez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-18T01:28:20.002435-05:00"}
-50	usuario	1233506796	UPDATE	1233506795	2025-11-18 01:44:27.950265-05	Cambio de estado de usuario 1233506796: True → False	{"numero_documento": 1233506796, "activo": true}	{"numero_documento": 1233506796, "activo": false}
-51	usuario	1233506796	UPDATE	1233506795	2025-11-18 01:44:29.770242-05	Cambio de estado de usuario 1233506796: False → True	{"numero_documento": 1233506796, "activo": false}	{"numero_documento": 1233506796, "activo": true}
-52	rol	2	INSERT	1233506795	2025-11-18 01:44:59.211065-05	Creacion de rol ID 2 a nombre 'admin2'	null	{"id": 2, "nombre": "admin2", "permisos": [7, 5]}
-53	rol	2	DELETE	1233506795	2025-11-18 01:46:30.492836-05	Eliminación de rol ID 2 con nombre 'admin2'	{"id": 2, "nombre": "admin2", "permisos": [7, 5]}	null
-54	rol	3	INSERT	1233506795	2025-11-18 01:46:53.405259-05	Creacion de rol ID 3 a nombre 'admin2'	null	{"id": 3, "nombre": "admin2", "permisos": [7, 5]}
-55	usuario	1233506795	UPDATE	1233506795	2025-11-18 16:08:07.994605-05	Cierre de sesión de usuario Julian David Rodriguez Fernandez	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-18T16:08:07.992113-05:00"}	null
-56	codigo_recuperacion	18	INSERT	1233506796	2025-11-18 16:08:27.314227-05	Solicitud de código de recuperación para juliandrf527@gmail.com	null	{"correo": "juliandrf527@gmail.com", "usuario_id": 1233506796, "fecha_solicitud": "2025-11-18T16:08:27.313518-05:00", "expiracion_minutos": 10}
-57	usuario	1233506796	UPDATE	1233506796	2025-11-18 16:08:40.311578-05	Recuperación de contraseña exitosa para juliandrf527@gmail.com	null	{"correo": "juliandrf527@gmail.com", "usuario_id": 1233506796, "fecha_recuperacion": "2025-11-18T16:08:40.311097-05:00", "password_temporal_enviado": true}
-58	usuario	1233506795	UPDATE	1233506795	2025-11-18 16:09:00.871257-05	Inicio de sesión de usuario Julian David Rodriguez Fernandez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-18T16:09:00.870420-05:00"}
-59	usuario	1233506796	UPDATE	1233506795	2025-11-18 16:11:18.524914-05	Cambio de rol de usuario 1233506796: 3 → 3	{"numero_documento": 1233506796, "rol_id": 1}	{"numero_documento": 1233506796, "rol_id": 3}
-60	usuario	1233506795	UPDATE	1233506795	2025-11-18 16:11:20.818012-05	Cierre de sesión de usuario Julian David Rodriguez Fernandez	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-18T16:11:20.816850-05:00"}	null
-61	usuario	1233506796	UPDATE	1233506796	2025-11-18 16:11:31.111581-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-11-18T16:11:31.111002-05:00"}
-62	usuario	1233506796	UPDATE	1233506796	2025-11-18 16:13:32.810861-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "fecha_logout": "2025-11-18T16:13:32.809929-05:00"}	null
-63	usuario	1233506795	UPDATE	1233506795	2025-11-18 16:13:37.952668-05	Inicio de sesión de usuario Julian David Rodriguez Fernandez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-18T16:13:37.951868-05:00"}
-64	usuario	1233506795	UPDATE	1233506795	2025-11-18 16:14:16.673685-05	Actualización de datos del usuario Julian Rodriguez	{"numero_documento": 1233506795, "primer_nombre": "Julian", "segundo_nombre": "David", "primer_apellido": "Rodriguez", "segundo_apellido": "Fernandez", "correo": "julianrf527@gmail.com"}	{"numero_documento": 1233506795, "nombre_completo": "Julian Rodriguez", "primer_nombre": "Julian", "segundo_nombre": null, "primer_apellido": "Rodriguez", "segundo_apellido": null, "correo": "julianrf527@gmail.com"}
-65	usuario	1233506795	UPDATE	1233506795	2025-11-18 16:14:18.693561-05	Cierre de sesión de usuario Julian David Rodriguez Fernandez	{"usuario_id": 1233506795, "nombre_completo": "Julian David Rodriguez Fernandez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-18T16:14:18.692240-05:00"}	null
-66	usuario	1233506795	UPDATE	1233506795	2025-11-18 16:14:30.436337-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-18T16:14:30.435838-05:00"}
-67	usuario	1233506795	UPDATE	1233506795	2025-11-18 22:40:35.653553-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-18T22:40:35.645496-05:00"}
-68	usuario	1233506795	UPDATE	1233506795	2025-11-19 13:28:37.412537-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-19T13:28:37.404972-05:00"}
-69	usuario	1233506795	UPDATE	1233506795	2025-11-22 15:41:14.054229-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-22T15:41:14.048537-05:00"}
-70	usuario	1233506795	UPDATE	1233506795	2025-11-24 08:55:50.532562-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-24T08:55:50.525107-05:00"}
-71	notificacion	3	DELETE	1233506795	2025-11-24 23:39:05.657172-05	Eliminación de notificación tipo 'expediente' (ID: 3)	{"id": 3, "usuario_id": 1233506795, "mensaje": "Se le ha asignado el expediente con radicado 2025ER1313", "id_vinculada": "2025ER1313", "tipo": "expediente", "fecha_creacion": "2025-11-25T04:22:22.549159+00:00"}	null
-72	notificacion	4	DELETE	1233506795	2025-11-24 23:41:51.067651-05	Eliminación masiva - Marcar todas como leídas	{"id": 4, "usuario_id": 1233506795, "mensaje": "Se le ha asignado el expediente con radicado 2025ER1313", "id_vinculada": "2025ER1313", "tipo": "expediente", "fecha_creacion": "2025-11-25T04:41:18.169809+00:00"}	null
-73	notificacion	5	DELETE	1233506795	2025-11-24 23:43:28.399741-05	Eliminación de notificación tipo 'expediente' (ID: 5)	{"id": 5, "usuario_id": 1233506795, "mensaje": "Se le ha asignado el expediente con radicado 2025ER1313", "id_vinculada": "2025ER1313", "tipo": "expediente", "fecha_creacion": "2025-11-25T04:42:08.191073+00:00"}	null
-74	notificacion	6	DELETE	1233506795	2025-11-24 23:45:43.061443-05	Eliminación de notificación tipo 'expediente' (ID: 6)	{"id": 6, "usuario_id": 1233506795, "mensaje": "Se le ha asignado el expediente con radicado 2025ER1313", "id_vinculada": "2025ER1313", "tipo": "expediente", "fecha_creacion": "2025-11-25T04:43:59.807292+00:00"}	null
-77	usuario	1233506795	UPDATE	1233506795	2025-11-25 00:43:42.051855-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-25T00:43:42.051280-05:00"}	null
-78	usuario	1233506796	UPDATE	1233506796	2025-11-25 00:44:13.246289-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-11-25T00:44:13.245741-05:00"}
-79	usuario	1233506796	UPDATE	1233506796	2025-11-25 00:55:36.264191-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "fecha_logout": "2025-11-25T00:55:36.263521-05:00"}	null
-80	usuario	1233506796	UPDATE	1233506796	2025-11-25 00:55:45.747468-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-11-25T00:55:45.746797-05:00"}
-81	usuario	1233506795	UPDATE	1233506795	2025-11-27 10:55:36.022806-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-27T10:55:36.010263-05:00"}
-82	usuario	1233506795	UPDATE	1233506795	2025-11-27 14:40:35.221231-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-27T14:40:35.217763-05:00"}	null
-83	usuario	1233506795	UPDATE	1233506795	2025-11-27 14:40:43.223027-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-27T14:40:43.222485-05:00"}
-84	usuario	1233506795	UPDATE	1233506795	2025-11-30 16:17:26.059933-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-30T16:17:26.058269-05:00"}
-85	permiso	14	INSERT	1233506795	2025-11-30 16:21:29.441696-05	Creacion de permioso ID 14 con nombre 'docymento_revisor'	null	{"id": 14, "nombre": "docymento_revisor", "menu_path": "/"}
-86	permiso	14	UPDATE	1233506795	2025-11-30 16:23:03.60616-05	Actualización de permiso ID 14 con nombre 'documento_revisor'	{"id": 14, "nombre": "docymento_revisor", "menu_path": "/"}	{"id": 14, "nombre": "documento_revisor", "menu_path": "/"}
-87	permiso	15	INSERT	1233506795	2025-11-30 16:23:48.596947-05	Creacion de permioso ID 15 con nombre 'documento_creador'	null	{"id": 15, "nombre": "documento_creador", "menu_path": "/./"}
-88	rol	1	UPDATE	1233506795	2025-11-30 18:08:15.140913-05	Actualización de rol ID 1 a nombre 'admin'	{"id": 1, "nombre": "admin", "permisos": [1, 2, 3, 4, 5, 6, 7, 8, 13]}	{"id": 1, "nombre": "admin", "permisos": [1, 2, 3, 4, 5, 6, 7, 8, 13, 14]}
-89	usuario	1233506795	UPDATE	1233506795	2025-11-30 18:12:36.860552-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-30T18:12:36.858590-05:00"}	null
-90	usuario	1233506795	UPDATE	1233506795	2025-11-30 18:12:42.066284-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-30T18:12:42.065784-05:00"}
-91	permiso	14	UPDATE	1233506795	2025-11-30 18:16:04.682295-05	Actualización de permiso ID 14 con nombre 'revisor'	{"id": 14, "nombre": "documento_revisor", "menu_path": "/"}	{"id": 14, "nombre": "revisor", "menu_path": "/"}
-92	permiso	14	UPDATE	1233506795	2025-11-30 18:16:13.931538-05	Actualización de permiso ID 14 con nombre 'revisor_doc'	{"id": 14, "nombre": "revisor", "menu_path": "/"}	{"id": 14, "nombre": "revisor_doc", "menu_path": "/"}
-93	permiso	15	UPDATE	1233506795	2025-11-30 18:16:27.200871-05	Actualización de permiso ID 15 con nombre 'creador_doc'	{"id": 15, "nombre": "documento_creador", "menu_path": "/./"}	{"id": 15, "nombre": "creador_doc", "menu_path": "/./"}
-94	permiso	16	INSERT	1233506795	2025-11-30 18:19:15.986282-05	Creacion de permioso ID 16 con nombre 'documento_gestionar'	null	{"id": 16, "nombre": "documento_gestionar", "menu_path": "document/manage"}
-95	permiso	16	UPDATE	1233506795	2025-11-30 18:19:39.236917-05	Actualización de permiso ID 16 con nombre 'documento_gestionar'	{"id": 16, "nombre": "documento_gestionar", "menu_path": "document/manage"}	{"id": 16, "nombre": "documento_gestionar", "menu_path": "/document/manage"}
-96	rol	1	UPDATE	1233506795	2025-11-30 18:21:16.918036-05	Actualización de rol ID 1 a nombre 'admin'	{"id": 1, "nombre": "admin", "permisos": [1, 2, 3, 4, 5, 6, 7, 8, 13, 14]}	{"id": 1, "nombre": "admin", "permisos": [1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 16]}
-97	usuario	1233506795	UPDATE	1233506795	2025-11-30 18:24:15.95717-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-30T18:24:15.956410-05:00"}	null
-98	usuario	1233506795	UPDATE	1233506795	2025-11-30 18:24:22.025004-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-30T18:24:22.024534-05:00"}
-99	usuario	1233506795	UPDATE	1233506795	2025-11-30 18:45:52.005597-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-11-30T18:45:52.003332-05:00"}	null
-100	usuario	1233506795	UPDATE	1233506795	2025-11-30 18:46:06.40349-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-30T18:46:06.403185-05:00"}
-101	rol	3	UPDATE	1233506795	2025-11-30 22:09:35.992964-05	Actualización de rol ID 3 a nombre 'admin2'	{"id": 3, "nombre": "admin2", "permisos": [7, 5]}	{"id": 3, "nombre": "admin2", "permisos": [7, 5, 14, 16]}
-102	usuario	1030695776	UPDATE	1233506795	2025-11-30 22:36:20.968649-05	Cambio de rol de usuario 1030695776: 3 → 3	{"numero_documento": 1030695776, "rol_id": 1}	{"numero_documento": 1030695776, "rol_id": 3}
-103	usuario	1233506797	UPDATE	1233506795	2025-11-30 22:36:22.44717-05	Cambio de rol de usuario 1233506797: 3 → 3	{"numero_documento": 1233506797, "rol_id": 1}	{"numero_documento": 1233506797, "rol_id": 3}
-104	usuario	1030695776	UPDATE	1233506795	2025-11-30 22:36:27.240449-05	Cambio de estado de usuario 1030695776: False → True	{"numero_documento": 1030695776, "activo": false}	{"numero_documento": 1030695776, "activo": true}
-105	usuario	1233506795	UPDATE	1233506795	2025-11-30 22:44:10.086486-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-30T22:44:10.085896-05:00"}
-106	usuario	1233506795	UPDATE	1233506795	2025-11-30 22:52:45.144792-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-30T22:52:45.143052-05:00"}
-107	usuario	1233506795	UPDATE	1233506795	2025-11-30 22:54:44.072484-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-30T22:54:44.070017-05:00"}
-108	usuario	1233506795	UPDATE	1233506795	2025-11-30 22:56:21.073727-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-30T22:56:21.072241-05:00"}
-109	usuario	1233506795	UPDATE	1233506795	2025-11-30 22:57:49.234497-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-30T22:57:49.232519-05:00"}
-110	usuario	1233506795	UPDATE	1233506795	2025-11-30 23:13:00.317283-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-11-30T23:13:00.315514-05:00"}
-111	usuario	1233506795	UPDATE	1233506795	2025-12-01 00:09:59.275783-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-12-01T00:09:59.274071-05:00"}	null
-112	codigo_recuperacion	19	INSERT	1233506796	2025-12-01 00:10:15.142669-05	Solicitud de código de recuperación para juliandrf527@gmail.com	null	{"correo": "juliandrf527@gmail.com", "usuario_id": 1233506796, "fecha_solicitud": "2025-12-01T00:10:15.142279-05:00", "expiracion_minutos": 10}
-113	usuario	1233506796	UPDATE	1233506796	2025-12-01 00:10:46.222471-05	Recuperación de contraseña exitosa para juliandrf527@gmail.com	null	{"correo": "juliandrf527@gmail.com", "usuario_id": 1233506796, "fecha_recuperacion": "2025-12-01T00:10:46.221896-05:00", "password_temporal_enviado": true}
-114	usuario	1233506796	UPDATE	1233506796	2025-12-01 00:10:59.176146-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-12-01T00:10:59.175761-05:00"}
-115	usuario	1233506796	UPDATE	1233506796	2025-12-01 00:11:11.282647-05	Cambio de contraseña del usuario 1233506796	null	{"numero_documento": 1233506796, "accion": "cambio_contrasena"}
-116	usuario	1233506796	UPDATE	1233506796	2025-12-01 00:11:13.297424-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "fecha_logout": "2025-12-01T00:11:13.296696-05:00"}	null
-117	usuario	1233506796	UPDATE	1233506796	2025-12-01 00:11:20.527832-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-12-01T00:11:20.527411-05:00"}
-118	usuario	1233506795	UPDATE	1233506795	2025-12-01 09:55:12.510659-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-01T09:55:12.507945-05:00"}
-119	notificacion	7	DELETE	1233506795	2025-12-01 10:22:35.421064-05	Eliminación de notificación tipo 'expediente' (ID: 7)	{"id": 7, "usuario_id": 1233506795, "mensaje": "Se le ha asignado el expediente con radicado 2025ER1313", "id_vinculada": "2025ER1313", "tipo": "expediente", "fecha_creacion": "2025-12-01T15:21:31.069206+00:00"}	null
-120	usuario	1233506795	UPDATE	1233506795	2025-12-01 12:05:50.628582-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-12-01T12:05:50.619810-05:00"}	null
-121	usuario	1233506796	UPDATE	1233506796	2025-12-01 12:06:03.532899-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-12-01T12:06:03.532457-05:00"}
-122	usuario	1233506796	UPDATE	1233506796	2025-12-01 12:09:33.035231-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "fecha_logout": "2025-12-01T12:09:33.034703-05:00"}	null
-123	usuario	1233506795	UPDATE	1233506795	2025-12-01 12:09:38.731025-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-01T12:09:38.730547-05:00"}
-124	usuario	1233506796	UPDATE	1233506796	2025-12-01 12:34:50.867477-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-12-01T12:34:50.867113-05:00"}
-125	notificacion	8	DELETE	1233506795	2025-12-01 14:35:08.513118-05	Eliminación de notificación tipo 'expediente' (ID: 8)	{"id": 8, "usuario_id": 1233506795, "mensaje": "Se le ha asignado el expediente con radicado 2025ER1313", "id_vinculada": "2025ER1313", "tipo": "expediente", "fecha_creacion": "2025-12-01T15:31:29.657566+00:00"}	null
-126	usuario	1233506796	UPDATE	1233506796	2025-12-02 12:46:33.653154-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-12-02T12:46:33.649943-05:00"}
-127	usuario	1233506796	UPDATE	1233506796	2025-12-02 12:46:54.701374-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "fecha_logout": "2025-12-02T12:46:54.700587-05:00"}	null
-128	usuario	1233506795	UPDATE	1233506795	2025-12-02 12:47:00.738997-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-02T12:47:00.738626-05:00"}
-129	usuario	1233506796	UPDATE	1233506796	2025-12-02 15:26:07.282196-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-12-02T15:26:07.280234-05:00"}
-130	usuario	1233506797	UPDATE	1233506795	2025-12-02 15:36:59.349908-05	Cambio de rol de usuario 1233506797: 1 → 1	{"numero_documento": 1233506797, "rol_id": 3}	{"numero_documento": 1233506797, "rol_id": 1}
-131	usuario	1030695776	UPDATE	1233506795	2025-12-02 15:37:00.270001-05	Cambio de rol de usuario 1030695776: 1 → 1	{"numero_documento": 1030695776, "rol_id": 3}	{"numero_documento": 1030695776, "rol_id": 1}
-132	usuario	1233506796	UPDATE	1233506796	2025-12-02 18:16:15.098634-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-12-02T18:16:15.096682-05:00"}
-133	notificacion	10	DELETE	1233506796	2025-12-02 18:32:04.607991-05	Eliminación de notificación tipo 'expediente' (ID: 10)	{"id": 10, "usuario_id": 1233506796, "mensaje": "Se le ha asignado el expediente con radicado 2017EE7987", "id_vinculada": "2017EE7987", "tipo": "expediente", "fecha_creacion": "2025-12-02T23:27:32.306861+00:00"}	null
-134	notificacion	9	DELETE	1233506796	2025-12-02 19:08:29.965999-05	Eliminación de notificación tipo 'expediente' (ID: 9)	{"id": 9, "usuario_id": 1233506796, "mensaje": "Se le ha asignado el expediente con radicado 2017EE7988", "id_vinculada": "2017EE7988", "tipo": "expediente", "fecha_creacion": "2025-12-02T23:26:54.701061+00:00"}	null
-135	notificacion	11	DELETE	1233506796	2025-12-02 19:10:40.421903-05	Eliminación de notificación tipo 'documento' (ID: 11)	{"id": 11, "usuario_id": 1233506796, "mensaje": "Te han asignado como revisor del documento 'Contrato X' (versi\\u00f3n 1)", "id_vinculada": "15", "tipo": "documento", "fecha_creacion": "2025-12-03T00:08:17.058162+00:00"}	null
-136	notificacion	12	DELETE	1233506795	2025-12-02 19:21:59.575988-05	Eliminación de notificación tipo 'documento' (ID: 12)	{"id": 12, "usuario_id": 1233506795, "mensaje": "Tu documento 'Contrato X' ha sido devuelto. Devoluci\\u00f3n 1/3", "id_vinculada": "15", "tipo": "documento", "fecha_creacion": "2025-12-03T00:21:44.954732+00:00"}	null
-137	notificacion	13	DELETE	1233506796	2025-12-02 19:23:53.460438-05	Eliminación de notificación tipo 'documento' (ID: 13)	{"id": 13, "usuario_id": 1233506796, "mensaje": "Se ha subido una nueva versi\\u00f3n (2) del documento 'Contrato X'", "id_vinculada": "15", "tipo": "documento", "fecha_creacion": "2025-12-03T00:23:40.641950+00:00"}	null
-138	notificacion	14	DELETE	1233506795	2025-12-03 00:57:12.962582-05	Eliminación de notificación tipo 'documento' (ID: 14)	{"id": 14, "usuario_id": 1233506795, "mensaje": "Tu documento 'Contrato X' ha sido devuelto. Devoluci\\u00f3n 2/3", "id_vinculada": "15", "tipo": "documento", "fecha_creacion": "2025-12-03T05:56:40.774344+00:00"}	null
-139	notificacion	15	DELETE	1233506796	2025-12-03 01:17:12.6712-05	Eliminación de notificación tipo 'documento' (ID: 15)	{"id": 15, "usuario_id": 1233506796, "mensaje": "Se ha subido una nueva versi\\u00f3n (3) del documento 'Contrato X'", "id_vinculada": "15", "tipo": "documento", "fecha_creacion": "2025-12-03T05:59:55.706623+00:00"}	null
-140	usuario	1233506795	UPDATE	1233506795	2025-12-05 09:03:11.973689-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-05T09:03:11.971112-05:00"}
-141	usuario	1233506795	UPDATE	1233506795	2025-12-05 09:50:59.964138-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-05T09:50:59.962658-05:00"}
-142	permiso	17	INSERT	1233506795	2025-12-05 09:52:28.401412-05	Creacion de permioso ID 17 con nombre 'expediente_gestionar involucrados'	null	{"id": 17, "nombre": "expediente_gestionar involucrados", "menu_path": "/file/involved/manage"}
-143	rol	1	UPDATE	1233506795	2025-12-05 09:52:41.10221-05	Actualización de rol ID 1 a nombre 'admin'	{"id": 1, "nombre": "admin", "permisos": [1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 16]}	{"id": 1, "nombre": "admin", "permisos": [1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 16, 17]}
-144	usuario	1233506795	UPDATE	1233506795	2025-12-05 09:53:02.482319-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-12-05T09:53:02.480692-05:00"}	null
-145	usuario	1233506795	UPDATE	1233506795	2025-12-05 09:53:07.723337-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-05T09:53:07.723037-05:00"}
-146	usuario	1233506795	UPDATE	1233506795	2025-12-05 23:11:07.800227-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": true, "fecha_login": "2025-12-05T23:11:07.795595-05:00"}
-147	usuario	1233506796	UPDATE	1233506796	2025-12-07 21:25:51.866618-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-12-07T21:25:51.859271-05:00"}
-148	usuario	1233506796	UPDATE	1233506796	2025-12-07 21:29:26.887523-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "fecha_logout": "2025-12-07T21:29:26.886045-05:00"}	null
-149	usuario	1233506796	UPDATE	1233506796	2025-12-07 21:29:34.716982-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-12-07T21:29:34.715443-05:00"}
-150	notificacion	16	DELETE	1233506796	2025-12-07 21:32:13.451443-05	Eliminación de notificación tipo 'documento' (ID: 16)	{"id": 16, "usuario_id": 1233506796, "mensaje": "Te han asignado como revisor del documento 'Contrato X' (versi\\u00f3n 1)", "id_vinculada": "16", "tipo": "documento", "fecha_creacion": "2025-12-08T02:32:01.383848+00:00"}	null
-151	notificacion	17	DELETE	1233506795	2025-12-07 21:33:31.758961-05	Eliminación de notificación tipo 'documento' (ID: 17)	{"id": 17, "usuario_id": 1233506795, "mensaje": "Tu documento 'Contrato X' ha sido devuelto. Devoluci\\u00f3n 1/3", "id_vinculada": "16", "tipo": "documento", "fecha_creacion": "2025-12-08T02:33:18.320111+00:00"}	null
-152	notificacion	18	DELETE	1233506796	2025-12-07 21:35:17.868602-05	Eliminación de notificación tipo 'documento' (ID: 18)	{"id": 18, "usuario_id": 1233506796, "mensaje": "Se ha subido una nueva versi\\u00f3n (2) del documento 'Contrato X'", "id_vinculada": "16", "tipo": "documento", "fecha_creacion": "2025-12-08T02:35:05.246677+00:00"}	null
-153	notificacion	19	DELETE	1233506795	2025-12-07 21:35:48.529226-05	Eliminación de notificación tipo 'documento' (ID: 19)	{"id": 19, "usuario_id": 1233506795, "mensaje": "\\u00a1Felicidades! Tu documento 'Contrato X' ha sido aprobado", "id_vinculada": "16", "tipo": "documento", "fecha_creacion": "2025-12-08T02:35:41.731598+00:00"}	null
-154	usuario	1233506795	UPDATE	1233506795	2025-12-09 00:20:28.446516-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-09T00:20:28.440652-05:00"}
-155	usuario	1233506795	UPDATE	1233506795	2025-12-09 14:19:26.371448-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-09T14:19:26.366271-05:00"}
-156	usuario	1233506795	UPDATE	1233506795	2025-12-10 11:33:34.965468-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-10T11:33:34.958799-05:00"}
-157	usuario	1233506795	UPDATE	1233506795	2025-12-11 09:06:36.404459-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-11T09:06:36.396951-05:00"}
-158	usuario	1233506795	UPDATE	1233506795	2025-12-11 10:14:03.721503-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-12-11T10:14:03.717403-05:00"}	null
-159	usuario	1233506795	UPDATE	1233506795	2025-12-11 10:14:15.16489-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-11T10:14:15.164079-05:00"}
-160	usuario	53101792	INSERT	1233506795	2025-12-11 10:18:29.932486-05	Creación de usuario Lina Paola Ramirez Barrera con documento 53101792	null	{"numero_documento": 53101792, "nombre_completo": "Lina Paola Ramirez Barrera", "primer_nombre": "Lina", "segundo_nombre": "Paola", "primer_apellido": "Ramirez", "segundo_apellido": "Barrera", "correo": "lina.ramirez@corpochivor.gov.co", "rol_id": 3, "activo": true}
-161	usuario	1233506795	UPDATE	1233506795	2025-12-11 10:21:22.983753-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-12-11T10:21:22.978098-05:00"}	null
-162	usuario	1233506795	UPDATE	1233506795	2025-12-11 10:22:41.577236-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-11T10:22:41.576094-05:00"}
-163	usuario	1233506796	UPDATE	1233506796	2025-12-11 10:24:09.267955-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-12-11T10:24:09.267144-05:00"}
-164	rol	3	UPDATE	1233506795	2025-12-11 10:29:41.042741-05	Actualización de rol ID 3 a nombre 'admin2'	{"id": 3, "nombre": "admin2", "permisos": [7, 5, 14, 16]}	{"id": 3, "nombre": "admin2", "permisos": [7, 14, 16, 5, 8, 3]}
-165	usuario	1233506796	UPDATE	1233506796	2025-12-11 10:29:46.958875-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "fecha_logout": "2025-12-11T10:29:46.957724-05:00"}	null
-166	usuario	1233506796	UPDATE	1233506796	2025-12-11 10:29:55.361116-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-12-11T10:29:55.360259-05:00"}
-167	notificacion	20	DELETE	1233506796	2025-12-11 10:36:19.936852-05	Eliminación de notificación tipo 'expediente' (ID: 20)	{"id": 20, "usuario_id": 1233506796, "mensaje": "Se le ha asignado el expediente con radicado 2018EE0823", "id_vinculada": "2018EE0823", "tipo": "expediente", "fecha_creacion": "2025-12-11T15:35:18.083643+00:00"}	null
-168	notificacion	22	DELETE	1233506796	2025-12-11 11:01:58.691246-05	Eliminación de notificación tipo 'documento' (ID: 22)	{"id": 22, "usuario_id": 1233506796, "mensaje": "Te han asignado como revisor del documento 'Notificaicon' (versi\\u00f3n 1)", "id_vinculada": "17", "tipo": "documento", "fecha_creacion": "2025-12-11T16:01:52.878774+00:00"}	null
-169	notificacion	23	DELETE	1233506795	2025-12-11 11:03:33.505215-05	Eliminación de notificación tipo 'documento' (ID: 23)	{"id": 23, "usuario_id": 1233506795, "mensaje": "Tu documento 'Notificaicon' ha sido devuelto. Devoluci\\u00f3n 1/3", "id_vinculada": "17", "tipo": "documento", "fecha_creacion": "2025-12-11T16:03:13.108273+00:00"}	null
-170	notificacion	24	DELETE	1233506796	2025-12-11 11:04:32.803421-05	Eliminación de notificación tipo 'documento' (ID: 24)	{"id": 24, "usuario_id": 1233506796, "mensaje": "Se ha subido una nueva versi\\u00f3n (2) del documento 'Notificaicon'", "id_vinculada": "17", "tipo": "documento", "fecha_creacion": "2025-12-11T16:04:21.519047+00:00"}	null
-171	notificacion	25	DELETE	1233506795	2025-12-11 11:05:15.226241-05	Eliminación de notificación tipo 'documento' (ID: 25)	{"id": 25, "usuario_id": 1233506795, "mensaje": "Tu documento 'Notificaicon' ha sido devuelto. Devoluci\\u00f3n 2/3", "id_vinculada": "17", "tipo": "documento", "fecha_creacion": "2025-12-11T16:05:03.797771+00:00"}	null
-172	notificacion	26	DELETE	1233506796	2025-12-11 11:05:57.873747-05	Eliminación de notificación tipo 'documento' (ID: 26)	{"id": 26, "usuario_id": 1233506796, "mensaje": "Se ha subido una nueva versi\\u00f3n (3) del documento 'Notificaicon'", "id_vinculada": "17", "tipo": "documento", "fecha_creacion": "2025-12-11T16:05:52.820869+00:00"}	null
-173	notificacion	28	DELETE	1233506796	2025-12-11 11:09:49.088962-05	Eliminación de notificación tipo 'documento' (ID: 28)	{"id": 28, "usuario_id": 1233506796, "mensaje": "Te han asignado como revisor del documento 'Comunicacion' (versi\\u00f3n 1)", "id_vinculada": "18", "tipo": "documento", "fecha_creacion": "2025-12-11T16:09:45.534897+00:00"}	null
-174	usuario	1233506795	UPDATE	1233506795	2025-12-11 12:06:11.592957-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-12-11T12:06:11.589088-05:00"}	null
-175	usuario	1233506795	UPDATE	1233506795	2025-12-11 12:06:49.172013-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-11T12:06:49.171444-05:00"}
-176	usuario	1233506795	UPDATE	1233506795	2025-12-11 16:22:43.695058-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-11T16:22:43.689647-05:00"}
-177	usuario	1233506796	UPDATE	1233506796	2025-12-11 16:40:39.240732-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-12-11T16:40:39.235557-05:00"}
-178	usuario	1233506795	UPDATE	1233506795	2025-12-15 06:46:34.394988-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-15T06:46:34.391445-05:00"}
-179	notificacion	21	DELETE	1233506795	2025-12-15 10:07:29.632587-05	Eliminación de notificación tipo 'expediente' (ID: 21)	{"id": 21, "usuario_id": 1233506795, "mensaje": "Se le ha asignado el expediente con radicado 2018EE0823", "id_vinculada": "2018EE0823", "tipo": "expediente", "fecha_creacion": "2025-12-11T15:52:54.872567+00:00"}	null
-180	usuario	1233506795	UPDATE	1233506795	2025-12-15 10:11:29.071816-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-12-15T10:11:29.070516-05:00"}	null
-181	usuario	1233506796	UPDATE	1233506796	2025-12-15 10:12:11.624516-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2025-12-15T10:12:11.623447-05:00"}
-182	usuario	1233506796	UPDATE	1233506796	2025-12-15 10:13:32.261162-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "fecha_logout": "2025-12-15T10:13:32.259509-05:00"}	null
-183	usuario	1233506795	UPDATE	1233506795	2025-12-18 16:46:15.641492-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-18T16:46:15.637503-05:00"}
-184	notificacion	27	DELETE	1233506795	2025-12-18 16:48:34.603339-05	Eliminación de notificación tipo 'documento' (ID: 27)	{"id": 27, "usuario_id": 1233506795, "mensaje": "Tu documento 'Notificaicon' ha sido finalizado tras alcanzar 3 devoluciones", "id_vinculada": "17", "tipo": "documento", "fecha_creacion": "2025-12-11T16:06:27.371032+00:00"}	null
-185	usuario	1233506795	UPDATE	1233506795	2025-12-18 16:48:50.141938-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2025-12-18T16:48:50.140419-05:00"}	null
-186	usuario	1233506795	UPDATE	1233506795	2025-12-23 11:34:40.142584-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-23T11:34:40.137841-05:00"}
-187	usuario	1233506795	UPDATE	1233506795	2025-12-30 20:11:59.559459-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2025-12-30T20:11:59.554524-05:00"}
-188	notificacion	29	DELETE	1233506795	2025-12-30 20:15:18.297113-05	Eliminación de notificación tipo 'documento' (ID: 29)	{"id": 29, "usuario_id": 1233506795, "mensaje": "\\u00a1Felicidades! Tu documento 'Comunicacion' ha sido aprobado", "id_vinculada": "18", "tipo": "documento", "fecha_creacion": "2025-12-11T16:10:06.655443+00:00"}	null
-189	usuario	1233506795	UPDATE	1233506795	2026-01-08 11:37:43.726701-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2026-01-08T11:37:43.719781-05:00"}
-190	usuario	1233506795	UPDATE	1233506795	2026-01-08 15:24:27.471261-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2026-01-08T15:24:27.465972-05:00"}	null
-191	usuario	1233506795	UPDATE	1233506795	2026-01-08 15:26:03.658261-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2026-01-08T15:26:03.657104-05:00"}
-192	usuario	1233506795	UPDATE	1233506795	2026-01-08 15:35:12.61735-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2026-01-08T15:35:12.616143-05:00"}	null
-193	usuario	1233506796	UPDATE	1233506796	2026-01-08 15:35:26.43343-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "remember": false, "fecha_login": "2026-01-08T15:35:26.432606-05:00"}
-194	usuario	1233506796	UPDATE	1233506796	2026-01-08 15:48:07.892207-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506796, "nombre_completo": "Julian Rodriguez", "correo": "juliandrf527@gmail.com", "rol": "admin2", "fecha_logout": "2026-01-08T15:48:07.890944-05:00"}	null
-195	usuario	1233506795	UPDATE	1233506795	2026-01-08 15:48:17.889455-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2026-01-08T15:48:17.888380-05:00"}
-196	usuario	1233506795	UPDATE	1233506795	2026-01-08 16:57:17.605822-05	Cierre de sesión de usuario Julian Rodriguez	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "fecha_logout": "2026-01-08T16:57:17.604270-05:00"}	null
-197	usuario	1233506795	UPDATE	1233506795	2026-01-26 14:06:55.48216-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2026-01-26T14:06:55.477718-05:00"}
-198	usuario	1233506795	UPDATE	1233506795	2026-01-29 14:22:16.292315-05	Inicio de sesión de usuario Julian Rodriguez	null	{"usuario_id": 1233506795, "nombre_completo": "Julian Rodriguez", "correo": "julianrf527@gmail.com", "rol": "admin", "remember": false, "fecha_login": "2026-01-29T14:22:16.287481-05:00"}
-\.
-
 
 --
 -- TOC entry 5061 (class 0 OID 18296)
@@ -449,19 +242,19 @@ COPY public.notificacion (id, mensaje, id_vinculada, usuario_id, fecha_creacion,
 --
 
 COPY public.permiso (id, nombre, menu_path) FROM stdin;
+1	admin_roles y permisos	/user/role
 2	admin_registrar usuario	/user/add
 3	admin_gestionar usuarios	/user/manage
 4	admin_auditoria expedientes	/file/log
 5	expediente_gestionar	/file/manage
 6	expediente_asignar encargados	/file/assign_manage
-7	expediente_consular	/file/consult
+7	expediente_consultar	/file/consult
 8	expediente_alertas	/file/alerts
-1	admin_roles y permisos	/user/role
-13	admin_auditoria usuarios	/user/log
-14	revisor_doc	/
-15	creador_doc	/./
-16	documento_gestionar	/document/manage
-17	expediente_gestionar involucrados	/file/involved/manage
+9	admin_auditoria usuarios	/user/log
+10	revisor_doc	/
+11	creador_doc	/./
+12	documento_gestionar	/document/manage
+13	expediente_gestionar involucrados	/file/involved/manage
 \.
 
 
@@ -473,7 +266,6 @@ COPY public.permiso (id, nombre, menu_path) FROM stdin;
 
 COPY public.rol (id, nombre) FROM stdin;
 1	admin
-3	admin2
 \.
 
 
@@ -492,17 +284,11 @@ COPY public.rol_permiso (rol_id, permiso_id) FROM stdin;
 1	6
 1	7
 1	8
+1	9
+1	10
+1	11
+1	12
 1	13
-1	14
-1	15
-1	16
-1	17
-3	7
-3	14
-3	16
-3	5
-3	8
-3	3
 \.
 
 
@@ -513,10 +299,6 @@ COPY public.rol_permiso (rol_id, permiso_id) FROM stdin;
 --
 
 COPY public.usuario (numero_documento, primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, correo, hash_contrasena, activo, ultimo_ingreso, fecha_registro, rol_id) FROM stdin;
-1233506797	Julian	David	Rodriguez	Fernandez	morofake527@gmail.com	$2b$12$b/ZVVQkI/zpKE7vSpVxZ2uv4EimCxYtVa5ZinRfRn.lvX9.9xgUX.	t	2025-11-16 23:43:29.346389-05	2025-11-16 23:43:29.346396-05	1
-1030695776	Andres	\N	Bolivar	\N	andresfelbol@gmail.com	$2b$12$qlGsDMpGDaEJaAOrBqhrUeiSx50teQiETYhwuyEfIHfb7eJ5t.7Jy	t	2025-11-16 22:41:05.597976-05	2025-11-16 22:41:05.597981-05	1
-53101792	Lina	Paola	Ramirez	Barrera	lina.ramirez@corpochivor.gov.co	$2b$12$ygUQg0V2jhwyEfAO.XzZ0u5Zm9RhNGpbXeQk0d2PqH7IS8lSY8dNa	t	2025-12-11 10:18:29.928865-05	2025-12-11 10:18:29.928877-05	3
-1233506796	Julian	\N	Rodriguez	\N	juliandrf527@gmail.com	$2b$12$558I4dFuZxIBpV1JYcgdQufkluS5p5eG9xMzDmD.i1TbsENBIZ5PW	t	2026-01-08 20:35:26.429959-05	2025-11-16 17:13:24.015562-05	3
 1233506795	Julian	\N	Rodriguez	\N	julianrf527@gmail.com	$2b$12$TmKaey9KQ5Y.LtWDu4.FqeawBRP.Cc0rwV5W/CsxuXBNHaqvEncue	t	2026-01-29 19:22:16.271407-05	2025-11-13 14:47:43.472071-05	1
 \.
 
@@ -527,7 +309,7 @@ COPY public.usuario (numero_documento, primer_nombre, segundo_nombre, primer_ape
 -- Name: auditoria_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.auditoria_id_seq', 198, true);
+SELECT pg_catalog.setval('public.auditoria_id_seq', 1, false);
 
 
 --
@@ -536,7 +318,7 @@ SELECT pg_catalog.setval('public.auditoria_id_seq', 198, true);
 -- Name: codigo_recuperacion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.codigo_recuperacion_id_seq', 19, true);
+SELECT pg_catalog.setval('public.codigo_recuperacion_id_seq', 1, false);
 
 
 --
@@ -545,7 +327,7 @@ SELECT pg_catalog.setval('public.codigo_recuperacion_id_seq', 19, true);
 -- Name: notificacion_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.notificacion_id_seq', 29, true);
+SELECT pg_catalog.setval('public.notificacion_id_seq', 1, false);
 
 
 --
@@ -554,7 +336,7 @@ SELECT pg_catalog.setval('public.notificacion_id_seq', 29, true);
 -- Name: permiso_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.permiso_id_seq', 17, true);
+SELECT pg_catalog.setval('public.permiso_id_seq', 13, true);
 
 
 --
@@ -563,7 +345,7 @@ SELECT pg_catalog.setval('public.permiso_id_seq', 17, true);
 -- Name: rol_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.rol_id_seq', 3, true);
+SELECT pg_catalog.setval('public.rol_id_seq', 1, true);
 
 
 --

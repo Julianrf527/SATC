@@ -11,7 +11,19 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL"
 )
 
-engine = create_async_engine(DATABASE_URL)
+# Optimización para alta concurrencia (50+ usuarios simultáneos)
+engine = create_async_engine(
+    DATABASE_URL,
+    pool_size=10,          # 10 conexiones base (5 por worker)
+    max_overflow=30,       # Hasta 40 conexiones totales para picos de 50+ users
+    pool_pre_ping=True,    # Verificar conexiones antes de usar
+    pool_recycle=3600,     # Reciclar conexiones cada hora
+    pool_timeout=30,       # Timeout esperando conexión disponible
+    echo_pool=False,       # Logging de connection pool (disable en prod)
+    connect_args={
+        "server_settings": {"client_encoding": "utf8"}
+    }
+)
 
 SessionLocal = sessionmaker(
     bind=engine,

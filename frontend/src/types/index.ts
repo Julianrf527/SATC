@@ -75,6 +75,7 @@ export type InvolucradoNotificacion = {
   fecha_constancia_citacion: string | null;
   notificacion_exitosa: boolean;
   url_documento: string;
+  url_doc_citacion: string | null;
   tipo_notificacion_id: number | null;
 };
 

@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 import logging
+import os
 
 # Configurar logging
 logging.basicConfig(
@@ -14,10 +17,21 @@ from routes import docs
 
 app = FastAPI()
 
-# CORS: cambia esto en producción
+# Middleware para forzar charset UTF-8 en todas las respuestas
+class CharsetMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if "application/json" in response.headers.get("content-type", ""):
+            response.headers["content-type"] = "application/json; charset=utf-8"
+        return response
+
+app.add_middleware(CharsetMiddleware)
+
+# CORS configurable desde variables de entorno
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:8000").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8003"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,7 +39,11 @@ app.add_middleware(
 
 app.include_router(docs.router, prefix="/docs", tags=["Documents"])
 
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8003, reload=True)
+# Health check endpoint (Caso 3: Alta Disponibilidad)
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "app-docs",
+        "version": "1.0.0"
+    }

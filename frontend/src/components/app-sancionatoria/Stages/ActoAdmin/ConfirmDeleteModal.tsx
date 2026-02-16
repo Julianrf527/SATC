@@ -21,30 +21,61 @@ export default function ConfirmDeleteModal({
   isDeleting = false,
   tipoActo,
 }: Props) {
-  const [theme, setTheme] = useState<string>("emerald");
+  const [theme, setTheme] = useState<string>(() => {
+    // Leer tema actual del DOM antes del primer render
+    const appRoot = document.querySelector("#root > div[data-theme]");
+    return (
+      appRoot?.getAttribute("data-theme") ||
+      localStorage.getItem("theme") ||
+      "emerald"
+    );
+  });
 
+  // Detectar tema - se actualiza cuando se abre el modal y cuando cambia el tema
   useEffect(() => {
+    if (!isOpen) return;
+
     const updateTheme = () => {
-      const currentTheme =
-        document.querySelector("[data-theme]")?.getAttribute("data-theme") ||
-        "emerald";
+      // Selector específico para el div de App, no el modal
+      const appRoot = document.querySelector("#root > div[data-theme]");
+      const currentTheme = appRoot?.getAttribute("data-theme") || "emerald";
+      console.log("[ConfirmDeleteModal] Tema detectado:", currentTheme);
       setTheme(currentTheme);
     };
 
+    // Actualizar tema inmediatamente al abrir
     updateTheme();
 
-    const observer = new MutationObserver(updateTheme);
-    const targetNode = document.querySelector("[data-theme]");
+    // Escuchar evento custom de cambio de tema
+    const handleThemeChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ theme: string }>;
+      console.log(
+        "[ConfirmDeleteModal] Evento themeChange recibido:",
+        customEvent.detail.theme,
+      );
+      setTheme(customEvent.detail.theme);
+    };
 
-    if (targetNode) {
-      observer.observe(targetNode, {
+    window.addEventListener("themeChange", handleThemeChange);
+
+    // Observar cambios en el atributo data-theme del div de App (backup)
+    const observer = new MutationObserver(updateTheme);
+    const appRoot = document.querySelector("#root > div[data-theme]");
+
+    console.log("[ConfirmDeleteModal] Observer configured, appRoot:", appRoot);
+
+    if (appRoot) {
+      observer.observe(appRoot, {
         attributes: true,
         attributeFilter: ["data-theme"],
       });
     }
 
-    return () => observer.disconnect();
-  }, []);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("themeChange", handleThemeChange);
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -225,6 +256,6 @@ export default function ConfirmDeleteModal({
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }
