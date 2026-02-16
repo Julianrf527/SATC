@@ -11,14 +11,15 @@ import time
 import json
 
 from utils.funtions import get_current_user_smart, invalidate_token_cache, is_circuit_open, record_failure, record_success
+from utils.cache_manager import check_cache_health, get_cache_stats
 
 load_dotenv()
 SECRET_GATEWAY = os.getenv("SECRET_GATEWAY")
 SECRET_KEY_GATEWAY = os.getenv("SECRET_KEY_GATEWAY")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
-USER_ROUTE = os.getenv("USER_ROUTE")
-SANCTIONING_ROUTE = os.getenv("SANCTIONING_ROUTE")
-DOCUMENTS_ROUTE = os.getenv("DOCUMENTS_ROUTE")
+USER_ROUTE = os.getenv("USER_ROUTE", "http://app-users:8001")
+SANCTIONING_ROUTE = os.getenv("SANCTIONING_ROUTE", "http://app-sanctioning:8002")
+DOCUMENTS_ROUTE = os.getenv("DOCUMENTS_ROUTE", "http://app-docs:8003")
 
 
 MICROSERVICES = {
@@ -33,6 +34,7 @@ PUBLIC_ROUTES = {
     "auth/recovery-code",
     "auth/recovery",
     "auth/logout",
+
     "role/permission/verify",
     "user/batch",
     "user/permission",
@@ -40,7 +42,8 @@ PUBLIC_ROUTES = {
     "notification/add",
     "email/send",
     "email/send-bulk",
-    "email/send-alert-report"
+    "email/send-alert-report",
+    "health"  #Health checks de microservicios
 }
 
 app = FastAPI()
@@ -48,8 +51,8 @@ app = FastAPI()
 http_client = httpx.AsyncClient(
     timeout=httpx.Timeout(20.0, connect=5.0),
     limits=httpx.Limits(
-        max_connections=100,
-        max_keepalive_connections=20,
+        max_connections=200,       # Aumentado de 100 para 50+ concurrent users
+        max_keepalive_connections=50,  # Aumentado de 20
         keepalive_expiry=30.0
     ),
     follow_redirects=True,
@@ -58,9 +61,11 @@ http_client = httpx.AsyncClient(
 
 app.add_middleware(GZipMiddleware, minimum_size=2000, compresslevel=6)
 
+# CORS configurable desde variables de entorno
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -117,7 +122,7 @@ async def proxy(
     if not is_public:
         # Para SSE, permitir token via query parameter (EventSource no puede enviar headers)
         final_token = token if token and "notification/stream" in path else access_token
-        token_data = get_current_user_smart(final_token, path)
+        token_data = await get_current_user_smart(final_token, path)
 
     headers = {
         "X-Gateway-Token": SECRET_GATEWAY,
@@ -141,9 +146,16 @@ async def proxy(
     if request.method in ("POST", "PUT", "PATCH"):
         body = await request.body()
 
+    # Reenviar cookies del request original al backend
+    cookies_dict = {}
+    if access_token:
+        cookies_dict["access_token"] = access_token
+
     try:
-        # Para SSE, usar timeout más largo y no esperar la respuesta completa
-        timeout_config = httpx.Timeout(300.0, connect=5.0) if "notification/stream" in path else httpx.Timeout(20.0, connect=5.0)
+        # Para SSE usar timeout más largo, también para descarga de PDFs combinados
+        is_sse = "notification/stream" in path
+        is_large_download = "download-all" in path
+        timeout_config = httpx.Timeout(300.0, connect=5.0) if (is_sse or is_large_download) else httpx.Timeout(20.0, connect=5.0)
         
         backend_resp = await http_client.request(
             request.method,
@@ -151,6 +163,7 @@ async def proxy(
             headers=headers,
             params=request.query_params,
             content=body,
+            cookies=cookies_dict,  # Reenviar cookies
             timeout=timeout_config,
         )
         record_success(service)
@@ -186,8 +199,9 @@ async def proxy(
             media_type=content_type or backend_resp.headers.get("content-type")
         )
 
+    # Invalidar cache en logout (Caso 4: Cache distribuido)
     if path == "auth/logout":
-        invalidate_token_cache(access_token)
+        await invalidate_token_cache(access_token)
 
     return Response(
         content=backend_resp.content,
@@ -199,20 +213,30 @@ async def proxy(
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "services": list(MICROSERVICES.keys())}
+    """
+    Health check endpoint con información de cache (Caso 4).
+    """
+    try:
+        cache_health = await check_cache_health()
+        cache_stats = get_cache_stats()  # No es async
+        
+        return {
+            "status": "healthy",
+            "services": list(MICROSERVICES.keys()),
+            "cache": {
+                "status": cache_health["status"],
+                "backend": cache_health["backend"],
+                "stats": cache_stats
+            }
+        }
+    except Exception as e:
+        return {
+            "status": "healthy",
+            "services": list(MICROSERVICES.keys()),
+            "cache": {"status": "error", "message": str(e)}
+        }
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     await http_client.aclose()
-
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "main:app", 
-        host="0.0.0.0", 
-        port=8000, 
-        reload=True,
-        log_level="info"
-    )

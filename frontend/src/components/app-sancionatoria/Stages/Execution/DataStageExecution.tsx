@@ -36,8 +36,6 @@ export default function DataStageExecution({
   data,
   setToast,
   etapaId,
-  tipoEtapa,
-  idAuxiliar,
   onDataUpdated,
   isEditable = true,
 }: Props) {
@@ -73,18 +71,23 @@ export default function DataStageExecution({
 
   const handleFileChange = (
     e: React.ChangeEvent<HTMLInputElement>,
-    fileType: "cobro_coactivo" | "ruia" | "memorando" | "auto"
+    fileType: "cobro_coactivo" | "ruia" | "memorando" | "auto",
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.type !== "application/pdf") {
-      setToast({id: Date.now(), message: "Solo se permiten archivos PDF", type: "error" });
+      setToast({
+        id: Date.now(),
+        message: "Solo se permiten archivos PDF",
+        type: "error",
+      });
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      setToast({id: Date.now(),
+      setToast({
+        id: Date.now(),
         message: "El archivo no debe superar los 10MB",
         type: "error",
       });
@@ -124,7 +127,8 @@ export default function DataStageExecution({
 
       // Validar número del auto
       if (autoNumero.length !== 4) {
-        setToast({id: Date.now(),
+        setToast({
+          id: Date.now(),
           message: "El numerado debe tener exactamente 4 dígitos",
           type: "error",
         });
@@ -156,7 +160,8 @@ export default function DataStageExecution({
         !cobroCoactivoFile &&
         !data?.cobro_coactivo_doc_url
       ) {
-        setToast({id: Date.now(),
+        setToast({
+          id: Date.now(),
           message: "Debe adjuntar el documento de Cobro Coactivo",
           type: "error",
         });
@@ -165,7 +170,8 @@ export default function DataStageExecution({
       }
 
       if (ruiaChecked && !ruiaFile && !data?.ruia_doc_url) {
-        setToast({id: Date.now(),
+        setToast({
+          id: Date.now(),
           message: "Debe adjuntar el documento RUIA",
           type: "error",
         });
@@ -174,7 +180,8 @@ export default function DataStageExecution({
       }
 
       if (memorandoChecked && !memorandoFile && !data?.memorando_doc_url) {
-        setToast({id: Date.now(),
+        setToast({
+          id: Date.now(),
           message: "Debe adjuntar el documento de Memorando",
           type: "error",
         });
@@ -184,7 +191,8 @@ export default function DataStageExecution({
 
       // Validar campos requeridos del acto administrativo
       if (!fechaAuto) {
-        setToast({id: Date.now(),
+        setToast({
+          id: Date.now(),
           message: "La fecha del auto es requerida",
           type: "error",
         });
@@ -193,7 +201,8 @@ export default function DataStageExecution({
       }
 
       if (!autoFile && !data?.auto_doc_url) {
-        setToast({id: Date.now(),
+        setToast({
+          id: Date.now(),
           message: "Debe adjuntar el documento del Acto Administrativo",
           type: "error",
         });
@@ -209,8 +218,6 @@ export default function DataStageExecution({
       formData.append("memorando", memorandoChecked.toString());
       formData.append("auto_admin", autoAdminCompleto);
       formData.append("fecha_auto", fechaAuto);
-      formData.append("id_auxiliar", idAuxiliar.toString());
-      formData.append("tipo_etapa", tipoEtapa);
 
       // Agregar archivos si existen
       if (cobroCoactivoFile)
@@ -228,7 +235,8 @@ export default function DataStageExecution({
       });
 
       if (res.ok) {
-        setToast({id: Date.now(),
+        setToast({
+          id: Date.now(),
           message: data?.id ? "Ejecución actualizada" : "Ejecución registrada",
           type: "success",
         });
@@ -246,11 +254,19 @@ export default function DataStageExecution({
         // Actualizar datos desde el servidor
         onDataUpdated?.();
       } else {
-        setToast({id: Date.now(), message: res.detail || "Error al guardar", type: "error" });
+        setToast({
+          id: Date.now(),
+          message: res.detail || "Error al guardar",
+          type: "error",
+        });
       }
     } catch (error) {
       console.error("Error al guardar:", error);
-      setToast({id: Date.now(), message: "Error al procesar la solicitud", type: "error" });
+      setToast({
+        id: Date.now(),
+        message: "Error al procesar la solicitud",
+        type: "error",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -288,8 +304,8 @@ export default function DataStageExecution({
                 {data
                   ? "Información sobre la ejecución"
                   : isEditable
-                  ? "Registra información de ejecución"
-                  : "No hay ejecución registrada"}
+                    ? "Registra información de ejecución"
+                    : "No hay ejecución registrada"}
               </p>
             </div>
           </div>

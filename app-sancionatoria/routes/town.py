@@ -5,6 +5,7 @@ from sqlalchemy import select
 from pydantic import BaseModel
 import logging
 import os
+import json
 
 #----- DB -----
 
@@ -91,7 +92,13 @@ async def cargar_municipios_y_veredas(
         else:
             logger.warning("Se ejecutó /towns-sidewalk pero no se encontraron registros.")
 
-        return JSONResponse(content={"ok": True, "data": data}, status_code=200)
+        # Retornar con encoding UTF-8 explícito
+        return JSONResponse(
+            content={"ok": True, "data": data}, 
+            status_code=200,
+            media_type="application/json; charset=utf-8",
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
 
     except Exception as e:
         logger.error(f"Error en /towns-sidewalk: {e}")

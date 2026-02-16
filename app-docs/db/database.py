@@ -11,8 +11,14 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL"
 )
 
-# Crear el motor asíncrono
-engine = create_async_engine(DATABASE_URL)
+# Crear el motor asíncrono con configuración UTF-8 para PostgreSQL
+engine = create_async_engine(
+    DATABASE_URL,
+    connect_args={
+        "server_settings": {"client_encoding": "utf8"}
+    },
+    pool_pre_ping=True
+)
 
 # Crear la sesión local
 SessionLocal = sessionmaker(

@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/docs", tags=["documentos"])
 logger = logging.getLogger(__name__)
 
 # URL del Gateway para comunicación entre servicios
-GATEWAY_URL = os.getenv("API_GATEWAY_URL", "http://localhost:8000")
+GATEWAY_URL = os.getenv("API_GATEWAY_URL", "http://api-gateway:8000")
 
 # Log de configuración
 logger.info(f"Servicio de notificaciones configurado con GATEWAY_URL: {GATEWAY_URL}")

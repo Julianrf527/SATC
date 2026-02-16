@@ -14,7 +14,7 @@ type Props = {
 export default function ItemSlider({ iconName, title, subMenu }: Props) {
   const cerrarDrawer = () => {
     const drawerCheckbox = document.getElementById(
-      "my-drawer"
+      "my-drawer",
     ) as HTMLInputElement;
     if (drawerCheckbox) drawerCheckbox.checked = false;
   };
@@ -28,9 +28,9 @@ export default function ItemSlider({ iconName, title, subMenu }: Props) {
             <div
               className="w-5 h-5 bg-base-content/70 group-hover:bg-base-content transition-colors"
               style={{
-                WebkitMask: `url(/src/assets/icons/${iconName}.png) no-repeat center`,
+                WebkitMask: `url(/icons/${iconName}.png) no-repeat center`,
                 WebkitMaskSize: "contain",
-                mask: `url(/src/assets/icons/${iconName}.png) no-repeat center`,
+                mask: `url(/icons/${iconName}.png) no-repeat center`,
                 maskSize: "contain",
               }}
             ></div>

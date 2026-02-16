@@ -103,7 +103,7 @@ async def tarea_envio_alertas_semanal(db: AsyncSession):
     Tarea que se ejecuta automáticamente cada semana
     """
     logger.info("=" * 60)
-    logger.info("🚀 Iniciando envío semanal de alertas...")
+    logger.info("Iniciando envio semanal de alertas...")
     logger.info("=" * 60)
     
     try:
@@ -111,10 +111,10 @@ async def tarea_envio_alertas_semanal(db: AsyncSession):
         usuarios = await obtener_usuarios_por_permiso("expedientes")
         
         if not usuarios:
-            logger.warning("⚠️ No hay usuarios con permiso de expedientes")
+            logger.warning("No hay usuarios con permiso de expedientes")
             return
         
-        logger.info(f"📧 Procesando {len(usuarios)} usuarios...")
+        logger.info(f"Procesando {len(usuarios)} usuarios...")
         
         enviados = 0
         sin_alertas = 0
@@ -125,11 +125,11 @@ async def tarea_envio_alertas_semanal(db: AsyncSession):
             email = datos.get("correo")
             
             if not email:
-                logger.warning(f"  ⚠️ Usuario {nombre} sin correo")
+                logger.warning(f"  Usuario {nombre} sin correo")
                 continue
                 
             try:
-                logger.info(f"  👤 Procesando: {nombre} ({email})")
+                logger.info(f"  Procesando: {nombre} ({email})")
                 
                 # Obtener alertas del usuario
                 alertas_data = await obtener_alertas_usuario(user_id, db)
@@ -139,30 +139,30 @@ async def tarea_envio_alertas_semanal(db: AsyncSession):
                     resultado = await enviar_reporte_alertas(email, alertas_data)
                     if resultado:
                         expedientes_con_alertas = alertas_data.get("expedientes_con_alertas", 0)
-                        logger.info(f"    ✅ Email enviado ({expedientes_con_alertas} expedientes)")
+                        logger.info(f"    Email enviado ({expedientes_con_alertas} expedientes)")
                         enviados += 1
                     else:
-                        logger.error(f"    ❌ Fallo al enviar email")
+                        logger.error(f"    Fallo al enviar email")
                         errores += 1
                 else:
-                    logger.info(f"    ℹ️ Sin alertas pendientes")
+                    logger.info(f"    Sin alertas pendientes")
                     sin_alertas += 1
                     
             except Exception as e:
-                logger.error(f"    ❌ Error procesando usuario {user_id}: {e}")
+                logger.error(f"    Error procesando usuario {user_id}: {e}")
                 errores += 1
         
         # Resumen
         logger.info("=" * 60)
-        logger.info("📊 RESUMEN DEL ENVÍO")
-        logger.info(f"  ✅ Emails enviados: {enviados}")
-        logger.info(f"  ℹ️ Sin alertas: {sin_alertas}")
-        logger.info(f"  ❌ Errores: {errores}")
-        logger.info(f"  📧 Total: {len(usuarios)}")
+        logger.info("RESUMEN DEL ENVIO")
+        logger.info(f"  Emails enviados: {enviados}")
+        logger.info(f"  Sin alertas: {sin_alertas}")
+        logger.info(f"  Errores: {errores}")
+        logger.info(f"  Total: {len(usuarios)}")
         logger.info("=" * 60)
         
     except Exception as e:
-        logger.error(f"❌ Error en tarea de envío: {e}", exc_info=True)
+        logger.error(f"Error en tarea de envio: {e}", exc_info=True)
 
 
 async def ejecutar_tarea_con_db(get_db):
@@ -193,7 +193,7 @@ def configurar_scheduler_alertas(app, get_db):
         )
         
         scheduler.start()
-        logger.info("✅ Scheduler iniciado - Lunes 8:00 AM")
+        logger.info("Scheduler iniciado - Lunes 8:00 AM")
     
     @app.on_event("shutdown")
     async def stop_scheduler():

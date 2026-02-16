@@ -27,8 +27,8 @@ export default function ComunicacionModal({
   onClose,
   radicado,
   actoAdminId,
-  idAuxiliar,
-  tipoEtapa,
+  idAuxiliar: _idAuxiliar,
+  tipoEtapa: _tipoEtapa,
   editComunicacion,
   onSuccess,
 }: Props) {
@@ -145,7 +145,7 @@ export default function ComunicacionModal({
   };
 
   const handleFechaNumeradoChange = (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     setFechaNumerado(e.target.value);
     if (errors.fecha_numerado) {
@@ -229,11 +229,9 @@ export default function ComunicacionModal({
       const formData = new FormData();
       formData.append("radicado", radicado);
       formData.append("acto_admin_id", actoAdminId.toString());
-      formData.append("id_auxiliar", idAuxiliar.toString());
       formData.append("numerado", numerado);
       formData.append("fecha_numerado", fechaNumerado);
       formData.append("fecha_envio", fechaEnvio);
-      formData.append("tipo_etapa", tipoEtapa);
 
       // Agregar archivo si existe
       if (selectedFile) {

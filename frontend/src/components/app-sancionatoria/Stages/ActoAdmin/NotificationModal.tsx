@@ -26,7 +26,6 @@ export default function NotificacionModal({
   yaNotificados,
   tiposNotificacion,
   onSave,
-  notificacionesExistentes = [],
 }: Props) {
   const [notificacionForm, setNotificacionForm] = useState({
     involucrado_id: 0,
@@ -38,8 +37,10 @@ export default function NotificacionModal({
     tipo_notificacion_id: 0,
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFileCitacion, setSelectedFileCitacion] = useState<File | null>(
+    null,
+  );
   const [theme, setTheme] = useState<string>("emerald");
-  const [showCopyDropdown, setShowCopyDropdown] = useState(false);
   const [errors, setErrors] = useState({
     involucrado_id: "",
     numerado: "",
@@ -48,37 +49,24 @@ export default function NotificacionModal({
     fecha_constancia_citacion: "",
     tipo_notificacion_id: "",
     file: "",
+    file_citacion: "",
     general: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const copyDropdownRef = useRef<HTMLDivElement>(null);
+  const fileCitacionInputRef = useRef<HTMLInputElement>(null);
 
   const isEditing = !!editingNotificacion;
 
-  // Detectar tema
+  // Detectar tema cada vez que se abre el modal
   useEffect(() => {
-    const updateTheme = () => {
+    if (isOpen) {
       const currentTheme =
         document.querySelector("[data-theme]")?.getAttribute("data-theme") ||
         "emerald";
       setTheme(currentTheme);
-    };
-
-    updateTheme();
-
-    const observer = new MutationObserver(updateTheme);
-    const targetNode = document.querySelector("[data-theme]");
-
-    if (targetNode) {
-      observer.observe(targetNode, {
-        attributes: true,
-        attributeFilter: ["data-theme"],
-      });
     }
-
-    return () => observer.disconnect();
-  }, []);
+  }, [isOpen]);
 
   // Reset form cuando se abre el modal
   useEffect(() => {
@@ -91,9 +79,9 @@ export default function NotificacionModal({
         fecha_constancia_citacion: "",
         tipo_notificacion_id: "",
         file: "",
+        file_citacion: "",
         general: "",
       });
-      setShowCopyDropdown(false);
 
       if (editingNotificacion) {
         setNotificacionForm({
@@ -107,6 +95,7 @@ export default function NotificacionModal({
           tipo_notificacion_id: editingNotificacion.tipo_notificacion_id || 0,
         });
         setSelectedFile(null);
+        setSelectedFileCitacion(null);
       } else {
         setNotificacionForm({
           involucrado_id: 0,
@@ -118,6 +107,7 @@ export default function NotificacionModal({
           tipo_notificacion_id: 0,
         });
         setSelectedFile(null);
+        setSelectedFileCitacion(null);
       }
       setIsSubmitting(false);
     }
@@ -143,26 +133,6 @@ export default function NotificacionModal({
       }));
     }
   }, [notificacionForm.notificacion_exitosa]);
-
-  // Cerrar dropdown al hacer click fuera
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        copyDropdownRef.current &&
-        !copyDropdownRef.current.contains(event.target as Node)
-      ) {
-        setShowCopyDropdown(false);
-      }
-    };
-
-    if (showCopyDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [showCopyDropdown]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -197,6 +167,39 @@ export default function NotificacionModal({
     }
   };
 
+  const handleFileCitacionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Solo permitir PDF
+      if (file.type !== "application/pdf") {
+        setErrors((prev) => ({
+          ...prev,
+          file_citacion: "Solo se permiten archivos PDF",
+        }));
+        if (fileCitacionInputRef.current) {
+          fileCitacionInputRef.current.value = "";
+        }
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        setErrors((prev) => ({
+          ...prev,
+          file_citacion: "El archivo no debe superar los 10MB",
+        }));
+        if (fileCitacionInputRef.current) {
+          fileCitacionInputRef.current.value = "";
+        }
+        return;
+      }
+
+      setSelectedFileCitacion(file);
+      if (errors.file_citacion) {
+        setErrors((prev) => ({ ...prev, file_citacion: "" }));
+      }
+    }
+  };
+
   const handleNumeradoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (/^\d{0,4}$/.test(value)) {
@@ -216,6 +219,7 @@ export default function NotificacionModal({
       fecha_constancia_citacion: "",
       tipo_notificacion_id: "",
       file: "",
+      file_citacion: "",
       general: "",
     };
 
@@ -268,14 +272,23 @@ export default function NotificacionModal({
       isValid = false;
     }
 
+    // Validar documento de citación (solo en creación)
+    if (!isEditing && !selectedFileCitacion) {
+      newErrors.file_citacion = "Debe cargar el documento de citación";
+      isValid = false;
+    }
+
     setErrors(newErrors);
     return isValid;
   };
 
   const handleSave = async () => {
     console.log("[NotificationModal] Iniciando guardado...");
-    console.log("[NotificationModal] Modo:", isEditing ? "EDICIÓN" : "CREACIÓN");
-    
+    console.log(
+      "[NotificationModal] Modo:",
+      isEditing ? "EDICIÓN" : "CREACIÓN",
+    );
+
     // Limpiar errores previos
     setErrors({
       involucrado_id: "",
@@ -285,6 +298,7 @@ export default function NotificacionModal({
       fecha_constancia_citacion: "",
       tipo_notificacion_id: "",
       file: "",
+      file_citacion: "",
       general: "",
     });
 
@@ -304,7 +318,7 @@ export default function NotificacionModal({
       if (!isEditing) {
         formData.append(
           "involucrado_id",
-          notificacionForm.involucrado_id.toString()
+          notificacionForm.involucrado_id.toString(),
         );
       }
 
@@ -312,19 +326,19 @@ export default function NotificacionModal({
       formData.append("fecha_numerado", notificacionForm.fecha_numerado);
       formData.append(
         "fecha_envio_citacion",
-        notificacionForm.fecha_envio_citacion
+        notificacionForm.fecha_envio_citacion,
       );
 
       if (notificacionForm.fecha_constancia_citacion) {
         formData.append(
           "fecha_constancia_citacion",
-          notificacionForm.fecha_constancia_citacion
+          notificacionForm.fecha_constancia_citacion,
         );
       }
 
       formData.append(
         "notificacion_exitosa",
-        notificacionForm.notificacion_exitosa.toString()
+        notificacionForm.notificacion_exitosa.toString(),
       );
 
       if (
@@ -333,12 +347,18 @@ export default function NotificacionModal({
       ) {
         formData.append(
           "tipo_notificacion_id",
-          notificacionForm.tipo_notificacion_id.toString()
+          notificacionForm.tipo_notificacion_id.toString(),
         );
       }
 
+      // Incluir archivo de notificación
       if (selectedFile) {
         formData.append("file", selectedFile);
+      }
+
+      // Incluir archivo de citación
+      if (selectedFileCitacion) {
+        formData.append("file_citacion", selectedFileCitacion);
       }
 
       console.log("[NotificationModal] Llamando onSave...");
@@ -351,7 +371,8 @@ export default function NotificacionModal({
         handleClose();
       } else {
         // Mostrar error específico
-        const errorMessage = result?.error || "Error desconocido al guardar la notificación";
+        const errorMessage =
+          result?.error || "Error desconocido al guardar la notificación";
         console.error("[NotificationModal] Error al guardar:", errorMessage);
         setErrors((prev) => ({
           ...prev,
@@ -368,7 +389,9 @@ export default function NotificacionModal({
             : "Error de conexión al guardar la notificación",
       }));
     } finally {
-      console.log("[NotificationModal] Finalizando guardado, isSubmitting = false");
+      console.log(
+        "[NotificationModal] Finalizando guardado, isSubmitting = false",
+      );
       setIsSubmitting(false);
     }
   };
@@ -384,7 +407,7 @@ export default function NotificacionModal({
       tipo_notificacion_id: 0,
     });
     setSelectedFile(null);
-    setShowCopyDropdown(false);
+    setSelectedFileCitacion(null);
     setErrors({
       involucrado_id: "",
       numerado: "",
@@ -393,38 +416,17 @@ export default function NotificacionModal({
       fecha_constancia_citacion: "",
       tipo_notificacion_id: "",
       file: "",
+      file_citacion: "",
       general: "",
     });
     setIsSubmitting(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    if (fileCitacionInputRef.current) {
+      fileCitacionInputRef.current.value = "";
+    }
     onClose();
-  };
-
-  const handleCopyFromNotificacion = (notificacion: InvolucradoNotificacion) => {
-    setNotificacionForm({
-      involucrado_id: 0, // No copiar el involucrado, debe ser seleccionado manualmente
-      numerado: String(notificacion.numerado || "").padStart(4, "0"),
-      fecha_numerado: notificacion.fecha_numerado,
-      fecha_envio_citacion: notificacion.fecha_envio_citacion,
-      fecha_constancia_citacion: notificacion.fecha_constancia_citacion || "",
-      notificacion_exitosa: notificacion.notificacion_exitosa,
-      tipo_notificacion_id: notificacion.tipo_notificacion_id || 0,
-    });
-    setShowCopyDropdown(false);
-  };
-
-  // Función para determinar si se puede copiar notificaciones (solo si año ≤ 2012)
-  const canCopyNotifications = (): boolean => {
-    if (notificacionesExistentes.length === 0) return false;
-    
-    // Obtener el año de la primera notificación existente
-    const primeraNotificacion = notificacionesExistentes[0];
-    if (!primeraNotificacion?.fecha_numerado) return false;
-    
-    const año = new Date(primeraNotificacion.fecha_numerado).getFullYear();
-    return año <= 2012;
   };
 
   // Función para formatear el número de documento con DV para NITs
@@ -443,8 +445,13 @@ export default function NotificacionModal({
   const involucradosDisponibles = involucrados.filter((inv) =>
     editingNotificacion
       ? inv.id === editingNotificacion.involucrado_id
-      : !yaNotificados.includes(inv.id)
+      : !yaNotificados.includes(inv.id),
   );
+
+  // Verificar si hay documento de citación (ya cargado o seleccionado)
+  const hasDocumentoCitacion = isEditing
+    ? editingNotificacion?.url_doc_citacion || selectedFileCitacion
+    : selectedFileCitacion;
 
   const modalContent = (
     <div
@@ -678,19 +685,100 @@ export default function NotificacionModal({
             </div>
           </div>
 
+          {/* Documento Citación */}
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text font-medium">
+                Documento Citación
+                {!isEditing && <span className="text-error ml-1">*</span>}
+                <span className="text-xs text-base-content/50 ml-2">
+                  (PDF - Máx. 10MB)
+                </span>
+              </span>
+            </label>
+            <input
+              ref={fileCitacionInputRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              className={`file-input file-input-bordered w-full ${
+                errors.file_citacion ? "file-input-error" : ""
+              }`}
+              onChange={handleFileCitacionChange}
+              disabled={isSubmitting}
+            />
+            {errors.file_citacion && (
+              <label className="label">
+                <span className="label-text-alt text-error">
+                  {errors.file_citacion}
+                </span>
+              </label>
+            )}
+            {selectedFileCitacion && !errors.file_citacion && (
+              <label className="label">
+                <span className="label-text-alt text-success flex items-center gap-1">
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  {selectedFileCitacion.name}
+                </span>
+              </label>
+            )}
+            {isEditing &&
+              !selectedFileCitacion &&
+              editingNotificacion?.url_doc_citacion && (
+                <label className="label">
+                  <span className="label-text-alt text-info">
+                    Opcional - Solo si desea reemplazar el documento actual
+                  </span>
+                </label>
+              )}
+            {isEditing &&
+              !selectedFileCitacion &&
+              !editingNotificacion?.url_doc_citacion && (
+                <label className="label">
+                  <span className="label-text-alt text-warning">
+                    ⚠️ No hay documento de citación cargado. Debe subir uno para
+                    habilitar la sección de notificación.
+                  </span>
+                </label>
+              )}
+          </div>
+
+          {/* Separador visual */}
+          {(editingNotificacion?.url_doc_citacion ||
+            selectedFileCitacion ||
+            !isEditing) && (
+            <div className="divider text-sm text-base-content/50">
+              Información de Notificación
+            </div>
+          )}
+
           {/* Citación Exitosa y Tipo Notificación */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="form-control">
               <label className="label">
-                <span className="label-text font-medium">Notificación Exitosa</span>
+                <span className="label-text font-medium">
+                  Notificación Exitosa
+                </span>
               </label>
               <label
                 className={`flex items-center h-12 px-4 rounded-lg border-2 ${
+                  !hasDocumentoCitacion ||
                   !notificacionForm.fecha_constancia_citacion
                     ? "opacity-50 cursor-not-allowed bg-base-200 border-base-300"
                     : notificacionForm.notificacion_exitosa
-                    ? "border-success bg-success/5 cursor-pointer"
-                    : "border-base-300 hover:border-success/30 hover:bg-success/5 cursor-pointer"
+                      ? "border-success bg-success/5 cursor-pointer"
+                      : "border-base-300 hover:border-success/30 hover:bg-success/5 cursor-pointer"
                 }`}
               >
                 <input
@@ -704,13 +792,17 @@ export default function NotificacionModal({
                   }
                   className="checkbox checkbox-success"
                   disabled={
-                    !notificacionForm.fecha_constancia_citacion || isSubmitting
+                    !hasDocumentoCitacion ||
+                    !notificacionForm.fecha_constancia_citacion ||
+                    isSubmitting
                   }
                 />
                 <span className="ml-3 text-sm font-medium">
-                  {!notificacionForm.fecha_constancia_citacion
-                    ? "Requiere fecha de constancia"
-                    : "Notificación entregada"}
+                  {!hasDocumentoCitacion
+                    ? "Requiere documento de citación"
+                    : !notificacionForm.fecha_constancia_citacion
+                      ? "Requiere fecha de constancia"
+                      : "Notificación entregada"}
                 </span>
               </label>
             </div>
@@ -743,21 +835,26 @@ export default function NotificacionModal({
                     errors.tipo_notificacion_id
                       ? "select-error border-2"
                       : notificacionForm.tipo_notificacion_id !== 0
-                      ? "border-2 border-success"
-                      : "focus:select-success"
+                        ? "border-2 border-success"
+                        : "focus:select-success"
                   } ${
+                    !hasDocumentoCitacion ||
                     !notificacionForm.notificacion_exitosa
                       ? "opacity-50 cursor-not-allowed"
                       : ""
                   }`}
                   disabled={
-                    !notificacionForm.notificacion_exitosa || isSubmitting
+                    !hasDocumentoCitacion ||
+                    !notificacionForm.notificacion_exitosa ||
+                    isSubmitting
                   }
                 >
                   <option value={0}>
-                    {!notificacionForm.notificacion_exitosa
-                      ? "Marque citación exitosa primero"
-                      : "Seleccione un tipo"}
+                    {!hasDocumentoCitacion
+                      ? "Requiere documento de citación"
+                      : !notificacionForm.notificacion_exitosa
+                        ? "Marque citación exitosa primero"
+                        : "Seleccione un tipo"}
                   </option>
                   {tiposNotificacion.map((tipo) => (
                     <option key={tipo.id} value={tipo.id}>
@@ -793,9 +890,9 @@ export default function NotificacionModal({
               accept=".pdf,application/pdf"
               className={`file-input file-input-bordered w-full ${
                 errors.file ? "file-input-error" : ""
-              }`}
+              } ${!hasDocumentoCitacion ? "opacity-50 cursor-not-allowed" : ""}`}
               onChange={handleFileChange}
-              disabled={isSubmitting}
+              disabled={!hasDocumentoCitacion || isSubmitting}
             />
             {errors.file && (
               <label className="label">
@@ -852,140 +949,62 @@ export default function NotificacionModal({
           )}
 
           {/* Botones */}
-          <div className="flex justify-between items-center space-x-2 pt-4 border-t border-base-300">
-            {/* Botón Copiar - Solo en creación y si año ≤ 2012 */}
-            <div className="flex-1">
-              {!editingNotificacion && canCopyNotifications() && (
-                <div className="relative" ref={copyDropdownRef}>
-                  <button
-                    type="button"
-                    onClick={() => setShowCopyDropdown(!showCopyDropdown)}
-                    className="btn btn-sm gap-2 bg-base-200 hover:bg-base-300 border-base-300"
-                    disabled={isSubmitting}
+          <div className="flex justify-end space-x-2 pt-4 border-t border-base-300">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="btn btn-ghost"
+              disabled={isSubmitting}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="btn btn-success text-white gap-2"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="loading loading-spinner loading-sm"></span>
+                  Guardando...
+                </>
+              ) : isEditing ? (
+                <>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                      />
-                    </svg>
-                    Copiar datos
-                  </button>
-
-                  {showCopyDropdown && (
-                    <div className="absolute bottom-full left-0 mb-2 w-96 bg-base-100 rounded-lg shadow-xl border border-base-300 z-50 max-h-64 overflow-y-auto">
-                      <div className="p-2">
-                        <div className="px-3 py-2 text-xs font-semibold text-base-content/60 border-b border-base-300">
-                          Seleccione una notificación para copiar sus datos
-                        </div>
-                        {notificacionesExistentes.map((notif) => {
-                          const involucrado = involucrados.find(
-                            (inv) => inv.id === notif.involucrado_id
-                          );
-                          return (
-                            <button
-                              key={notif.id}
-                              type="button"
-                              onClick={() => handleCopyFromNotificacion(notif)}
-                              className="w-full text-left px-3 py-2 hover:bg-base-200 rounded-md transition-colors"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-sm truncate">
-                                    {involucrado?.nombre || "Involucrado desconocido"}
-                                  </div>
-                                  <div className="text-xs text-base-content/60">
-                                    Numerado: {String(notif.numerado || "").padStart(4, "0")} |{" "}
-                                    {notif.fecha_numerado}
-                                  </div>
-                                </div>
-                                <div className="flex-shrink-0">
-                                  {notif.notificacion_exitosa ? (
-                                    <span className="badge badge-success badge-sm">
-                                      Exitosa
-                                    </span>
-                                  ) : (
-                                    <span className="badge badge-ghost badge-sm">
-                                      Pendiente
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  Actualizar
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Agregar
+                </>
               )}
-            </div>
-
-            {/* Botones de acción */}
-            <div className="flex space-x-2">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="btn btn-ghost"
-                disabled={isSubmitting}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                className="btn btn-success text-white gap-2"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <span className="loading loading-spinner loading-sm"></span>
-                    Guardando...
-                  </>
-                ) : isEditing ? (
-                  <>
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                      />
-                    </svg>
-                    Actualizar
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      className="w-4 h-4"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    Agregar
-                  </>
-                )}
-              </button>
-            </div>
+            </button>
           </div>
         </div>
       </div>

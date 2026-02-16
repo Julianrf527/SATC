@@ -83,9 +83,6 @@ export default function ActoAdmin({
         formData.append("radicado_expediente", radicado);
       if (!formData.has("etapa_id"))
         formData.append("etapa_id", etapaId.toString());
-      if (!formData.has("id_auxiliar"))
-        formData.append("id_auxiliar", idAuxiliar.toString());
-      if (!formData.has("tipo_etapa")) formData.append("tipo_etapa", tipoEtapa);
 
       // Manejar nivel_auxiliar con prioridad: FormData > Prop > localActoAdmin > actoAdmin
       if (!formData.has("nivel_auxiliar")) {
@@ -330,8 +327,6 @@ export default function ActoAdmin({
       // Agregar datos comunes al FormData
       formData.append("notificacion_id", notificacionId.toString());
       formData.append("radicado", radicado);
-      formData.append("id_auxiliar", idAuxiliar.toString());
-      formData.append("tipo_etapa", tipoEtapa);
 
       // Determinar endpoint y método según si es edición o creación
       const endpoint = isEditing

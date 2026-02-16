@@ -1,0 +1,7 @@
+# Dockerignore específico para App Sanctioning
+__pycache__/
+*.py[cod]
+.venv/
+.env
+*.md
+.git/

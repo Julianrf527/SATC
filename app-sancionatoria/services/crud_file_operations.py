@@ -163,6 +163,7 @@ async def get_acto_admin(etapa_id: int,notificacion: bool, db:AsyncSession, nive
                         "fecha_constancia_citacion": str(inv_noti.fecha_constancia_citacion),
                         "notificacion_exitosa": inv_noti.notificacion_exitosa,
                         "url_documento" : inv_noti.url_documento,
+                        "url_doc_citacion": inv_noti.url_doc_citacion,
                         "tipo_notificacion_id": inv_noti.tipo_notificacion_id,
                     }
                     for inv_noti in involucrados_noti

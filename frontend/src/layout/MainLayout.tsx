@@ -16,11 +16,14 @@ type Props = {
   }) => void;
 };
 
-export default function MainLayout({ setTheme }: Props) {
+export default function MainLayout({ setTheme, setToast }: Props) {
   const [loading, setLoading] = useState(true);
   // undefined = cargando, null = no autenticado, User = autenticado
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const navigate = useNavigate();
+
+  // @ts-ignore - setToast es pasado a componentes hijos
+  void setToast;
 
   useEffect(() => {
     async function verifyToken() {
@@ -105,5 +108,5 @@ const HeaderWrapper = React.memo(
     return (
       <Header userId={userId} setTheme={setTheme} permission={permission} />
     );
-  }
+  },
 );

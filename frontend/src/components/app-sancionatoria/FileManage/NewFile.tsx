@@ -36,7 +36,7 @@ export default function NewFile({
 
     if (formRef.current) {
       const veredaEl = formRef.current.elements.namedItem(
-        "vereda"
+        "vereda",
       ) as HTMLSelectElement | null;
       if (veredaEl) veredaEl.value = "";
     }
@@ -58,10 +58,10 @@ export default function NewFile({
         });
 
         const municipioObj = towns.find(
-          (t) => t.id === Number(formData.municipio)
+          (t) => t.id === Number(formData.municipio),
         );
         const veredaObj = municipioObj?.sidewalk.find(
-          (sw) => sw.id === Number(formData.vereda)
+          (sw) => sw.id === Number(formData.vereda),
         );
 
         const newFile: File = {
@@ -78,6 +78,7 @@ export default function NewFile({
             ? { id: veredaObj.id, name: veredaObj.name }
             : { id: 0, name: "Desconocido" },
           involucrados: [],
+          archivado: false,
         };
 
         addFile(newFile);
@@ -101,7 +102,7 @@ export default function NewFile({
 
   const handleResourceToggle = (id: number) => {
     setSelectedResources((prev) =>
-      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id],
     );
   };
 

@@ -44,6 +44,52 @@ class Permission(BaseModel):
 from utils.insertLog import insert_auditoria
 from utils.verify_gateway_token import verify_gateway_token
 
+async def get_user_permissions(user_id: int, db: AsyncSession) -> set[int]:
+    """
+    Obtiene el conjunto de IDs de permisos que posee un usuario.
+    
+    Args:
+        user_id: Número de documento del usuario
+        db: Sesión de base de datos
+    
+    Returns:
+        set[int]: Conjunto de IDs de permisos del usuario
+    """
+    stmt = (
+        select(Permiso.id)
+        .select_from(RolPermiso)
+        .join(Permiso, Permiso.id == RolPermiso.permiso_id)
+        .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
+        .where(Usuario.numero_documento == user_id)
+    )
+    
+    result = await db.execute(stmt)
+    permission_ids = result.scalars().all()
+    
+    return set(permission_ids)
+
+
+async def get_role_permissions(rol_id: int, db: AsyncSession) -> set[int]:
+    """
+    Obtiene el conjunto de IDs de permisos que tiene un rol.
+    
+    Args:
+        rol_id: ID del rol
+        db: Sesión de base de datos
+    
+    Returns:
+        set[int]: Conjunto de IDs de permisos del rol
+    """
+    stmt = (
+        select(RolPermiso.permiso_id)
+        .where(RolPermiso.rol_id == rol_id)
+    )
+    
+    result = await db.execute(stmt)
+    permission_ids = result.scalars().all()
+    
+    return set(permission_ids)
+
 # ---------- ENDPOINTS ----------
 
 @router.get("/all")
@@ -138,6 +184,24 @@ async def agregar_rol(
         if not tiene_permiso:
             raise HTTPException(status_code=403, detail="No cuenta con permisos")
 
+        # VALIDACIÓN DE ESCALADA DE PRIVILEGIOS:
+        # El usuario solo puede asignar permisos que él mismo posee
+        user_permissions = await get_user_permissions(user_id, db)
+        requested_permissions = set(rol.permission)
+        
+        permisos_no_autorizados = requested_permissions - user_permissions
+        
+        if permisos_no_autorizados:
+            # Obtener nombres de permisos no autorizados para mensaje claro
+            stmt = select(Permiso.nombre).where(Permiso.id.in_(permisos_no_autorizados))
+            result = await db.execute(stmt)
+            nombres_permisos = result.scalars().all()
+            
+            raise HTTPException(
+                status_code=403, 
+                detail=f"No puede asignar permisos que no posee: {', '.join(nombres_permisos)}"
+            )
+
         # Verificar si el rol ya existe
         stmr = select(Rol).where(Rol.nombre == rol.name)
         result = await db.execute(stmr)
@@ -222,6 +286,23 @@ async def actualizar_rol(
 
         if not tiene_permiso:
             raise HTTPException(status_code=401, detail="No cuenta con permisos")
+
+        # VALIDACIÓN DE ESCALADA DE PRIVILEGIOS:
+        # El usuario solo puede asignar permisos que él mismo posee
+        user_permissions = await get_user_permissions(user_id, db)
+        requested_permissions = set(data.permission)
+        
+        permisos_no_autorizados = requested_permissions - user_permissions
+        
+        if permisos_no_autorizados:
+            stmt = select(Permiso.nombre).where(Permiso.id.in_(permisos_no_autorizados))
+            result = await db.execute(stmt)
+            nombres_permisos = result.scalars().all()
+            
+            raise HTTPException(
+                status_code=403, 
+                detail=f"No puede asignar permisos que no posee: {', '.join(nombres_permisos)}"
+            )
 
         # Verificar si el rol existe y obtener datos anteriores
         stmr = select(Rol).where(Rol.id == rol_id)

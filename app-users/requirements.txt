@@ -1,0 +1,85 @@
+# ====================================
+# ApiCorp - Requirements Backend
+# Python 3.11+
+# ====================================
+
+# Framework Web
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+gunicorn>=21.2.0
+python-multipart>=0.0.6
+
+# Base de Datos
+sqlalchemy>=2.0.0
+asyncpg>=0.28.0
+psycopg2-binary>=2.9.7
+
+# Autenticación y Seguridad
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+bcrypt>=4.1.2
+
+# Validación
+pydantic>=2.0.0
+pydantic[email]>=2.0.0
+email-validator>=2.0.0
+
+# HTTP Client (comunicación entre microservicios)
+httpx>=0.24.0
+
+# Redis (cache y sesiones)
+redis[hiredis]>=5.0.1
+
+# Variables de Entorno
+python-dotenv>=1.0.0
+
+# Manejo de Archivos
+aiofiles>=23.0.0
+
+# Almacenamiento de objetos MinIO
+minio>=7.2.0
+
+# Antivirus ClamAV
+pyclamd>=0.4.0
+
+# Manejo y combinación de PDFs
+pypdf>=3.17.0
+
+# Detección de tipos MIME de archivos (Caso 8: Seguridad de archivos)
+python-magic>=0.4.27
+
+# Utilidades
+pytz>=2023.3
+# On Windows, the stdlib zoneinfo may not have the IANA tz database available.
+# Provide timezone data via `tzdata` instead of the non-existent `zoneinfo` PyPI package.
+tzdata>=2023.3; sys_platform == "win32"
+
+# Email async SMTP client used by `app-users/utils/emailUtil.py`
+aiosmtplib>=1.1.6
+
+# Holiday calendars for business-day calculations used by `app-sancionatoria/utils/funtions.py`
+holidays>=0.28.0
+
+# Background scheduler used by `app-sancionatoria/services/alertas_scheduler.py`
+APScheduler>=3.10.1
+
+# Logging
+loguru>=0.7.0
+
+# ====================================
+# Dependencias Específicas por Módulo
+# ====================================
+
+# app-users (Email)
+# Usa smtplib (built-in Python)
+
+# app-docs (Archivos)
+# aiofiles ya incluido arriba
+
+# api-gateway (Caché y Circuit Breaker)
+# Implementación custom, sin deps adicionales
+
+# ====================================
+# Instalación
+# ====================================
+# pip install -r requirements.txt

@@ -1,0 +1,7 @@
+# Dockerignore específico para App Docs
+__pycache__/
+*.py[cod]
+.venv/
+.env
+*.md
+.git/

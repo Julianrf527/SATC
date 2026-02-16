@@ -15,6 +15,15 @@ const menuBase = [
   { iconName: "book-alt", title: "Documentos", prefix: "documento_" },
 ];
 
+// Orden específico para el submenú de Expedientes
+const ordenExpedientes = [
+  "gestionar",
+  "consultar",
+  "alertas",
+  "asignar encargados",
+  "gestionar involucrados",
+];
+
 export default function Slider({ permission }: Props) {
   const menuFiltrado = menuBase
     .map((cat) => {
@@ -23,7 +32,30 @@ export default function Slider({ permission }: Props) {
         .map((p) => ({
           name: formatearNombre(p.name, cat.prefix),
           url: p.path,
+          originalName: p.name,
         }));
+
+      // Aplicar orden específico para Expedientes
+      if (cat.prefix === "expediente_") {
+        subMenuPermitido.sort((a, b) => {
+          const nombreA = a.name.toLowerCase();
+          const nombreB = b.name.toLowerCase();
+          const indexA = ordenExpedientes.indexOf(nombreA);
+          const indexB = ordenExpedientes.indexOf(nombreB);
+
+          // Si ambos están en el orden definido, comparar por índice
+          if (indexA !== -1 && indexB !== -1) {
+            return indexA - indexB;
+          }
+          // Si solo A está en el orden, A va primero
+          if (indexA !== -1) return -1;
+          // Si solo B está en el orden, B va primero
+          if (indexB !== -1) return 1;
+          // Si ninguno está en el orden, mantener orden original
+          return 0;
+        });
+      }
+
       return { ...cat, subMenu: subMenuPermitido };
     })
     .filter((cat) => cat.subMenu.length > 0);

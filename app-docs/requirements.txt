@@ -6,6 +6,7 @@
 # Framework Web
 fastapi>=0.100.0
 uvicorn[standard]>=0.23.0
+gunicorn>=21.2.0
 python-multipart>=0.0.6
 
 # Base de Datos
@@ -16,7 +17,7 @@ psycopg2-binary>=2.9.7
 # Autenticación y Seguridad
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
-bcrypt>=4.0.1
+bcrypt>=4.1.2
 
 # Validación
 pydantic>=2.0.0
@@ -31,6 +32,18 @@ python-dotenv>=1.0.0
 
 # Manejo de Archivos
 aiofiles>=23.0.0
+
+# Almacenamiento de objetos MinIO
+minio>=7.2.0
+
+# Antivirus ClamAV
+pyclamd>=0.4.0
+
+# Manejo y combinación de PDFs
+pypdf>=3.17.0
+
+# Detección de tipos MIME de archivos (Caso 8: Seguridad de archivos)
+python-magic>=0.4.27
 
 # Utilidades
 pytz>=2023.3

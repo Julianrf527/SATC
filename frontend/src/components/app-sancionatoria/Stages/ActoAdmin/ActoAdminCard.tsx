@@ -5,12 +5,10 @@ import type {
   Involved,
   TipoNotificacion,
   InvolucradoNotificacion,
-  ActoAdminData
+  ActoAdminData,
 } from "../../../../types";
 
 type TipoActo = "notificacion" | "comunicacion";
-
-
 
 type Props = {
   actoAdmin: ActoAdminData;
@@ -84,7 +82,7 @@ export default function ActoAdminCard({
   const handleViewFile = () => {
     const BASE_URL = import.meta.env.VITE_API_URL;
     const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
-      actoAdmin.url_acto
+      actoAdmin.url_acto,
     )}`;
     window.open(url, "_blank");
   };
@@ -155,7 +153,7 @@ export default function ActoAdminCard({
           <div className="flex items-center gap-4">
             <span
               className={`badge badge-lg ${getTipoBadgeStyles(
-                actoAdmin.tipo_acto
+                actoAdmin.tipo_acto,
               )}`}
             >
               {actoAdmin.tipo_acto}
@@ -168,16 +166,17 @@ export default function ActoAdminCard({
 
           <button
             onClick={handleViewFile}
-            className="btn btn-ghost btn-sm hover:bg-error/10"
-            title="Ver documento PDF"
+            className="btn btn-success btn-sm gap-1 px-2 tooltip"
+            data-tip="Ver documento PDF"
           >
             <svg
-              className="w-8 h-8 text-error"
+              className="w-4 h-4 text-white"
               viewBox="0 0 24 24"
               fill="currentColor"
             >
               <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M15.5,15.5L13,19L11.5,15.5L8,14L11.5,12.5L13,9L14.5,12.5L18,14L15.5,15.5M13,3.5L17.5,8H13V3.5Z" />
             </svg>
+            <span className="text-xs font-medium text-white">Acto Admin</span>
           </button>
         </div>
 
