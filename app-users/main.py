@@ -19,11 +19,11 @@ async def startup_event():
     try:
         redis_client = await get_redis()
         if redis_client:
-            print("✅ Redis conectado exitosamente para sesiones")
+            print("Redis conectado exitosamente para sesiones")
         else:
-            print("⚠️ Redis deshabilitado - usando PostgreSQL para sesiones")
+            print("Redis deshabilitado - usando PostgreSQL para sesiones")
     except Exception as e:
-        print(f"⚠️ Error conectando Redis: {e}")
+        print(f"Error conectando Redis: {e}")
 
 # Shutdown event - cerrar Redis
 @app.on_event("shutdown")
