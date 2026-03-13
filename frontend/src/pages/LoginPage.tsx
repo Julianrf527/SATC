@@ -1,5 +1,5 @@
 import { apiCall, API_CONFIG } from "../utils/api";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MailInput from "../components/Input/MailInput";
 import PasswordInput from "../components/Input/PasswordInput";
 
@@ -13,6 +13,13 @@ export default function LoginPage({ theme }: Props) {
   const [errorMsg, setErrorMsg] = useState("");
   const [remember, setRemember] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  useEffect(() => {
+    const img = new window.Image();
+    img.src = "/static/login-bg.jpg";
+    img.onload = () => setImgLoaded(true);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,7 +108,7 @@ export default function LoginPage({ theme }: Props) {
             </form>
           </div>
           <div
-            className="hidden md:block md:w-1/2 bg-cover bg-center"
+            className={`hidden md:block md:w-1/2 bg-cover bg-center bg-base-300 transition-opacity duration-700 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
             style={{ backgroundImage: `url(/static/login-bg.jpg)` }}
             role="img"
           />
