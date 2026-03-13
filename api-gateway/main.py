@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 import httpx
 import os
-import time
 import json
 
 from utils.funtions import get_current_user_smart, invalidate_token_cache, is_circuit_open, record_failure, record_success

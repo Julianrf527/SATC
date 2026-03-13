@@ -98,6 +98,10 @@ temp/
 # Archivos de uploads (documentos subidos por usuarios)
 uploads/documentos/*
 !uploads/documentos/.gitkeep
+
+# Deploy
+deploy/
+
 uploads/expedientes/*
 !uploads/expedientes/.gitkeep
 
