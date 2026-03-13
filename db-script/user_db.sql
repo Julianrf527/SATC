@@ -15,7 +15,7 @@ SET idle_in_transaction_session_timeout = 0;
 -- SET transaction_timeout = 0;  -- Comentado: requiere PostgreSQL 17+, contenedor usa PG 15
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
+SELECT pg_catalog.set_config('search_path', 'public', false);
 SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
@@ -213,6 +213,26 @@ CREATE TABLE public.usuario (
 
 
 ALTER TABLE public.usuario OWNER TO postgres;
+
+
+--
+-- Name: sesion_activa; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE IF NOT EXISTS public.sesion_activa (
+    id SERIAL PRIMARY KEY,
+    usuario_id BIGINT NOT NULL,
+    token_jti VARCHAR(255) UNIQUE NOT NULL,
+    ip_address VARCHAR(50),
+    user_agent TEXT,
+    fecha_login TIMESTAMPTZ DEFAULT NOW(),
+    fecha_ultimo_uso TIMESTAMPTZ DEFAULT NOW(),
+    activo BOOLEAN DEFAULT TRUE
+);
+
+ALTER TABLE public.sesion_activa OWNER TO postgres;
+
+CREATE INDEX IF NOT EXISTS idx_sesion_usuario_activo ON public.sesion_activa(usuario_id, activo);
 
 
 --
@@ -480,6 +500,14 @@ ALTER TABLE ONLY public.rol_permiso
 
 ALTER TABLE ONLY public.usuario
     ADD CONSTRAINT usuario_rol_id_fkey FOREIGN KEY (rol_id) REFERENCES public.rol(id);
+
+
+--
+-- Name: sesion_activa sesion_activa_usuario_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.sesion_activa
+    ADD CONSTRAINT sesion_activa_usuario_id_fkey FOREIGN KEY (usuario_id) REFERENCES public.usuario(numero_documento) ON DELETE CASCADE ON UPDATE CASCADE;
 
 
 -- Completed on 2026-02-10 09:12:08
