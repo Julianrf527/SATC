@@ -39,8 +39,6 @@ export default function NewPermission({
           menu_path: menuPathRef.current.value,
         }),
       });
-      
-      console.log(res)
 
       if (res.ok) {
         setToast({id: Date.now(),message:"Permiso creado correctamente",type:"success"});
@@ -54,7 +52,7 @@ export default function NewPermission({
         setToast({id: Date.now(), message:res.detail || "Error al crear el permiso",type:"error"});
       }
     } catch (e) {
-      console.error("Error al hacer fetch:", e);
+      /* console.error("Error al hacer fetch:", e); */
       setToast({id: Date.now(),message:"Error al crear el permiso",type:"error"});
     }
   };

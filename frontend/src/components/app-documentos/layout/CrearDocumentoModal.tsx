@@ -171,15 +171,6 @@ export default function CrearDocumentoModal({
       formData.append("revisores_ids", JSON.stringify(revisoresIds));
       formData.append("archivo", selectedFile!);
 
-      console.log("📤 Enviando datos:");
-      for (const [key, value] of formData.entries()) {
-        if (value instanceof File) {
-          console.log(`- ${key}: [File] ${value.name} (${value.size} bytes)`);
-        } else {
-          console.log(`- ${key}:`, value);
-        }
-      }
-
       const res = await apiCall(API_CONFIG.ENDPOINTS.DOCS_CREATE, {
         method: "POST",
         body: formData,
@@ -211,7 +202,7 @@ export default function CrearDocumentoModal({
         });
       }
     } catch (error) {
-      console.error("Error al crear documento:", error);
+      /* console.error("Error al crear documento:", error); */
       setToast({
         id: Date.now(),
         message: "Error de conexión al crear el documento",

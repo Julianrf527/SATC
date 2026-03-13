@@ -1,6 +1,6 @@
 import ComunicacionCard from "./ComunicacionCard";
 import NotificacionesTable from "./NotificationesTable";
-import { API_CONFIG } from "../../../../utils/api";
+import { API_CONFIG, BASE_URL } from "../../../../utils/api";
 import type {
   Involved,
   TipoNotificacion,
@@ -80,7 +80,6 @@ export default function ActoAdminCard({
   };
 
   const handleViewFile = () => {
-    const BASE_URL = import.meta.env.VITE_API_URL;
     const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
       actoAdmin.url_acto,
     )}`;
@@ -266,10 +265,10 @@ export default function ActoAdminCard({
               {isEditable && (
                 <>
                   {involucrados.length === 0 ? (
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-warning/10 border border-warning/20 rounded-lg">
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-[rgba(245,158,11,0.12)] border border-[rgba(245,158,11,0.35)] rounded-lg">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="stroke-warning h-5 w-5"
+                        className="stroke-[#f59e0b] h-5 w-5"
                         fill="none"
                         viewBox="0 0 24 24"
                       >
@@ -280,7 +279,7 @@ export default function ActoAdminCard({
                           d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
                         />
                       </svg>
-                      <span className="text-sm text-warning font-medium">
+                      <span className="text-sm text-[#f59e0b] font-medium">
                         Agregue presuntos infractores
                       </span>
                     </div>

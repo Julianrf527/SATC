@@ -75,7 +75,6 @@ export default function SubstantiveDecision({
       });
 
       if (res.ok) {
-        console.log(res);
         setLocalDecision(res.decision_fondo);
         setDocumentos(res.decision_fondo?.documento || []);
 
@@ -98,7 +97,7 @@ export default function SubstantiveDecision({
         });
       }
     } catch (e) {
-      console.error("Error fetching decision:", e);
+      /* console.error("Error fetching decision:", e); */
       setToast({
         id: Date.now(),
         message: "Error al cargar decisión de fondo.",

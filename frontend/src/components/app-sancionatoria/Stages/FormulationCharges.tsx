@@ -80,7 +80,6 @@ export default function FormulationCharges({
       );
 
       if (res.ok) {
-        console.log(res);
         setLocalFormulacion(res.formulacion);
         setDocumentos(res.formulacion?.documento || []);
         setFormulationData(res.formulacion?.informacion);
@@ -97,7 +96,7 @@ export default function FormulationCharges({
         });
       }
     } catch (e) {
-      console.error("Error fetching formulacion:", e);
+      /* console.error("Error fetching formulacion:", e); */
       setToast({id: Date.now(),
         message: "Error al cargar formulación de cargos.",
         type: "error",

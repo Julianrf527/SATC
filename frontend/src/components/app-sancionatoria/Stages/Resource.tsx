@@ -69,7 +69,6 @@ export default function Resource({
       });
 
       if (res.ok) {
-        console.log(res);
         setLocalRecurso(res.recurso);
         setDocumentos(res.recurso?.documento || []);
 
@@ -86,7 +85,7 @@ export default function Resource({
         });
       }
     } catch (e) {
-      console.error("Error fetching recurso:", e);
+      /* console.error("Error fetching recurso:", e); */
       setToast({
         id: Date.now(),
         message: "Error al cargar recurso.",
@@ -171,7 +170,7 @@ export default function Resource({
         });
       }
     } catch (e) {
-      console.error("Error creando etapa:", e);
+      /* console.error("Error creando etapa:", e); */
       setToast({
         id: Date.now(),
         message: "Error al crear la etapa.",

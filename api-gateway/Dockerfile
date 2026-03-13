@@ -46,13 +46,15 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 EXPOSE 8000
 
 # Comando de inicio con Gunicorn + Uvicorn workers (producción)
+# 6 workers = equivalente a 3 réplicas × 2 workers, con --preload para copy-on-write RAM
 CMD ["gunicorn", "main:app", \
-    "--workers", "2", \
+    "--workers", "6", \
     "--worker-class", "uvicorn.workers.UvicornWorker", \
     "--bind", "0.0.0.0:8000", \
     "--timeout", "120", \
     "--graceful-timeout", "30", \
     "--keep-alive", "5", \
+    "--preload", \
     "--access-logfile", "-", \
     "--error-logfile", "-", \
     "--forwarded-allow-ips", "*", \

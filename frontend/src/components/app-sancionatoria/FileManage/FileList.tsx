@@ -95,8 +95,8 @@ export default function FileList({
   // Aplicar filtros avanzados (llamada al backend)
   const applyAdvancedFilters = async (filters: FilterData) => {
     setIsLoadingAdvanced(true);
-    console.log("[FileList] Enviando filtros avanzados:", filters);
-    console.log("[FileList] Filtros en JSON:", JSON.stringify(filters, null, 2));
+    /* console.log("[FileList] Enviando filtros avanzados:", filters);
+    console.log("[FileList] Filtros en JSON:", JSON.stringify(filters, null, 2)); */
     try {
       const response = await apiCall(API_CONFIG.ENDPOINTS.FILE_FILTER, {
         method: "POST",
@@ -115,7 +115,7 @@ export default function FileList({
         });
       }
     } catch (error) {
-      console.error("Error al aplicar filtros avanzados:", error);
+      /* console.error("Error al aplicar filtros avanzados:", error); */
       setToast({
         id: Date.now(),
         message: "Error al aplicar filtros avanzados",

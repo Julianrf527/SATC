@@ -102,7 +102,7 @@ export default function FileManageLayout({ setToast }: Props) {
           });
         }
       } catch (e) {
-        console.error("Error en el fetch:", e);
+        /* console.error("Error en el fetch:", e); */
         setToast({
           id: Date.now(),
           message: "Error en el fetch",
@@ -134,7 +134,7 @@ export default function FileManageLayout({ setToast }: Props) {
           }
         }
       } catch (e) {
-        console.log(e);
+        /* console.log(e); */
         setToast({
           id: Date.now(),
           message: "Error al cargar los expedientes",

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { apiCall, API_CONFIG } from "../../../../utils/api";
+import { apiCall, API_CONFIG, BASE_URL } from "../../../../utils/api";
 import type {
   ActoAdminData,
   Involved,
@@ -149,12 +149,10 @@ export default function ActoAdmin({
             errorMessage = res.detail.map((err: any) => err.msg).join(", ");
           }
         }
-
-        console.error("Error del backend:", res);
         return { ok: false, error: errorMessage };
       }
     } catch (e) {
-      console.error("Error guardando acto administrativo:", e);
+      /* console.error("Error guardando acto administrativo:", e); */
       return { ok: false, error: "Error al guardar acto administrativo" };
     }
   };
@@ -194,7 +192,7 @@ export default function ActoAdmin({
         });
       }
     } catch (e) {
-      console.error("Error eliminando acto administrativo:", e);
+      /* console.error("Error eliminando acto administrativo:", e); */
       setToast({
         id: Date.now(),
         message: "Error al eliminar acto administrativo",
@@ -259,14 +257,9 @@ export default function ActoAdmin({
     formData: FormData,
   ): Promise<{ ok: boolean; error?: string }> => {
     const isEditing = editingNotificacion !== null;
-    console.log(
-      "[handleSaveNotificacion] Modo:",
-      isEditing ? "EDICIÓN" : "CREACIÓN",
-    );
 
     try {
       if (!hasActoAdmin || !("id" in localActoAdmin)) {
-        console.error("[handleSaveNotificacion] No hay acto administrativo");
         return { ok: false, error: "No hay acto administrativo" };
       }
 
@@ -275,7 +268,6 @@ export default function ActoAdmin({
 
       // Crear notificación base si no existe
       if (!actoAdminCasted.notificacion || !actoAdminCasted.notificacion.id) {
-        console.log("[handleSaveNotificacion] Creando notificación base...");
         const notifFormData = new FormData();
         notifFormData.append("radicado", radicado);
         notifFormData.append("acto_admin_id", actoAdminCasted.id.toString());
@@ -286,10 +278,6 @@ export default function ActoAdmin({
         });
 
         if (!notifRes.ok) {
-          console.error(
-            "[handleSaveNotificacion] Error creando notificación base:",
-            notifRes,
-          );
           return {
             ok: false,
             error: notifRes.detail || "Error al crear notificación base",
@@ -297,7 +285,6 @@ export default function ActoAdmin({
         }
 
         if (!notifRes.data || !notifRes.data.id) {
-          console.error("[handleSaveNotificacion] Notificación base sin ID");
           return {
             ok: false,
             error: "Error al crear notificación: ID no disponible",
@@ -305,10 +292,6 @@ export default function ActoAdmin({
         }
 
         notificacionId = notifRes.data.id;
-        console.log(
-          "[handleSaveNotificacion] Notificación base creada, ID:",
-          notificacionId,
-        );
 
         const updatedActo = {
           ...actoAdminCasted,
@@ -318,10 +301,6 @@ export default function ActoAdmin({
         if (onActoAdminUpdate) onActoAdminUpdate(updatedActo);
       } else {
         notificacionId = actoAdminCasted.notificacion.id;
-        console.log(
-          "[handleSaveNotificacion] Usando notificación existente, ID:",
-          notificacionId,
-        );
       }
 
       // Agregar datos comunes al FormData
@@ -337,16 +316,11 @@ export default function ActoAdmin({
 
       const method = isEditing ? "PUT" : "POST";
 
-      console.log("[handleSaveNotificacion] Llamando endpoint:", endpoint);
-      console.log("[handleSaveNotificacion] Método:", method);
-
       // Ejecutar la petición
       const res = await apiCall(endpoint, { method, body: formData });
-      console.log("[handleSaveNotificacion] Respuesta completa:", res);
 
       // Verificar respuesta exitosa
       if (!res.ok) {
-        console.error("[handleSaveNotificacion] Respuesta no exitosa:", res);
         let errorMessage = isEditing
           ? "Error al actualizar notificación"
           : "Error al crear notificación";
@@ -366,22 +340,16 @@ export default function ActoAdmin({
 
       // Verificar que llegó data
       if (!res.data) {
-        console.error("[handleSaveNotificacion] Respuesta sin data:", res);
         return {
           ok: false,
           error: "No se recibieron datos del servidor",
         };
       }
 
-      console.log("[handleSaveNotificacion] Data recibida:", res.data);
-
       // Actualizar estado local
       const currentActo = localActoAdmin as ActoAdminData;
 
       if (!currentActo.notificacion) {
-        console.error(
-          "[handleSaveNotificacion] No existe notificación en acto actual",
-        );
         return { ok: false, error: "Error al actualizar notificación" };
       }
 
@@ -391,14 +359,10 @@ export default function ActoAdmin({
         : [];
 
       if (isEditing) {
-        console.log(
-          "[handleSaveNotificacion] Actualizando involucrado existente",
-        );
         updatedInvolucrados = updatedInvolucrados.map((inv) =>
           inv.id === res.data.id ? res.data : inv,
         );
       } else {
-        console.log("[handleSaveNotificacion] Agregando nuevo involucrado");
         updatedInvolucrados.push(res.data);
       }
 
@@ -413,8 +377,6 @@ export default function ActoAdmin({
       setLocalActoAdmin(updatedActoAdmin);
       if (onActoAdminUpdate) onActoAdminUpdate(updatedActoAdmin);
 
-      console.log("[handleSaveNotificacion] Estado actualizado exitosamente");
-
       setToast({
         id: Date.now(),
         message: isEditing
@@ -423,10 +385,8 @@ export default function ActoAdmin({
         type: "success",
       });
 
-      console.log("[handleSaveNotificacion] Retornando ok: true");
       return { ok: true };
     } catch (e) {
-      console.error("[handleSaveNotificacion] Excepción capturada:", e);
       const errorMsg =
         e instanceof Error
           ? e.message
@@ -480,7 +440,6 @@ export default function ActoAdmin({
         });
       }
     } catch (e) {
-      console.error("Error eliminando notificación:", e);
       setToast({
         id: Date.now(),
         message: "Error al eliminar notificación",
@@ -490,7 +449,6 @@ export default function ActoAdmin({
   };
 
   const handleViewDocument = (url: string) => {
-    const BASE_URL = import.meta.env.VITE_API_URL;
     const fullUrl = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(url)}`;
     window.open(fullUrl, "_blank");
   };

@@ -85,9 +85,6 @@ export default function TableUsers({
       {/* Panel de filtros - siempre visible */}
       <div className="mb-4">
         <div className="flex justify-between items-center mb-3">
-          <h4 className="text-sm font-semibold text-base-content/70">
-            Filtros de Búsqueda
-          </h4>
           {hasActiveFilters && (
             <button
               onClick={handleClearFilters}

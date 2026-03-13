@@ -20,10 +20,10 @@ type LogAuditoria = {
 
 type Props = {
   setToast: (toast: {
-    id: number; 
-    message: string; 
+    id: number;
+    message: string;
     type: "success" | "error";
-    }) => void;
+  }) => void;
 };
 
 export default function FileLogLayout({ setToast }: Props) {
@@ -41,9 +41,6 @@ export default function FileLogLayout({ setToast }: Props) {
   const [searchIdRegistro, setSearchIdRegistro] = useState("");
   const [searchFechaInicio, setSearchFechaInicio] = useState("");
   const [searchFechaFin, setSearchFechaFin] = useState("");
-
-  // Estado para filtros avanzados
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Filtros internos
   const [usuarioFilter, setUsuarioFilter] = useState("");
@@ -72,7 +69,7 @@ export default function FileLogLayout({ setToast }: Props) {
       if (searchIdRegistro) params.append("id_registro", searchIdRegistro);
       if (searchFechaInicio) params.append("fecha_inicio", searchFechaInicio);
       if (searchFechaFin) params.append("fecha_fin", searchFechaFin);
-      
+
       // Agregar parámetros de paginación
       const pageNumber = Number(page) || 1;
       const offset = (pageNumber - 1) * recordsPerPage;
@@ -83,7 +80,7 @@ export default function FileLogLayout({ setToast }: Props) {
         `${API_CONFIG.ENDPOINTS.AUDIT_LOGS}?${params.toString()}`,
         {
           method: "GET",
-        }
+        },
       );
 
       if (!res.ok) {
@@ -98,12 +95,14 @@ export default function FileLogLayout({ setToast }: Props) {
         setLogs(res.data || []);
         setTotalRecords(res.pagination?.total || res.total || 0);
         setCurrentPage(pageNumber);
-        
+
         if (showToast) {
           if (res.data && res.data.length > 0) {
             setToast({
               id: Date.now(),
-              message: res.msg || `Se encontraron ${res.pagination?.total || res.data.length} registros`,
+              message:
+                res.msg ||
+                `Se encontraron ${res.pagination?.total || res.data.length} registros`,
               type: "success",
             });
           } else {
@@ -116,7 +115,11 @@ export default function FileLogLayout({ setToast }: Props) {
         }
       }
     } catch (error) {
-      setToast({id: Date.now(), message: "Error al cargar los logs", type: "error" });
+      setToast({
+        id: Date.now(),
+        message: "Error al cargar los logs",
+        type: "error",
+      });
       setLogs([]);
       setTotalRecords(0);
     } finally {
@@ -190,7 +193,7 @@ export default function FileLogLayout({ setToast }: Props) {
   // Obtener valores únicos para filtros
   const uniqueTables = useMemo(() => {
     const tables = new Set(
-      logs.map((log) => log.tabla_afectada).filter(Boolean)
+      logs.map((log) => log.tabla_afectada).filter(Boolean),
     );
     return Array.from(tables).sort();
   }, [logs]);
@@ -210,110 +213,118 @@ export default function FileLogLayout({ setToast }: Props) {
               <div className="bg-base-200 rounded-lg border border-base-300 mb-4">
                 {/* Filtros básicos */}
                 <div className="p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                    <div className="form-control">
-                      <label className="label py-1">
-                        <span className="label-text text-sm font-medium">Usuario ID</span>
-                      </label>
-                      <input
-                        type="number"
-                        className="input input-sm input-bordered w-full"
-                        placeholder="Ej: 1231574827"
-                        value={searchUsuarioId}
-                        onChange={(e) => setSearchUsuarioId(e.target.value)}
-                        disabled={loading}
-                      />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                    <div className="md:col-span-2">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="form-control">
+                          <label className="label py-1">
+                            <span className="label-text text-sm font-medium">
+                              Usuario ID
+                            </span>
+                          </label>
+                          <input
+                            type="number"
+                            className="input input-sm input-bordered w-full"
+                            placeholder="Ej: 1231574827"
+                            value={searchUsuarioId}
+                            onChange={(e) => setSearchUsuarioId(e.target.value)}
+                            disabled={loading}
+                          />
+                        </div>
+
+                        <div className="form-control">
+                          <label className="label py-1">
+                            <span className="label-text text-sm font-medium">
+                              Radicado
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            className="input input-sm input-bordered w-full"
+                            placeholder="Ej: 2024EE1001"
+                            value={searchRadicado}
+                            onChange={(e) => setSearchRadicado(e.target.value)}
+                            disabled={loading}
+                          />
+                        </div>
+
+                        <div className="form-control">
+                          <label className="label py-1">
+                            <span className="label-text text-sm font-medium">
+                              ID Registro
+                            </span>
+                          </label>
+                          <input
+                            type="text"
+                            className="input input-sm input-bordered w-full"
+                            placeholder="Ej: 12345"
+                            value={searchIdRegistro}
+                            onChange={(e) =>
+                              setSearchIdRegistro(e.target.value)
+                            }
+                            disabled={loading}
+                          />
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="form-control">
-                      <label className="label py-1">
-                        <span className="label-text text-sm font-medium">Radicado</span>
-                      </label>
-                      <input
-                        type="text"
-                        className="input input-sm input-bordered w-full"
-                        placeholder="Ej: 2024EE1001"
-                        value={searchRadicado}
-                        onChange={(e) => setSearchRadicado(e.target.value)}
-                        disabled={loading}
-                      />
+                    <div className="md:col-span-1">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="form-control">
+                          <label className="label py-1">
+                            <span className="label-text text-sm font-medium">
+                              Fecha Inicio
+                            </span>
+                          </label>
+                          <input
+                            type="date"
+                            className="input input-sm input-bordered w-full"
+                            value={searchFechaInicio}
+                            onChange={(e) =>
+                              setSearchFechaInicio(e.target.value)
+                            }
+                            disabled={loading}
+                          />
+                        </div>
+
+                        <div className="form-control">
+                          <label className="label py-1">
+                            <span className="label-text text-sm font-medium">
+                              Fecha Fin
+                            </span>
+                          </label>
+                          <input
+                            type="date"
+                            className="input input-sm input-bordered w-full"
+                            value={searchFechaFin}
+                            onChange={(e) => setSearchFechaFin(e.target.value)}
+                            disabled={loading}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Filtros avanzados (colapsable) */}
-                  {showAdvancedFilters && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3 p-4 bg-base-300/30 rounded-lg border border-base-300">
-                      <div className="form-control">
-                        <label className="label py-1">
-                          <span className="label-text text-sm font-medium">ID Registro</span>
-                        </label>
-                        <input
-                          type="text"
-                          className="input input-sm input-bordered w-full"
-                          placeholder="Ej: 12345"
-                          value={searchIdRegistro}
-                          onChange={(e) => setSearchIdRegistro(e.target.value)}
-                          disabled={loading}
-                        />
-                      </div>
-
-                      <div className="form-control">
-                        <label className="label py-1">
-                          <span className="label-text text-sm font-medium">Fecha Inicio</span>
-                        </label>
-                        <input
-                          type="date"
-                          className="input input-sm input-bordered w-full"
-                          value={searchFechaInicio}
-                          onChange={(e) => setSearchFechaInicio(e.target.value)}
-                          disabled={loading}
-                        />
-                      </div>
-
-                      <div className="form-control">
-                        <label className="label py-1">
-                          <span className="label-text text-sm font-medium">Fecha Fin</span>
-                        </label>
-                        <input
-                          type="date"
-                          className="input input-sm input-bordered w-full"
-                          value={searchFechaFin}
-                          onChange={(e) => setSearchFechaFin(e.target.value)}
-                          disabled={loading}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Toggle filtros avanzados y botones de acción en la misma fila */}
-                  <div className="flex gap-2 justify-between items-center">
-                    <button
-                      type="button"
-                      onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                      className="btn btn-ghost btn-sm gap-2"
-                    >
-                      <svg
-                        className={`w-4 h-4 transition-transform ${showAdvancedFilters ? 'rotate-180' : ''}`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                      Filtros Avanzados
-                      {(searchIdRegistro || searchFechaInicio || searchFechaFin) && (
-                        <span className="badge badge-sm badge-success">Activos</span>
-                      )}
-                    </button>
-
+                  {/* Botones de acción en la misma fila */}
+                  <div className="flex gap-2 justify-end items-center">
                     <div className="flex gap-2">
                       <button
                         className="btn btn-sm btn-ghost gap-2"
                         onClick={handleClear}
                         disabled={loading}
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                          className="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
                         </svg>
                         Limpiar
                       </button>
@@ -329,8 +340,18 @@ export default function FileLogLayout({ setToast }: Props) {
                           </>
                         ) : (
                           <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                              />
                             </svg>
                             Buscar
                           </>

@@ -123,7 +123,7 @@ export default function EditRol({ permission, setToast }: Props) {
         });
       }
     } catch (e) {
-      console.error("Error al hacer fetch:", e);
+      /* console.error("Error al hacer fetch:", e); */
       setToast({
         id: Date.now(),
         message: "Error al actualizar el rol",
@@ -175,7 +175,7 @@ export default function EditRol({ permission, setToast }: Props) {
         });
       }
     } catch (e) {
-      console.error("Error al hacer fetch:", e);
+      /* console.error("Error al hacer fetch:", e); */
       setToast({
         id: Date.now(),
         message: "Error al eliminar el rol",
@@ -203,7 +203,7 @@ export default function EditRol({ permission, setToast }: Props) {
           });
         }
       } catch (e) {
-        console.error("Error al hacer fetch:", e);
+        /* console.error("Error al hacer fetch:", e); */
         setToast({
           id: Date.now(),
           message: "Error al cargar los permisos",

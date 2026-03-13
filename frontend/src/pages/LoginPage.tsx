@@ -12,25 +12,39 @@ export default function LoginPage({ theme }: Props) {
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [remember, setRemember] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setErrorMsg("");
     try {
       const email = mail;
       const res = await apiCall(API_CONFIG.ENDPOINTS.AUTH_LOGIN, {
         method: "POST",
         body: JSON.stringify({ email, password, remember }),
       });
-      console.log(res) 
 
       if (res.ok) {
         window.location.href = "/";
       } else {
-        setErrorMsg(res.detail);
+        const detail = res.detail;
+        if (typeof detail === "string") {
+          setErrorMsg(detail);
+        } else if (Array.isArray(detail)) {
+          setErrorMsg(
+            detail.map((d: { msg?: string }) => d.msg).join(", ") ||
+              "Error al iniciar sesión.",
+          );
+        } else {
+          setErrorMsg("Error al iniciar sesión. Inténtalo de nuevo.");
+        }
       }
     } catch (error) {
-      console.error("Error al hacer fetch:", error);
+      /* console.error("Error al hacer fetch:", error); */
       setErrorMsg("No se pudo conectar al servidor.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -75,8 +89,9 @@ export default function LoginPage({ theme }: Props) {
               <button
                 type="submit"
                 className="btn btn-success w-full !text-white"
+                disabled={isLoading}
               >
-                Iniciar Sesión
+                {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
               </button>
               {errorMsg && (
                 <p className="text-error text-sm text-center mt-2">

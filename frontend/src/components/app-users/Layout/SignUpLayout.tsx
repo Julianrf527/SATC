@@ -111,7 +111,7 @@ export default function SignUpLayout({ setToast }: Props) {
         });
       }
     } catch (error) {
-      console.error("Error al registrar:", error);
+      /* console.error("Error al registrar:", error); */
       setToast({
         id: Date.now(),
         message: "Error de conexión al registrar usuario",

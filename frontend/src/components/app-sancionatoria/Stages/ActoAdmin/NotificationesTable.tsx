@@ -84,7 +84,7 @@ export default function NotificacionesTable({
       setDeleteModalOpen(false);
       setNotificacionToDelete(null);
     } catch (error) {
-      console.error("Error al eliminar notificación:", error);
+      /* console.error("Error al eliminar notificación:", error); */
     } finally {
       setIsDeleting(false);
     }

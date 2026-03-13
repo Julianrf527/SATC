@@ -16,7 +16,7 @@ echo "Generando configuración de entorno en runtime..."
 # Crear archivo con variables de entorno
 cat <<EOF > $ENV_JS_FILE
 window.ENV = {
-  VITE_API_URL: "${VITE_API_URL:-http://localhost:8000}"
+  VITE_API_URL: "${VITE_API_URL-http://localhost:8000}"
 };
 EOF
 

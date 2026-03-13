@@ -85,7 +85,6 @@ export default function DataStageMeasure({
       };
 
       if (medida) {
-        console.log("Actualizar medida:", medidaData);
         const response = await apiCall(
           API_CONFIG.ENDPOINTS.FILE_MEASURE_UPDATE(medida.id),
           {
@@ -151,7 +150,7 @@ export default function DataStageMeasure({
         }
       }
     } catch (error) {
-      console.error("Error al guardar:", error);
+      /* console.error("Error al guardar:", error); */
       setToast({
         id: Date.now(),
         message: "Error al procesar la solicitud",

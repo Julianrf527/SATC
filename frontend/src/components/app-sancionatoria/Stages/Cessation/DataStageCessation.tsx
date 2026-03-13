@@ -103,7 +103,7 @@ export default function DataStageCessation({
         });
       }
     } catch (error) {
-      console.error("Error al guardar:", error);
+      /* console.error("Error al guardar:", error); */
       setToast({
         id: Date.now(),
         message: "Error al procesar la solicitud",

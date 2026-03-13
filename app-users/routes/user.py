@@ -1042,6 +1042,7 @@ async def obtener_usuarios_por_permiso(
     """
     Obtiene información básica de múltiples usuarios por permiso.
     SOLO para comunicación entre servicios internos.
+    
     """
 
     try:

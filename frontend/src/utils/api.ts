@@ -1,10 +1,8 @@
 // Configuración de la URL base del API
-// En desarrollo usa import.meta.env.VITE_API_URL
-// En producción (Docker) usa window.ENV.VITE_API_URL inyectado en runtime
-const BASE_URL =
-  (window as any).ENV?.VITE_API_URL ||
-  import.meta.env.VITE_API_URL ||
-  "http://localhost:8000";
+// En producción (Docker) usa window.ENV.VITE_API_URL inyectado en runtime (vacío = URLs relativas)
+// En desarrollo usa import.meta.env.VITE_API_URL o vacío (proxy de Vite)
+export const BASE_URL: string =
+  (window as any).ENV?.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "";
 
 export const API_CONFIG = {
   ENDPOINTS: {
@@ -90,6 +88,7 @@ export const API_CONFIG = {
     FILE_ADD: "/sanctioning/file/add",
     FILE_UPDATE_ENCARGADO: (radicado: string, encargadoId?: number) =>
       `/sanctioning/file/${radicado}/encargado/${encargadoId ?? ""}`,
+    FILE_BULK_UPDATE_ENCARGADO: "/sanctioning/file/encargado/bulk",
 
     FILE_FUll: (radicado: string) => `/sanctioning/file/full/${radicado}`,
     FILE_BASIC_DATA: (radicado: string) =>

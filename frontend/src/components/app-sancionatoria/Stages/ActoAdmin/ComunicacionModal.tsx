@@ -277,7 +277,7 @@ export default function ComunicacionModal({
         }));
       }
     } catch (error) {
-      console.error("Error al guardar comunicación:", error);
+      /* console.error("Error al guardar comunicación:", error); */
       setErrors((prev) => ({
         ...prev,
         general: "Error de conexión al guardar la comunicación",

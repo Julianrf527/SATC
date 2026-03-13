@@ -121,7 +121,7 @@ export default function EditInvolvedModal({
       });
       handleClose();
     } catch (error) {
-      console.error("Error guardando:", error);
+      /* console.error("Error guardando:", error); */
       setErrorGeneral("Error al actualizar el involucrado");
     } finally {
       setIsSubmitting(false);

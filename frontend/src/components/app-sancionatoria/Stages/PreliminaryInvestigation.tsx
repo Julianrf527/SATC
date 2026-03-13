@@ -66,7 +66,6 @@ export default function PreliminaryInvestigation({
       );
 
       if (res.ok) {
-        console.log(res);
         setLocalIndagacion(res.indagacion);
         setDocumentos(res.indagacion?.documento || []);
 
@@ -83,7 +82,7 @@ export default function PreliminaryInvestigation({
         });
       }
     } catch (e) {
-      console.error("Error fetching investigation:", e);
+      /* console.error("Error fetching investigation:", e); */
       setToast({
         id: Date.now(),
         message: "Error al cargar la indagación preliminar.",
@@ -164,7 +163,7 @@ export default function PreliminaryInvestigation({
         });
       }
     } catch (e) {
-      console.error("Error creando etapa:", e);
+      /* console.error("Error creando etapa:", e); */
       setToast({
         id: Date.now(),
         message: "Error al crear la etapa.",

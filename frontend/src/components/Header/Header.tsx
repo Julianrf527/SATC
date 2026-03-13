@@ -129,7 +129,7 @@ export default function Header({ userId, setTheme, permission }: Props) {
           setNotification(res.data);
         }
       } catch (error) {
-        console.log(error);
+        /* console.log(error); */
       }
     }
 
@@ -168,23 +168,16 @@ export default function Header({ userId, setTheme, permission }: Props) {
         window.location.href = "/login";
       }
     } catch (error) {
-      console.log(error);
+      /* console.log(error); */
     }
   };
 
   const handleThemeToggle = () => {
     const newTheme = isDark ? "emerald" : "dark";
-    console.log(
-      "[Header] Cambiando tema de",
-      isDark ? "dark" : "emerald",
-      "a",
-      newTheme,
-    );
     setTheme(newTheme);
     setIsDark(!isDark);
     localStorage.setItem("theme", newTheme);
     // Disparar evento para que los modales detecten el cambio
-    console.log("[Header] Disparando evento themeChange con tema:", newTheme);
     window.dispatchEvent(
       new CustomEvent("themeChange", { detail: { theme: newTheme } }),
     );

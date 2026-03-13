@@ -266,10 +266,13 @@ export default function NotificacionModal({
       isValid = false;
     }
 
-    // Validar documento (solo en creación)
-    if (!isEditing && !selectedFile) {
-      newErrors.file = "Debe cargar un documento";
-      isValid = false;
+    // Validar documento cuando notificacion_exitosa es true
+    if (notificacionForm.notificacion_exitosa) {
+      const tieneDocumentoExistente = isEditing && editingNotificacion?.url_documento;
+      if (!selectedFile && !tieneDocumentoExistente) {
+        newErrors.file = "Debe cargar un documento de notificación";
+        isValid = false;
+      }
     }
 
     // Validar documento de citación (solo en creación)
@@ -283,12 +286,6 @@ export default function NotificacionModal({
   };
 
   const handleSave = async () => {
-    console.log("[NotificationModal] Iniciando guardado...");
-    console.log(
-      "[NotificationModal] Modo:",
-      isEditing ? "EDICIÓN" : "CREACIÓN",
-    );
-
     // Limpiar errores previos
     setErrors({
       involucrado_id: "",
@@ -304,7 +301,6 @@ export default function NotificacionModal({
 
     // Validar formulario
     if (!validateForm()) {
-      console.log("[NotificationModal] Validación fallida");
       return;
     }
 
@@ -354,33 +350,32 @@ export default function NotificacionModal({
       // Incluir archivo de notificación
       if (selectedFile) {
         formData.append("file", selectedFile);
+      } else if (isEditing && editingNotificacion?.url_documento) {
+        formData.append("url_documento_origen", editingNotificacion.url_documento);
       }
 
       // Incluir archivo de citación
       if (selectedFileCitacion) {
         formData.append("file_citacion", selectedFileCitacion);
+      } else if (isEditing && editingNotificacion?.url_doc_citacion) {
+        formData.append("url_citacion_origen", editingNotificacion.url_doc_citacion);
       }
 
-      console.log("[NotificationModal] Llamando onSave...");
       const result = await onSave(formData);
-      console.log("[NotificationModal] Resultado de onSave:", result);
 
       // Verificar que el resultado sea exitoso
       if (result && result.ok === true) {
-        console.log("[NotificationModal] Guardado exitoso, cerrando modal...");
         handleClose();
       } else {
         // Mostrar error específico
         const errorMessage =
           result?.error || "Error desconocido al guardar la notificación";
-        console.error("[NotificationModal] Error al guardar:", errorMessage);
         setErrors((prev) => ({
           ...prev,
           general: errorMessage,
         }));
       }
     } catch (error) {
-      console.error("[NotificationModal] Excepción capturada:", error);
       setErrors((prev) => ({
         ...prev,
         general:
@@ -389,9 +384,6 @@ export default function NotificacionModal({
             : "Error de conexión al guardar la notificación",
       }));
     } finally {
-      console.log(
-        "[NotificationModal] Finalizando guardado, isSubmitting = false",
-      );
       setIsSubmitting(false);
     }
   };
@@ -873,12 +865,14 @@ export default function NotificacionModal({
             </div>
           </div>
 
-          {/* Documento */}
+          {/* Documento Notificación */}
           <div className="form-control">
             <label className="label">
               <span className="label-text font-medium">
-                Documento
-                {!isEditing && <span className="text-error ml-1">*</span>}
+                Documento Notificación
+                {notificacionForm.notificacion_exitosa && (
+                  <span className="text-error ml-1">*</span>
+                )}
                 <span className="text-xs text-base-content/50 ml-2">
                   (PDF - Máx. 10MB)
                 </span>
@@ -892,7 +886,7 @@ export default function NotificacionModal({
                 errors.file ? "file-input-error" : ""
               } ${!hasDocumentoCitacion ? "opacity-50 cursor-not-allowed" : ""}`}
               onChange={handleFileChange}
-              disabled={!hasDocumentoCitacion || isSubmitting}
+              disabled={!notificacionForm.notificacion_exitosa || isSubmitting}
             />
             {errors.file && (
               <label className="label">
@@ -919,10 +913,12 @@ export default function NotificacionModal({
                 </span>
               </label>
             )}
-            {isEditing && !selectedFile && (
+            {isEditing && !selectedFile && !errors.file && (
               <label className="label">
                 <span className="label-text-alt text-base-content/60">
-                  Opcional - Solo si desea reemplazar el documento
+                  {notificacionForm.notificacion_exitosa && !editingNotificacion?.url_documento
+                    ? "Debe cargar un documento de notificación"
+                    : "Opcional - Solo si desea reemplazar el documento"}
                 </span>
               </label>
             )}

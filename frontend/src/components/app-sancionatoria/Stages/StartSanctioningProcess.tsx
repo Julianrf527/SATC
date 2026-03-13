@@ -91,7 +91,7 @@ export default function StartSanctioningProcess({
         });
       }
     } catch (e) {
-      console.error("Error fetching inicio proceso:", e);
+      /* console.error("Error fetching inicio proceso:", e); */
       setToast({
         id: Date.now(),
         message: "Error al cargar el inicio del proceso sancionatorio.",
@@ -173,7 +173,7 @@ export default function StartSanctioningProcess({
         });
       }
     } catch (e) {
-      console.error("Error creando etapa:", e);
+      /* console.error("Error creando etapa:", e); */
       setToast({
         id: Date.now(),
         message: "Error al crear la etapa.",

@@ -119,12 +119,11 @@ export default function BasicDataFile({
           message: response.detail || "El radicado se encuentra en uso",
           type: "error",
         });
-        const errorMessage = response.detail || `Error ${response.status}`;
-        console.error("Error al actualizar expediente:", errorMessage);
+        /* console.error("Error al actualizar expediente:", response.detail); */
         return false;
       }
     } catch (networkError) {
-      console.error("Error de red o fetch:", networkError);
+      /* console.error("Error de red o fetch:", networkError); */
       setToast({
         id: Date.now(),
         message: "Error de conexión al actualizar el expediente",
@@ -147,7 +146,6 @@ export default function BasicDataFile({
       }
 
       if (!hasDataChanged(formData)) {
-        console.log("No hay cambios que guardar");
         setShowForm(false);
         setIsLoading(false);
         return;
@@ -195,7 +193,7 @@ export default function BasicDataFile({
         setShowForm(false);
       }
     } catch (error) {
-      console.error("Error completo al guardar:", error);
+      /* console.error("Error completo al guardar:", error); */
 
       let errorMessage = "Error desconocido al actualizar el expediente";
 

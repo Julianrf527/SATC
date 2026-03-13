@@ -33,7 +33,7 @@ export default function RolesPermisosPage({ setToast }: Props) {
         setToast({id: Date.now(), message: res.msg || "Error al cargar los permisos",type: "error"});
       }
     } catch (e) {
-      console.error("Error al hacer fetch:", e);
+      /* console.error("Error al hacer fetch:", e); */
       setToast({id: Date.now(),message:"Error al cargar los permisos",type:"error"});
     }
   };

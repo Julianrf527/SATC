@@ -71,8 +71,6 @@ export default function ExecutionOfSanction({
       });
 
       if (res.ok) {
-        console.log("Ejecución completa:", res);
-
         // Extraer etapa_id del response principal
         const etapaIdFromResponse = res.etapa_id;
 
@@ -96,7 +94,7 @@ export default function ExecutionOfSanction({
         });
       }
     } catch (e) {
-      console.error("Error fetching execution:", e);
+      /* console.error("Error fetching execution:", e); */
       setToast({
         id: Date.now(),
         message: "Error al cargar ejecución de la sanción.",
@@ -169,7 +167,7 @@ export default function ExecutionOfSanction({
         });
       }
     } catch (e) {
-      console.error("Error creando etapa:", e);
+      /* console.error("Error creando etapa:", e); */
       setToast({
         id: Date.now(),
         message: "Error al crear la etapa.",
@@ -222,7 +220,7 @@ export default function ExecutionOfSanction({
         });
       }
     } catch (e) {
-      console.error("Error archivando expediente:", e);
+      /* console.error("Error archivando expediente:", e); */
       setToast({
         id: Date.now(),
         message: "Error al archivar el expediente.",

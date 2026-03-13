@@ -48,12 +48,10 @@ export default function Notifications({
 
       if (res.ok) {
         setNotification([]);
-        console.log(`${res.count} notificaciones eliminadas`);
-      } else {
-        console.error(res.detail || "Error al eliminar notificaciones");
+        /* console.log(`${res.count} notificaciones eliminadas`); */
       }
     } catch (error) {
-      console.error("Error al marcar todas como leídas:", error);
+      /* console.error("Error al marcar todas como leídas:", error); */
     } finally {
       setIsDeletingAll(false);
     }

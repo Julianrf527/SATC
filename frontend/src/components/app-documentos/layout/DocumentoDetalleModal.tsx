@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { API_CONFIG, apiCall } from "../../../utils/api";
+import { API_CONFIG, apiCall, BASE_URL } from "../../../utils/api";
 import { useAuth } from "../../../context/AuthContext";
 import {
   X,
@@ -152,7 +152,7 @@ export default function DocumentoDetalleModal({
         setDocumento(res);
       }
     } catch (error) {
-      console.error("Error cargando documento:", error);
+      /* console.error("Error cargando documento:", error); */
     } finally {
       setLoading(false);
     }
@@ -161,10 +161,9 @@ export default function DocumentoDetalleModal({
   const handleDescargarArchivo = async (
     versionId: number,
     archivo_nombre: string,
-    tipo_archivo: string
+    tipo_archivo: string,
   ) => {
     try {
-      const BASE_URL = import.meta.env.VITE_API_URL;
       const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.DOCS_DOWNLOAD(versionId)}`;
 
       // Si es PDF, abrir en nueva pestaña
@@ -178,7 +177,7 @@ export default function DocumentoDetalleModal({
         link.click();
       }
     } catch (error) {
-      console.error("Error descargando archivo:", error);
+      /* console.error("Error descargando archivo:", error); */
     }
   };
 
@@ -290,7 +289,7 @@ export default function DocumentoDetalleModal({
   const esCreador =
     Number(documento?.usuario_creador_id) === Number(usuarioActualId);
   const esRevisor = documento?.revisores_asignados.some(
-    (r) => Number(r.revisor_id) === Number(usuarioActualId)
+    (r) => Number(r.revisor_id) === Number(usuarioActualId),
   );
   const puedeSubirVersion = esCreador && documento?.estado === "rechazado";
 
@@ -298,7 +297,7 @@ export default function DocumentoDetalleModal({
   const yaRevisoVersionActual = documento?.revisiones.some(
     (r) =>
       Number(r.revisor_id) === Number(usuarioActualId) &&
-      r.version_revisada === documento.version_actual
+      r.version_revisada === documento.version_actual,
   );
 
   const puedeRevisar =
@@ -432,7 +431,7 @@ export default function DocumentoDetalleModal({
                         {/* Punto en la línea */}
                         <div
                           className={`w-16 h-16 bg-base-100 border-2 ${getAccionBorderColor(
-                            item.accion
+                            item.accion,
                           )} rounded-full flex items-center justify-center shadow-lg z-10 mb-3`}
                         >
                           {getAccionIcon(item.accion)}
@@ -513,7 +512,7 @@ export default function DocumentoDetalleModal({
                               handleDescargarArchivo(
                                 version.version_id,
                                 version.archivo_nombre,
-                                documento.tipo_archivo
+                                documento.tipo_archivo,
                               )
                             }
                             className="btn btn-ghost btn-sm btn-circle"
