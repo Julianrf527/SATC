@@ -38,7 +38,7 @@ export default function MainLayout({ setTheme, setToast }: Props) {
           setUser(null);
         }
       } catch (error) {
-        console.error("Error al hacer fetch:", error);
+        /* console.error("Error al hacer fetch:", error); */
         setUser(null);
       } finally {
         setLoading(false);

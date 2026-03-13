@@ -89,7 +89,7 @@ export default function ManageInvolvedLayout({ setToast }: Props) {
           });
         }
       } catch (e) {
-        console.error(e);
+        /* console.error(e); */
         setToast({
           id: Date.now(),
           message: "Error al cargar los datos",
@@ -159,7 +159,7 @@ export default function ManageInvolvedLayout({ setToast }: Props) {
         });
       }
     } catch (e) {
-      console.error(e);
+      /* console.error(e); */
       setToast({
         id: Date.now(),
         message: "Error al actualizar el involucrado",

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { API_CONFIG, apiCall } from "../../../../utils/api";
+import { API_CONFIG, apiCall, BASE_URL } from "../../../../utils/api";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 
 type ComunicacionData = {
@@ -33,7 +33,6 @@ export default function ComunicacionCard({
   isEditable = true,
 }: Props) {
   useEffect(() => {
-    console.log("comunica", comunicacion);
   }, [comunicacion]);
   const [showPreview, setShowPreview] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -74,7 +73,6 @@ export default function ComunicacionCard({
 
   const openDocument = () => {
     if (comunicacion?.url_documento) {
-      const BASE_URL = import.meta.env.VITE_API_URL;
       const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
         comunicacion.url_documento,
       )}`;
@@ -118,7 +116,7 @@ export default function ComunicacionCard({
         });
       }
     } catch (e) {
-      console.error("Error eliminando comunicación:", e);
+      /* console.error("Error eliminando comunicación:", e); */
       setToast({
         id: Date.now(),
         message: "Error al eliminar la comunicación",
@@ -362,9 +360,7 @@ export default function ComunicacionCard({
                 </svg>
               </button>
               <img
-                src={`${
-                  import.meta.env.VITE_API_URL
-                }${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
+                src={`${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
                   comunicacion.url_documento,
                 )}`}
                 alt="Vista previa del documento"

@@ -1,112 +1,81 @@
+import base64
+import httpx
+import logging
+import os
 from email.message import EmailMessage
 from typing import Optional
-from fastapi import APIRouter
-from aiosmtplib import send
-import logging
-from dotenv import load_dotenv
-import os
 
-router = APIRouter(prefix="/email", tags=["email"])
 logger = logging.getLogger(__name__)
 
-async def sendEmail(title,message, email, subject):
-    # Preparar email
 
-        load_dotenv()
-        msg = EmailMessage()
-        msg["From"] = os.getenv("EMAIL_ORIGEN")
-        msg["To"] = email
-        msg["Subject"] = subject
-        msg.set_content(message)
+def _build_html(title: str, message: str) -> str:
+    return f"""
+    <html>
+        <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; color: #1a202c; padding: 20px; margin: 0;">
+            <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
+                <h2 style="color: #2d3748; text-align: center; margin: 0 0 20px 0; font-size: 24px;">{title}</h2>
+                <div style="margin: 20px 0;">{message}</div>
+                <p style="font-size: 12px; color: #718096; text-align: left; margin: 20px 0;">
+                    Si no solicitaste este cambio, ignora este correo.<br>
+                    Este es un mensaje automático, por favor no responder a este correo.
+                </p>
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;">
+                <p style="font-size: 12px; color: #718096; text-align: center; margin: 0;">
+                    © 2025 Corpochivor. Todos los derechos reservados.
+                </p>
+            </div>
+        </body>
+    </html>
+    """
 
-        msg.set_content(message)
 
-        # Contenido HTML
-        html_content = f"""
-        <html>
-            <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; color: #1a202c; padding: 20px; margin: 0;">
-                <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
-                    <h2 style="color: #2d3748; text-align: center; margin: 0 0 20px 0; font-size: 24px;">{title}</h2>
-                    
-                    <div style="margin: 20px 0;">
-                        {message}
-                    </div>
-                    <p style="font-size: 12px; color: #718096; text-align: left; margin: 20px 0;">
-                        Si no solicitaste este cambio, ignora este correo.<br>
-                        Este es un mensaje automático, por favor no responder a este correo.
-                    </p>
-                    
-                    <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;">
-                    
-                    <p style="font-size: 12px; color: #718096; text-align: center; margin: 0;">
-                        © 2025 Corpochivor. Todos los derechos reservados.
-                    </p>
-                </div>
-            </body>
-        </html>
-        """
-
-        msg.add_alternative(html_content, subtype="html")
-
-        await send(
-            msg,
-            hostname=os.getenv("SMTP_HOST"),
-            port=int(os.getenv("SMTP_PORT")),
-            username=os.getenv("SMTP_USER"),
-            password=os.getenv("SMTP_PASS"),
-            start_tls=True,
+async def _get_access_token() -> str:
+    """Obtiene un access token fresco usando el refresh token de OAuth2."""
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.post(
+            "https://oauth2.googleapis.com/token",
+            data={
+                "client_id": os.getenv("GOOGLE_CLIENT_ID"),
+                "client_secret": os.getenv("GOOGLE_CLIENT_SECRET"),
+                "refresh_token": os.getenv("GOOGLE_REFRESH_TOKEN"),
+                "grant_type": "refresh_token",
+            },
         )
+    if resp.status_code != 200:
+        raise RuntimeError(f"OAuth2 token error {resp.status_code}: {resp.text}")
+    return resp.json()["access_token"]
 
-async def send_single_email(title: str, message: str, email: str, subject: str, html_content: Optional[str] = None):
-    """Función auxiliar para enviar un email"""
+
+async def _send_via_gmail_api(to_email: str, subject: str, html_content: str) -> None:
+    """Envía un email usando la Gmail API (HTTPS puerto 443, sin SMTP)."""
+    from_email = os.getenv("SMTP_FROM")
+    msg = EmailMessage()
+    msg["From"] = from_email
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.add_alternative(html_content, subtype="html")
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
+    access_token = await _get_access_token()
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
+            json={"raw": raw},
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(f"Gmail API error {resp.status_code}: {resp.text}")
+
+
+async def sendEmail(title: str, message: str, email: str, subject: str) -> None:
+    await _send_via_gmail_api(email, subject, _build_html(title, message))
+
+
+async def send_single_email(title: str, message: str, email: str, subject: str, html_content: Optional[str] = None) -> bool:
     try:
-        msg = EmailMessage()
-        msg["From"] = os.getenv("EMAIL_ORIGEN")
-        msg["To"] = email
-        msg["Subject"] = subject
-        msg.set_content(message)
-
-        # Si se proporciona HTML personalizado, usarlo; sino usar el template por defecto
-        if html_content:
-            final_html = html_content
-        else:
-            final_html = f"""
-            <html>
-                <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; color: #1a202c; padding: 20px; margin: 0;">
-                    <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.15);">
-                        <h2 style="color: #2d3748; text-align: center; margin: 0 0 20px 0; font-size: 24px;">{title}</h2>
-                        
-                        <div style="margin: 20px 0;">
-                            {message}
-                        </div>
-                        <p style="font-size: 12px; color: #718096; text-align: left; margin: 20px 0;">
-                            Si no solicitaste este cambio, ignora este correo.<br>
-                            Este es un mensaje automático, por favor no responder a este correo.
-                        </p>
-                        
-                        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;">
-                        
-                        <p style="font-size: 12px; color: #718096; text-align: center; margin: 0;">
-                            © 2025 Corpochivor. Todos los derechos reservados.
-                        </p>
-                    </div>
-                </body>
-            </html>
-            """
-
-        msg.add_alternative(final_html, subtype="html")
-
-        await send(
-            msg,
-            hostname=os.getenv("SMTP_HOST"),
-            port=int(os.getenv("SMTP_PORT")),
-            username=os.getenv("SMTP_USER"),
-            password=os.getenv("SMTP_PASS"),
-            start_tls=True,
-        )
-        
+        final_html = html_content if html_content else _build_html(title, message)
+        await _send_via_gmail_api(email, subject, final_html)
         return True
-        
     except Exception as e:
         logger.error(f"Error enviando email a {email}: {e}")
         raise

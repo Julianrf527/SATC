@@ -68,7 +68,6 @@ export default function ClosingProbationaryPeriod({
       );
 
       if (res.ok) {
-        console.log(res);
         setLocalCierre(res.cierre_etapa_probatoria);
         setDocumentos(res.cierre_etapa_probatoria?.documento || []);
 
@@ -85,7 +84,7 @@ export default function ClosingProbationaryPeriod({
         });
       }
     } catch (e) {
-      console.error("Error fetching cierre:", e);
+      /* console.error("Error fetching cierre:", e); */
       setToast({
         id: Date.now(),
         message: "Error al cargar cierre etapa probatoria.",
@@ -169,7 +168,7 @@ export default function ClosingProbationaryPeriod({
         });
       }
     } catch (e) {
-      console.error("Error creando etapa:", e);
+      /* console.error("Error creando etapa:", e); */
       setToast({
         id: Date.now(),
         message: "Error al crear la etapa.",

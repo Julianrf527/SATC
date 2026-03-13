@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { apiCall, API_CONFIG } from "../../../../utils/api";
+import { apiCall, API_CONFIG, BASE_URL } from "../../../../utils/api";
 import ExecutionView from "./ExecutionView";
 import ExecutionForm from "./ExecutionForm";
 
@@ -112,7 +112,6 @@ export default function DataStageExecution({
   };
 
   const handleViewDocument = (url: string) => {
-    const BASE_URL = import.meta.env.VITE_API_URL;
     const fullUrl = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(url)}`;
     window.open(fullUrl, "_blank");
   };
@@ -261,7 +260,7 @@ export default function DataStageExecution({
         });
       }
     } catch (error) {
-      console.error("Error al guardar:", error);
+      /* console.error("Error al guardar:", error); */
       setToast({
         id: Date.now(),
         message: "Error al procesar la solicitud",

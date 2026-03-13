@@ -920,6 +920,77 @@ async def actualizar_encargado_de_expediente(
         logger.error(f"Error actualizando encargado: {e}")
         raise HTTPException(status_code=500, detail="Error al actualizar encargado")
 
+class BulkEncargadoRequest(BaseModel):
+    radicados: List[str]
+    encargado_id: int
+
+@router.patch("/encargado/bulk")
+async def actualizar_encargado_bulk(
+    request: Request,
+    data: BulkEncargadoRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        usuario_id = verify_gateway_token(request)
+        res = await verificar_permiso_externo(usuario_id, ENCARGADO_PERMISSION)
+
+        if not res["ok"]:
+            raise HTTPException(status_code=403, detail="No cuenta con permisos")
+
+        new_value = None if data.encargado_id == 0 else data.encargado_id
+        updated = []
+
+        for radicado in data.radicados:
+            stmt_check = select(Expediente).where(Expediente.radicado == radicado)
+            res_check = await db.execute(stmt_check)
+            expediente = res_check.scalar_one_or_none()
+            if expediente is None:
+                continue
+
+            datos_anteriores = {"radicado": radicado, "encargado_id": expediente.encargado_id}
+
+            await db.execute(
+                update(Expediente)
+                .where(Expediente.radicado == radicado)
+                .values({Expediente.encargado_id: new_value})
+                .execution_options(synchronize_session=False)
+            )
+
+            await insert_log_auditoria(
+                db=db,
+                usuario_id=usuario_id,
+                tabla_afectada="expediente",
+                tipo_operacion="UPDATE",
+                descripcion=f"Actualización masiva de encargado del expediente {radicado}",
+                expediente_radicado=radicado,
+                id_registro=radicado,
+                datos_anteriores=datos_anteriores,
+                datos_nuevos={"radicado": radicado, "encargado_id": new_value}
+            )
+            updated.append(radicado)
+
+        await db.commit()
+
+        if new_value:
+            for radicado in updated:
+                await crear_notificacion_usuario(
+                    mensaje=f"Se te ha asignado el expediente {radicado}",
+                    ruta=f"/expedientes/{radicado}",
+                    usuario_id=new_value
+                )
+
+        return JSONResponse(
+            content={"ok": True, "updated": updated, "msg": f"Se actualizaron {len(updated)} expedientes"},
+            status_code=200
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error actualizando encargados bulk: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error al actualizar encargados")
+
 # Archivar expediente
 @router.patch("/{radicado}/archive")
 async def archivar_expediente(
@@ -4611,8 +4682,8 @@ async def crear_involucrado_notificacion(
             logger.warning("Error validando numerado")
             raise HTTPException(status_code=400, detail="El numerado debe tener como maximo 4 dígitos")
 
-        # Validar que se proporcione file o url_documento_origen
-        if not file and not url_documento_origen:
+        # Validar que se proporcione file o url_documento_origen (solo si notificacion_exitosa)
+        if notificacion_exitosa and not file and not url_documento_origen:
             raise HTTPException(status_code=400, detail="Debe proporcionar un archivo o una URL de origen")
 
         # Validación tipo archivo si se proporciona
@@ -4701,36 +4772,32 @@ async def crear_involucrado_notificacion(
         else:
             logger.info("Año ≤ 2012 - se permite duplicado en mismo expediente")
 
-        # Guardar o copiar archivo en MinIO
-        logger.info("Procesando archivo de notificación...")
-        
-        if file and file.filename:
-            # Subir nuevo archivo
-            # Leer contenido del archivo
-            file_data = await file.read()
-            
-            # Subir a MinIO con deduplicación (ruta automática basada en hash)
-            result = await upload_file_with_deduplication(
-                db=db,
-                file_data=file_data,
-                original_filename=file.filename,
-                content_type=file.content_type
-            )
-            if not result["ok"]:
-                raise HTTPException(status_code=500, detail=f"Error subiendo archivo: {result['message']}")
-            
-            url_documento = result["url"]
-            if result.get("deduplicated"):
-                logger.info(f"Archivo duplicado detectado - URL reutilizada: {url_documento} (Hash: {result.get('file_hash')})")
+        # Guardar o copiar archivo en MinIO (solo si notificacion_exitosa)
+        url_documento = None
+        if notificacion_exitosa:
+            logger.info("Procesando archivo de notificación...")
+            if file and file.filename:
+                file_data = await file.read()
+                result = await upload_file_with_deduplication(
+                    db=db,
+                    file_data=file_data,
+                    original_filename=file.filename,
+                    content_type=file.content_type
+                )
+                if not result["ok"]:
+                    raise HTTPException(status_code=500, detail=f"Error subiendo archivo: {result['message']}")
+                url_documento = result["url"]
+                if result.get("deduplicated"):
+                    logger.info(f"Archivo duplicado detectado - URL reutilizada: {url_documento} (Hash: {result.get('file_hash')})")
+                else:
+                    logger.info(f"Archivo nuevo guardado en MinIO: {url_documento} (Hash: {result.get('file_hash')})")
+            elif url_documento_origen:
+                url_documento = url_documento_origen
+                logger.info(f"Reutilizando URL de documento existente: {url_documento}")
             else:
-                logger.info(f"Archivo nuevo guardado en MinIO: {url_documento} (Hash: {result.get('file_hash')})")
-            
-        elif url_documento_origen:
-            # Reutilizar URL existente sin duplicar archivo
-            url_documento = url_documento_origen
-            logger.info(f"Reutilizando URL de documento existente: {url_documento}")
+                raise HTTPException(status_code=400, detail="Debe proporcionar un archivo o una URL de origen")
         else:
-            raise HTTPException(status_code=400, detail="Debe proporcionar un archivo o una URL de origen")
+            logger.info("Notificación no exitosa - documento de notificación omitido")
 
         # Procesar documento de citación si existe
         url_doc_citacion = None

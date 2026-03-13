@@ -39,7 +39,6 @@ export default function ConfirmDeleteModal({
       // Selector específico para el div de App, no el modal
       const appRoot = document.querySelector("#root > div[data-theme]");
       const currentTheme = appRoot?.getAttribute("data-theme") || "emerald";
-      console.log("[ConfirmDeleteModal] Tema detectado:", currentTheme);
       setTheme(currentTheme);
     };
 
@@ -49,10 +48,6 @@ export default function ConfirmDeleteModal({
     // Escuchar evento custom de cambio de tema
     const handleThemeChange = (e: Event) => {
       const customEvent = e as CustomEvent<{ theme: string }>;
-      console.log(
-        "[ConfirmDeleteModal] Evento themeChange recibido:",
-        customEvent.detail.theme,
-      );
       setTheme(customEvent.detail.theme);
     };
 
@@ -61,8 +56,6 @@ export default function ConfirmDeleteModal({
     // Observar cambios en el atributo data-theme del div de App (backup)
     const observer = new MutationObserver(updateTheme);
     const appRoot = document.querySelector("#root > div[data-theme]");
-
-    console.log("[ConfirmDeleteModal] Observer configured, appRoot:", appRoot);
 
     if (appRoot) {
       observer.observe(appRoot, {

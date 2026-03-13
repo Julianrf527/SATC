@@ -67,7 +67,6 @@ export default function Cessation({
       });
 
       if (res.ok) {
-        console.log(res);
         setLocalCesacion(res.cesacion);
         setDocumentos(res.cesacion?.documento || []);
         if (res.cesacion?.acto_admin?.id) {
@@ -81,7 +80,7 @@ export default function Cessation({
         });
       }
     } catch (e) {
-      console.error("Error fetching cesacion:", e);
+      /* console.error("Error fetching cesacion:", e); */
       setToast({
         id: Date.now(),
         message: "Error al cargar cesación.",
@@ -166,7 +165,7 @@ export default function Cessation({
         });
       }
     } catch (e) {
-      console.error("Error creando etapa:", e);
+      /* console.error("Error creando etapa:", e); */
       setToast({
         id: Date.now(),
         message: "Error al crear la etapa.",

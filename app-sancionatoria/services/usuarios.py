@@ -93,7 +93,7 @@ async def obtener_info_usuarios(user_ids: list[int]) -> dict:
         # Generar token de servicio
         service_token = generate_service_jwt("expedientes-service", SERVICE_SECRET_KEY)
         
-        gateway_url = f"{GATEWAY_URL}/users/batch"
+        gateway_url = f"{GATEWAY_URL}/users/user/batch"
         logger.info(f"Llamando a {gateway_url} con {len(user_ids)} IDs: {user_ids}")
 
         async with httpx.AsyncClient(timeout=10.0) as client:

@@ -5,8 +5,8 @@ Sistema completo de respaldo y restauración para bases de datos PostgreSQL y ar
 ## 📋 Tabla de Contenidos
 
 - [Características](#características)
+- [Configuración Automática](#configuración-automática)
 - [Componentes Respaldados](#componentes-respaldados)
-- [Configuración Inicial](#configuración-inicial)
 - [Uso](#uso)
 - [Monitoreo](#monitoreo)
 - [Restauración](#restauración)
@@ -17,87 +17,57 @@ Sistema completo de respaldo y restauración para bases de datos PostgreSQL y ar
 
 ## 🎯 Características
 
-- ✅ **Backups automáticos cada hora**
-- ✅ **Respaldo completo**: Bases de datos + Archivos
-- ✅ **Compresión ZIP**: Reduce espacio en disco
-- ✅ **Verificación de integridad**: Detecta archivos corruptos
+- ✅ **Backups automáticos cada 30 minutos** (configurado en Docker)
+- ✅ **Respaldo completo**: Bases de datos PostgreSQL
+- ✅ **Compresión GZIP**: Reduce espacio en disco (90% ahorro)
 - ✅ **Limpieza automática**: Elimina backups antiguos (30 días por defecto)
 - ✅ **Logging detallado**: Auditoría completa de operaciones
-- ✅ **Resumen JSON**: Para integración con sistemas de monitoreo
+- ✅ **Auto-inicio**: Se activa al ejecutar `docker-compose up`
 - ✅ **Restauración simplificada**: Script interactivo
+- ✅ **Sin configuración manual**: Funciona out-of-the-box
 
 ---
 
-## 📦 Componentes Respaldados
+## ⚙️ Configuración Automática
 
-### Bases de Datos PostgreSQL (3)
+### ✨ Backups automáticos activos desde el inicio
 
-- **user_db** - Usuarios y autenticación
-- **expedientes_db** - Expedientes sancionatorios
-- **documentos_db** - Documentos administrativos
+Al ejecutar `docker-compose up -d`, el servicio `satc-backup-service`:
 
-### Archivos MinIO (2 buckets)
+1. ✅ Se inicia automáticamente (sin configuración adicional)
+2. ✅ Ejecuta un backup inicial inmediatamente
+3. ✅ Configura cron job para backups cada 30 minutos
+4. ✅ Limpia backups antiguos (mayores a 30 días)
+5. ✅ Registra todas las operaciones en logs
 
-- **satc-expedientes** - Archivos de expedientes
-- **satc-documentos** - Archivos de documentos
+### 📅 Frecuencia
 
-### Metadatos
+```
+Cron: */30 * * * * (cada 30 minutos)
 
-- Lista de volúmenes Docker persistentes
-
----
-
-## ⚙️ Configuración Inicial
-
-### Paso 1: Preparar el sistema
-
-Asegúrate de que Docker Desktop esté corriendo y todos los contenedores estén activos:
-
-```powershell
-docker ps
+Ejemplo de ejecuciones:
+- 10:00 AM
+- 10:30 AM
+- 11:00 AM
+- 11:30 AM
+... cada 30 minutos las 24 horas
 ```
 
-Deberías ver 17 contenedores corriendo, incluyendo:
-
-- `satc-postgres-users`
-- `satc-postgres-sanctioning`
-- `satc-postgres-docs`
-- `satc-minio`
-
-### Paso 2: Configurar backups automáticos
-
-**IMPORTANTE:** Requiere ejecutar PowerShell como **Administrador**
+### 🔄 Verificar que está funcionando
 
 ```powershell
-# 1. Abrir PowerShell como Administrador
-# (Clic derecho → Run as Administrator)
+# Ver si el servicio está corriendo
+docker ps --filter "name=backup"
 
-# 2. Navegar a la carpeta scripts
-cd C:\Users\julia\Escritorio\SATC\scripts
+# Ver logs de backups
+docker logs satc-backup-service
 
-# 3. Ejecutar script de configuración
-.\setup-backup-schedule.ps1
+# Ver próximos backups programados
+docker exec satc-backup-service cat /etc/crontabs/root
 
-# 4. Confirmar cuando pregunte si ejecutar backup de prueba
+# Ver historial de backups ejecutados
+docker exec satc-backup-service tail -50 /var/log/backup-cron.log
 ```
-
-### Paso 3: Verificar configuración
-
-```powershell
-# Ver tarea programada
-Get-ScheduledTask -TaskName "SATC-Backup-Automatico"
-
-# Ver próxima ejecución
-Get-ScheduledTaskInfo -TaskName "SATC-Backup-Automatico" | Select-Object NextRunTime
-```
-
-✅ **LISTO**: Los backups ahora se ejecutarán automáticamente cada hora.
-
----
-
-## 🚀 Uso
-
-### Backup Manual
 
 Si necesitas ejecutar un backup fuera del horario programado:
 

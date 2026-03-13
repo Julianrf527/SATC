@@ -1,13 +1,12 @@
-# ====================================
+﻿# ====================================
 # SATC - Sistema ApiCorp
-# Docker Compose - Producción
 # ====================================
 # Changelog:
-# - 2026-02-13: Configuración inicial con mejoras de arquitectura
+# - 2026-02-13: ConfiguraciÃ³n inicial con mejoras de arquitectura
 # - Timezone: America/Bogota en todos los servicios
 # - Healthchecks y restart policies configurados
-# - Volúmenes persistentes para datos y backups
-# - Network aislada para comunicación interna
+# - VolÃºmenes persistentes para datos y backups
+# - Network aislada para comunicaciÃ³n interna
 # ====================================
 
 version: "3.8"
@@ -256,7 +255,7 @@ services:
         max-file: "3"
 
   # ==========================================
-  # ANTIVIRUS - ClamAV (Caso 8: Seguridad)
+  # ANTIVIRUS - ClamAV
   # ==========================================
   clamav:
     image: clamav/clamav:latest
@@ -324,7 +323,7 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
-    # Redis SIEMPRE activo para sesiones (Optimización de performance)
+    # Redis SIEMPRE activo para sesiones (OptimizaciÃ³n de performance)
 
   # ==========================================
   # NGINX LOAD BALANCER
@@ -347,11 +346,9 @@ services:
     ports:
       - "8000:80"
     depends_on:
-      api-gateway-1:
+      api-gateway:
         condition: service_healthy
-      api-gateway-2:
-        condition: service_healthy
-      api-gateway-3:
+      frontend:
         condition: service_healthy
     healthcheck:
       test:
@@ -369,98 +366,26 @@ services:
       TZ: America/Bogota
 
   # ==========================================
-  # MICROSERVICIO - Users (Replica 1)
+  # MICROSERVICIO - Users (instancia Ãºnica Â· 4 workers)
   # ==========================================
-  app-users-1:
+  app-users:
     build:
       context: ./app-users
       dockerfile: Dockerfile
-    container_name: satc-app-users-1
+    container_name: satc-app-users
     deploy:
       resources:
         limits:
-          cpus: "1.0" # Aumentado para 4 workers (antes 0.75 para 2 workers)
-          memory: 400M # Optimizado según uso real: 296MB pico
+          cpus: "2.0" # 4 workers Gunicorn (consolida 2 rÃ©plicas Ã— 2 workers)
+          memory: 600M # Cubre uso real pico con --preload
         reservations:
-          cpus: "0.5"
-          memory: 200M
-    environment:
-      # Database
-      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres-users:5432/user_db
-
-      # Redis Sessions (Optimización: 96% más rápido que PostgreSQL)
-      REDIS_SESSIONS_ENABLED: "true"
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
-      REDIS_DB_SESSIONS: 1
-
-      # JWT
-      SECRET_KEY: ${SECRET_KEY}
-      SECRET_KEY_GATEWAY: ${SECRET_KEY_GATEWAY}
-      SECRET_GATEWAY: ${SECRET_GATEWAY}
-      JWT_ALGORITHM: HS256
-      JWT_EXP_DAYS: 1
-
-      # Email
-      SMTP_SERVER: ${SMTP_SERVER}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USERNAME: ${SMTP_USERNAME}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
-      SMTP_FROM: ${SMTP_FROM}
-
-      # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
-
-      # Permisos
-      PERMISO_ROL: ${PERMISO_ROL:-admin_roles y permisos}
-      PERMISO_USER: ${PERMISO_USER:-admin_registrar usuario}
-      GESTION_USER: ${GESTION_USER:-admin_gestionar usuarios}
-      USER_LOG: ${USER_LOG:-admin_auditoria usuarios}
-
-      # Timezone
-      TZ: America/Bogota
-    depends_on:
-      postgres-users:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - satc-network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==========================================
-  # MICROSERVICIO - Users (Replica 2)
-  # ==========================================
-  app-users-2:
-    build:
-      context: ./app-users
-      dockerfile: Dockerfile
-    container_name: satc-app-users-2
-    deploy:
-      resources:
-        limits:
           cpus: "1.0"
-          memory: 400M
-        reservations:
-          cpus: "0.5"
           memory: 200M
     environment:
       # Database
       DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres-users:5432/user_db
 
-      # Redis Sessions (Optimización: 96% más rápido que PostgreSQL)
+      # Redis Sessions (OptimizaciÃ³n: 96% mÃ¡s rÃ¡pido que PostgreSQL)
       REDIS_SESSIONS_ENABLED: "true"
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -471,14 +396,14 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       SECRET_KEY_GATEWAY: ${SECRET_KEY_GATEWAY}
       SECRET_GATEWAY: ${SECRET_GATEWAY}
+      SERVICE_SECRET_KEY: ${SECRET_GATEWAY}
       JWT_ALGORITHM: HS256
       JWT_EXP_DAYS: 1
 
       # Email
-      SMTP_SERVER: ${SMTP_SERVER}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USERNAME: ${SMTP_USERNAME}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REFRESH_TOKEN: ${GOOGLE_REFRESH_TOKEN}
       SMTP_FROM: ${SMTP_FROM}
 
       # CORS
@@ -500,7 +425,11 @@ services:
     networks:
       - satc-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:8001/health'')" || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -514,7 +443,7 @@ services:
 
   # ==========================================
   # MICROSERVICIO - Users (Replica 3) - DESHABILITADO
-  # Configuración ajustada para 30 usuarios: Solo 2 réplicas necesarias
+  # ConfiguraciÃ³n ajustada para 30 usuarios: Solo 2 rÃ©plicas necesarias
   # ==========================================
   # app-users-3:
   #   build:
@@ -573,7 +502,7 @@ services:
   #       max-file: "3"
 
   # ==========================================
-  # MICROSERVICIO - Sanctioning
+  # MICROSERVICIO - Sanctioning (instancia Ãºnica Â· 4 workers)
   # ==========================================
   app-sanctioning:
     build:
@@ -583,17 +512,18 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1.0" # Reducido de 1.5 (2 workers)
-          memory: 256M # Optimizado según uso real: 187MB pico
+          cpus: "2.0" # 4 workers Gunicorn (consolida 2 rÃ©plicas Ã— 2 workers)
+          memory: 450M # Cubre uso real pico con --preload
         reservations:
-          cpus: "0.5"
-          memory: 128M
+          cpus: "1.0"
+          memory: 225M
     environment:
       # Database
       DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres-sanctioning:5432/expedientes_db
 
       # JWT
       SECRET_GATEWAY: ${SECRET_GATEWAY}
+      SERVICE_SECRET_KEY: ${SECRET_GATEWAY}
 
       # MinIO
       MINIO_ENDPOINT: minio:9000
@@ -603,7 +533,12 @@ services:
       MINIO_SECURE: "false"
 
       # Services URLs
-      USER_SERVICE_URL: http://app-users-1:8001
+      GATEWAY_URL: http://api-gateway:8000
+      USER_SERVICE_URL: http://app-users:8001
+
+      # Permissions
+      FILE_PERMISSION: expediente_gestionar
+      ENCARGADO_PERMISSION: expediente_gestionar
 
       # File Security (Caso 8)
       MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-10}
@@ -624,9 +559,7 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      app-users-1:
-        condition: service_healthy
-      app-users-2:
+      app-users:
         condition: service_healthy
       clamav:
         condition: service_healthy
@@ -636,76 +569,6 @@ services:
       - satc-network
     ports:
       - "8002:8002"
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==========================================
-  # MICROSERVICIO - Sanctioning (Replica 2)
-  # Alta disponibilidad para servicio crítico - Sin port mapping
-  # ==========================================
-  app-sanctioning-2:
-    build:
-      context: ./app-sancionatoria
-      dockerfile: Dockerfile
-    container_name: satc-app-sanctioning-2
-    deploy:
-      resources:
-        limits:
-          cpus: "1.0"
-          memory: 256M
-        reservations:
-          cpus: "0.5"
-          memory: 128M
-    environment:
-      # Database
-      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres-sanctioning:5432/expedientes_db
-
-      # JWT
-      SECRET_GATEWAY: ${SECRET_GATEWAY}
-
-      # MinIO
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
-      MINIO_BUCKET: satc-expedientes
-      MINIO_SECURE: "false"
-
-      # Services URLs
-      USER_SERVICE_URL: http://app-users-1:8001
-
-      # File Security (Caso 8)
-      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-10}
-      UPLOAD_DIR: /app/secure-uploads
-
-      # ClamAV Antivirus
-      CLAMAV_ENABLED: ${CLAMAV_ENABLED:-true}
-      CLAMAV_HOST: clamav
-      CLAMAV_PORT: 3310
-
-      # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
-
-      # Timezone
-      TZ: America/Bogota
-    depends_on:
-      postgres-sanctioning:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-      app-users-1:
-        condition: service_healthy
-      app-users-2:
-        condition: service_healthy
-      clamav:
-        condition: service_healthy
-    volumes:
-      - secure-uploads-sanctioning:/app/secure-uploads
-    networks:
-      - satc-network
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -725,7 +588,7 @@ services:
       resources:
         limits:
           cpus: "0.5" # Reducido de 1.0 (1 worker)
-          memory: 128M # Optimizado según uso real: 89MB pico
+          memory: 128M # Optimizado segÃºn uso real: 89MB pico
         reservations:
           cpus: "0.25"
           memory: 64M
@@ -744,7 +607,7 @@ services:
       MINIO_SECURE: "false"
 
       # Services URLs
-      USER_SERVICE_URL: http://app-users-1:8001
+      USER_SERVICE_URL: http://app-users:8001
       API_GATEWAY_URL: http://nginx-lb:80
 
       # File Security (Caso 8)
@@ -766,9 +629,7 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      app-users-1:
-        condition: service_healthy
-      app-users-2:
+      app-users:
         condition: service_healthy
       clamav:
         condition: service_healthy
@@ -786,21 +647,21 @@ services:
         max-file: "3"
 
   # ==========================================
-  # API GATEWAY (Replica 1)
+  # API GATEWAY (instancia Ãºnica Â· 6 workers)
   # ==========================================
-  api-gateway-1:
+  api-gateway:
     build:
       context: ./api-gateway
       dockerfile: Dockerfile
-    container_name: satc-api-gateway-1
+    container_name: satc-api-gateway
     deploy:
       resources:
         limits:
-          cpus: "1.5" # Aumentado para 6 workers (antes 1.0 para 4 workers)
-          memory: 384M # Optimizado según uso real: 291MB pico
+          cpus: "4.0" # 6 workers Gunicorn (consolida 3 rÃ©plicas Ã— 2 workers)
+          memory: 900M # Cubre uso real pico con --preload
         reservations:
-          cpus: "0.75"
-          memory: 192M
+          cpus: "2.0"
+          memory: 450M
     environment:
       # JWT
       SECRET_KEY_GATEWAY: ${SECRET_KEY_GATEWAY}
@@ -808,7 +669,7 @@ services:
       JWT_ALGORITHM: HS256
 
       # Services Routes
-      USER_ROUTE: http://app-users-1:8001
+      USER_ROUTE: http://app-users:8001
       SANCTIONING_ROUTE: http://app-sanctioning:8002
       DOCUMENTS_ROUTE: http://app-docs:8003
 
@@ -830,9 +691,7 @@ services:
       RATE_LIMIT_ENABLED: "true"
       RATE_LIMIT_PER_MINUTE: 100
     depends_on:
-      app-users-1:
-        condition: service_healthy
-      app-users-2:
+      app-users:
         condition: service_healthy
       app-sanctioning:
         condition: service_healthy
@@ -841,143 +700,11 @@ services:
     networks:
       - satc-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==========================================
-  # API GATEWAY (Replica 2)
-  # ==========================================
-  api-gateway-2:
-    build:
-      context: ./api-gateway
-      dockerfile: Dockerfile
-    container_name: satc-api-gateway-2
-    deploy:
-      resources:
-        limits:
-          cpus: "1.5"
-          memory: 384M
-        reservations:
-          cpus: "0.75"
-          memory: 192M
-    environment:
-      # JWT
-      SECRET_KEY_GATEWAY: ${SECRET_KEY_GATEWAY}
-      SECRET_GATEWAY: ${SECRET_GATEWAY}
-      JWT_ALGORITHM: HS256
-
-      # Services Routes
-      USER_ROUTE: http://app-users-2:8001
-      SANCTIONING_ROUTE: http://app-sanctioning:8002
-      DOCUMENTS_ROUTE: http://app-docs:8003
-
-      # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-
-      # Timezone
-      TZ: America/Bogota
-
-      # Cache Distribuido (Caso 4)
-      CACHE_TYPE: ${CACHE_TYPE:-local} # local, redis, none
-      CACHE_TTL: ${CACHE_TTL:-900} # 15 minutos (para pruebas de carga)
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_DB: 0
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
-
-      # Rate Limiting (Caso 12)
-      RATE_LIMIT_ENABLED: "true"
-      RATE_LIMIT_PER_MINUTE: 100
-    depends_on:
-      app-users-1:
-        condition: service_healthy
-      app-users-2:
-        condition: service_healthy
-      app-sanctioning:
-        condition: service_healthy
-      app-docs:
-        condition: service_healthy
-    networks:
-      - satc-network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-
-  # ==========================================
-  # API GATEWAY (Replica 3)
-  # ==========================================
-  api-gateway-3:
-    build:
-      context: ./api-gateway
-      dockerfile: Dockerfile
-    container_name: satc-api-gateway-3
-    deploy:
-      resources:
-        limits:
-          cpus: "1.5"
-          memory: 384M
-        reservations:
-          cpus: "0.75"
-          memory: 192M
-    environment:
-      # JWT
-      SECRET_KEY_GATEWAY: ${SECRET_KEY_GATEWAY}
-      SECRET_GATEWAY: ${SECRET_GATEWAY}
-      JWT_ALGORITHM: HS256
-
-      # Services Routes
-      USER_ROUTE: http://app-users-1:8001
-      SANCTIONING_ROUTE: http://app-sanctioning:8002
-      DOCUMENTS_ROUTE: http://app-docs:8003
-
-      # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-
-      # Timezone
-      TZ: America/Bogota
-
-      # Cache Distribuido (Caso 4)
-      CACHE_TYPE: ${CACHE_TYPE:-local} # local, redis, none
-      CACHE_TTL: ${CACHE_TTL:-900} # 15 minutos (para pruebas de carga)
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_DB: 0
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
-
-      # Rate Limiting (Caso 12)
-      RATE_LIMIT_ENABLED: "true"
-      RATE_LIMIT_PER_MINUTE: 100
-    depends_on:
-      app-users-1:
-        condition: service_healthy
-      app-users-2:
-        condition: service_healthy
-      app-sanctioning:
-        condition: service_healthy
-      app-docs:
-        condition: service_healthy
-    networks:
-      - satc-network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:8000/health'')" || exit 1',
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -1008,16 +735,13 @@ services:
           cpus: "0.25"
           memory: 32M
     environment:
-      # URL del API Gateway (inyectada en runtime)
-      VITE_API_URL: ${FRONTEND_API_URL:-http://localhost:8000}
+      # URL del API Gateway (vacío = URLs relativas, funciona desde cualquier IP)
+      VITE_API_URL: ""
       TZ: America/Bogota
     networks:
       - satc-network
     ports:
       - "80:80"
-    depends_on:
-      nginx-lb:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
       interval: 30s
@@ -1033,34 +757,66 @@ services:
 
   # ==========================================
   # BACKUP SERVICE (Caso 11: Disaster Recovery)
+  # Backups automÃ¡ticos cada 30 minutos
   # ==========================================
   backup-service:
     image: postgres:15-alpine
     container_name: satc-backup-service
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+        reservations:
+          cpus: "0.25"
+          memory: 64M
     environment:
       TZ: America/Bogota
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
     volumes:
       - ./backups:/backups
       - ./scripts/backup-all.sh:/backup-all.sh:ro
+      - ./scripts/setup-cron-backup.sh:/setup-cron-backup.sh:ro
     networks:
       - satc-network
-    entrypoint: ["sh", "-c", "while true; do sleep 86400; done"]
+    entrypoint: ["sh", "/setup-cron-backup.sh"]
     depends_on:
-      - postgres-users
-      - postgres-sanctioning
-      - postgres-docs
+      postgres-users:
+        condition: service_healthy
+      postgres-sanctioning:
+        condition: service_healthy
+      postgres-docs:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep crond || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     restart: unless-stopped
-    profiles:
-      - backup
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 # ==========================================
 # CONFIGURACIONES ADICIONALES
 # ==========================================
-# Para ejecutar backup manual:
-#   docker-compose exec backup-service sh /backup-all.sh
+# Backups automÃ¡ticos:
+#   - Frecuencia: Cada 30 minutos
+#   - UbicaciÃ³n: ./backups/
+#   - RetenciÃ³n: 30 dÃ­as
+#   - Ver logs: docker logs satc-backup-service
 #
-# Para ver logs:
+# Para ejecutar backup manual inmediato:
+#   docker exec satc-backup-service /backup-all.sh
+#
+# Para ver logs de backups:
+#   docker logs satc-backup-service
+#   docker exec satc-backup-service tail -f /var/log/backup-cron.log
+#
+# Para ver otros logs de servicios:
 #   docker-compose logs -f [service-name]
 #
 # Para aplicar migraciones:

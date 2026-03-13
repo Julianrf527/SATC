@@ -72,7 +72,6 @@ export default function OpeningProbationaryPeriod({
       );
 
       if (res.ok) {
-        console.log(res);
         setLocalApertura(res.apertura_etapa_probatoria);
         setDocumentos(res.apertura_etapa_probatoria?.documento || []);
 
@@ -89,7 +88,7 @@ export default function OpeningProbationaryPeriod({
         });
       }
     } catch (e) {
-      console.error("Error fetching apertura:", e);
+      /* console.error("Error fetching apertura:", e); */
       setToast({
         id: Date.now(),
         message: "Error al cargar apertura etapa probatoria.",
@@ -174,7 +173,7 @@ export default function OpeningProbationaryPeriod({
         });
       }
     } catch (e) {
-      console.error("Error creando etapa:", e);
+      /* console.error("Error creando etapa:", e); */
       setToast({
         id: Date.now(),
         message: "Error al crear la etapa.",

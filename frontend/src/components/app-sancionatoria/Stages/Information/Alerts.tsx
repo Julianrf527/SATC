@@ -85,7 +85,7 @@ export default function Alerts({ radicado, setToast }: Props) {
         });
       }
     } catch (error) {
-      console.error("Error cargando alertas:", error);
+      /* console.error("Error cargando alertas:", error); */
       setToast?.({
         id: Date.now(),
         message: "Error al cargar las alertas",

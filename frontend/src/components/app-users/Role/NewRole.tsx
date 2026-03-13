@@ -81,7 +81,7 @@ export default function NewRole({ permission, setToast }: Props) {
         });
       }
     } catch (e) {
-      console.error("Error al hacer fetch:", e);
+      /* console.error("Error al hacer fetch:", e); */
       setToast({
         id: Date.now(),
         message: "Error al crear el rol",

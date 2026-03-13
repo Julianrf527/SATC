@@ -121,7 +121,7 @@ function App() {
             <Route
               path="file/consult"
               element={
-                <RequirePermission required="expediente_consular">
+                <RequirePermission required="expediente_consultar">
                   <FileViewLayout setToast={setToast} />
                 </RequirePermission>
               }

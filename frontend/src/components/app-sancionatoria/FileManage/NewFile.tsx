@@ -89,11 +89,11 @@ export default function NewFile({
         setSelectedResources([]);
         onCancel();
       } else {
-        console.log("Error en respuesta:", res);
+        /* console.log("Error en respuesta:", res); */
         setErrorMsg(res.detail || "Error al registrar el expediente");
       }
     } catch (e) {
-      console.error("Error en onSubmit:", e);
+      /* console.error("Error en onSubmit:", e); */
       setErrorMsg("Error de conexión con el servidor");
     } finally {
       setIsSubmitting(false);

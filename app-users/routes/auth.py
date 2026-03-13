@@ -189,8 +189,18 @@ async def iniciar_sesion(
         rol_id = user[1]
         token_jti = str(uuid.uuid4())
 
-        # OPTIMIZACIÓN 3: Token MÍNIMO (eliminado rol.nombre - no se necesita)
-        # Frontend puede obtenerlo con /users/role/{rol_id} si lo necesita
+        # Obtener permisos del rol para incluirlos en el token
+        permisos = []
+        if rol_id:
+            stmt_permisos = select(Permiso.nombre, Permiso.menu_path).join(
+                RolPermiso, RolPermiso.permiso_id == Permiso.id
+            ).where(RolPermiso.rol_id == rol_id)
+            result_permisos = await db.execute(stmt_permisos)
+            permisos = [
+                {"name": nombre, "path": menu_path}
+                for nombre, menu_path in result_permisos.all()
+            ]
+
         token_data = {
             "id": str(user_id),
             "primer_nombre": user[2],
@@ -199,6 +209,7 @@ async def iniciar_sesion(
             "segundo_apellido": user[5] or "",
             "correo": email,
             "rol_id": rol_id,
+            "permisos": permisos,
             "jti": token_jti
         }
 
@@ -322,12 +333,15 @@ async def validar_correo(
             </div>
         </div>
         """
-        await sendEmail(
-            "Recuperación de Contraseña",
-            message,
-            email,
-            "Recuperación de Contraseña"
-        )
+        try:
+            await sendEmail(
+                "Recuperación de Contraseña",
+                message,
+                email,
+                "Recuperación de Contraseña"
+            )
+        except Exception as mail_err:
+            logger.error(f"No se pudo enviar correo a {email}: {mail_err}")
 
         # Guardar/actualizar código (UPSERT)
         codigo_hash = hash_password(code)
@@ -473,12 +487,15 @@ async def validar_code_de_recuperacion(
                 </div>
             </div>
             """
-            await sendEmail(
-                "Contraseña Temporal",
-                message,
-                email,
-                "Contraseña Temporal"
-            )
+            try:
+                await sendEmail(
+                    "Contraseña Temporal",
+                    message,
+                    email,
+                    "Contraseña Temporal"
+                )
+            except Exception as mail_err:
+                logger.error(f"No se pudo enviar correo a {email}: {mail_err}")
 
             # Actualizar contraseña en la BD
             stmt = update(Usuario).where(Usuario.correo == email).values(hash_contrasena=hash_password(cont))

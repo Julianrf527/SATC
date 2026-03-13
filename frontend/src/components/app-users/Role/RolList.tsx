@@ -29,7 +29,7 @@ export default function RolList({ rolRef, setErrorMsg }: Props) {
           setErrorMsg(res.detail || "Error Inesperado");
         }
       } catch (error) {
-        console.log(error);
+        /* console.log(error); */
       }
     }
     loadRol();

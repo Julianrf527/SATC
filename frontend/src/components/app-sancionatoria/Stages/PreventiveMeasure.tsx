@@ -73,7 +73,7 @@ export default function PreventiveMeasure({
         });
       }
     } catch (e) {
-      console.error("Error fetching medida preventiva:", e);
+      /* console.error("Error fetching medida preventiva:", e); */
       setToast({
         id: Date.now(),
         message: "Error al obtener la medida preventiva.",
@@ -154,7 +154,7 @@ export default function PreventiveMeasure({
         });
       }
     } catch (e) {
-      console.error("Error creando etapa:", e);
+      /* console.error("Error creando etapa:", e); */
       setToast({
         id: Date.now(),
         message: "Error al crear la etapa.",

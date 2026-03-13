@@ -124,7 +124,7 @@ export default function RevisarDocumentoModal({
         }));
       }
     } catch (error) {
-      console.error("Error al revisar documento:", error);
+      /* console.error("Error al revisar documento:", error); */
       setErrors((prev) => ({
         ...prev,
         general: "Error de conexión al revisar el documento",

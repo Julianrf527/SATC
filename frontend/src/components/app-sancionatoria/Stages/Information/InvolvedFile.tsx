@@ -113,7 +113,7 @@ export default function InvolvedFile({
         if (error.message.includes("404")) {
           setExistingInvolucrado(null);
         } else {
-          console.error("Error buscando involucrado:", error);
+          /* console.error("Error buscando involucrado:", error); */
         }
       } finally {
         setIsLoading(false);
@@ -243,7 +243,7 @@ export default function InvolvedFile({
         type: "success",
       });
     } catch (error: any) {
-      console.error("Error:", error);
+      /* console.error("Error:", error); */
 
       let errorMessage = "Error desconocido";
       if (error.message.includes("400")) {
@@ -334,7 +334,7 @@ export default function InvolvedFile({
         type: "success",
       });
     } catch (error: any) {
-      console.error("Error al eliminar:", error);
+      /* console.error("Error al eliminar:", error); */
 
       setToast({
         id: Date.now(),

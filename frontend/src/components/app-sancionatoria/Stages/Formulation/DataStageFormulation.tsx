@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { apiCall, API_CONFIG } from "../../../../utils/api";
+import { apiCall, API_CONFIG, BASE_URL } from "../../../../utils/api";
 
 type FormulationCharges = {
   id: number;
@@ -167,7 +167,7 @@ export default function DataStageFormulation({
         });
       }
     } catch (error) {
-      console.error("Error al guardar:", error);
+      /* console.error("Error al guardar:", error); */
       setToast({
         id: Date.now(),
         message: "Error al procesar la solicitud",
@@ -195,7 +195,6 @@ export default function DataStageFormulation({
 
   const handleViewDocument = () => {
     if (data?.url_documento) {
-      const BASE_URL = import.meta.env.VITE_API_URL;
       const fullUrl = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
         data.url_documento,
       )}`;

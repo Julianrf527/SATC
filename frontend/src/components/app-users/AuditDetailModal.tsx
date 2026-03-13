@@ -104,7 +104,7 @@ export default function AuditDetailModal({
             Object.assign(etapasMap, etapasRes.data);
           }
         } catch (error) {
-          console.error("Error cargando etapas:", error);
+          /* console.error("Error cargando etapas:", error); */
         }
       }
 
@@ -116,7 +116,7 @@ export default function AuditDetailModal({
         etapas: etapasMap,
       });
     } catch (error) {
-      console.error("Error cargando mapeos:", error);
+      /* console.error("Error cargando mapeos:", error); */
     } finally {
       setLoading(false);
     }

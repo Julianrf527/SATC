@@ -78,7 +78,7 @@ export default function CodeForm({ email, setToast }: Props) {
         setToast({ message: "Código inválido o expirado", type: "error" });
       }
     } catch (error) {
-      console.error("Error al hacer fetch:", error);
+      /* console.error("Error al hacer fetch:", error); */
       setToast({
         message: "Error de conexión, intenta más tarde",
         type: "error",

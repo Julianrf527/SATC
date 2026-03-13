@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { apiCall, API_CONFIG } from "../../../../utils/api";
+import { apiCall, API_CONFIG, BASE_URL } from "../../../../utils/api";
 import DocumentoModal from "./DocumentModal";
 import ConfirmDeleteDocumentoModal from "./ConfirmDeleteDocumentModal";
 
@@ -64,7 +64,6 @@ export default function Document({
   };
 
   const handleViewFile = (urlDocumento: string) => {
-    const BASE_URL = import.meta.env.VITE_API_URL;
     const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
       urlDocumento,
     )}`;
@@ -134,7 +133,7 @@ export default function Document({
           }
         }
 
-        console.error("Error del backend:", res);
+        /* console.error("Error del backend:", res); */
         return { ok: false, error: errorMessage };
       }
     } catch (e) {

@@ -60,11 +60,11 @@ export default function CardNotification({
       if (res.ok) {
         onRemove();
       } else {
-        console.log(res.detail || "Error desconocido");
+        /* console.log(res.detail || "Error desconocido"); */
         setIsDeleting(false);
       }
     } catch (error) {
-      console.log(error);
+      /* console.log(error); */
       setIsDeleting(false);
     }
   };

@@ -70,7 +70,7 @@ export default function ProfileLayout({setToast}: Props) {
           setToast({id: Date.now(), message:"Error al cargar los datos del usuario",type: "error"});
         }
       } catch (error) {
-        console.error("Error al cargar datos:", error);
+        /* console.error("Error al cargar datos:", error); */
         setToast({id: Date.now(), message: "Error al cargar los datos del usuario",type: "error"});
       } finally {
         setIsLoading(false);
@@ -92,7 +92,7 @@ export default function ProfileLayout({setToast}: Props) {
         method: "POST",
       });
     } catch (error) {
-      console.error("Error al cerrar sesión:", error);
+      /* console.error("Error al cerrar sesión:", error); */
     } finally {
       // Redirigir al login independientemente del resultado
       navigate("/login");
@@ -144,7 +144,7 @@ export default function ProfileLayout({setToast}: Props) {
         setIsSavingData(false);
       }
     } catch (error) {
-      console.error("Error al actualizar datos:", error);
+      /* console.error("Error al actualizar datos:", error); */
       setToast({id: Date.now(),message: "Error de conexión al actualizar datos",type: "error"});
       setIsSavingData(false);
     }
@@ -197,7 +197,7 @@ export default function ProfileLayout({setToast}: Props) {
         setIsSavingPassword(false);
       }
     } catch (error) {
-      console.error("Error al cambiar contraseña:", error);
+      /* console.error("Error al cambiar contraseña:", error); */
       setToast({id: Date.now(),message:"Error de conexión al cambiar contraseña",type: "error"});
       setIsSavingPassword(false);
     }

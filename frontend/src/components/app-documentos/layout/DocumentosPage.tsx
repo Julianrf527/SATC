@@ -129,7 +129,7 @@ export default function DocumentosPage({ setToast }: Props) {
         setRevisores([]);
       }
     } catch (error) {
-      console.error("Error cargando revisores:", error);
+      /* console.error("Error cargando revisores:", error); */
       setRevisores([]);
     } finally {
       setLoadingRevisores(false);
@@ -197,7 +197,7 @@ export default function DocumentosPage({ setToast }: Props) {
         setStats(resStats.stats);
       }
     } catch (error) {
-      console.error("Error cargando datos:", error);
+      /* console.error("Error cargando datos:", error); */
       setToast({
         id: Date.now(),
         message: "Error al cargar documentos",

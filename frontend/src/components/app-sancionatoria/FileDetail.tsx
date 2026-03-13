@@ -1,6 +1,7 @@
 import type { BasicFile, Town, File, TipoNotificacion } from "../../types";
 import { useState, useEffect, lazy, Suspense } from "react";
-import { API_CONFIG, apiCall } from "../../utils/api";
+import { API_CONFIG, apiCall, BASE_URL } from "../../utils/api";
+import "boxicons/css/boxicons.min.css";
 
 const Information = lazy(() => import("./Stages/InformationStage"));
 const PreliminaryInvestigation = lazy(
@@ -121,7 +122,7 @@ export default function FileDetail({
           });
         }
       } catch (error) {
-        console.error("Error al cargar expediente completo:", error);
+        /* console.error("Error al cargar expediente completo:", error); */
         setToast({
           id: Date.now(),
           message: "Error al cargar información completa del expediente",
@@ -239,9 +240,6 @@ export default function FileDetail({
     if (!currentFile) return;
     // Verificar disponibilidad antes de cambiar
     if (!isEtapaDisponible(tabId)) {
-      console.log(
-        `[FileDetail] Intento de acceder a etapa no disponible: ${tabId}`,
-      );
       return;
     }
     setActiveTab(tabId);
@@ -279,10 +277,6 @@ export default function FileDetail({
 
     setIsDownloadingAll(true);
 
-    const BASE_URL =
-      (window as any).ENV?.VITE_API_URL ||
-      import.meta.env.VITE_API_URL ||
-      "http://localhost:8000";
     const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD_ALL(
       currentFile.radicado,
     )}`;
@@ -374,11 +368,6 @@ export default function FileDetail({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-base-200">
-      <link
-        href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css"
-        rel="stylesheet"
-      />
-
       {/* HEADER MEJORADO */}
       <div className="flex-shrink-0 bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm sticky top-0 z-10">
         <div className="container mx-auto px-6 py-4">

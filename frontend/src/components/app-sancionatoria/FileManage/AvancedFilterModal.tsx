@@ -97,7 +97,7 @@ export default function AdvancedFiltersModal({
           setVeredas(response.veredas || []);
         }
       } catch (error) {
-        console.error("Error al cargar veredas:", error);
+        //console.error("Error al cargar veredas:", error);
       } finally {
         setLoadingVeredas(false);
       }

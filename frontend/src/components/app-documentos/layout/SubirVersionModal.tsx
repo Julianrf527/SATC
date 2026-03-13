@@ -165,7 +165,7 @@ export default function SubirVersionModal({
         }));
       }
     } catch (error) {
-      console.error("Error al subir versión:", error);
+      /* console.error("Error al subir versión:", error); */
       setErrors((prev) => ({
         ...prev,
         general: "Error de conexión al subir la versión",
