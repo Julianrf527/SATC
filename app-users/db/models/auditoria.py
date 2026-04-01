@@ -1,20 +1,23 @@
-from sqlalchemy import Column, Integer, BigInteger, String, ForeignKey, JSON, TIMESTAMP, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, JSON, TIMESTAMP, Text, BigInteger, DateTime
 from .base import Base
+from sqlalchemy.orm import relationship
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 class Auditoria(Base):
-    __tablename__ = "auditoria"
+    __tablename__    = "auditoria"
 
-    id = Column(Integer, autoincrement=True, primary_key=True)
-    tabla_afectada = Column(String(30), nullable=True)
-    id_registro = Column(String(20), nullable=True)
-    tipo_operacion = Column(String(10), nullable=False)
-    usuario_id = Column(BigInteger, ForeignKey("usuario.numero_documento", ondelete="SET NULL", onupdate="CASCADE"))
-    fecha = Column(
-        TIMESTAMP(timezone=True),
-        default=lambda: datetime.now(ZoneInfo("America/Bogota"))
-    )
-    descripcion = Column(Text)
-    datos_anteriores = Column(JSON)
-    datos_nuevos = Column(JSON)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    usuario_id = Column(Integer, ForeignKey("usuario.id", ondelete="SET NULL"), nullable=True)
+    documento_usuario = Column(String(20), nullable=True) # Número de documento del usuario
+    nombre_usuario = Column(String(150), nullable=True) # Nombre completo del usuario para mejor legibilidad
+    tipo_evento = Column(String(30), nullable=False)
+    resultado = Column(String(10), nullable=False)
+    ip_address = Column(String(50), nullable=True)
+    user_agent = Column(Text, nullable=True)
+    fecha = Column(DateTime(timezone=True), default=lambda: datetime.now(ZoneInfo("America/Bogota")), nullable=False)
+    detalle = Column(Text, nullable=True)
+    datos_anteriores = Column(JSON, nullable=True)
+    datos_nuevos = Column(JSON, nullable=True)
+
+    usuario = relationship("Usuario", back_populates="auditorias")

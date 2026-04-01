@@ -1,6 +1,7 @@
 """
 Background task para limpiar sesiones expiradas periódicamente
 Evita acumulación de sesiones inactivas en la base de datos
+
 """
 import asyncio
 from datetime import datetime, timedelta

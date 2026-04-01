@@ -79,3 +79,18 @@ def verify_permission(request: Request, required_permission: str) -> int:
         )
     
     return int(user_id)
+
+def get_user_info_from_headers(request: Request) -> dict:
+    """
+    Extrae información completa del usuario desde los headers del gateway.
+    Retorna dict con user_id, documento, y nombre o None si no están disponibles.
+    """
+    user_id = request.headers.get("X-Gateway-User-Id")
+    documento = request.headers.get("X-Gateway-User-Document")
+    nombre = request.headers.get("X-Gateway-User-Name")
+
+    return {
+        "user_id": int(user_id) if user_id else None,
+        "documento": documento,
+        "nombre": nombre
+    }

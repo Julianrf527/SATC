@@ -1,15 +1,15 @@
 type Execution = {
   id?: number;
   cobro_coactivo: boolean;
-  cobro_coactivo_doc_url: string | null;
+  documento_cobro_coactivo_id: number | null;
   disposicion: boolean;
   ruia: boolean;
-  ruia_doc_url: string | null;
+  documento_ruia_id: number | null;
   memorando: boolean;
-  memorando_doc_url: string | null;
+  documento_memorando_id: number | null;
   auto_admin: string;
   fecha_auto: string | null;
-  auto_doc_url: string | null;
+  documento_auto_id: number | null;
   etapa_id: number;
 };
 
@@ -18,10 +18,10 @@ type Props = {
   isLoading: boolean;
   onSubmit: (e: React.FormEvent) => void;
   onCancel: () => void;
-  onViewDocument: (url: string) => void;
+  onViewDocument: (documentId: number) => void;
   onFileChange: (
     e: React.ChangeEvent<HTMLInputElement>,
-    fileType: "cobro_coactivo" | "ruia" | "memorando" | "auto"
+    fileType: "cobro_coactivo" | "ruia" | "memorando" | "auto",
   ) => void;
   autoTipo: string;
   autoNumero: string;
@@ -120,10 +120,12 @@ export default function ExecutionForm({
                   Nuevo archivo
                 </span>
               )}
-              {data?.cobro_coactivo_doc_url && (
+              {data?.documento_cobro_coactivo_id && (
                 <button
                   type="button"
-                  onClick={() => onViewDocument(data.cobro_coactivo_doc_url!)}
+                  onClick={() =>
+                    onViewDocument(data.documento_cobro_coactivo_id!)
+                  }
                   className="btn btn-sm btn-ghost text-info"
                   title="Ver actual"
                 >
@@ -182,10 +184,10 @@ export default function ExecutionForm({
                   Nuevo archivo
                 </span>
               )}
-              {data?.ruia_doc_url && (
+              {data?.documento_ruia_id && (
                 <button
                   type="button"
-                  onClick={() => onViewDocument(data.ruia_doc_url!)}
+                  onClick={() => onViewDocument(data.documento_ruia_id!)}
                   className="btn btn-sm btn-ghost text-info"
                   title="Ver actual"
                 >
@@ -244,10 +246,10 @@ export default function ExecutionForm({
                   Nuevo archivo
                 </span>
               )}
-              {data?.memorando_doc_url && (
+              {data?.documento_memorando_id && (
                 <button
                   type="button"
-                  onClick={() => onViewDocument(data.memorando_doc_url!)}
+                  onClick={() => onViewDocument(data.documento_memorando_id!)}
                   className="btn btn-sm btn-ghost text-info"
                   title="Ver actual"
                 >
@@ -379,10 +381,10 @@ export default function ExecutionForm({
               <span className="label-text font-medium">
                 Documento del Auto (PDF) <span className="text-error">*</span>
               </span>
-              {data?.auto_doc_url && (
+              {data?.documento_auto_id && (
                 <button
                   type="button"
-                  onClick={() => onViewDocument(data.auto_doc_url!)}
+                  onClick={() => onViewDocument(data.documento_auto_id!)}
                   className="label-text-alt text-error hover:underline flex items-center gap-1"
                 >
                   <svg

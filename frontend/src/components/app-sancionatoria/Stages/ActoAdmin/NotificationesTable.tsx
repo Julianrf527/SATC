@@ -20,7 +20,7 @@ export default function NotificacionesTable({
   tiposNotificacion: TipoNotificacion[];
   onEdit: (notificacion: InvolucradoNotificacion) => void;
   onDelete: (id: number) => void;
-  onViewDocument: (url: string) => void;
+  onViewDocument: (fileId: number) => void;
   isEditable?: boolean;
 }) {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -65,10 +65,6 @@ export default function NotificacionesTable({
     const [year, month, day] = parts;
     if (!year || !month || !day) return "No registrada";
     return `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}`;
-  };
-
-  const isPdfUrl = (url: string) => {
-    return /\.pdf$/i.test(url);
   };
 
   const handleDeleteClick = (id: number) => {
@@ -196,37 +192,21 @@ export default function NotificacionesTable({
                   </div>
 
                   {/* Botón para ver documento de citación */}
-                  {notificacion.url_doc_citacion ? (
+                  {notificacion.documento_citacion_id ? (
                     <button
                       onClick={() =>
-                        onViewDocument(notificacion.url_doc_citacion!)
+                        onViewDocument(notificacion.documento_citacion_id)
                       }
                       className="btn btn-success btn-sm gap-1 px-2 tooltip"
                       data-tip="Ver documento de citación"
                     >
-                      {isPdfUrl(notificacion.url_doc_citacion) ? (
-                        <svg
-                          className="w-4 h-4 text-white"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" />
-                        </svg>
-                      ) : (
-                        <svg
-                          className="w-4 h-4 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                      )}
+                      <svg
+                        className="w-4 h-4 text-white"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" />
+                      </svg>
                       <span className="text-xs font-medium text-white">
                         Citación
                       </span>
@@ -252,35 +232,22 @@ export default function NotificacionesTable({
                   )}
 
                   {/* Botón para ver documento de notificación */}
-                  {notificacion.url_documento && (
+                  {notificacion.documento_notificacion_id && (
                     <button
-                      onClick={() => onViewDocument(notificacion.url_documento)}
+                      onClick={() =>
+                        notificacion.documento_notificacion_id &&
+                        onViewDocument(notificacion.documento_notificacion_id)
+                      }
                       className="btn btn-success btn-sm gap-1 px-2 tooltip"
                       data-tip="Ver documento de notificación"
                     >
-                      {isPdfUrl(notificacion.url_documento) ? (
-                        <svg
-                          className="w-4 h-4 text-white"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" />
-                        </svg>
-                      ) : (
-                        <svg
-                          className="w-4 h-4 text-white"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                      )}
+                      <svg
+                        className="w-4 h-4 text-white"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" />
+                      </svg>
                       <span className="text-xs font-medium text-white">
                         Notificación
                       </span>

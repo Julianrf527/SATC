@@ -42,41 +42,24 @@ pyclamd>=0.4.0
 # Manejo y combinación de PDFs
 pypdf>=3.17.0
 
-# Detección de tipos MIME de archivos (Caso 8: Seguridad de archivos)
+# Detección de tipos MIME de archivos
 python-magic>=0.4.27
+
+# Sesiones y caché distribuido (app-users y api-gateway)
+redis[asyncio]>=5.0.0
 
 # Utilidades
 pytz>=2023.3
-# On Windows, the stdlib zoneinfo may not have the IANA tz database available.
-# Provide timezone data via `tzdata` instead of the non-existent `zoneinfo` PyPI package.
 tzdata>=2023.3; sys_platform == "win32"
 
-# Email async SMTP client used by `app-users/utils/emailUtil.py`
+# Email async SMTP client
 aiosmtplib>=1.1.6
 
-# Holiday calendars for business-day calculations used by `app-sancionatoria/utils/funtions.py`
+# Holiday calendars
 holidays>=0.28.0
 
-# Background scheduler used by `app-sancionatoria/services/alertas_scheduler.py`
+# Background scheduler
 APScheduler>=3.10.1
 
 # Logging
 loguru>=0.7.0
-
-# ====================================
-# Dependencias Específicas por Módulo
-# ====================================
-
-# app-users (Email)
-# Usa smtplib (built-in Python)
-
-# app-docs (Archivos)
-# aiofiles ya incluido arriba
-
-# api-gateway (Caché y Circuit Breaker)
-# Implementación custom, sin deps adicionales
-
-# ====================================
-# Instalación
-# ====================================
-# pip install -r requirements.txt

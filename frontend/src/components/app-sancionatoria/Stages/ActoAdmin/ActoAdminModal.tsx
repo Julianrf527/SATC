@@ -1,20 +1,23 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-
-type ActoAdminData = {
-  id: number;
-  numerado: string;
-  fecha_numerado: string;
-  url_acto: string;
-  tipo_acto: string;
-  etapa_id: number;
-  nivel?: number | null;
-};
+import type { ActoAdminData } from "../../../../types";
+import {
+  uploadFileToDocuments,
+  generateDocumentFileName,
+} from "../../../../utils/fileUpload";
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (formData: FormData) => Promise<{ ok: boolean; error?: string }>;
+  onSave: (data: {
+    tipo_acto: string;
+    numerado: string;
+    fecha_numerado: string;
+    documento_acto_id?: number;
+    radicado_expediente: string;
+    etapa_id: number;
+    nivel_auxiliar?: boolean | null;
+  }) => Promise<{ ok: boolean; error?: string }>;
   editActoAdmin: ActoAdminData | null;
 };
 
@@ -31,12 +34,14 @@ export default function ActoAdminModal({
   const [theme, setTheme] = useState<string>("emerald");
   const [errorGeneral, setErrorGeneral] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const updateTheme = () => {
       const currentTheme =
-        document.querySelector("[data-theme]")?.getAttribute("data-theme") || "emerald";
+        document.querySelector("[data-theme]")?.getAttribute("data-theme") ||
+        "emerald";
       setTheme(currentTheme);
     };
 
@@ -61,7 +66,9 @@ export default function ActoAdminModal({
         setTipoActo(editActoAdmin.tipo_acto as "AUTO" | "RES");
         setNumerado(String(editActoAdmin.numerado).padStart(4, "0"));
         // Convertir fecha al formato yyyy-MM-dd para el input date
-        const fechaFormateada = editActoAdmin.fecha_numerado?.split(' ')[0] || editActoAdmin.fecha_numerado;
+        const fechaFormateada =
+          editActoAdmin.fecha_numerado?.split(" ")[0] ||
+          editActoAdmin.fecha_numerado;
         setFechaNumerado(fechaFormateada);
         setSelectedFile(null);
       } else {
@@ -94,25 +101,59 @@ export default function ActoAdminModal({
     setIsSubmitting(true);
 
     try {
-      const formData = new FormData();
-      formData.append("tipo_acto", tipoActo);
-      formData.append("numerado", numerado);
-      formData.append("fecha_numerado", fechaNumerado);
+      let documento_acto_id: number | undefined;
 
+      // Paso 1: Si hay archivo seleccionado, subirlo a app-docs primero
       if (selectedFile) {
-        const fileName = `${tipoActo}_${numerado}_${fechaNumerado.replace(/-/g, "")}.pdf`;
-        formData.append("file", selectedFile, fileName);
+        setIsUploadingFile(true);
+
+        try {
+          const fileName = generateDocumentFileName(
+            tipoActo,
+            numerado,
+            fechaNumerado,
+          );
+          documento_acto_id = await uploadFileToDocuments(
+            selectedFile,
+            fileName,
+          );
+        } catch (uploadError) {
+          throw new Error(
+            uploadError instanceof Error
+              ? uploadError.message
+              : "Error al subir el archivo a la aplicación de documentos",
+          );
+        } finally {
+          setIsUploadingFile(false);
+        }
       }
 
-      const result = await onSave(formData);
+      // Paso 2: Enviar datos al endpoint de sancionatoria
+      const actoData = {
+        tipo_acto: tipoActo,
+        numerado: numerado,
+        fecha_numerado: fechaNumerado,
+        ...(documento_acto_id && { documento_acto_id }),
+        radicado_expediente: "", // Se agregará en el componente padre
+        etapa_id: 0, // Se agregará en el componente padre
+        nivel_auxiliar: null, // Se agregará en el componente padre si es necesario
+      };
+
+      const result = await onSave(actoData);
 
       if (result.ok) {
         handleClose();
       } else {
-        setErrorGeneral(result.error || "Error al guardar el acto administrativo");
+        setErrorGeneral(
+          result.error || "Error al guardar el acto administrativo",
+        );
       }
     } catch (error) {
-      setErrorGeneral("Error inesperado al guardar el acto administrativo");
+      setErrorGeneral(
+        error instanceof Error
+          ? error.message
+          : "Error inesperado al guardar el acto administrativo",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -125,6 +166,7 @@ export default function ActoAdminModal({
     setSelectedFile(null);
     setErrorGeneral("");
     setIsSubmitting(false);
+    setIsUploadingFile(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -144,7 +186,9 @@ export default function ActoAdminModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="font-bold text-lg mb-4 text-base-content">
-          {editActoAdmin ? "Editar Acto Administrativo" : "Nuevo Acto Administrativo"}
+          {editActoAdmin
+            ? "Editar Acto Administrativo"
+            : "Nuevo Acto Administrativo"}
         </h3>
 
         <form onSubmit={handleSave} className="space-y-4 select-none">
@@ -158,7 +202,7 @@ export default function ActoAdminModal({
                 required
                 value={tipoActo}
                 onChange={(e) => setTipoActo(e.target.value as "AUTO" | "RES")}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingFile}
               >
                 <option value="AUTO">AUTO</option>
                 <option value="RES">RES</option>
@@ -167,7 +211,9 @@ export default function ActoAdminModal({
             <div className="w-2/3">
               <label className="block text-sm font-medium text-base-content/70 mb-1">
                 Numerado <span className="text-error">*</span>
-                <span className="text-xs text-base-content/50 ml-2">(Ej: 1234)</span>
+                <span className="text-xs text-base-content/50 ml-2">
+                  (Ej: 1234)
+                </span>
               </label>
               <input
                 type="number"
@@ -178,7 +224,7 @@ export default function ActoAdminModal({
                 maxLength={4}
                 minLength={4}
                 required
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingFile}
               />
             </div>
           </div>
@@ -193,13 +239,14 @@ export default function ActoAdminModal({
               value={fechaNumerado}
               onChange={(e) => setFechaNumerado(e.target.value)}
               required
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingFile}
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-base-content/70 mb-1">
-              Documento PDF {!editActoAdmin && <span className="text-error">*</span>}
+              Documento PDF{" "}
+              {!editActoAdmin && <span className="text-error">*</span>}
               {editActoAdmin && (
                 <span className="text-xs text-base-content/50 ml-2">
                   (Opcional - Solo si desea reemplazar)
@@ -213,7 +260,7 @@ export default function ActoAdminModal({
               className="file-input file-input-bordered w-full"
               onChange={handleFileChange}
               required={!editActoAdmin}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingFile}
             />
             {selectedFile && (
               <div className="mt-2 flex items-center gap-2 text-sm text-success">
@@ -264,16 +311,21 @@ export default function ActoAdminModal({
               type="button"
               onClick={handleClose}
               className="btn btn-ghost"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingFile}
             >
               Cancelar
             </button>
             <button
               type="submit"
               className="btn btn-success text-white"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingFile}
             >
-              {isSubmitting ? (
+              {isUploadingFile ? (
+                <>
+                  <span className="loading loading-spinner loading-sm"></span>
+                  Subiendo archivo...
+                </>
+              ) : isSubmitting ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span>
                   Guardando...

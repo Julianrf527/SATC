@@ -12,19 +12,18 @@ import os
 # -------- MODELS ------------
 from db.models.tipo_etapa import TipoEtapa
 from db.models.etapa import Etapa
-from db.models.acto_admin import ActoAdmin
+from db.models.acto_admin import ActoAdministrativo
 from db.models.comunicacion import Comunicacion
-from db.models.documento import Documento
 from db.models.medida_preventiva import MedidaPreventiva
 from db.models.notificacion import Notificacion
 from db.models.tipo_medida import TipoMedida
-from db.models.involucrado_notificacion import InvolucradoNotificacion
 from db.models.formulacion_cargos import FormulacionCargos
 from db.models.decision_fondo import DecisionFondo
 from db.models.tipo_sancion import TipoSancion
 from db.models.cesacion import Cesacion
 from db.models.tipo_cesacion import TipoCesacion
-from db.models.log_auditoria import LogAuditoria
+from db.models.auditoria import Auditoria
+from db.models.documento_anexo import DocumentoAnexo
 
 
 load_dotenv()
@@ -43,29 +42,33 @@ logger = logging.getLogger(__name__)
 from utils.funtions import calcular_dias_laborales
 
 #Crud Auxiliar
-async def insert_log_auditoria(
+from zoneinfo import ZoneInfo
+
+async def insert_auditoria(
     db: AsyncSession,
-    usuario_id: int,
-    tabla_afectada: str,
-    tipo_operacion: str,
-    descripcion: str,
-    expediente_radicado: str | None = None,
-    id_registro: str | None = None,
+    tipo_evento: str,
+    resultado: str,
+    usuario_id: int | None = None,
+    expediente_id: int | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+    detalle: str | None = None,
     datos_anteriores: dict | None = None,
     datos_nuevos: dict | None = None,
 ):
     try:
-        stmt = insert(LogAuditoria).values(
+        stmt = insert(Auditoria).values(
             usuario_id=usuario_id,
-            tabla_afectada=tabla_afectada,
-            tipo_operacion=tipo_operacion,
-            descripcion=descripcion,
-            expediente_radicado=expediente_radicado,
-            id_registro=id_registro,
-            fecha=datetime.utcnow(),
+            tipo_evento=tipo_evento,
+            resultado=resultado,
+            expediente_id=expediente_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            detalle=detalle,
+            fecha=datetime.now(ZoneInfo("America/Bogota")),
             datos_anteriores=datos_anteriores,
             datos_nuevos=datos_nuevos,
-        ).returning(LogAuditoria.id)
+        ).returning(Auditoria.id)
         
         result = await db.execute(stmt)
         inserted_id = result.scalar()
@@ -73,12 +76,12 @@ async def insert_log_auditoria(
     except Exception as e:
         return {"ok": False, "error": str(e)}
 
-async def get_creable(etapa_consulta: str, etapa_name_db: str, radicado: str, db: AsyncSession):
+async def get_creable(etapa_consulta: str, etapa_name_db: str, expediente_id: int, db: AsyncSession):
     stmt = (
         select(Etapa.id)
         .join(TipoEtapa, Etapa.tipo_etapa_id == TipoEtapa.id)
         .where(
-            Etapa.expediente_radicado == radicado,
+            Etapa.expediente_id == expediente_id,
             TipoEtapa.nombre == etapa_name_db
         )
     )
@@ -92,7 +95,7 @@ async def get_creable(etapa_consulta: str, etapa_name_db: str, radicado: str, db
     else:
 
         # Buscar acto administrativo asociado
-        stmt = select(ActoAdmin.id,ActoAdmin.fecha_numerado).where(ActoAdmin.etapa_id == etapa_id)
+        stmt = select(ActoAdministrativo.id,ActoAdministrativo.fecha_numerado).where(ActoAdministrativo.etapa_id == etapa_id)
         result = await db.execute(stmt)
         ad = result.first()
 
@@ -104,9 +107,8 @@ async def get_creable(etapa_consulta: str, etapa_name_db: str, radicado: str, db
         else:
             # Verificar notificación exitosa
             stmt = (
-                select(InvolucradoNotificacion.notificacion_exitosa)
-                .join(Notificacion, InvolucradoNotificacion.notificacion_id == Notificacion.id)
-                .where(Notificacion.acto_admin_id == ad.id)
+                select(Notificacion.notificacion_exitosa)
+                .where(Notificacion.acto_administrativo_id == ad.id)
             )
             result = await db.execute(stmt)
             notificaciones = result.scalars().all()
@@ -124,9 +126,9 @@ async def get_creable(etapa_consulta: str, etapa_name_db: str, radicado: str, db
 async def get_acto_admin(etapa_id: int,notificacion: bool, db:AsyncSession, nivel: bool = None):
     #Si noti = False, se evalua comunicacion
     if nivel:
-        stmt = select(ActoAdmin).where(ActoAdmin.etapa_id == etapa_id, ActoAdmin.nivel_auxiliar == nivel)
+        stmt = select(ActoAdministrativo).where(ActoAdministrativo.etapa_id == etapa_id, ActoAdministrativo.nivel_auxiliar == nivel)
     else:
-        stmt = select(ActoAdmin).where(ActoAdmin.etapa_id == etapa_id, ActoAdmin.nivel_auxiliar == False)
+        stmt = select(ActoAdministrativo).where(ActoAdministrativo.etapa_id == etapa_id, ActoAdministrativo.nivel_auxiliar == False)
 
     acto_admin = await db.scalar(stmt)
     acto_admin_data = {}
@@ -144,37 +146,32 @@ async def get_acto_admin(etapa_id: int,notificacion: bool, db:AsyncSession, nive
             "nivel_auxiliar": acto_admin.nivel_auxiliar
         }
 
-        # Buscar notificacion asociada
+        # Buscar notificaciones asociadas (ahora hay múltiples registros, uno por involucrado)
         if notificacion:
-            stmt = select(Notificacion).where(Notificacion.acto_admin_id == acto_admin.id)
-            noti = await db.scalar(stmt)
+            stmt = select(Notificacion).where(Notificacion.acto_administrativo_id == acto_admin.id)
+            notificaciones = (await db.execute(stmt)).scalars().all()
 
-            notificacion_data = {}
-            if noti:
-                stmt = select(InvolucradoNotificacion).where(InvolucradoNotificacion.notificacion_id == noti.id)
-                involucrados_noti = (await db.execute(stmt)).scalars().all()
-                involucrados_noti_data = [
+            notificaciones_data = []
+            if notificaciones:
+                notificaciones_data = [
                     {
-                        "id": inv_noti.id,
-                        "involucrado_id": inv_noti.involucrado_id,
-                        "numerado": inv_noti.numerado,
-                        "fecha_numerado": str(inv_noti.fecha_numerado),
-                        "fecha_envio_citacion": str(inv_noti.fecha_envio_citacion),
-                        "fecha_constancia_citacion": str(inv_noti.fecha_constancia_citacion),
-                        "notificacion_exitosa": inv_noti.notificacion_exitosa,
-                        "url_documento" : inv_noti.url_documento,
-                        "url_doc_citacion": inv_noti.url_doc_citacion,
-                        "tipo_notificacion_id": inv_noti.tipo_notificacion_id,
+                        "id": noti.id,
+                        "involucrado_id": noti.involucrado_id,
+                        "numerado": noti.numerado,
+                        "fecha_numerado": str(noti.fecha_numerado) if noti.fecha_numerado else None,
+                        "fecha_envio_citacion": str(noti.fecha_envio_citacion) if noti.fecha_envio_citacion else None,
+                        "fecha_constancia_citacion": str(noti.fecha_constancia_citacion) if noti.fecha_constancia_citacion else None,
+                        "notificacion_exitosa": noti.notificacion_exitosa,
+                        "documento_notificacion_id": noti.documento_notificacion_id,
+                        "documento_citacion_id": noti.documento_citacion_id,
+                        "tipo_notificacion_id": noti.tipo_notificacion_id,
+                        "fecha_notificacion": str(noti.fecha_notificacion) if noti.fecha_notificacion else None,
+                        "fecha_creacion": str(noti.fecha_creacion) if noti.fecha_creacion else None,
                     }
-                    for inv_noti in involucrados_noti
+                    for noti in notificaciones
                 ]
 
-                notificacion_data = {
-                    "id": noti.id,
-                    "fecha_creacion": str(noti.fecha_creacion),
-                    "involucrados": involucrados_noti_data
-                }
-            acto_admin_data["notificacion"]= notificacion_data
+            acto_admin_data["notificaciones"] = notificaciones_data
         else:
             # Buscar comunicación asociada
             stmt = select(Comunicacion).where(Comunicacion.acto_admin_id == acto_admin.id)
@@ -196,7 +193,7 @@ async def get_acto_admin(etapa_id: int,notificacion: bool, db:AsyncSession, nive
     return acto_admin_data
 
 #Crud Get Etapas
-async def get_indagacion_preliminar(radicado: str, db: AsyncSession):
+async def get_indagacion_preliminar(expediente_id: int, db: AsyncSession):
     try:
         # Buscar id del tipo de etapa
         stmt = select(TipoEtapa.id).where(TipoEtapa.nombre == 'INDAGACION PRELIMINAR')
@@ -209,7 +206,7 @@ async def get_indagacion_preliminar(radicado: str, db: AsyncSession):
 
         # Buscar id de la etapa asociada
         stmt = select(Etapa.id).where(
-            Etapa.expediente_radicado == radicado,
+            Etapa.expediente_id == expediente_id,
             Etapa.tipo_etapa_id == tipo_etapa_id
         )
         etapa_id = await db.scalar(stmt)
@@ -222,26 +219,13 @@ async def get_indagacion_preliminar(radicado: str, db: AsyncSession):
                 
             }
 
-        stmt = select(Documento).where(Documento.etapa_id == etapa_id)
-        documentos = (await db.execute(stmt)).scalars().all()
-
-        documentos_data = [
-                {
-                    "id": doc.id,
-                    "nombre": doc.nombre,
-                    "url_documento": doc.url_documento,
-                    "fecha_subida": str(doc.fecha_subida)
-                }
-                for doc in documentos
-            ]
-
         # Si existe la etapa, buscar el acto administrativo
         acto_admin_data = await get_acto_admin(etapa_id, False, db)
 
         indagacion = {
             "etapa_id": etapa_id,
             "acto_admin": acto_admin_data,
-            "documento": documentos_data,
+            
             "tipo_etapa_id": tipo_etapa_id
         }
 
@@ -258,7 +242,7 @@ async def get_indagacion_preliminar(radicado: str, db: AsyncSession):
             "ok": False
         }
 
-async def get_medida_preventiva(radicado: str, db: AsyncSession):
+async def get_medida_preventiva(expediente_id: int, db: AsyncSession):
     try:
         # Buscar id del tipo de etapa
         stmt = select(TipoEtapa.id).where(TipoEtapa.nombre == 'DETALLE MEDIDA PREVENTIVA')
@@ -271,7 +255,7 @@ async def get_medida_preventiva(radicado: str, db: AsyncSession):
 
         # Buscar id de la etapa asociada
         stmt = select(Etapa.id).where(
-            Etapa.expediente_radicado == radicado,
+            Etapa.expediente_id == expediente_id,
             Etapa.tipo_etapa_id == tipo_etapa_id
         )
         etapa_id = await db.scalar(stmt)
@@ -282,19 +266,6 @@ async def get_medida_preventiva(radicado: str, db: AsyncSession):
                 "ok": True,
                 "medida": {"tipo_etapa_id": tipo_etapa_id}
             }
-
-        stmt = select(Documento).where(Documento.etapa_id == etapa_id)
-        documentos = (await db.execute(stmt)).scalars().all()
-
-        documentos_data = [
-                {
-                    "id": doc.id,
-                    "nombre": doc.nombre,
-                    "url_documento": doc.url_documento,
-                    "fecha_subida": str(doc.fecha_subida)
-                }
-                for doc in documentos
-            ]
         #Si existe la etapa, buscar la info
         stmt = select(MedidaPreventiva).where(MedidaPreventiva.etapa_id == etapa_id)
         info = await db.scalar(stmt)
@@ -328,7 +299,7 @@ async def get_medida_preventiva(radicado: str, db: AsyncSession):
             "etapa_id": etapa_id,
             "informacion": info_data,
             "acto_admin": acto_admin_data,
-            "documento": documentos_data,
+            
             "tipo_etapa_id": tipo_etapa_id
         }
 
@@ -345,7 +316,7 @@ async def get_medida_preventiva(radicado: str, db: AsyncSession):
             "ok": False
         }
 
-async def get_inicio_proceso_sancionatorio(radicado: str, db: AsyncSession):
+async def get_inicio_proceso_sancionatorio(expediente_id: int, db: AsyncSession):
     try:
         # Buscar id del tipo de etapa
         stmt = select(TipoEtapa.id).where(TipoEtapa.nombre == 'INICIO PROCESO SANCIONATORIO')
@@ -358,7 +329,7 @@ async def get_inicio_proceso_sancionatorio(radicado: str, db: AsyncSession):
 
         # Buscar id de la etapa asociada
         stmt = select(Etapa.id).where(
-            Etapa.expediente_radicado == radicado,
+            Etapa.expediente_id == expediente_id,
             Etapa.tipo_etapa_id == tipo_etapa_id
         )
         etapa_id = await db.scalar(stmt)
@@ -370,26 +341,13 @@ async def get_inicio_proceso_sancionatorio(radicado: str, db: AsyncSession):
                 "inicio_proceso": {"tipo_etapa_id": tipo_etapa_id}
             }
 
-        stmt = select(Documento).where(Documento.etapa_id == etapa_id)
-        documentos = (await db.execute(stmt)).scalars().all()
-
-        documentos_data = [
-                {
-                    "id": doc.id,
-                    "nombre": doc.nombre,
-                    "url_documento": doc.url_documento,
-                    "fecha_subida": str(doc.fecha_subida)
-                }
-                for doc in documentos
-            ]
-
         # Si existe la etapa, buscar el acto administrativo
         acto_admin_data = await get_acto_admin(etapa_id, True, db)
 
         proceso = {
             "etapa_id": etapa_id,
             "acto_admin": acto_admin_data,
-            "documento": documentos_data,
+            
             "tipo_etapa_id": tipo_etapa_id
         }
 
@@ -406,7 +364,7 @@ async def get_inicio_proceso_sancionatorio(radicado: str, db: AsyncSession):
             "ok": False
         }
 
-async def get_cesacion(radicado: str, db: AsyncSession):
+async def get_cesacion(expediente_id: int, db: AsyncSession):
     try:
         # Buscar id del tipo de etapa
         stmt = select(TipoEtapa.id).where(TipoEtapa.nombre == 'CESACION')
@@ -418,11 +376,11 @@ async def get_cesacion(radicado: str, db: AsyncSession):
             }
 
         #Permisos
-        creable = await get_creable("Inicio Proceso Sancionatorio","INICIO PROCESO SANCIONATORIO", radicado, db)
+        creable = await get_creable("Inicio Proceso Sancionatorio","INICIO PROCESO SANCIONATORIO", expediente_id, db)
 
         # Buscar id de la etapa asociada
         stmt = select(Etapa.id).where(
-            Etapa.expediente_radicado == radicado,
+            Etapa.expediente_id == expediente_id,
             Etapa.tipo_etapa_id == tipo_etapa_id
         )
         etapa_id = await db.scalar(stmt)
@@ -434,19 +392,6 @@ async def get_cesacion(radicado: str, db: AsyncSession):
                 "cesacion": {"tipo_etapa_id": tipo_etapa_id,"creable": creable},
                 
             }
-
-        stmt = select(Documento).where(Documento.etapa_id == etapa_id)
-        documentos = (await db.execute(stmt)).scalars().all()
-
-        documentos_data = [
-                {
-                    "id": doc.id,
-                    "nombre": doc.nombre,
-                    "url_documento": doc.url_documento,
-                    "fecha_subida": str(doc.fecha_subida)
-                }
-                for doc in documentos
-            ]
         
         #Si existe la etapa, buscar la info
         stmt = select(Cesacion).where(Cesacion.etapa_id == etapa_id)
@@ -477,7 +422,7 @@ async def get_cesacion(radicado: str, db: AsyncSession):
             "etapa_id": etapa_id,
             "informacion": info_data,
             "acto_admin": acto_admin_data,
-            "documento": documentos_data,
+            
             "creable": creable,
             "tipo_etapa_id": tipo_etapa_id
         }
@@ -495,7 +440,7 @@ async def get_cesacion(radicado: str, db: AsyncSession):
             "ok": False
         }
 
-async def get_formulacion_cargos(radicado: str, db: AsyncSession):
+async def get_formulacion_cargos(expediente_id: int, db: AsyncSession):
     try:
         # Buscar id del tipo de etapa
         stmt = select(TipoEtapa.id).where(TipoEtapa.nombre == 'FORMULACION DE CARGOS')
@@ -506,11 +451,11 @@ async def get_formulacion_cargos(radicado: str, db: AsyncSession):
                 "ok": False
             }
         #Permisos
-        creable = await get_creable("Inicio Proceso Sancionatorio","INICIO PROCESO SANCIONATORIO", radicado, db)
+        creable = await get_creable("Inicio Proceso Sancionatorio","INICIO PROCESO SANCIONATORIO", expediente_id, db)
 
         # Buscar id de la etapa asociada
         stmt = select(Etapa.id).where(
-            Etapa.expediente_radicado == radicado,
+            Etapa.expediente_id == expediente_id,
             Etapa.tipo_etapa_id == tipo_etapa_id
         )
         etapa_id = await db.scalar(stmt)
@@ -522,19 +467,6 @@ async def get_formulacion_cargos(radicado: str, db: AsyncSession):
                 "formulacion_cargos": {"tipo_etapa_id": tipo_etapa_id,"creable": creable}
                 
             }
-
-        stmt = select(Documento).where(Documento.etapa_id == etapa_id)
-        documentos = (await db.execute(stmt)).scalars().all()
-
-        documentos_data = [
-                {
-                    "id": doc.id,
-                    "nombre": doc.nombre,
-                    "url_documento": doc.url_documento,
-                    "fecha_subida": str(doc.fecha_subida)
-                }
-                for doc in documentos
-            ]
         
         #Si existe la etapa, buscar la info
         stmt = select(FormulacionCargos).where(FormulacionCargos.etapa_id == etapa_id)
@@ -555,7 +487,7 @@ async def get_formulacion_cargos(radicado: str, db: AsyncSession):
             "informacion": info_data,
             "acto_admin": acto_admin_data,
             "creable": creable,
-            "documento": documentos_data,
+            
             "tipo_etapa_id": tipo_etapa_id
         }
 
@@ -572,7 +504,7 @@ async def get_formulacion_cargos(radicado: str, db: AsyncSession):
             "ok": False
         }
 
-async def get_apertura_etapa_probatoria(radicado: str, db: AsyncSession):
+async def get_apertura_etapa_probatoria(expediente_id: int, db: AsyncSession):
     try:
         # Buscar id del tipo de etapa
         stmt = select(TipoEtapa.id).where(TipoEtapa.nombre == 'APERTURA ETAPA PROBATORIA')
@@ -583,11 +515,11 @@ async def get_apertura_etapa_probatoria(radicado: str, db: AsyncSession):
                 "ok": False
             }
         #Permisos
-        creable = await get_creable("Formulacion de Cargos", "FORMULACION DE CARGOS", radicado, db)
+        creable = await get_creable("Formulacion de Cargos", "FORMULACION DE CARGOS", expediente_id, db)
 
         # Buscar id de la etapa asociada
         stmt = select(Etapa.id).where(
-            Etapa.expediente_radicado == radicado,
+            Etapa.expediente_id == expediente_id,
             Etapa.tipo_etapa_id == tipo_etapa_id
         )
         etapa_id = await db.scalar(stmt)
@@ -600,19 +532,6 @@ async def get_apertura_etapa_probatoria(radicado: str, db: AsyncSession):
                 
             }
 
-        stmt = select(Documento).where(Documento.etapa_id == etapa_id)
-        documentos = (await db.execute(stmt)).scalars().all()
-
-        documentos_data = [
-                {
-                    "id": doc.id,
-                    "nombre": doc.nombre,
-                    "url_documento": doc.url_documento,
-                    "fecha_subida": str(doc.fecha_subida)
-                }
-                for doc in documentos
-            ]
-
         # Si existe la etapa, buscar el acto administrativo
         acto_admin_data = await get_acto_admin(etapa_id,True,db)
 
@@ -620,7 +539,7 @@ async def get_apertura_etapa_probatoria(radicado: str, db: AsyncSession):
             "etapa_id": etapa_id,
             "acto_admin": acto_admin_data,
             "creable": creable,
-            "documento": documentos_data,
+            
             "tipo_etapa_id": tipo_etapa_id
         }
 
@@ -637,7 +556,7 @@ async def get_apertura_etapa_probatoria(radicado: str, db: AsyncSession):
             "ok": False
         }
 
-async def get_cierre_etapa_probatoria(radicado: str, db: AsyncSession):
+async def get_cierre_etapa_probatoria(expediente_id: int, db: AsyncSession):
     try:
         # Buscar id del tipo de etapa
         stmt = select(TipoEtapa.id).where(TipoEtapa.nombre == 'CIERRE ETAPA PROBATORIA')
@@ -648,11 +567,11 @@ async def get_cierre_etapa_probatoria(radicado: str, db: AsyncSession):
                 "ok": False
             }
         #Permisos
-        creable = await get_creable("Apertura Etapa Probatoria","APERTURA ETAPA PROBATORIA", radicado, db)
+        creable = await get_creable("Apertura Etapa Probatoria","APERTURA ETAPA PROBATORIA", expediente_id, db)
 
         # Buscar id de la etapa asociada
         stmt = select(Etapa.id).where(
-            Etapa.expediente_radicado == radicado,
+            Etapa.expediente_id == expediente_id,
             Etapa.tipo_etapa_id == tipo_etapa_id
         )
         etapa_id = await db.scalar(stmt)
@@ -665,19 +584,6 @@ async def get_cierre_etapa_probatoria(radicado: str, db: AsyncSession):
                 
             }
 
-        stmt = select(Documento).where(Documento.etapa_id == etapa_id)
-        documentos = (await db.execute(stmt)).scalars().all()
-
-        documentos_data = [
-                {
-                    "id": doc.id,
-                    "nombre": doc.nombre,
-                    "url_documento": doc.url_documento,
-                    "fecha_subida": str(doc.fecha_subida)
-                }
-                for doc in documentos
-            ]
-
         # Si existe la etapa, buscar el acto administrativo
         acto_admin_data = await get_acto_admin(etapa_id,True,db)
 
@@ -685,7 +591,7 @@ async def get_cierre_etapa_probatoria(radicado: str, db: AsyncSession):
             "etapa_id": etapa_id,
             "acto_admin": acto_admin_data,
             "creable": creable,
-            "documento": documentos_data,
+            
             "tipo_etapa_id": tipo_etapa_id
         }
 
@@ -702,10 +608,10 @@ async def get_cierre_etapa_probatoria(radicado: str, db: AsyncSession):
             "ok": False
         }
 
-async def get_decision_fondo(radicado: str, db: AsyncSession):
+async def get_decision_fondo(expediente_id: int, db: AsyncSession):
     try:
-        print(f"[GET_DECISION_FONDO] Iniciando para radicado: {radicado}")
-        
+        print(f"[GET_DECISION_FONDO] Iniciando para expediente_id: {expediente_id}")
+
         # Buscar id del tipo de etapa
         stmt = select(TipoEtapa.id).where(TipoEtapa.nombre == 'DECISION DE FONDO')
         tipo_etapa_id = await db.scalar(stmt)
@@ -720,14 +626,14 @@ async def get_decision_fondo(radicado: str, db: AsyncSession):
                     "creable": False
                 }
             }
-        
+
         print(f"[GET_DECISION_FONDO] Obteniendo permisos creable...")
         # Permisos
-        creable = await get_creable("Cierre Etapa Probatoria", "CIERRE ETAPA PROBATORIA", radicado, db)
+        creable = await get_creable("Cierre Etapa Probatoria", "CIERRE ETAPA PROBATORIA", expediente_id, db)
 
         # Buscar id de la etapa asociada
         stmt = select(Etapa.id).where(
-            Etapa.expediente_radicado == radicado,
+            Etapa.expediente_id == expediente_id,
             Etapa.tipo_etapa_id == tipo_etapa_id
         )
         etapa_id = await db.scalar(stmt)
@@ -743,18 +649,6 @@ async def get_decision_fondo(radicado: str, db: AsyncSession):
             }
 
         # Consultar documentos
-        stmt = select(Documento).where(Documento.etapa_id == etapa_id)
-        documentos = (await db.execute(stmt)).scalars().all()
-
-        documentos_data = [
-            {
-                "id": doc.id,
-                "nombre": doc.nombre,
-                "url_documento": doc.url_documento,
-                "fecha_subida": str(doc.fecha_subida)
-            }
-            for doc in documentos
-        ]
 
         # Consultar tipos de sanción
         stmt = select(TipoSancion)
@@ -775,41 +669,31 @@ async def get_decision_fondo(radicado: str, db: AsyncSession):
             }
 
         # Buscar PRIMER acto administrativo (tipo null)
-        stmt = select(ActoAdmin).where(ActoAdmin.etapa_id == etapa_id, ActoAdmin.nivel_auxiliar == False)
+        stmt = select(ActoAdministrativo).where(ActoAdministrativo.etapa_id == etapa_id, ActoAdministrativo.nivel_auxiliar == False)
         acto_admin = await db.scalar(stmt)
         acto_admin_data = {}
 
         if acto_admin:
-            # Buscar notificación asociada
-            stmt = select(Notificacion).where(Notificacion.acto_admin_id == acto_admin.id)
-            noti = await db.scalar(stmt)
+            # Buscar notificaciones asociadas
+            stmt = select(Notificacion).where(Notificacion.acto_administrativo_id == acto_admin.id)
+            notificaciones = (await db.execute(stmt)).scalars().all()
 
-            notificacion_data = {}
-            if noti:
-                stmt = select(InvolucradoNotificacion).where(
-                    InvolucradoNotificacion.notificacion_id == noti.id
-                )
-                involucrados_noti = (await db.execute(stmt)).scalars().all()
-                involucrados_noti_data = [
+            notificaciones_data = []
+            if notificaciones:
+                notificaciones_data = [
                     {
-                        "id": inv_noti.id,
-                        "involucrado_id": inv_noti.involucrado_id,
-                        "numerado": inv_noti.numerado,
-                        "fecha_numerado": str(inv_noti.fecha_numerado),
-                        "fecha_envio_citacion": str(inv_noti.fecha_envio_citacion),
-                        "fecha_constancia_citacion": str(inv_noti.fecha_constancia_citacion),
-                        "notificacion_exitosa": inv_noti.notificacion_exitosa,
-                        "url_documento": inv_noti.url_documento,
-                        "tipo_notificacion_id": inv_noti.tipo_notificacion_id,
+                        "id": noti.id,
+                        "involucrado_id": noti.involucrado_id,
+                        "numerado": noti.numerado,
+                        "fecha_numerado": str(noti.fecha_numerado) if noti.fecha_numerado else None,
+                        "fecha_envio_citacion": str(noti.fecha_envio_citacion) if noti.fecha_envio_citacion else None,
+                        "fecha_constancia_citacion": str(noti.fecha_constancia_citacion) if noti.fecha_constancia_citacion else None,
+                        "notificacion_exitosa": noti.notificacion_exitosa,
+                        "documento_notificacion_id": noti.documento_notificacion_id,
+                        "tipo_notificacion_id": noti.tipo_notificacion_id,
                     }
-                    for inv_noti in involucrados_noti
+                    for noti in notificaciones
                 ]
-
-                notificacion_data = {
-                    "id": noti.id,
-                    "fecha_creacion": str(noti.fecha_creacion),
-                    "involucrados": involucrados_noti_data
-                }
 
             acto_admin_data = {
                 "id": acto_admin.id,
@@ -819,7 +703,7 @@ async def get_decision_fondo(radicado: str, db: AsyncSession):
                 "tipo_acto": acto_admin.tipo_acto,
                 "fecha_creacion": str(acto_admin.fecha_creacion),
                 "etapa_id": acto_admin.etapa_id,
-                "notificacion": notificacion_data,
+                "notificaciones": notificaciones_data,
             }
 
         # Buscar SEGUNDO acto administrativo (el más reciente - recurso)
@@ -830,20 +714,21 @@ async def get_decision_fondo(radicado: str, db: AsyncSession):
         
         # Obtener la fecha de referencia: fecha de constancia de citación de notificación exitosa
         fecha_referencia_notificacion = None
-        if acto_admin_data and acto_admin_data.get("notificacion") and acto_admin_data["notificacion"].get("involucrados"):
+        if acto_admin_data and acto_admin_data.get("notificaciones"):
             # Buscar la fecha más reciente de constancia de citación exitosa
-            for inv_noti in acto_admin_data["notificacion"]["involucrados"]:
-                if inv_noti.get("notificacion_exitosa") and inv_noti.get("fecha_constancia_citacion"):
-                    fecha_const = inv_noti["fecha_constancia_citacion"]
+            for noti in acto_admin_data["notificaciones"]:
+                if noti.get("notificacion_exitosa") and noti.get("fecha_constancia_citacion"):
+                    fecha_const = noti["fecha_constancia_citacion"]
                     if isinstance(fecha_const, str):
                         fecha_const = fecha_const.split(' ')[0] if ' ' in fecha_const else fecha_const
                         fecha_const = datetime.strptime(fecha_const, "%Y-%m-%d").date()
-                    
+
                     if fecha_referencia_notificacion is None or fecha_const > fecha_referencia_notificacion:
                         fecha_referencia_notificacion = fecha_const
-        
-        # Verificar si existe documento de recurso
-        doc_recurso = next((doc for doc in documentos_data if doc["nombre"] == "Recurso"),None)
+
+        # TODO: Verificar si existe documento de recurso (requiere integración con app-docs/anexos)
+        # doc_recurso = next((doc for doc in documentos_data if doc["nombre"] == "Recurso"),None)
+        doc_recurso = None
 
         if doc_recurso:
             fecha_subida = doc_recurso["fecha_subida"]
@@ -886,41 +771,31 @@ async def get_decision_fondo(radicado: str, db: AsyncSession):
                     creable_recurso = {"status": False, "msg": "Pasaron más de 10 días hábiles desde la notificación exitosa del acto de etapa"}
                 
         # Buscar si ya existe el acto de recurso (nivel = recurso)
-        stmt = select(ActoAdmin).where(ActoAdmin.etapa_id == etapa_id, ActoAdmin.nivel_auxiliar == True)
+        stmt = select(ActoAdministrativo).where(ActoAdministrativo.etapa_id == etapa_id, ActoAdministrativo.nivel_auxiliar == True)
         acto_recurso = await db.scalar(stmt)
 
         # Solo considerar como acto de recurso si hay más de un acto
         if acto_recurso and acto_recurso.id != acto_admin_data.get("id"):
-            # Buscar notificación asociada
-            stmt = select(Notificacion).where(Notificacion.acto_admin_id == acto_recurso.id)
-            noti = await db.scalar(stmt)
+            # Buscar notificaciones asociadas
+            stmt = select(Notificacion).where(Notificacion.acto_administrativo_id == acto_recurso.id)
+            notificaciones = (await db.execute(stmt)).scalars().all()
 
-            notificacion_data = {}
-            if noti:
-                stmt = select(InvolucradoNotificacion).where(
-                    InvolucradoNotificacion.notificacion_id == noti.id
-                )
-                involucrados_noti = (await db.execute(stmt)).scalars().all()
-                involucrados_noti_data = [
+            notificaciones_data = []
+            if notificaciones:
+                notificaciones_data = [
                     {
-                        "id": inv_noti.id,
-                        "involucrado_id": inv_noti.involucrado_id,
-                        "numerado": inv_noti.numerado,
-                        "fecha_numerado": str(inv_noti.fecha_numerado),
-                        "fecha_envio_citacion": str(inv_noti.fecha_envio_citacion),
-                        "fecha_constancia_citacion": str(inv_noti.fecha_constancia_citacion),
-                        "notificacion_exitosa": inv_noti.notificacion_exitosa,
-                        "url_documento": inv_noti.url_documento,
-                        "tipo_notificacion_id": inv_noti.tipo_notificacion_id,
+                        "id": noti.id,
+                        "involucrado_id": noti.involucrado_id,
+                        "numerado": noti.numerado,
+                        "fecha_numerado": str(noti.fecha_numerado) if noti.fecha_numerado else None,
+                        "fecha_envio_citacion": str(noti.fecha_envio_citacion) if noti.fecha_envio_citacion else None,
+                        "fecha_constancia_citacion": str(noti.fecha_constancia_citacion) if noti.fecha_constancia_citacion else None,
+                        "notificacion_exitosa": noti.notificacion_exitosa,
+                        "documento_notificacion_id": noti.documento_notificacion_id,
+                        "tipo_notificacion_id": noti.tipo_notificacion_id,
                     }
-                    for inv_noti in involucrados_noti
+                    for noti in notificaciones
                 ]
-
-                notificacion_data = {
-                    "id": noti.id,
-                    "fecha_creacion": str(noti.fecha_creacion),
-                    "involucrados": involucrados_noti_data
-                }
 
             acto_admin_recurso_data = {
                 "id": acto_recurso.id,
@@ -930,7 +805,7 @@ async def get_decision_fondo(radicado: str, db: AsyncSession):
                 "tipo_acto": acto_recurso.tipo_acto,
                 "fecha_creacion": str(acto_recurso.fecha_creacion),
                 "etapa_id": acto_recurso.etapa_id,
-                "notificacion": notificacion_data,
+                "notificaciones": notificaciones_data,
                 "nivel_auxiliar": acto_recurso.nivel_auxiliar
             }
         
@@ -943,7 +818,7 @@ async def get_decision_fondo(radicado: str, db: AsyncSession):
             "creable": creable,
             "creable_recurso": creable_recurso,
             "creable_acto_recurso": creable_acto_recurso,
-            "documento": documentos_data,
+            
             "documentos_restringidos": documentos_restringidos,
             "tipo_etapa_id": tipo_etapa_id
         }
@@ -964,7 +839,7 @@ async def get_decision_fondo(radicado: str, db: AsyncSession):
             "error": str(e)
         }
     
-async def get_recurso(radicado: str, db: AsyncSession):
+async def get_recurso(expediente_id: int, db: AsyncSession):
     try:
         # Buscar id del tipo de etapa
         stmt = select(TipoEtapa.id).where(TipoEtapa.nombre == 'PROBATORIA DE RECURSO')
@@ -974,13 +849,13 @@ async def get_recurso(radicado: str, db: AsyncSession):
             return {
                 "ok": False
             }
-        
+
         #Permisos
         stmt = (
             select(Etapa.id)
             .join(TipoEtapa, Etapa.tipo_etapa_id == TipoEtapa.id)
             .where(
-                Etapa.expediente_radicado == radicado,
+                Etapa.expediente_id == expediente_id,
                 TipoEtapa.nombre == "EJECUCION DE LA SANCION"
             )
         )
@@ -996,7 +871,7 @@ async def get_recurso(radicado: str, db: AsyncSession):
                 select(Etapa.id)
                 .join(TipoEtapa, Etapa.tipo_etapa_id == TipoEtapa.id)
                 .where(
-                    Etapa.expediente_radicado == radicado,
+                    Etapa.expediente_id == expediente_id,
                     TipoEtapa.nombre == "DECISION DE FONDO"
                 )
             )
@@ -1009,7 +884,7 @@ async def get_recurso(radicado: str, db: AsyncSession):
                 }
             else:
                 
-                stmt = select(ActoAdmin.id).where(ActoAdmin.etapa_id == decision_id, ActoAdmin.nivel_auxiliar == True)
+                stmt = select(ActoAdministrativo.id).where(ActoAdministrativo.etapa_id == decision_id, ActoAdministrativo.nivel_auxiliar == True)
                 ad_recurso_id = await db.scalar(stmt)
 
                 if not ad_recurso_id:
@@ -1019,9 +894,8 @@ async def get_recurso(radicado: str, db: AsyncSession):
                     }
                 else:
                     stmt = (
-                        select(InvolucradoNotificacion.notificacion_exitosa)
-                        .join(Notificacion, InvolucradoNotificacion.notificacion_id == Notificacion.id)
-                        .where(Notificacion.acto_admin_id == ad_recurso_id)
+                        select(Notificacion.notificacion_exitosa)
+                        .where(Notificacion.acto_administrativo_id == ad_recurso_id)
                     )
                     result = await db.execute(stmt)
                     notificaciones = result.scalars().all()
@@ -1031,7 +905,7 @@ async def get_recurso(radicado: str, db: AsyncSession):
                             "msg": f'No se ha notificado exitosamente el acto administrativo de recurso en "Decision de Fondo".'
                         }
                     else:
-                        stmt = select(ActoAdmin.id).where(ActoAdmin.etapa_id == decision_id, ActoAdmin.nivel_auxiliar == True)
+                        stmt = select(ActoAdministrativo.id).where(ActoAdministrativo.etapa_id == decision_id, ActoAdministrativo.nivel_auxiliar == True)
                         ad_id = await db.scalar(stmt)
                         if not ad_id:
                             creable = {
@@ -1040,9 +914,8 @@ async def get_recurso(radicado: str, db: AsyncSession):
                             }
                         else:
                             stmt = (
-                            select(InvolucradoNotificacion.notificacion_exitosa)
-                            .join(Notificacion, InvolucradoNotificacion.notificacion_id == Notificacion.id)
-                            .where(Notificacion.acto_admin_id == ad_id)
+                            select(Notificacion.notificacion_exitosa)
+                            .where(Notificacion.acto_administrativo_id == ad_id)
                             )
                             result = await db.execute(stmt)
                             notificaciones = result.scalars().all()
@@ -1057,7 +930,7 @@ async def get_recurso(radicado: str, db: AsyncSession):
 
         # Buscar id de la etapa asociada
         stmt = select(Etapa.id).where(
-            Etapa.expediente_radicado == radicado,
+            Etapa.expediente_id == expediente_id,
             Etapa.tipo_etapa_id == tipo_etapa_id
         )
         etapa_id = await db.scalar(stmt)
@@ -1070,19 +943,6 @@ async def get_recurso(radicado: str, db: AsyncSession):
                 
             }
 
-        stmt = select(Documento).where(Documento.etapa_id == etapa_id)
-        documentos = (await db.execute(stmt)).scalars().all()
-
-        documentos_data = [
-                {
-                    "id": doc.id,
-                    "nombre": doc.nombre,
-                    "url_documento": doc.url_documento,
-                    "fecha_subida": str(doc.fecha_subida)
-                }
-                for doc in documentos
-            ]
-
         # Si existe la etapa, buscar el acto administrativo
         acto_admin_data = await get_acto_admin(etapa_id,True,db)
 
@@ -1093,7 +953,7 @@ async def get_recurso(radicado: str, db: AsyncSession):
             "acto_admin": acto_admin_data,
             "acto_admin_decision": acto_admin_decision,
             "creable": creable,
-            "documento": documentos_data,
+            
             "tipo_etapa_id": tipo_etapa_id
         }
 
@@ -1109,3 +969,4 @@ async def get_recurso(radicado: str, db: AsyncSession):
         return {
             "ok": False
         }
+

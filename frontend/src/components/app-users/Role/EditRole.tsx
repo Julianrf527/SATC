@@ -1,7 +1,7 @@
 import Input from "../../Input/Input";
 import { useEffect, useState, useRef } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
-import ConfirmDeleteRolePermissionModal from "./ConfirmDeleteRolePermissionModa";
+import ConfirmationModal from "./ConfirmationModal";
 
 type Roles = { id: number; name: string; permission: number[] };
 
@@ -216,13 +216,14 @@ export default function EditRol({ permission, setToast }: Props) {
 
   return (
     <div className="card bg-base-100 shadow-md border border-base-300 h-full flex flex-col">
-      <ConfirmDeleteRolePermissionModal
+      <ConfirmationModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleConfirmDelete}
-        type="rol"
-        itemName={role.find((r) => r.id === Number(selectedRoleId))?.name}
-        isDeleting={isDeleting}
+        typeOperation="actualizar"
+        typeChange="rol"
+        itemIdentifier={role.find((r) => r.id === Number(selectedRoleId))?.name}
+        isSubmitting={isDeleting}
       />
 
       <div className="card-body flex flex-col h-full">

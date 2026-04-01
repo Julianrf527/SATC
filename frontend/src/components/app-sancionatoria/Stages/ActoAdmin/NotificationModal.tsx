@@ -5,6 +5,7 @@ import type {
   TipoNotificacion,
   InvolucradoNotificacion,
 } from "../../../../types";
+import { uploadFileToDocuments, generateDocumentFileName, validateFile } from "../../../../utils/fileUpload";
 
 type Props = {
   isOpen: boolean;
@@ -13,7 +14,20 @@ type Props = {
   involucrados: Involved[];
   yaNotificados: number[];
   tiposNotificacion: TipoNotificacion[];
-  onSave: (formData: FormData) => Promise<{ ok: boolean; error?: string }>;
+  onSave: (data: {
+    involucrado_id?: number;
+    numerado: string;
+    fecha_numerado: string;
+    fecha_envio_citacion: string;
+    fecha_constancia_citacion: string;
+    notificacion_exitosa: boolean;
+    tipo_notificacion_id?: number;
+    fecha_notificacion?: string;
+    documento_notificacion_id?: number;
+    documento_citacion_id?: number;
+    notificacion_id: number;
+    radicado: string;
+  }) => Promise<{ ok: boolean; error?: string }>;
   isEditable?: boolean;
   notificacionesExistentes?: InvolucradoNotificacion[];
 };
@@ -53,6 +67,7 @@ export default function NotificacionModal({
     general: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingFiles, setIsUploadingFiles] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileCitacionInputRef = useRef<HTMLInputElement>(null);
 
@@ -137,22 +152,11 @@ export default function NotificacionModal({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Solo permitir PDF
-      if (file.type !== "application/pdf") {
+      const validation = validateFile(file);
+      if (!validation.isValid) {
         setErrors((prev) => ({
           ...prev,
-          file: "Solo se permiten archivos PDF",
-        }));
-        if (fileInputRef.current) {
-          fileInputRef.current.value = "";
-        }
-        return;
-      }
-
-      if (file.size > 10 * 1024 * 1024) {
-        setErrors((prev) => ({
-          ...prev,
-          file: "El archivo no debe superar los 10MB",
+          file: validation.error || "Archivo inválido",
         }));
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
@@ -170,22 +174,11 @@ export default function NotificacionModal({
   const handleFileCitacionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Solo permitir PDF
-      if (file.type !== "application/pdf") {
+      const validation = validateFile(file);
+      if (!validation.isValid) {
         setErrors((prev) => ({
           ...prev,
-          file_citacion: "Solo se permiten archivos PDF",
-        }));
-        if (fileCitacionInputRef.current) {
-          fileCitacionInputRef.current.value = "";
-        }
-        return;
-      }
-
-      if (file.size > 10 * 1024 * 1024) {
-        setErrors((prev) => ({
-          ...prev,
-          file_citacion: "El archivo no debe superar los 10MB",
+          file_citacion: validation.error || "Archivo inválido",
         }));
         if (fileCitacionInputRef.current) {
           fileCitacionInputRef.current.value = "";
@@ -268,7 +261,7 @@ export default function NotificacionModal({
 
     // Validar documento cuando notificacion_exitosa es true
     if (notificacionForm.notificacion_exitosa) {
-      const tieneDocumentoExistente = isEditing && editingNotificacion?.url_documento;
+      const tieneDocumentoExistente = isEditing && editingNotificacion?.documento_notificacion_id;
       if (!selectedFile && !tieneDocumentoExistente) {
         newErrors.file = "Debe cargar un documento de notificación";
         isValid = false;
@@ -307,61 +300,80 @@ export default function NotificacionModal({
     setIsSubmitting(true);
 
     try {
-      // Preparar FormData
-      const formData = new FormData();
+      let documento_notificacion_id: number | undefined;
+      let documento_citacion_id: number | undefined;
 
-      // Solo incluir involucrado_id al crear
-      if (!isEditing) {
-        formData.append(
-          "involucrado_id",
-          notificacionForm.involucrado_id.toString(),
-        );
-      }
+      setIsUploadingFiles(true);
 
-      formData.append("numerado", notificacionForm.numerado.trim());
-      formData.append("fecha_numerado", notificacionForm.fecha_numerado);
-      formData.append(
-        "fecha_envio_citacion",
-        notificacionForm.fecha_envio_citacion,
-      );
+      // Paso 1: Subir archivos en paralelo si existen
+      const uploadPromises: Promise<{ type: 'notificacion' | 'citacion', fileId: number }>[] = [];
 
-      if (notificacionForm.fecha_constancia_citacion) {
-        formData.append(
-          "fecha_constancia_citacion",
-          notificacionForm.fecha_constancia_citacion,
-        );
-      }
-
-      formData.append(
-        "notificacion_exitosa",
-        notificacionForm.notificacion_exitosa.toString(),
-      );
-
-      if (
-        notificacionForm.notificacion_exitosa &&
-        notificacionForm.tipo_notificacion_id
-      ) {
-        formData.append(
-          "tipo_notificacion_id",
-          notificacionForm.tipo_notificacion_id.toString(),
-        );
-      }
-
-      // Incluir archivo de notificación
       if (selectedFile) {
-        formData.append("file", selectedFile);
-      } else if (isEditing && editingNotificacion?.url_documento) {
-        formData.append("url_documento_origen", editingNotificacion.url_documento);
+        const fileName = generateDocumentFileName("NOTIF", notificacionForm.numerado, notificacionForm.fecha_numerado);
+
+        uploadPromises.push(
+          uploadFileToDocuments(selectedFile, fileName).then((fileId) => ({
+            type: 'notificacion' as const,
+            fileId
+          }))
+        );
       }
 
-      // Incluir archivo de citación
       if (selectedFileCitacion) {
-        formData.append("file_citacion", selectedFileCitacion);
-      } else if (isEditing && editingNotificacion?.url_doc_citacion) {
-        formData.append("url_citacion_origen", editingNotificacion.url_doc_citacion);
+        const fileName = generateDocumentFileName("CITAC", notificacionForm.numerado, notificacionForm.fecha_numerado);
+
+        uploadPromises.push(
+          uploadFileToDocuments(selectedFileCitacion, fileName).then((fileId) => ({
+            type: 'citacion' as const,
+            fileId
+          }))
+        );
       }
 
-      const result = await onSave(formData);
+      // Esperar a que todos los uploads terminen en paralelo
+      if (uploadPromises.length > 0) {
+        try {
+          const uploadResults = await Promise.all(uploadPromises);
+
+          uploadResults.forEach((result) => {
+            if (result.type === 'notificacion') {
+              documento_notificacion_id = result.fileId;
+            } else {
+              documento_citacion_id = result.fileId;
+            }
+          });
+        } catch (uploadError) {
+          throw new Error(
+            uploadError instanceof Error
+              ? uploadError.message
+              : "Error al subir los archivos"
+          );
+        }
+      }
+
+      setIsUploadingFiles(false);
+
+      // Paso 3: Preparar datos para enviar
+      const notificationData = {
+        numerado: notificacionForm.numerado.trim(),
+        fecha_numerado: notificacionForm.fecha_numerado,
+        fecha_envio_citacion: notificacionForm.fecha_envio_citacion,
+        fecha_constancia_citacion: notificacionForm.fecha_constancia_citacion || "",
+        notificacion_exitosa: notificacionForm.notificacion_exitosa,
+        ...(documento_notificacion_id && { documento_notificacion_id }),
+        ...(documento_citacion_id && { documento_citacion_id }),
+        notificacion_id: 0, // Se establecerá en el componente padre
+        radicado: "", // Se establecerá en el componente padre
+        ...(notificacionForm.notificacion_exitosa &&
+            notificacionForm.tipo_notificacion_id &&
+            { tipo_notificacion_id: notificacionForm.tipo_notificacion_id }),
+        ...(notificacionForm.notificacion_exitosa &&
+            notificacionForm.fecha_constancia_citacion &&
+            { fecha_notificacion: notificacionForm.fecha_constancia_citacion }),
+        ...(!isEditing && { involucrado_id: notificacionForm.involucrado_id }),
+      };
+
+      const result = await onSave(notificationData);
 
       // Verificar que el resultado sea exitoso
       if (result && result.ok === true) {
@@ -385,6 +397,7 @@ export default function NotificacionModal({
       }));
     } finally {
       setIsSubmitting(false);
+      setIsUploadingFiles(false);
     }
   };
 
@@ -412,6 +425,7 @@ export default function NotificacionModal({
       general: "",
     });
     setIsSubmitting(false);
+    setIsUploadingFiles(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -442,7 +456,7 @@ export default function NotificacionModal({
 
   // Verificar si hay documento de citación (ya cargado o seleccionado)
   const hasDocumentoCitacion = isEditing
-    ? editingNotificacion?.url_doc_citacion || selectedFileCitacion
+    ? editingNotificacion?.documento_citacion_id || selectedFileCitacion
     : selectedFileCitacion;
 
   const modalContent = (
@@ -488,7 +502,7 @@ export default function NotificacionModal({
           <button
             onClick={handleClose}
             className="absolute top-4 right-4 btn btn-ghost btn-sm btn-circle"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isUploadingFiles}
           >
             <svg
               className="w-5 h-5"
@@ -530,7 +544,7 @@ export default function NotificacionModal({
                     ? "select-error"
                     : "focus:select-success"
                 }`}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingFiles}
               >
                 <option value={0}>Seleccione un involucrado</option>
                 {involucradosDisponibles.map((involucrado) => (
@@ -571,7 +585,7 @@ export default function NotificacionModal({
                 }`}
                 placeholder="0001"
                 maxLength={4}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingFiles}
               />
               {errors.numerado && (
                 <label className="label">
@@ -604,7 +618,7 @@ export default function NotificacionModal({
                 className={`input input-bordered w-full ${
                   errors.fecha_numerado ? "input-error" : "focus:input-success"
                 }`}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingFiles}
               />
               {errors.fecha_numerado && (
                 <label className="label">
@@ -645,7 +659,7 @@ export default function NotificacionModal({
                     ? "input-error"
                     : "focus:input-success"
                 }`}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingFiles}
               />
               {errors.fecha_envio_citacion && (
                 <label className="label">
@@ -672,7 +686,7 @@ export default function NotificacionModal({
                   })
                 }
                 className="input input-bordered w-full focus:input-success"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingFiles}
               />
             </div>
           </div>
@@ -696,7 +710,7 @@ export default function NotificacionModal({
                 errors.file_citacion ? "file-input-error" : ""
               }`}
               onChange={handleFileCitacionChange}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingFiles}
             />
             {errors.file_citacion && (
               <label className="label">
@@ -727,7 +741,7 @@ export default function NotificacionModal({
             )}
             {isEditing &&
               !selectedFileCitacion &&
-              editingNotificacion?.url_doc_citacion && (
+              editingNotificacion?.documento_citacion_id && (
                 <label className="label">
                   <span className="label-text-alt text-info">
                     Opcional - Solo si desea reemplazar el documento actual
@@ -736,7 +750,7 @@ export default function NotificacionModal({
               )}
             {isEditing &&
               !selectedFileCitacion &&
-              !editingNotificacion?.url_doc_citacion && (
+              !editingNotificacion?.documento_citacion_id && (
                 <label className="label">
                   <span className="label-text-alt text-warning">
                     ⚠️ No hay documento de citación cargado. Debe subir uno para
@@ -747,7 +761,7 @@ export default function NotificacionModal({
           </div>
 
           {/* Separador visual */}
-          {(editingNotificacion?.url_doc_citacion ||
+          {(editingNotificacion?.documento_citacion_id ||
             selectedFileCitacion ||
             !isEditing) && (
             <div className="divider text-sm text-base-content/50">
@@ -916,7 +930,7 @@ export default function NotificacionModal({
             {isEditing && !selectedFile && !errors.file && (
               <label className="label">
                 <span className="label-text-alt text-base-content/60">
-                  {notificacionForm.notificacion_exitosa && !editingNotificacion?.url_documento
+                  {notificacionForm.notificacion_exitosa && !editingNotificacion?.documento_notificacion_id
                     ? "Debe cargar un documento de notificación"
                     : "Opcional - Solo si desea reemplazar el documento"}
                 </span>
@@ -950,7 +964,7 @@ export default function NotificacionModal({
               type="button"
               onClick={handleClose}
               className="btn btn-ghost"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingFiles}
             >
               Cancelar
             </button>
@@ -958,9 +972,14 @@ export default function NotificacionModal({
               type="button"
               onClick={handleSave}
               className="btn btn-success text-white gap-2"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingFiles}
             >
-              {isSubmitting ? (
+              {isUploadingFiles ? (
+                <>
+                  <span className="loading loading-spinner loading-sm"></span>
+                  Subiendo archivos...
+                </>
+              ) : isSubmitting ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span>
                   Guardando...
@@ -1009,3 +1028,4 @@ export default function NotificacionModal({
 
   return createPortal(modalContent, document.body);
 }
+

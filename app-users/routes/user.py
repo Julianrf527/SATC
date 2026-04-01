@@ -4,8 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, exists, insert, update, and_, or_, func
 from pydantic import BaseModel, EmailStr, validator
 from typing import List
-from passlib.hash import bcrypt
-from utils.passwords import hash_password, verify_password
 from utils import emailUtil
 from datetime import datetime
 from dotenv import load_dotenv
@@ -22,14 +20,14 @@ from db.models.rol_permiso import RolPermiso
 from db.models.permiso import Permiso
 from db.models.rol import Rol
 from db.models.auditoria import Auditoria
+from core.permissions import Permisos
 
 router = APIRouter()
 load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
-PERMISO_USER = os.getenv("PERMISO_USER")
-GESTION_USER = os.getenv("GESTION_USER")
-USER_LOG = os.getenv("USER_LOG")
-
+PERMISO_USER = Permisos.PERMISO_USER
+GESTION_USER = Permisos.GESTION_USER
+USER_LOG = Permisos.USER_LOG
 
 # ---------- LOGGER ------------
 
@@ -38,6 +36,10 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+#----------- FUNCIONES ----------
+
+from utils.passwords import hash_password
 
 # ---------- MODELOS ----------
 
@@ -122,55 +124,10 @@ class UserBatchResponse(BaseModel):
 
 #----------- FUNCIONES ------------
 
-from utils.verify_gateway_token import verify_gateway_token
+from utils.verify_token import verify_gateway_token, verify_service_token
+from utils.permission_crud import get_role_permissions
 from utils.insertLog import insert_auditoria
-from utils.verify_token_service import verify_service_jwt
-
-async def get_user_permissions(user_id: int, db: AsyncSession) -> set[int]:
-    """
-    Obtiene el conjunto de IDs de permisos que posee un usuario.
-    
-    Args:
-        user_id: Número de documento del usuario
-        db: Sesión de base de datos
-    
-    Returns:
-        set[int]: Conjunto de IDs de permisos del usuario
-    """
-    stmt = (
-        select(Permiso.id)
-        .select_from(RolPermiso)
-        .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-        .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-        .where(Usuario.numero_documento == user_id)
-    )
-    
-    result = await db.execute(stmt)
-    permission_ids = result.scalars().all()
-    
-    return set(permission_ids)
-
-
-async def get_role_permissions(rol_id: int, db: AsyncSession) -> set[int]:
-    """
-    Obtiene el conjunto de IDs de permisos que tiene un rol.
-    
-    Args:
-        rol_id: ID del rol
-        db: Sesión de base de datos
-    
-    Returns:
-        set[int]: Conjunto de IDs de permisos del rol
-    """
-    stmt = (
-        select(RolPermiso.permiso_id)
-        .where(RolPermiso.rol_id == rol_id)
-    )
-    
-    result = await db.execute(stmt)
-    permission_ids = result.scalars().all()
-    
-    return set(permission_ids)
+from utils.verify_permission import verify_permission
 
 # ---------- ENDPOINTS ----------
 
@@ -182,24 +139,8 @@ async def registrar_usuario(
 ):
     try:
         # Verificar permisos
-        user_id = verify_gateway_token(request)
-
-        stmt = (
-            select(1)
-            .select_from(RolPermiso)
-            .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-            .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-            .where(
-                Usuario.numero_documento == user_id,
-                Permiso.nombre == PERMISO_USER
-            )
-            .limit(1)
-        )
-
-        tiene_permiso = await db.scalar(stmt)
-
-        if not tiene_permiso:
-            raise HTTPException(status_code=403, detail="No cuenta con permisos")
+        token_data = verify_gateway_token(request)
+        verify_permission(token_data, PERMISO_USER)
 
         # VALIDACIÓN DE ESCALADA DE PRIVILEGIOS:
         # El rol asignado no debe tener permisos superiores a los del usuario creador
@@ -211,7 +152,7 @@ async def registrar_usuario(
             raise HTTPException(status_code=404, detail="El rol seleccionado no existe")
         
         # Obtener permisos del usuario creador y del rol a asignar
-        user_permissions = await get_user_permissions(user_id, db)
+        user_permissions = token_data["permisos"]
         role_permissions = await get_role_permissions(rol, db)
         
         # Verificar que el rol no tenga permisos superiores
@@ -227,7 +168,7 @@ async def registrar_usuario(
                 detail=f"No puede asignar un rol con permisos que no posee: {', '.join(nombres_permisos)}"
             )
 
-        # Capitalizar nombres (por si acaso no se hizo en frontend)
+        # Capitalizar nombres
         def capitalize_name(name: str) -> str:
             return name.strip().capitalize() if name else ""
 
@@ -301,11 +242,12 @@ async def registrar_usuario(
         # Guardar auditoría
         audit_result = await insert_auditoria(
             db=db,
-            usuario_id=user_id,
-            tabla_afectada="usuario",
-            tipo_operacion="INSERT",
-            descripcion=f"Creación de usuario {full_name} con documento {document}",
-            id_registro=str(document),
+            usuario_id=token_data["user_id"],
+            tipo_evento="GESTION_USUARIO",
+            resultado="EXITOSO",
+            detalle=f"Creación de usuario {full_name} con documento {document}",
+            documento_usuario=token_data["documento"],
+            nombre_usuario=token_data["nombre"],
             datos_nuevos=datos_nuevos
         )
 
@@ -372,27 +314,12 @@ async def obtener_usuarios(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        user_id = verify_gateway_token(request)
-
-        stmt = (
-            select(1)
-            .select_from(RolPermiso)
-            .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-            .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-            .where(
-                Usuario.numero_documento == user_id,
-                Permiso.nombre == GESTION_USER
-            )
-            .limit(1)
-        )
-
-        tiene_permiso = await db.scalar(stmt)
-
-        if not tiene_permiso:
-            raise HTTPException(status_code=403, detail="No cuenta con permisos")
+        token_data = verify_gateway_token(request)
+        verify_permission(token_data, PERMISO_USER)
         
         stmr = select(
-            Usuario.numero_documento, 
+            Usuario.id,
+            Usuario.numero_documento,
             Usuario.primer_nombre,
             Usuario.segundo_nombre,
             Usuario.primer_apellido,
@@ -405,8 +332,9 @@ async def obtener_usuarios(
         users = result.all()
 
         user_list = [
-            {   
-                "id": user.numero_documento,
+            {
+                "id": user.id,
+                "numero_documento": user.numero_documento,
                 "primer_nombre": user.primer_nombre,
                 "segundo_nombre": user.segundo_nombre,
                 "primer_apellido": user.primer_apellido,
@@ -424,72 +352,48 @@ async def obtener_usuarios(
         logger.error(f"Error en el servidor al cargar los usuarios: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.patch("/toggleState/{document}")
+@router.patch("/toggleState/{user_id}")
 async def actualizar_estado(
     request: Request,
-    document: int,
+    user_id: int,
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        user_id = verify_gateway_token(request)
+        token_data = verify_gateway_token(request)
+        verify_permission(token_data, PERMISO_USER)
 
-        stmt = (
-            select(1)
-            .select_from(RolPermiso)
-            .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-            .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-            .where(
-                Usuario.numero_documento == user_id,
-                Permiso.nombre == GESTION_USER
-            )
-            .limit(1)
-        )
-
-        tiene_permiso = await db.scalar(stmt)
-
-        if not tiene_permiso:
-            raise HTTPException(status_code=403, detail="No cuenta con permisos")
-
-        stmr = select(Usuario.activo).where(Usuario.numero_documento == document)
+        stmr = select(Usuario.activo, Usuario.numero_documento).where(Usuario.id == user_id)
         result = await db.execute(stmr)
-        current_state = result.scalar()
+        row = result.first()
 
-        if current_state is None:
+        if row is None:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-        datos_anteriores = {
-            "numero_documento": document,
-            "activo": current_state
-        }
+        current_state, numero_documento = row.activo, row.numero_documento
 
-        stmr = update(Usuario).where(Usuario.numero_documento == document).values(activo=not current_state)
-        await db.execute(stmr)
+        datos_anteriores = {"user_id": user_id, "numero_documento": numero_documento, "activo": current_state}
 
-        datos_nuevos = {
-            "numero_documento": document,
-            "activo": not current_state
-        }
+        await db.execute(update(Usuario).where(Usuario.id == user_id).values(activo=not current_state))
+
+        datos_nuevos = {"user_id": user_id, "numero_documento": numero_documento, "activo": not current_state}
 
         audit_result = await insert_auditoria(
             db=db,
-            usuario_id=user_id,
-            tabla_afectada="usuario",
-            tipo_operacion="UPDATE",
-            descripcion=f"Cambio de estado de usuario {document}: {current_state} → {not current_state}",
-            id_registro=str(document),
+            usuario_id=token_data["user_id"],
+            tipo_evento="DESACTIVACION" if current_state else "ACTIVACION",
+            resultado="EXITOSO",
+            detalle=f"Cambio de estado de usuario ID {user_id}: {current_state} → {not current_state}",
+            documento_usuario=token_data["documento"],
+            nombre_usuario=token_data["nombre"],
             datos_anteriores=datos_anteriores,
             datos_nuevos=datos_nuevos
         )
 
         if not audit_result["ok"]:
             await db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Error al guardar registro de auditoría"
-            )
+            raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
 
         await db.commit()
-
         return JSONResponse({"ok": True}, status_code=200)
 
     except HTTPException:
@@ -499,104 +403,72 @@ async def actualizar_estado(
         logger.error(f"Error en el servidor al cambiar estado: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.patch("/toggleRol/{document}/{rol_id}")
-async def actualizar_rol(
-    request:Request,
-    document: int,
+
+@router.patch("/toggleRol/{user_id}/{rol_id}")
+async def actualizar_rol_usuario(
+    request: Request,
+    user_id: int,
     rol_id: int,
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        user_id = verify_gateway_token(request)
+        token_data = verify_gateway_token(request)
+        verify_permission(token_data, PERMISO_USER)
 
-        stmt = (
-            select(1)
-            .select_from(RolPermiso)
-            .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-            .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-            .where(
-                Usuario.numero_documento == user_id,
-                Permiso.nombre == GESTION_USER
-            )
-            .limit(1)
-        )
-
-        tiene_permiso = await db.scalar(stmt)
-
-        if not tiene_permiso:
-            raise HTTPException(status_code=403, detail="No cuenta con permisos")
-
-        # VALIDACIÓN DE ESCALADA DE PRIVILEGIOS:
-        # El rol asignado no debe tener permisos superiores a los del usuario que hace el cambio
-        # Verificar que el rol existe
-        rol_exists = await db.execute(select(exists().where(Rol.id == rol_id)))
-        if not rol_exists.scalar():
-            raise HTTPException(status_code=404, detail="El rol seleccionado no existe")
-        
-        # Obtener permisos del usuario que hace el cambio y del rol a asignar
-        user_permissions = await get_user_permissions(user_id, db)
-        role_permissions = await get_role_permissions(rol_id, db)
-        
-        # Verificar que el rol no tenga permisos superiores
-        permisos_no_autorizados = role_permissions - user_permissions
-        
-        if permisos_no_autorizados:
-            stmt = select(Permiso.nombre).where(Permiso.id.in_(permisos_no_autorizados))
-            result = await db.execute(stmt)
-            nombres_permisos = result.scalars().all()
-            
-            raise HTTPException(
-                status_code=403,
-                detail=f"No puede asignar un rol con permisos que no posee: {', '.join(nombres_permisos)}"
-            )
-
-        stmr = select(Usuario).where(Usuario.numero_documento == document)
-        result = await db.execute(stmr)
-        usuario = result.scalar_one_or_none()
-        
+        # Verificar que el usuario existe
+        usuario = await db.scalar(select(Usuario).where(Usuario.id == user_id))
         if not usuario:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-        datos_anteriores = {
-            "numero_documento": document,
-            "rol_id": usuario.rol_id
-        }
+        # Verificar que el nuevo rol existe
+        rol_exists = await db.scalar(select(exists().where(Rol.id == rol_id)))
+        if not rol_exists:
+            raise HTTPException(status_code=404, detail="El rol seleccionado no existe")
 
-        stmr = update(Usuario).where(Usuario.numero_documento == document).values(rol_id=rol_id)
-        await db.execute(stmr)
+        # VALIDACIÓN DE ESCALADA DE PRIVILEGIOS
+        user_permissions = await get_role_permissions(token_data["rol_id"], db)
+        role_permissions = await get_role_permissions(rol_id, db)
+        permisos_no_autorizados = role_permissions - user_permissions
 
-        datos_nuevos = {
-            "numero_documento": document,
-            "rol_id": rol_id
-        }
+        if permisos_no_autorizados:
+            stmt_names = select(Permiso.nombre).where(Permiso.id.in_(permisos_no_autorizados))
+            result_names = await db.execute(stmt_names)
+            nombres = result_names.scalars().all()
+            raise HTTPException(
+                status_code=403,
+                detail=f"No puede asignar un rol con permisos que no posee: {', '.join(nombres)}"
+            )
+
+        datos_anteriores = {"user_id": user_id, "rol_id": usuario.rol_id}
+
+        await db.execute(update(Usuario).where(Usuario.id == user_id).values(rol_id=rol_id))
+
+        datos_nuevos = {"user_id": user_id, "rol_id": rol_id}
 
         audit_result = await insert_auditoria(
             db=db,
-            usuario_id=user_id,
-            tabla_afectada="usuario",
-            tipo_operacion="UPDATE",
-            descripcion=f"Cambio de rol de usuario {document}: {usuario.rol_id} → {rol_id}",
-            id_registro=str(document),
+            usuario_id=token_data["user_id"],
+            tipo_evento="CAMBIO_ROL",
+            resultado="EXITOSO",
+            detalle=f"Cambio de rol del usuario ID {user_id}: {usuario.rol_id} → {rol_id}",
+            documento_usuario=token_data["documento"],
+            nombre_usuario=token_data["nombre"],
             datos_anteriores=datos_anteriores,
             datos_nuevos=datos_nuevos
         )
 
         if not audit_result["ok"]:
             await db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Error al guardar registro de auditoría"
-            )
+            raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
 
         await db.commit()
-
-        return JSONResponse({"ok": True}, status_code=200)
+        return JSONResponse({"ok": True, "msg": "Rol actualizado correctamente"}, status_code=200)
 
     except HTTPException:
         raise
     except Exception as e:
         await db.rollback()
-        logger.error(f"Error en el servidor al cambiar rol: {e}")
+        logger.error(f"Error al cambiar rol del usuario: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/password-resets")
@@ -606,37 +478,22 @@ async def cambiar_contrasena(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        user_id = verify_gateway_token(request)
-
-        email = data.email
-        new_password = data.new_password
-
-        stmr = ( 
-                update(Usuario).where(
-                Usuario.numero_documento == user_id, 
-                Usuario.correo == email
-            ).values(
-                hash_contrasena=hash_password(new_password)
-            ).returning(Usuario.numero_documento)
-        )
-
-        new_user_id = await db.scalar(stmr)
-        
-        if user_id != new_user_id:
-            raise HTTPException(status_code=403, detail="No cuenta con permisos")
+        token_data = verify_gateway_token(request)
+        verify_permission(token_data, GESTION_USER)
 
         datos_nuevos = {
-            "numero_documento": new_user_id,
+            "numero_documento": token_data["documento"],
             "accion": "cambio_contrasena"
         }
 
         audit_result = await insert_auditoria(
             db=db,
-            usuario_id=user_id,
-            tabla_afectada="usuario",
-            tipo_operacion="UPDATE",
-            descripcion=f"Cambio de contraseña del usuario {user_id}",
-            id_registro=str(user_id),
+            usuario_id=token_data["user_id"],
+            tipo_evento="CAMBIO_CONTRASENA",
+            resultado="EXITOSO",
+            detalle=f"Cambio de contraseña del usuario {token_data['user_id']}",
+            documento_usuario=token_data.get("documento"),
+            nombre_usuario=token_data.get("nombre"),
             datos_nuevos=datos_nuevos
         )
 
@@ -665,7 +522,7 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        user_id = verify_gateway_token(request)
+        token_data = verify_gateway_token(request)
 
         # Capitalizar nombres
         def capitalize_name(name: str) -> str:
@@ -688,14 +545,14 @@ async def update_user(
 
         # Obtener usuario actual
         usuario = await db.scalar(
-            select(Usuario).where(Usuario.numero_documento == user_id)
+            select(Usuario).where(Usuario.id == token_data["user_id"])
         )
         if not usuario:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
         # Guardar datos anteriores para auditoría
         datos_anteriores = {
-            "numero_documento": user_id,
+            "numero_documento": token_data["documento"],
             "primer_nombre": usuario.primer_nombre,
             "segundo_nombre": usuario.segundo_nombre,
             "primer_apellido": usuario.primer_apellido,
@@ -707,7 +564,7 @@ async def update_user(
         existe_correo = await db.scalar(
             select(Usuario).where(
                 Usuario.correo == nuevo_correo,
-                Usuario.numero_documento != user_id
+                Usuario.id != token_data["user_id"]
             )
         )
         if existe_correo:
@@ -719,7 +576,7 @@ async def update_user(
         # Actualizar usuario
         stmt = (
             update(Usuario)
-            .where(Usuario.numero_documento == user_id)
+            .where(Usuario.id == token_data["user_id"])
             .values(
                 primer_nombre=first_name,
                 segundo_nombre=middle_name if middle_name else None,
@@ -732,7 +589,7 @@ async def update_user(
 
         # Datos nuevos para auditoría
         datos_nuevos = {
-            "numero_documento": user_id,
+            "numero_documento": token_data["documento"],
             "nombre_completo": full_name,
             "primer_nombre": first_name,
             "segundo_nombre": middle_name if middle_name else None,
@@ -744,11 +601,12 @@ async def update_user(
         # Guardar auditoría
         audit_result = await insert_auditoria(
             db=db,
-            usuario_id=user_id,
-            tabla_afectada="usuario",
-            tipo_operacion="UPDATE",
-            descripcion=f"Actualización de datos del usuario {full_name}",
-            id_registro=str(user_id),
+            usuario_id=token_data["user_id"],
+            tipo_evento="ACTUALIZACION_PERFIL",
+            resultado="EXITOSO",
+            detalle=f"Actualización de datos del usuario {full_name}",
+            documento_usuario=token_data.get("documento"),
+            nombre_usuario=token_data.get("nombre"),
             datos_anteriores=datos_anteriores,
             datos_nuevos=datos_nuevos
         )
@@ -781,15 +639,13 @@ async def update_user(
         logger.error(f"Error en el servidor al actualizar usuario: {e}")
         raise HTTPException(status_code=500, detail="Error interno del servidor")
     
-# Endpoint de Auditoría
 @router.get("/log")
 async def obtener_auditoria(
     request: Request,
-    usuario_id: int = Query(None, description="ID del usuario (número de documento)"),
-    nombre_usuario: str = Query(None, description="Nombre del usuario (busca en nombres y apellidos)"),
-    tabla_afectada: str = Query(None, description="Tabla afectada"),
-    tipo_operacion: str = Query(None, description="Tipo de operación: INSERT, UPDATE, DELETE"),
-    id_registro: str = Query(None, description="ID del registro afectado"),
+    usuario_id: int = Query(None, description="ID del usuario"),
+    nombre_usuario: str = Query(None, description="Nombre del usuario"),
+    tipo_evento: str = Query(None, description="Tipo de evento: LOGIN, LOGOUT, CAMBIO_CONTRASENA, etc."),
+    resultado: str = Query(None, description="Resultado: EXITOSO, FALLIDO"),
     fecha_inicio: str = Query(None, description="Fecha de inicio (YYYY-MM-DD)"),
     fecha_fin: str = Query(None, description="Fecha de fin (YYYY-MM-DD)"),
     limit: int = Query(100, ge=1, le=1000, description="Número máximo de registros"),
@@ -802,33 +658,17 @@ async def obtener_auditoria(
     """
     try:
         # Verificar permisos
-        user_id = verify_gateway_token(request)
-
-        stmt = (
-            select(1)
-            .select_from(RolPermiso)
-            .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-            .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-            .where(
-                Usuario.numero_documento == user_id,
-                Permiso.nombre == USER_LOG
-            )
-            .limit(1)
-        )
-
-        tiene_permiso = await db.scalar(stmt)
-
-        if not tiene_permiso:
-            raise HTTPException(status_code=403, detail="No cuenta con permisos")
+        token_data = verify_gateway_token(request)
+        verify_permission(token_data, USER_LOG)
         
         # Consulta base con joins para obtener información del usuario
         query = select(
             Auditoria.id,
             Auditoria.usuario_id,
-            Auditoria.tabla_afectada,
-            Auditoria.tipo_operacion,
-            Auditoria.descripcion,
-            Auditoria.id_registro,
+            Auditoria.tipo_evento,
+            Auditoria.resultado,
+            Auditoria.ip_address,
+            Auditoria.detalle,
             Auditoria.fecha,
             Auditoria.datos_anteriores,
             Auditoria.datos_nuevos,
@@ -838,7 +678,7 @@ async def obtener_auditoria(
             Usuario.segundo_apellido,
             Usuario.correo.label("usuario_correo")
         ).join(
-            Usuario, Auditoria.usuario_id == Usuario.numero_documento, isouter=True
+            Usuario, Auditoria.usuario_id == Usuario.id, isouter=True
         )
 
         # Aplicar filtros
@@ -860,14 +700,11 @@ async def obtener_auditoria(
             )
             conditions.append(nombre_conditions)
         
-        if tabla_afectada:
-            conditions.append(Auditoria.tabla_afectada.ilike(f"%{tabla_afectada}%"))
-        
-        if tipo_operacion:
-            conditions.append(Auditoria.tipo_operacion == tipo_operacion.upper())
-        
-        if id_registro:
-            conditions.append(Auditoria.id_registro.ilike(f"%{id_registro}%"))
+        if tipo_evento:
+            conditions.append(Auditoria.tipo_evento == tipo_evento.upper())
+
+        if resultado:
+            conditions.append(Auditoria.resultado == resultado.upper())
         
         if fecha_inicio:
             try:
@@ -900,7 +737,7 @@ async def obtener_auditoria(
             # Para el count, necesitamos incluir el join si hay filtro de nombre
             if nombre_usuario:
                 count_query = count_query.join(
-                    Usuario, Auditoria.usuario_id == Usuario.numero_documento, isouter=True
+                    Usuario, Auditoria.usuario_id == Usuario.id, isouter=True
                 )
             count_query = count_query.where(and_(*conditions))
         
@@ -930,10 +767,10 @@ async def obtener_auditoria(
                 "usuario_id": log.usuario_id,
                 "usuario_nombre": nombre_completo or "Usuario Desconocido",
                 "usuario_correo": log.usuario_correo,
-                "tabla_afectada": log.tabla_afectada,
-                "tipo_operacion": log.tipo_operacion,
-                "descripcion": log.descripcion,
-                "id_registro": log.id_registro,
+                "tipo_evento": log.tipo_evento,
+                "resultado": log.resultado,
+                "ip_address": log.ip_address,
+                "detalle": log.detalle,
                 "fecha": log.fecha.isoformat() if log.fecha else None,
                 "datos_anteriores": log.datos_anteriores,
                 "datos_nuevos": log.datos_nuevos
@@ -963,6 +800,7 @@ async def obtener_auditoria(
             detail="Error al obtener registros de auditoría"
         )
 
+# Servicios internos
 @router.post("/batch")
 async def obtener_usuarios_batch(
     request: Request,
@@ -976,7 +814,7 @@ async def obtener_usuarios_batch(
     """
     try:
         # Verificar que sea una llamada de servicio a servicio
-        service_name = verify_service_jwt(request)
+        service_name = verify_service_token(request)
         
         if not data.user_ids:
             return JSONResponse(
@@ -991,13 +829,14 @@ async def obtener_usuarios_batch(
             )
         
         stmt = select(
+            Usuario.id,
             Usuario.numero_documento,
             Usuario.primer_nombre,
             Usuario.segundo_nombre,
             Usuario.primer_apellido,
             Usuario.segundo_apellido,
             Usuario.correo
-        ).where(Usuario.numero_documento.in_(data.user_ids))
+        ).where(Usuario.id.in_(data.user_ids))
         
         result = await db.execute(stmt)
         users = result.fetchall()
@@ -1014,7 +853,8 @@ async def obtener_usuarios_batch(
             nombre_completo = " ".join(nombre_parts)
             
             users_data.append({
-                "id": user.numero_documento,
+                "id": user.id,
+                "numero_documento": user.numero_documento,
                 "nombre": nombre_completo,
                 "correo": user.correo
             })
@@ -1046,7 +886,7 @@ async def obtener_usuarios_por_permiso(
     """
 
     try:
-        service_name = verify_service_jwt(request)
+        service_name = verify_service_token(request)
         
         # 1. Buscar permiso
         permiso_id = (
@@ -1061,6 +901,7 @@ async def obtener_usuarios_por_permiso(
         # 2. Traer todos los usuarios con ese permiso (UNA sola consulta)
         result = await db.execute(
             select(
+                Usuario.id,
                 Usuario.numero_documento,
                 Usuario.primer_nombre,
                 Usuario.segundo_nombre,
@@ -1088,7 +929,8 @@ async def obtener_usuarios_por_permiso(
             )
 
             users_data.append({
-                "id": r.numero_documento,
+                "id": r.id,
+                "numero_documento": r.numero_documento,
                 "nombre": nombre_completo,
                 "correo": r.correo
             })

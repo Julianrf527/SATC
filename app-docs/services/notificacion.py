@@ -1,4 +1,3 @@
-from fastapi import APIRouter
 import os
 import httpx
 from dotenv import load_dotenv
@@ -7,7 +6,6 @@ import traceback
 
 load_dotenv()
 
-router = APIRouter(prefix="/api/docs", tags=["documentos"])
 logger = logging.getLogger(__name__)
 
 # URL del Gateway para comunicación entre servicios
@@ -15,10 +13,6 @@ GATEWAY_URL = os.getenv("API_GATEWAY_URL", "http://api-gateway:8000")
 
 # Log de configuración
 logger.info(f"Servicio de notificaciones configurado con GATEWAY_URL: {GATEWAY_URL}")
-
-# Nombres de permisos
-PERMISO_CREADOR = os.getenv("PERMISO_CREADOR_DOC", "documento.crear")
-PERMISO_REVISOR = os.getenv("PERMISO_REVISION_DOC", "documento.revisar")
 
 async def crear_notificacion_usuario(
     mensaje: str,

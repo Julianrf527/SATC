@@ -16,8 +16,73 @@ import FileViewLayout from "./components/app-sancionatoria/Layout/FileViewLayout
 import ManagerFilesLayout from "./components/app-sancionatoria/Layout/ManagerFilesLayout";
 import AlertsLayout from "./components/app-sancionatoria/Layout/AlertsLayout";
 import FileLogLayout from "./components/app-sancionatoria/Layout/FileLogLayout";
-import ManageInvolvedLayout from "./components/app-sancionatoria/Layout/ManageInvolvedLayout";
+import ManageInvolvedLayout from "./components/app-involved/Layout/ManageInvolvedLayout";
 import DocumentPage from "./components/app-documentos/layout/DocumentosPage";
+
+// Configuración simplificada de rutas (solo path y componente)
+type RouteConfig = {
+  path: string;
+  component: React.ComponentType<any>;
+  props?: Record<string, any>;
+};
+
+// Inferencia automática de permisos basada en el path
+const inferPermissionFromPath = (path: string): string => {
+  // Mapeo de paths a permisos siguiendo exactamente el patrón actualizado de seeds.py
+  const pathToPermissionMap: Record<string, string> = {
+    // === ADMINISTRACIÓN ===
+    "/user/role": "admin_roles",
+    "/user/add": "admin_crear_usuarios",
+    "/user/manage": "admin_gestionar_usuarios",
+
+    // === EXPEDIENTES ===
+    "/file/manage": "expediente_gestionar",
+    "/file/consult": "expediente_consultar",
+    "/file/alerts": "expediente_alertas",
+    "/file/assign_manage": "expediente_asignar",
+    
+    // === INVOLUCRADOS ===
+    "/involved/manage": "involucrado_gestionar",
+
+    // === DOCUMENTOS ===
+    "/document/manage": "documento_gestionar",
+
+    // === AUDITORÍA ===
+    "/audit/users": "auditoria_usuarios",
+    "/audit/files": "auditoria_expedientes",
+    "/audit/involved": "auditoria_involucrados",
+  };
+
+  const permission = pathToPermissionMap[path];
+
+  if (!permission) {
+    console.warn(`No se encontró permiso para el path: ${path}`);
+    return `unknown_permission_${path.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  }
+
+  return permission;
+};
+
+// Componente helper para rutas protegidas con inferencia automática
+const ProtectedRoute = ({
+  component: Component,
+  path,
+  props = {},
+  setToast
+}: {
+  component: React.ComponentType<any>;
+  path: string;
+  props?: Record<string, any>;
+  setToast: React.Dispatch<React.SetStateAction<{ id: number; message: string; type: "success" | "error" } | null>>;
+}) => {
+  const permission = inferPermissionFromPath(path);
+
+  return (
+    <RequirePermission required={permission}>
+      <Component setToast={setToast} {...props} />
+    </RequirePermission>
+  );
+};
 
 function App() {
   const [theme, setTheme] = useState<"emerald" | "dark">("emerald");
@@ -38,6 +103,30 @@ function App() {
     }
   }, [setTheme]);
 
+  // Configuración simplificada - permisos se infieren automáticamente del path
+  const protectedRoutes: RouteConfig[] = [
+    // === AUDITORÍA ===
+    { path: "/audit/users", component: UserLogLayout },
+    { path: "/audit/files", component: FileLogLayout },
+
+    // === ADMINISTRACIÓN ===
+    { path: "/user/add", component: SignUpLayout },
+    { path: "/user/manage", component: ManageUserLayout },
+    { path: "/user/role", component: RoleLayout },
+
+    // === EXPEDIENTES ===
+    { path: "/file/manage", component: FileManageLayout },
+    { path: "/file/consult", component: FileViewLayout },
+    { path: "/file/alerts", component: AlertsLayout },
+    { path: "/file/assign_manage", component: ManagerFilesLayout },
+    
+    // === INVOLUCRADOS ===
+    { path: "/involved/manage", component: ManageInvolvedLayout },
+
+    // === DOCUMENTOS ===
+    { path: "/document/manage", component: DocumentPage },
+  ];
+
   return (
     <div data-theme={theme}>
       {toast && (
@@ -50,115 +139,41 @@ function App() {
       )}
       <BrowserRouter>
         <Routes>
-          {/* públicas */}
+          {/* páginas públicas */}
           <Route path="/login" element={<LoginPage theme={theme} />} />
           <Route path="/recover" element={<RecoverPage theme={theme} />} />
 
-          {/* privadas */}
+          {/* páginas privadas */}
           <Route
-            path="/"
+            path=""
             element={<MainLayout setTheme={setTheme} setToast={setToast} />}
           >
+            {/* página de inicio (sin restricciones) */}
             <Route index element={<WelcomeLayout theme={theme} />} />
 
+            {/* perfil (sin restricciones) */}
             <Route
-              path="profile"
+              path="/profile"
               element={<ProfileLayout setToast={setToast} />}
             />
 
-            <Route
-              path="user/log"
-              element={
-                <RequirePermission required="admin_auditoria usuarios">
-                  <UserLogLayout setToast={setToast} />
-                </RequirePermission>
-              }
-            />
-
-            <Route
-              path="file/log"
-              element={
-                <RequirePermission required="admin_auditoria expedientes">
-                  <FileLogLayout setToast={setToast} />
-                </RequirePermission>
-              }
-            />
-
-            <Route
-              path="user/add"
-              element={
-                <RequirePermission required="admin_registrar usuario">
-                  <SignUpLayout setToast={setToast} />
-                </RequirePermission>
-              }
-            />
-
-            <Route
-              path="user/manage"
-              element={
-                <RequirePermission required="admin_gestionar usuarios">
-                  <ManageUserLayout setToast={setToast} />
-                </RequirePermission>
-              }
-            />
-
-            <Route
-              path="user/role"
-              element={
-                <RequirePermission required="admin_roles y permisos">
-                  <RoleLayout setToast={setToast} />
-                </RequirePermission>
-              }
-            />
-            <Route
-              path="file/manage"
-              element={
-                <RequirePermission required="expediente_gestionar">
-                  <FileManageLayout setToast={setToast} />
-                </RequirePermission>
-              }
-            />
-            <Route
-              path="file/consult"
-              element={
-                <RequirePermission required="expediente_consultar">
-                  <FileViewLayout setToast={setToast} />
-                </RequirePermission>
-              }
-            />
-            <Route
-              path="file/alerts"
-              element={
-                <RequirePermission required="expediente_alertas">
-                  <AlertsLayout setToast={setToast} />
-                </RequirePermission>
-              }
-            />
-            <Route
-              path="file/assign_manage"
-              element={
-                <RequirePermission required="expediente_asignar encargados">
-                  <ManagerFilesLayout setToast={setToast} />
-                </RequirePermission>
-              }
-            />
-            <Route
-              path="file/involved/manage"
-              element={
-                <RequirePermission required="expediente_gestionar involucrados">
-                  <ManageInvolvedLayout setToast={setToast} />
-                </RequirePermission>
-              }
-            />
-            <Route
-              path="document/manage"
-              element={
-                <RequirePermission required="documento_gestionar">
-                  <DocumentPage setToast={setToast} />
-                </RequirePermission>
-              }
-            />
+            {/* rutas protegidas con inferencia automática de permisos */}
+            {protectedRoutes.map((route) => (
+              <Route
+                key={route.path}
+                path={route.path}
+                element={
+                  <ProtectedRoute
+                    component={route.component}
+                    path={route.path}
+                    props={route.props}
+                    setToast={setToast}
+                  />
+                }
+              />
+            ))}
           </Route>
+
           {/* cualquier ruta desconocida fuera de "/" redirige a main */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

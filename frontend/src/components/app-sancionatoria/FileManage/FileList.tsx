@@ -543,7 +543,7 @@ export default function FileList({
         {isEditable && (
           <div className={`${isAdding ? "block" : "hidden"} h-full`}>
             <NewFile
-              userId={Number(user?.id)}
+              userId={Number(user?.user_id)}
               towns={townList}
               resource={resourceList}
               setToast={setToast}

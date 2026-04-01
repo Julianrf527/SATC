@@ -54,7 +54,7 @@ export default function InvolvedFile({
   const [existingInvolucrado, setExistingInvolucrado] = useState<any>(null);
   const [formData, setFormData] = useState<InvolucradoForm>(initialFormData);
   const [involvedList, setInvolvedList] = useState<Involved[]>(
-    file.involucrados || []
+    file.involucrados || [],
   );
 
   useEffect(() => {
@@ -79,19 +79,12 @@ export default function InvolvedFile({
       try {
         setIsLoading(true);
 
-        // Construir endpoint con DV si es NIT
-        let endpoint;
-        if (tipoDocumento === "NIT" && dv) {
-          endpoint = `${API_CONFIG.ENDPOINTS.INVOLVED_SEARCH(
-            numeroDocumento,
-            tipoDocumento
-          )}/${dv}`;
-        } else {
-          endpoint = API_CONFIG.ENDPOINTS.INVOLVED_SEARCH(
-            numeroDocumento,
-            tipoDocumento
-          );
-        }
+        // Usar endpoint centralizado de app-involved con parámetros correctos
+        const endpoint = API_CONFIG.ENDPOINTS.INVOLVED_SEARCH(
+          tipoDocumento,
+          numeroDocumento,
+          dv,
+        );
 
         const data = await apiCall(endpoint);
 
@@ -111,7 +104,18 @@ export default function InvolvedFile({
         }
       } catch (error: any) {
         if (error.message.includes("404")) {
+          // Involucrado no encontrado - habilitar creación
           setExistingInvolucrado(null);
+        } else if (
+          error.message.includes("503") ||
+          error.message.includes("Service Unavailable")
+        ) {
+          setToast({
+            id: Date.now(),
+            message:
+              "Servicio de involucrados no disponible. Intente más tarde.",
+            type: "error",
+          });
         } else {
           /* console.error("Error buscando involucrado:", error); */
         }
@@ -119,7 +123,7 @@ export default function InvolvedFile({
         setIsLoading(false);
       }
     },
-    []
+    [setToast],
   );
 
   const createInvolucrado = async () => {
@@ -143,7 +147,7 @@ export default function InvolvedFile({
   const linkInvolucradoToExpediente = async (
     numeroDocumento: string,
     tipoDocumento: string,
-    dv?: string
+    dv?: string,
   ) => {
     const payload = {
       expediente_radicado: file.radicado,
@@ -200,7 +204,7 @@ export default function InvolvedFile({
       const yaExisteEnLista = involvedList.some(
         (inv) =>
           inv.numero_documento == involucradoData.numero_documento &&
-          inv.tipo_documento === involucradoData.tipo_documento
+          inv.tipo_documento === involucradoData.tipo_documento,
       );
 
       if (yaExisteEnLista) {
@@ -217,13 +221,13 @@ export default function InvolvedFile({
       const linkResponse = await linkInvolucradoToExpediente(
         formData.numero_documento.trim(),
         formData.tipo_documento,
-        formData.digito_verificacion
+        formData.digito_verificacion,
       );
 
       // Verificar que la vinculación fue exitosa
       if (!linkResponse || !linkResponse.ok) {
         throw new Error(
-          linkResponse?.detail || "Error al vincular el involucrado"
+          linkResponse?.detail || "Error al vincular el involucrado",
         );
       }
 
@@ -304,18 +308,14 @@ export default function InvolvedFile({
 
       // Primero eliminar en el servidor
       const deleteResponse = await apiCall(
-        API_CONFIG.ENDPOINTS.INVOLVED_EXPEDIENTE_UNLINK(
-          file.radicado,
-          involucrado.numero_documento,
-          involucrado.tipo_documento
-        ),
-        { method: "DELETE" }
+        API_CONFIG.ENDPOINTS.INVOLVED_EXPEDIENTE_UNLINK(involucrado.id),
+        { method: "DELETE" },
       );
 
       // Verificar que la eliminación fue exitosa
       if (!deleteResponse || !deleteResponse.ok) {
         throw new Error(
-          deleteResponse?.detail || "Error al desvincular el involucrado"
+          deleteResponse?.detail || "Error al desvincular el involucrado",
         );
       }
 
@@ -399,7 +399,7 @@ export default function InvolvedFile({
           searchInvolucrado(
             formData.numero_documento,
             formData.tipo_documento,
-            formData.digito_verificacion
+            formData.digito_verificacion,
           );
         }
       } else {
@@ -419,7 +419,7 @@ export default function InvolvedFile({
       searchInvolucrado(
         formData.numero_documento,
         formData.tipo_documento,
-        formData.digito_verificacion
+        formData.digito_verificacion,
       );
     }
   };
@@ -533,7 +533,7 @@ export default function InvolvedFile({
                           </h4>
                           <span
                             className={`badge badge-sm ${getDocumentTypeColor(
-                              involucrado.tipo_documento
+                              involucrado.tipo_documento,
                             )}`}
                           >
                             {involucrado.tipo_documento}

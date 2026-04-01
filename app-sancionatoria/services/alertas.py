@@ -15,11 +15,10 @@ import os
 # -------- MODELS ------------
 from db.models.tipo_etapa import TipoEtapa
 from db.models.etapa import Etapa
-from db.models.acto_admin import ActoAdmin
-from db.models.documento import Documento
+from db.models.acto_admin import ActoAdministrativo
 from db.models.notificacion import Notificacion
-from db.models.involucrado_notificacion import InvolucradoNotificacion
-from db.models.formulacion_cargos import FormulacionCargos
+# from db.models.involucrado_notificacion import InvolucradoNotificacion  # Módulo no existe
+# from db.models.formulacion_cargos import FormulacionCargos  # Módulo no existe
 
 
 load_dotenv()

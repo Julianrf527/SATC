@@ -33,6 +33,6 @@ SessionLocal = sessionmaker(
 
 
 async def init_db():
-    from models import base  
+    from . import models
     async with engine.begin() as conn:
-        await conn.run_sync(base.metadata.create_all)
+        await conn.run_sync(models.Base.metadata.create_all)

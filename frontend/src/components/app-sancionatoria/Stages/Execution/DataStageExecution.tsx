@@ -1,20 +1,28 @@
 import { useState, useEffect, useRef } from "react";
-import { apiCall, API_CONFIG, BASE_URL } from "../../../../utils/api";
+import {
+  uploadFileToDocuments,
+  generateDocumentFileName,
+} from "../../../../utils/fileUpload";
+import {
+  openDocumentById,
+  isValidDocumentId,
+} from "../../../../utils/documentViewer";
+import { apiCall, API_CONFIG } from "../../../../utils/api";
 import ExecutionView from "./ExecutionView";
 import ExecutionForm from "./ExecutionForm";
 
 type Execution = {
   id?: number;
   cobro_coactivo: boolean;
-  cobro_coactivo_doc_url: string | null;
+  documento_cobro_coactivo_id: number | null;
   disposicion: boolean;
   ruia: boolean;
-  ruia_doc_url: string | null;
+  documento_ruia_id: number | null;
   memorando: boolean;
-  memorando_doc_url: string | null;
+  documento_memorando_id: number | null;
   auto_admin: string;
   fecha_auto: string | null;
-  auto_doc_url: string | null;
+  documento_auto_id: number | null;
   etapa_id: number;
 };
 
@@ -111,9 +119,10 @@ export default function DataStageExecution({
     }
   };
 
-  const handleViewDocument = (url: string) => {
-    const fullUrl = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(url)}`;
-    window.open(fullUrl, "_blank");
+  const handleViewDocument = (documentId: number) => {
+    if (isValidDocumentId(documentId)) {
+      openDocumentById(documentId);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -122,7 +131,6 @@ export default function DataStageExecution({
 
     try {
       const form = e.target as HTMLFormElement;
-      const formData = new FormData();
 
       // Validar número del auto
       if (autoNumero.length !== 4) {
@@ -157,7 +165,7 @@ export default function DataStageExecution({
       if (
         cobroCoactivoChecked &&
         !cobroCoactivoFile &&
-        !data?.cobro_coactivo_doc_url
+        !data?.documento_cobro_coactivo_id
       ) {
         setToast({
           id: Date.now(),
@@ -168,7 +176,7 @@ export default function DataStageExecution({
         return;
       }
 
-      if (ruiaChecked && !ruiaFile && !data?.ruia_doc_url) {
+      if (ruiaChecked && !ruiaFile && !data?.documento_ruia_id) {
         setToast({
           id: Date.now(),
           message: "Debe adjuntar el documento RUIA",
@@ -178,7 +186,7 @@ export default function DataStageExecution({
         return;
       }
 
-      if (memorandoChecked && !memorandoFile && !data?.memorando_doc_url) {
+      if (memorandoChecked && !memorandoFile && !data?.documento_memorando_id) {
         setToast({
           id: Date.now(),
           message: "Debe adjuntar el documento de Memorando",
@@ -199,7 +207,7 @@ export default function DataStageExecution({
         return;
       }
 
-      if (!autoFile && !data?.auto_doc_url) {
+      if (!autoFile && !data?.documento_auto_id) {
         setToast({
           id: Date.now(),
           message: "Debe adjuntar el documento del Acto Administrativo",
@@ -209,28 +217,120 @@ export default function DataStageExecution({
         return;
       }
 
-      // Agregar datos al FormData - Enviando booleanos correctamente
-      formData.append("etapa_id", etapaId.toString());
-      formData.append("cobro_coactivo", cobroCoactivoChecked.toString());
-      formData.append("disposicion", disposicionChecked.toString());
-      formData.append("ruia", ruiaChecked.toString());
-      formData.append("memorando", memorandoChecked.toString());
-      formData.append("auto_admin", autoAdminCompleto);
-      formData.append("fecha_auto", fechaAuto);
+      // Paso 1: Subir todos los archivos a app-docs en paralelo
+      const uploadPromises: Promise<{ type: string; fileId: number }>[] = [];
 
-      // Agregar archivos si existen
-      if (cobroCoactivoFile)
-        formData.append("cobro_coactivo_doc", cobroCoactivoFile);
-      if (ruiaFile) formData.append("ruia_doc", ruiaFile);
-      if (memorandoFile) formData.append("memorando_doc", memorandoFile);
-      if (autoFile) formData.append("auto_doc", autoFile);
+      if (cobroCoactivoFile) {
+        const fileName = generateDocumentFileName(
+          "COBRO_COACTIVO",
+          autoAdminCompleto,
+          fechaAuto,
+        );
+        uploadPromises.push(
+          uploadFileToDocuments(cobroCoactivoFile, fileName).then((fileId) => ({
+            type: "cobro_coactivo",
+            fileId,
+          })),
+        );
+      }
+
+      if (ruiaFile) {
+        const fileName = generateDocumentFileName(
+          "RUIA",
+          autoAdminCompleto,
+          fechaAuto,
+        );
+        uploadPromises.push(
+          uploadFileToDocuments(ruiaFile, fileName).then((fileId) => ({
+            type: "ruia",
+            fileId,
+          })),
+        );
+      }
+
+      if (memorandoFile) {
+        const fileName = generateDocumentFileName(
+          "MEMORANDO",
+          autoAdminCompleto,
+          fechaAuto,
+        );
+        uploadPromises.push(
+          uploadFileToDocuments(memorandoFile, fileName).then((fileId) => ({
+            type: "memorando",
+            fileId,
+          })),
+        );
+      }
+
+      if (autoFile) {
+        const fileName = generateDocumentFileName(
+          "AUTO",
+          autoAdminCompleto,
+          fechaAuto,
+        );
+        uploadPromises.push(
+          uploadFileToDocuments(autoFile, fileName).then((fileId) => ({
+            type: "auto",
+            fileId,
+          })),
+        );
+      }
+
+      // Ejecutar uploads en paralelo
+      const uploadResults = await Promise.all(uploadPromises);
+
+      // Paso 2: Preparar datos para enviar al backend
+      const requestBody: any = {
+        etapa_id: etapaId.toString(),
+        cobro_coactivo: cobroCoactivoChecked.toString(),
+        disposicion: disposicionChecked.toString(),
+        ruia: ruiaChecked.toString(),
+        memorando: memorandoChecked.toString(),
+        auto_admin: autoAdminCompleto,
+        fecha_auto: fechaAuto,
+      };
+
+      // Agregar IDs de documentos subidos
+      uploadResults.forEach(({ type, fileId }) => {
+        switch (type) {
+          case "cobro_coactivo":
+            requestBody.documento_cobro_coactivo_id = fileId.toString();
+            break;
+          case "ruia":
+            requestBody.documento_ruia_id = fileId.toString();
+            break;
+          case "memorando":
+            requestBody.documento_memorando_id = fileId.toString();
+            break;
+          case "auto":
+            requestBody.documento_auto_id = fileId.toString();
+            break;
+        }
+      });
+
+      // Mantener IDs existentes para documentos no reemplazados
+      if (!cobroCoactivoFile && data?.documento_cobro_coactivo_id) {
+        requestBody.documento_cobro_coactivo_id =
+          data.documento_cobro_coactivo_id.toString();
+      }
+      if (!ruiaFile && data?.documento_ruia_id) {
+        requestBody.documento_ruia_id = data.documento_ruia_id.toString();
+      }
+      if (!memorandoFile && data?.documento_memorando_id) {
+        requestBody.documento_memorando_id =
+          data.documento_memorando_id.toString();
+      }
+      if (!autoFile && data?.documento_auto_id) {
+        requestBody.documento_auto_id = data.documento_auto_id.toString();
+      }
 
       const endpoint = data?.id
         ? API_CONFIG.ENDPOINTS.FILE_EXECUTION_UPDATE(data.id)
         : API_CONFIG.ENDPOINTS.FILE_EXECUTION_CREATE;
       const res = await apiCall(endpoint, {
         method: data?.id ? "PUT" : "POST",
-        body: formData,
+        body: JSON.stringify(requestBody),
+        headers: { "Content-Type": "application/json" },
       });
 
       if (res.ok) {
@@ -261,9 +361,14 @@ export default function DataStageExecution({
       }
     } catch (error) {
       /* console.error("Error al guardar:", error); */
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Error al procesar la solicitud";
+
       setToast({
         id: Date.now(),
-        message: "Error al procesar la solicitud",
+        message: errorMessage,
         type: "error",
       });
     } finally {

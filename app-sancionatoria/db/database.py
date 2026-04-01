@@ -30,6 +30,6 @@ SessionLocal = sessionmaker(
 
 # Si necesitas crear tablas automáticamente
 async def init_db():
-    from models import base  # Asegúrate de que models.Base exista
+    from . import models
     async with engine.begin() as conn:
-        await conn.run_sync(base.metadata.create_all)
+        await conn.run_sync(models.Base.metadata.create_all)

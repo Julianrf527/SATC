@@ -11,7 +11,6 @@ type Notification = {
 
 type Props = {
   notification: Notification[];
-  userId: number;
 };
 
 // Mapeo de tipos a títulos
@@ -22,8 +21,7 @@ const NOTIFICATION_CONFIG: Record<string, { title: string }> = {
 };
 
 export default function Notifications({
-  notification: initialNotification,
-  userId,
+  notification: initialNotification
 }: Props) {
   const [notification, setNotification] = useState(initialNotification);
   const [isDeletingAll, setIsDeletingAll] = useState(false);
@@ -40,7 +38,7 @@ export default function Notifications({
     setIsDeletingAll(true);
     try {
       const res = await apiCall(
-        API_CONFIG.ENDPOINTS.NOTIFICATION_DELETE_ALL(userId),
+        API_CONFIG.ENDPOINTS.NOTIFICATION_DELETE_ALL,
         {
           method: "DELETE",
         }

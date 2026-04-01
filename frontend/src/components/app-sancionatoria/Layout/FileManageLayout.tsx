@@ -121,7 +121,7 @@ export default function FileManageLayout({ setToast }: Props) {
       try {
         if (user) {
           const res = await apiCall(
-            API_CONFIG.ENDPOINTS.FILES_BY_USER(user.id)
+            API_CONFIG.ENDPOINTS.FILES_BY_USER(user.user_id)
           );
           if (res.ok) {
             setFileList(res.data);

@@ -4,27 +4,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, and_, func
 from sqlalchemy.dialects.postgresql import insert
 from pydantic import BaseModel, EmailStr, validator
-from passlib.hash import bcrypt
-from utils.passwords import hash_password, verify_password, verify_password_async
-from utils.redis_session import (
-    save_session_redis, 
-    get_session_redis, 
-    delete_session_redis,
-    redis_health_check
-)
-from utils.rate_limiter import RateLimiter, LoginThrottler
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from typing import Optional
 from dotenv import load_dotenv
-from jose import jwt, jwe
+from jose import jwe
 import traceback
+import time
 import random
 import string
 import logging
 import os
 import uuid
 import json
+import asyncio
 
 #----- DB -----
 from db.deps import get_db
@@ -38,11 +31,12 @@ from db.models.sesion_activa import SesionActiva
 router = APIRouter()
 
 load_dotenv()
+
 SECRET_KEY = os.getenv("SECRET_KEY")
-SECRET_KEY_GATEWAY = os.getenv("SECRET_KEY_GATEWAY")  # Para que el gateway pueda leer el JWT
+SECRET_KEY_GATEWAY = os.getenv("SECRET_KEY_GATEWAY")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM")
 JWT_EXP_DAYS = os.getenv("JWT_EXP_DAYS")
-BCRYPT_ROUNDS = int(os.getenv("BCRYPT_ROUNDS", "10"))
+BCRYPT_ROUNDS = int(os.getenv("BCRYPT_ROUNDS"))
 
 # Validar que las claves secretas estén cargadas
 if not SECRET_KEY_GATEWAY:
@@ -56,9 +50,13 @@ logger = logging.getLogger(__name__)
 
 #----------- FUNCIONES ------------
 
-from utils.verify_gateway_token import verify_gateway_token
+
 from utils.insertLog import insert_auditoria
 from utils.emailUtil import sendEmail
+from utils.passwords import hash_password, verify_password, verify_password_async
+from utils.redis_session import save_session_redis
+from utils.rate_limiter import RateLimiter, LoginThrottler
+from utils.verify_token import verify_gateway_token, verify_service_token
 
 #----------- LOGGER ------------
 
@@ -112,159 +110,152 @@ async def iniciar_sesion(
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        email = data.email.lower()  # Normalizar inmediatamente
+        email = data.email.lower()
         password = data.password
         remember = data.remember 
         ip_address = request.client.host if request.client else "unknown"
+        user_agent = request.headers.get("user-agent", "unknown")
         
-        # ═══════════════════════════════════════════════════════════
-        # SEGURIDAD 1: Verificar bloqueo por intentos fallidos
-        # ═══════════════════════════════════════════════════════════
+        # BLOQUEO POR INTENTOS FALLIDOS
         block_status = LoginThrottler.check_login_block(f"{email}:{ip_address}")
         if block_status["blocked"]:
             retry_after = block_status["retry_after"] - int(time.time())
-            logger.warning(f"🚫 Login bloqueado para {email[:3]}***@{email.split('@')[1]} desde {ip_address} - {block_status['attempts']} intentos")
+            logger.warning(f"Login bloqueado para {email[:3]}***@{email.split('@')[1]} desde {ip_address}")
             raise HTTPException(
                 status_code=429,
-                detail=f"Cuenta temporalmente bloqueada por múltiples intentos fallidos. Intente nuevamente en {retry_after // 60} minutos.",
+                detail=f"Cuenta temporalmente bloqueada. Intente en {retry_after // 60} minutos.",
                 headers={"Retry-After": str(retry_after)}
             )
         
-        # ═══════════════════════════════════════════════════════════
-        # SEGURIDAD 2: Rate Limiting (protección contra brute force)
-        # ═══════════════════════════════════════════════════════════
+        #RATE LIMITING
         rate_status = RateLimiter.check_rate_limit(ip_address, "login")
         if not rate_status["allowed"]:
-            logger.warning(f"⚠️ Rate limit excedido para IP {ip_address} en login")
+            logger.warning(f"Rate limit excedido para IP {ip_address}")
             raise HTTPException(
                 status_code=429,
-                detail=f"Demasiadas solicitudes. Intente nuevamente en {rate_status['retry_after']} segundos.",
+                detail=f"Demasiadas solicitudes. Intente en {rate_status['retry_after']} segundos.",
                 headers={"Retry-After": str(rate_status["retry_after"])}
             )
         
-        # OPTIMIZACIÓN 1: SELECT solo campos críticos
+        # BUSCAR USUARIO
         stmt = select(
-            Usuario.numero_documento,
+            Usuario.id,
             Usuario.rol_id,
             Usuario.primer_nombre,
             Usuario.segundo_nombre,
             Usuario.primer_apellido,
             Usuario.segundo_apellido,
             Usuario.hash_contrasena,
-            Usuario.activo
+            Usuario.activo,
+            Usuario.numero_documento
         ).where(Usuario.correo == email)
 
         result = await db.execute(stmt)
         user = result.first()
         
-        # Validaciones rápidas (fail-fast)
+        # VALIDACIONES FAIL-FAST
         if user is None:
-            # Registrar intento fallido
             LoginThrottler.record_failed_login(f"{email}:{ip_address}")
-            logger.info(f"❌ Login fallido: usuario no existe - {email[:3]}***@{email.split('@')[1]} desde {ip_address}")
-            raise HTTPException(status_code=401, detail="Usuario no registrado")
+            logger.info(f"Login fallido: usuario no existe - {email[:3]}***@{email.split('@')[1]}")
+            raise HTTPException(status_code=401, detail="Credenciales inválidas")
         
-        if not user[7]:  # activo
-            logger.info(f"❌ Login fallido: usuario inactivo - {email[:3]}***@{email.split('@')[1]}")
+        if not user.activo:
+            logger.info(f"Login fallido: usuario inactivo - {email[:3]}***@{email.split('@')[1]}")
             raise HTTPException(status_code=403, detail="Usuario inactivo")
 
-        # OPTIMIZACIÓN 2: bcrypt async (no bloquea event loop)
-        password_valid = await verify_password_async(password, user[6])
+        password_valid = await verify_password_async(password, user.hash_contrasena)
         if not password_valid:
-            # Registrar intento fallido y aplicar throttling
             throttle_status = LoginThrottler.record_failed_login(f"{email}:{ip_address}")
-            logger.warning(f"❌ Login fallido: contraseña incorrecta - {email[:3]}***@{email.split('@')[1]} desde {ip_address} - Intento #{throttle_status['attempts']}")
+            logger.warning(f"Login fallido: contraseña incorrecta - {email[:3]}***@{email.split('@')[1]} - Intento #{throttle_status['attempts']}")
             
             if throttle_status["blocked"]:
                 retry_minutes = throttle_status["block_duration"] // 60
                 raise HTTPException(
                     status_code=429,
-                    detail=f"Demasiados intentos fallidos. Cuenta bloqueada por {retry_minutes} minutos.",
+                    detail=f"Cuenta bloqueada por {retry_minutes} minutos.",
                     headers={"Retry-After": str(throttle_status["block_duration"])}
                 )
             
-            raise HTTPException(status_code=401, detail="Credenciales Invalidas")
+            raise HTTPException(status_code=401, detail="Credenciales inválidas")
         
-        user_id = user[0]
-        rol_id = user[1]
+        # TOKEN
         token_jti = str(uuid.uuid4())
-
-        # Obtener permisos del rol para incluirlos en el token
-        permisos = []
-        if rol_id:
-            stmt_permisos = select(Permiso.nombre, Permiso.menu_path).join(
-                RolPermiso, RolPermiso.permiso_id == Permiso.id
-            ).where(RolPermiso.rol_id == rol_id)
-            result_permisos = await db.execute(stmt_permisos)
-            permisos = [
-                {"name": nombre, "path": menu_path}
-                for nombre, menu_path in result_permisos.all()
-            ]
+        ttl_days = int(JWT_EXP_DAYS) if remember else 1
+        ttl_seconds = int(timedelta(days=ttl_days).total_seconds())
 
         token_data = {
-            "id": str(user_id),
-            "primer_nombre": user[2],
-            "segundo_nombre": user[3] or "",
-            "primer_apellido": user[4],
-            "segundo_apellido": user[5] or "",
-            "correo": email,
-            "rol_id": rol_id,
-            "permisos": permisos,
-            "jti": token_jti
+            "sub": int(user.id),
+            "rol_id": user.rol_id,
+            "jti": token_jti,           
+            "iat": int(time.time()),       
         }
 
-        # ═══════════════════════════════════════════════════════════
-        # PRODUCCIÓN: Encriptar payload con JWE (JSON Web Encryption)
-        # ═══════════════════════════════════════════════════════════
         token = jwe.encrypt(
             plaintext=json.dumps(token_data).encode('utf-8'),
             key=SECRET_KEY_GATEWAY,
-            algorithm='dir',  # Direct Encryption with symmetric key
-            encryption='A256GCM'  # AES-256-GCM (AEAD)
+            algorithm='dir',
+            encryption='A256GCM'
         ).decode('utf-8')
 
-        # OPTIMIZACIÓN 4: Guardar sesión en REDIS (96% más rápido que PostgreSQL)
-        # TTL automático: no necesita cleanup periódico
-        ip_address = request.client.host if request.client else "unknown"
-        user_agent = request.headers.get("user-agent", "unknown")
-        ttl_days = int(JWT_EXP_DAYS) if remember else 1
-        
+        #PERMISOS EN REDIS (separados del token)
+        permisos = []
+        if user.rol_id:
+            stmt_permisos = select(Permiso.nombre).join(
+                RolPermiso, RolPermiso.permiso_id == Permiso.id
+            ).where(RolPermiso.rol_id == user.rol_id)
+            result_permisos = await db.execute(stmt_permisos)
+            permisos = [row.nombre for row in result_permisos.all()]
+
+        # GUARDAR SESIÓN Y PERMISOS EN REDIS (pipeline)
         redis_saved = await save_session_redis(
             token_jti=token_jti,
-            user_id=user_id,
+            user_id=user.id,
             ip_address=ip_address,
             user_agent=user_agent,
+            permisos=permisos,
+            nombre=f"{user.primer_nombre} {user.segundo_nombre} {user.primer_apellido} {user.segundo_apellido}".strip(),
+            documento=str(user.numero_documento),
             ttl_days=ttl_days
         )
-        
-        # Fallback a PostgreSQL si Redis falla
+
+        #FALLBACK A POSTGRESQL SI REDIS FALLA
         if not redis_saved:
-            logger.warning(f"⚠️ Redis no disponible, guardando sesión en PostgreSQL")
             nueva_sesion = SesionActiva(
-                usuario_id=user_id,
+                usuario_id=user.id,
                 token_jti=token_jti,
                 ip_address=ip_address,
                 user_agent=user_agent,
                 activo=True
             )
             db.add(nueva_sesion)
-            await db.commit()
-        
-        # ═══════════════════════════════════════════════════════════
-        # SEGURIDAD 3: Resetear intentos fallidos después de login exitoso
-        # ═══════════════════════════════════════════════════════════
-        LoginThrottler.reset_failed_logins(f"{email}:{ip_address}")
-        logger.info(f"✅ Login exitoso: {email[:3]}***@{email.split('@')[1]} desde {ip_address}")
+            logger.warning("Sesión guardada en PostgreSQL — permisos se consultarán en cada request")
 
-        # OPTIMIZACIÓN 5: Respuesta simplificada
+        #AUDITORÍA
+        LoginThrottler.reset_failed_logins(f"{email}:{ip_address}")
+        logger.info(f"Login exitoso: {email[:3]}***@{email.split('@')[1]} desde {ip_address}")
+
+        await insert_auditoria(
+            db=db,
+            usuario_id=user.id,
+            tipo_evento="LOGIN",
+            resultado="EXITOSO",
+            detalle=f"Inicio de sesión desde {ip_address}",
+            ip_address=ip_address,
+            user_agent=user_agent,
+            documento_usuario=str(user.numero_documento),
+            nombre_usuario=f"{user.primer_nombre} {user.primer_apellido}".strip(),
+        )
+        await db.commit()
+
+        #RESPUESTA
         response = JSONResponse({"ok": True}, 200)
         response.set_cookie(
             key="access_token",
             value=token,
             httponly=True,
             samesite="Lax",
-            secure=False,  # Cambiado a False para desarrollo (HTTP)
-            max_age=int(timedelta(days=int(JWT_EXP_DAYS)).total_seconds()) if remember else None
+            secure=False,  # True en producción (HTTPS)
+            max_age=ttl_seconds if remember else None
         )
         return response
 
@@ -272,9 +263,9 @@ async def iniciar_sesion(
         raise
     except Exception as e:
         await db.rollback()
-        logger.error(f"Error en el servidor durante login: {str(e)}", exc_info=True)
+        logger.error(f"Error en login: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error en el servidor")
-
+    
 @router.post("/recovery")
 async def validar_correo(
     data: RecuperarRequest, 
@@ -282,20 +273,26 @@ async def validar_correo(
 ):  
     email = data.email
     try:
-        # Obtener el usuario y su nombre
+        # Obtener el usuario y su información completa
         stmt = select(
-            Usuario.numero_documento,
+            Usuario.id,
             Usuario.primer_nombre,
-            Usuario.primer_apellido
+            Usuario.primer_apellido,
+            Usuario.numero_documento
         ).where(Usuario.correo == email)
         result = await db.execute(stmt)
         user_data = result.first()
-        
+
         if user_data is None:
-            raise HTTPException(status_code=404, detail="Correo no registrado")
-        
+            await asyncio.sleep(0.3)
+            return JSONResponse(
+                content={"ok": True, "message": "Si el correo está registrado, recibirás un mensaje para continuar"},
+                status_code=200
+            )
+
         user_id = user_data[0]
         user_name = f"{user_data[1]} {user_data[2]}"
+        numero_documento = user_data[3]
 
         # Verificar si ya existe código activo
         stmt = select(CodigoRecuperacion.id).where(
@@ -378,10 +375,11 @@ async def validar_correo(
         audit_result = await insert_auditoria(
             db=db,
             usuario_id=user_id,
-            tabla_afectada="codigo_recuperacion",
-            tipo_operacion="INSERT",
-            descripcion=f"Solicitud de código de recuperación para {email}",
-            id_registro=str(code_id),
+            tipo_evento="RECUPERACION_CONTRASENA",
+            resultado="EXITOSO",
+            detalle=f"Solicitud de código de recuperación para {email} - {user_name}",
+            documento_usuario=str(numero_documento),
+            nombre_usuario=user_name,
             datos_nuevos=datos_nuevos
         )
         if not audit_result["ok"]:
@@ -414,18 +412,20 @@ async def validar_code_de_recuperacion(
 
         # Obtener datos del usuario
         stmt_user = select(
-            Usuario.numero_documento,
+            Usuario.id,
             Usuario.primer_nombre,
-            Usuario.primer_apellido
+            Usuario.primer_apellido,
+            Usuario.numero_documento
         ).where(Usuario.correo == email)
         result = await db.execute(stmt_user)
         user_data = result.first()
-        
+
         if not user_data:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
-        
+
         user_id = user_data[0]
         user_name = f"{user_data[1]} {user_data[2]}"
+        numero_documento = user_data[3]
 
         # Verificar código
         stmr = select(
@@ -436,6 +436,12 @@ async def validar_code_de_recuperacion(
         ))
         result = await db.execute(stmr)
         result = result.first()
+
+        #BLOQUEO POR INTENTOS FALLIDOS
+        if result.intentos_fallidos >= 5:
+            await db.execute(delete(CodigoRecuperacion).where(CodigoRecuperacion.usuario_id == user_id))
+            await db.commit()
+            raise HTTPException(status_code=429, detail="Demasiados intentos fallidos. Solicita un nuevo código.")
 
         if result and verify_password(code, result[0]):
             
@@ -512,10 +518,11 @@ async def validar_code_de_recuperacion(
             audit_result = await insert_auditoria(
                 db=db,
                 usuario_id=user_id,
-                tabla_afectada="usuario",
-                tipo_operacion="UPDATE",
-                descripcion=f"Recuperación de contraseña exitosa para {email}",
-                id_registro=str(user_id),
+                tipo_evento="RECUPERACION_CONTRASENA",
+                resultado="EXITOSO",
+                detalle=f"Recuperación de contraseña exitosa para {email} - {user_name}",
+                documento_usuario=str(numero_documento),
+                nombre_usuario=user_name,
                 datos_nuevos=datos_nuevos
             )
 
@@ -533,12 +540,29 @@ async def validar_code_de_recuperacion(
                 status_code=200
             )
         
+        # Incrementar intentos fallidos
+        await db.execute(
+            update(CodigoRecuperacion)
+            .where(CodigoRecuperacion.usuario_id == user_id)
+            .values(intentos_fallidos=CodigoRecuperacion.intentos_fallidos + 1)
+        )
+        await db.commit()
+        await insert_auditoria(
+            db=db,
+            usuario_id=user_id,
+            tipo_evento="RECUPERACION_CONTRASENA",
+            resultado="FALLIDO",
+            detalle=f"Código inválido o expirado para {email} - {user_name}",
+            documento_usuario=str(numero_documento),
+            nombre_usuario=user_name,
+        )
+        await db.commit()
         raise HTTPException(status_code=401, detail="Código inválido o expirado")
     except HTTPException:
         raise
     except Exception as e:
         await db.rollback()
-        logger.warning(f"Error en el servidor durante auth code: {e}") 
+        logger.warning(f"Error en el servidor durante auth code: {e}")
         raise HTTPException(status_code=500, detail="Error en el servidor")
 
 @router.get("/me")
@@ -547,71 +571,56 @@ async def validar_token(
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        # Verificar que venga del gateway (opcional para /me)
-        gw_token = request.headers.get("x-gateway-token")
-        if gw_token and gw_token != os.getenv("SECRET_GATEWAY"):
-            raise HTTPException(status_code=403, detail="Gateway token inválido")
-
-        token = request.cookies.get("access_token")
-        if not token:
-            raise HTTPException(status_code=401, detail="Token no encontrado")
-
-        # ═══════════════════════════════════════════════════════════
-        # PRODUCCIÓN: Desencriptar payload JWE
-        # ═══════════════════════════════════════════════════════════
-        try:
-            # Intentar desencriptar con JWE (tokens de producción)
-            decrypted_payload = jwe.decrypt(token, SECRET_KEY_GATEWAY)
-            payload = json.loads(decrypted_payload.decode('utf-8'))
-        except Exception as jwe_error:
-            # Fallback: Intentar decodificar JWT sin encriptar (tokens legacy)
-            try:
-                payload = jwt.decode(token, SECRET_KEY_GATEWAY, algorithms=JWT_ALGORITHM)
-                logger.warning(f"⚠️ Token sin encriptar detectado. Migrar a JWE.")
-            except Exception as jwt_error:
-                logger.error(f"❌ Error decodificando token: {jwe_error}, {jwt_error}")
-                raise HTTPException(401, "Token inválido o corrupto")
+        token_data = verify_gateway_token(request)
+        user_id = token_data["user_id"]  
         
-        # ═══════════════════════════════════════════════════════════
-        # CONSULTAR PERMISOS DEL ROL DEL USUARIO
-        # ═══════════════════════════════════════════════════════════
-        rol_id = payload.get("rol_id")
-        if rol_id:
-            # Obtener nombre del rol
-            stmt = select(Rol.nombre).where(Rol.id == rol_id)
-            result = await db.execute(stmt)
-            rol_nombre = result.scalar_one_or_none()
-            
-            # Obtener permisos del rol con sus rutas
-            stmt = select(
-                Permiso.nombre,
-                Permiso.menu_path
-            ).join(
-                RolPermiso, RolPermiso.permiso_id == Permiso.id
-            ).where(
-                RolPermiso.rol_id == rol_id
-            )
-            result = await db.execute(stmt)
-            permisos_rows = result.all()
-            
-            # Formatear permisos para el frontend
-            permisos = [
-                {"name": nombre, "path": menu_path}
-                for nombre, menu_path in permisos_rows
-            ]
-            
-            # Agregar datos al payload
-            payload["rol"] = rol_nombre
-            payload["permisos"] = permisos
-        else:
-            # Si no hay rol_id, devolver listas vacías
-            payload["rol"] = None
-            payload["permisos"] = []
-        
-        return JSONResponse({"ok": True, "usuario": payload}, status_code=200)
+        # DATOS DEL USUARIO DESDE BD
+        stmt = select(
+            Usuario.primer_nombre,
+            Usuario.segundo_nombre,
+            Usuario.primer_apellido,
+            Usuario.segundo_apellido,
+            Usuario.correo,
+            Usuario.numero_documento,
+            Rol.nombre.label("rol_nombre")
+        ).join(
+            Rol, Rol.id == Usuario.rol_id, isouter=True
+        ).where(Usuario.id == user_id)
+
+        result = await db.execute(stmt)
+        user = result.first()
+
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+        # CONSTRUIR RESPUESTA PARA EL FRONTEND
+        stmt = select(Permiso.nombre, Permiso.menu_path).join(
+            RolPermiso, RolPermiso.permiso_id == Permiso.id
+        ).where(RolPermiso.rol_id == token_data["rol_id"])
+
+        result = await db.execute(stmt)
+        permisos = [
+            {"name": row[0], "path": row[1]} for row in result.fetchall()
+        ]
+
+        return JSONResponse({
+            "ok": True,
+            "usuario": {
+                "user_id": user_id,
+                "primer_nombre": user[0],
+                "segundo_nombre": user[1] or "",
+                "primer_apellido": user[2],
+                "segundo_apellido": user[3] or "",
+                "correo": user[4],
+                "permisos": permisos,
+            }
+        }, status_code=200)
+
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error en el servidor durante auth token: {e}")
-        raise HTTPException(status_code=401, detail="Credenciales invalidas")
+        logger.error(f"Error en /me: {e}", exc_info=True)
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
 @router.post("/validate-session")
 async def validar_sesion_activa(
@@ -623,7 +632,6 @@ async def validar_sesion_activa(
     Solo debe ser llamado desde el gateway con el token de servicio.
     """
     try:
-        from utils.verify_gateway_token import verify_service_token
         verify_service_token(request)
         
         # Obtener el JTI del body
@@ -664,76 +672,79 @@ async def cerrar_sesion(
     request: Request,
     response: Response,
     db: AsyncSession = Depends(get_db)
-):  
+):
     try:
-        # Obtener información del usuario antes de cerrar sesión
         token = request.cookies.get("access_token")
-        
+
         if token:
             try:
-                # ═══════════════════════════════════════════════════════════
-                # PRODUCCIÓN: Desencriptar payload JWE
-                # ═══════════════════════════════════════════════════════════
-                try:
-                    # Intentar desencriptar con JWE (tokens de producción)
-                    decrypted_payload = jwe.decrypt(token, SECRET_KEY_GATEWAY)
-                    payload = json.loads(decrypted_payload.decode('utf-8'))
-                except Exception as jwe_error:
-                    # Fallback: Intentar decodificar JWT sin encriptar (tokens legacy)
-                    try:
-                        payload = jwt.decode(token, SECRET_KEY_GATEWAY, algorithms=JWT_ALGORITHM)
-                        logger.warning(f"⚠️ Token sin encriptar detectado en validate-session")
-                    except Exception as jwt_error:
-                        logger.error(f"❌ Error decodificando token: {jwe_error}")
-                        return JSONResponse({"ok": False, "valid": False, "message": "Token inválido"}, 401)
-                user_id = int(payload.get("id"))
+                # DESENCRIPTAR TOKEN
+                decrypted_payload = jwe.decrypt(token, SECRET_KEY_GATEWAY)
+                payload = json.loads(decrypted_payload.decode('utf-8'))
+
+                user_id_raw = payload.get("sub")
+                if not user_id_raw:
+                    raise ValueError("Token sin sub")
+
+                user_id = int(user_id_raw)
                 token_jti = payload.get("jti")
-                
-                # Invalidar la sesión activa en la base de datos
+
                 if token_jti:
-                    stmt = update(SesionActiva).where(
-                        SesionActiva.token_jti == token_jti
-                    ).values(activo=False)
-                    await db.execute(stmt)
-                
-                # Construir nombre completo
-                nombre_partes = [payload.get("primer_nombre")]
-                if payload.get("segundo_nombre"):
-                    nombre_partes.append(payload.get("segundo_nombre"))
-                nombre_partes.append(payload.get("primer_apellido"))
-                if payload.get("segundo_apellido"):
-                    nombre_partes.append(payload.get("segundo_apellido"))
-                nombre_completo = " ".join([p for p in nombre_partes if p])
+                    # INVALIDAR SESIÓN EN REDIS
+                    from utils.redis_session import delete_session_redis
+                    redis_deleted = await delete_session_redis(token_jti)
 
-                # Guardar auditoría de cierre de sesión
-                datos_anteriores = {
-                    "usuario_id": user_id,
-                    "nombre_completo": nombre_completo,
-                    "correo": payload.get("correo"),
-                    "rol": payload.get("rol"),
-                    "fecha_logout": datetime.now(ZoneInfo("America/Bogota")).isoformat()
-                }
+                    # FALLBACK A POSTGRESQL SI REDIS NO ELIMINÓ
+                    if not redis_deleted:
+                        stmt = update(SesionActiva).where(
+                            SesionActiva.token_jti == token_jti
+                        ).values(
+                            activo=False,
+                            fecha_logout=datetime.now(ZoneInfo("America/Bogota"))
+                        )
+                        await db.execute(stmt)
 
-                audit_result = await insert_auditoria(
+                # DATOS DEL USUARIO PARA AUDITORÍA
+                stmt = select(
+                    Usuario.primer_nombre,
+                    Usuario.segundo_nombre,
+                    Usuario.primer_apellido,
+                    Usuario.segundo_apellido,
+                    Usuario.correo,
+                    Usuario.numero_documento,
+                ).where(Usuario.id == user_id)
+                result = await db.execute(stmt)
+                user = result.first()
+
+                nombre_completo = ""
+                if user:
+                    nombre_completo = " ".join(filter(None, [
+                        user.primer_nombre,
+                        user.segundo_nombre,
+                        user.primer_apellido,
+                        user.segundo_apellido
+                    ]))
+
+                # AUDITORÍA
+                await insert_auditoria(
                     db=db,
                     usuario_id=user_id,
-                    tabla_afectada="usuario",
-                    tipo_operacion="UPDATE",
-                    descripcion=f"Cierre de sesión de usuario {nombre_completo}",
-                    id_registro=str(user_id),
-                    datos_anteriores=datos_anteriores
+                    tipo_evento="LOGOUT",
+                    resultado="EXITOSO",
+                    detalle=f"Cierre de sesión desde {request.client.host if request.client else 'unknown'}",
+                    ip_address=request.client.host if request.client else None,
+                    user_agent=request.headers.get("user-agent"),
+                    documento_usuario=str(user.numero_documento) if user else "",
+                    nombre_usuario=nombre_completo,
                 )
-
-                if not audit_result["ok"]:
-                    logger.warning(f"No se pudo guardar auditoría de logout para usuario {user_id}")
-
                 await db.commit()
+
             except Exception as e:
-                logger.warning(f"Error al guardar auditoría de logout: {e}")
+                logger.warning(f"Error procesando logout: {e}")
 
         response.delete_cookie(key="access_token", path="/")
         return {"ok": True}
-        
+
     except Exception as e:
         logger.error(f"Error durante logout: {e}")
         response.delete_cookie(key="access_token", path="/")
