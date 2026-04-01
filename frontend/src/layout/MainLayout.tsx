@@ -18,7 +18,6 @@ type Props = {
 
 export default function MainLayout({ setTheme, setToast }: Props) {
   const [loading, setLoading] = useState(true);
-  // undefined = cargando, null = no autenticado, User = autenticado
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const navigate = useNavigate();
 
@@ -38,7 +37,6 @@ export default function MainLayout({ setTheme, setToast }: Props) {
           setUser(null);
         }
       } catch (error) {
-        /* console.error("Error al hacer fetch:", error); */
         setUser(null);
       } finally {
         setLoading(false);
@@ -76,7 +74,6 @@ export default function MainLayout({ setTheme, setToast }: Props) {
 
         <div className="drawer-content flex flex-col min-h-screen">
           <HeaderWrapper
-            userId={user.id}
             setTheme={setTheme}
             permission={user.permisos}
           />
@@ -97,16 +94,14 @@ export default function MainLayout({ setTheme, setToast }: Props) {
 // Wrapper para evitar renderizado innecesario del Header
 const HeaderWrapper = React.memo(
   ({
-    userId,
     setTheme,
     permission,
   }: {
-    userId: number;
     setTheme: (theme: "emerald" | "dark") => void;
     permission: { name: string; path: string }[];
   }) => {
     return (
-      <Header userId={userId} setTheme={setTheme} permission={permission} />
+      <Header setTheme={setTheme} permission={permission} />
     );
   },
 );

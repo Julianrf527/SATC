@@ -108,7 +108,7 @@ export default function DocumentoDetalleModal({
 
   // Obtener usuario actual del contexto
   const { user } = useAuth();
-  const usuarioActualId = user?.id || 0;
+  const usuarioActualId = user?.user_id || 0;
 
   // Detectar tema
   useEffect(() => {

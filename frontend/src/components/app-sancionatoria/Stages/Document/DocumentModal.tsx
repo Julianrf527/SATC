@@ -1,17 +1,24 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import {
+  uploadFileToDocuments,
+  validateFile,
+} from "../../../../utils/fileUpload";
 
 type DocumentoData = {
   id: number;
   nombre: string;
-  url_documento: string;
-  fecha_subida: string;
+  documento_anexo_id: number;
+  fecha_creacion: string;
 };
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (formData: FormData) => Promise<{ ok: boolean; error?: string }>;
+  onSave: (data: {
+    nombre: string;
+    documento_anexo_id?: number;
+  }) => Promise<{ ok: boolean; error?: string }>;
   editDocumento: DocumentoData | null;
   tiposDocumento: string[];
 };
@@ -34,6 +41,7 @@ export default function DocumentModal({
     general: "",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isEditing = !!editDocumento;
@@ -98,10 +106,11 @@ export default function DocumentModal({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.type !== "application/pdf") {
+      const validation = validateFile(file);
+      if (!validation.isValid) {
         setErrors((prev) => ({
           ...prev,
-          file: "Solo se permiten archivos PDF",
+          file: validation.error || "Archivo inválido",
         }));
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
@@ -227,20 +236,39 @@ export default function DocumentModal({
     setIsSubmitting(true);
 
     try {
-      // Crear FormData
-      const formData = new FormData();
+      let documento_anexo_id: number | undefined;
 
-      // El nombre final del documento
-      const nombreFinal = isOtroSelected
-        ? nombrePersonalizado.trim()
-        : tipoDocumento;
-      formData.append("nombre", nombreFinal);
-
+      // Paso 1: Si hay archivo seleccionado, subirlo a app-docs primero
       if (selectedFile) {
-        formData.append("file", selectedFile);
+        setIsUploadingFile(true);
+
+        try {
+          const nombreFinal = isOtroSelected
+            ? nombrePersonalizado.trim()
+            : tipoDocumento;
+          const fileName = `${nombreFinal.replace(/\s+/g, "_")}.pdf`;
+          documento_anexo_id = await uploadFileToDocuments(
+            selectedFile,
+            fileName,
+          );
+        } catch (uploadError) {
+          throw new Error(
+            uploadError instanceof Error
+              ? uploadError.message
+              : "Error al subir el archivo a la aplicación de documentos",
+          );
+        } finally {
+          setIsUploadingFile(false);
+        }
       }
 
-      const result = await onSave(formData);
+      // Paso 2: Preparar datos del documento para enviar
+      const documentData = {
+        nombre: isOtroSelected ? nombrePersonalizado.trim() : tipoDocumento,
+        ...(documento_anexo_id && { documento_anexo_id }),
+      };
+
+      const result = await onSave(documentData);
 
       if (result.ok) {
         handleClose();
@@ -254,7 +282,10 @@ export default function DocumentModal({
     } catch (error) {
       setErrors((prev) => ({
         ...prev,
-        general: "Error inesperado al guardar el documento",
+        general:
+          error instanceof Error
+            ? error.message
+            : "Error inesperado al guardar el documento",
       }));
     } finally {
       setIsSubmitting(false);
@@ -272,6 +303,7 @@ export default function DocumentModal({
       general: "",
     });
     setIsSubmitting(false);
+    setIsUploadingFile(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -306,7 +338,7 @@ export default function DocumentModal({
               }`}
               value={tipoDocumento}
               onChange={handleTipoChange}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingFile}
             >
               <option value="">Seleccione un tipo</option>
               {tiposDocumento.map((tipo) => (
@@ -335,7 +367,7 @@ export default function DocumentModal({
                 placeholder="Ingrese un nombre diferente a los tipos existentes"
                 value={nombrePersonalizado}
                 onChange={handleNombrePersonalizadoChange}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isUploadingFile}
               />
               {errors.nombre && (
                 <p className="text-error text-xs mt-1">{errors.nombre}</p>
@@ -367,7 +399,7 @@ export default function DocumentModal({
                 errors.file ? "file-input-error" : ""
               }`}
               onChange={handleFileChange}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingFile}
             />
             {errors.file && (
               <p className="text-error text-xs mt-1">{errors.file}</p>
@@ -423,16 +455,21 @@ export default function DocumentModal({
               type="button"
               onClick={handleClose}
               className="btn btn-ghost"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingFile}
             >
               Cancelar
             </button>
             <button
               type="submit"
               className="btn btn-success text-white"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingFile}
             >
-              {isSubmitting ? (
+              {isUploadingFile ? (
+                <>
+                  <span className="loading loading-spinner loading-sm"></span>
+                  Subiendo archivo...
+                </>
+              ) : isSubmitting ? (
                 <>
                   <span className="loading loading-spinner loading-sm"></span>
                   Guardando...

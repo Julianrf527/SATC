@@ -1,10 +1,18 @@
 import { useState, useRef } from "react";
-import { apiCall, API_CONFIG, BASE_URL } from "../../../../utils/api";
+import {
+  uploadFileToDocuments,
+  generateDocumentFileName,
+} from "../../../../utils/fileUpload";
+import {
+  openDocumentById,
+  isValidDocumentId,
+} from "../../../../utils/documentViewer";
+import { apiCall, API_CONFIG } from "../../../../utils/api";
 
 type FormulationCharges = {
   id: number;
   descargos: boolean | null;
-  url_documento?: string | null;
+  documento_descargos_id?: number | null;
 };
 
 type Props = {
@@ -45,6 +53,15 @@ export default function DataStageFormulation({
   const getDescargosBadgeClass = (estado: boolean | null) => {
     if (estado === null) return "badge-ghost";
     return estado ? "badge-success" : "badge-error";
+  };
+
+  const handleViewDocument = () => {
+    if (
+      data?.documento_descargos_id &&
+      isValidDocumentId(data.documento_descargos_id)
+    ) {
+      openDocumentById(data.documento_descargos_id);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,7 +121,11 @@ export default function DataStageFormulation({
       else if (descargosValue === "null") descargosBoolean = null;
 
       // Validar que si descargos es "Sí", debe haber un archivo
-      if (descargosBoolean === true && !selectedFile && !data?.url_documento) {
+      if (
+        descargosBoolean === true &&
+        !selectedFile &&
+        !data?.documento_descargos_id
+      ) {
         setToast({
           id: Date.now(),
           message:
@@ -115,15 +136,39 @@ export default function DataStageFormulation({
         return;
       }
 
-      const formData = new FormData();
-      formData.append(
-        "descargos",
-        descargosBoolean !== null ? descargosBoolean.toString() : "null",
-      );
-      formData.append("etapa_id", etapaId.toString());
+      let documento_descargos_id: number | undefined;
 
+      // Paso 1: Subir archivo a app-docs si hay uno seleccionado
       if (selectedFile) {
-        formData.append("file", selectedFile);
+        const fileName = generateDocumentFileName(
+          "DESCARGOS",
+          `F-${etapaId}`,
+          new Date().toISOString().split("T")[0],
+        );
+        documento_descargos_id = await uploadFileToDocuments(
+          selectedFile,
+          fileName,
+        );
+      }
+
+      // Paso 2: Enviar datos de formulación con ID del documento
+      const requestBody: any = {
+        descargos:
+          descargosBoolean !== null ? descargosBoolean.toString() : "null",
+        etapa_id: etapaId.toString(),
+      };
+
+      // Solo incluir documento_descargos_id si se subió un archivo nuevo
+      if (documento_descargos_id !== undefined) {
+        requestBody.documento_descargos_id = documento_descargos_id.toString();
+      } else if (!data?.id && descargosBoolean === true) {
+        setToast({
+          id: Date.now(),
+          message: "Error: No se pudo procesar el archivo",
+          type: "error",
+        });
+        setIsLoading(false);
+        return;
       }
 
       let res;
@@ -132,13 +177,15 @@ export default function DataStageFormulation({
           API_CONFIG.ENDPOINTS.FILE_FORMULATION_UPDATE(data.id),
           {
             method: "PUT",
-            body: formData,
+            body: JSON.stringify(requestBody),
+            headers: { "Content-Type": "application/json" },
           },
         );
       } else {
         res = await apiCall(API_CONFIG.ENDPOINTS.FILE_FORMULATION_CREATE, {
           method: "POST",
-          body: formData,
+          body: JSON.stringify(requestBody),
+          headers: { "Content-Type": "application/json" },
         });
       }
 
@@ -168,9 +215,14 @@ export default function DataStageFormulation({
       }
     } catch (error) {
       /* console.error("Error al guardar:", error); */
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Error al procesar la solicitud";
+
       setToast({
         id: Date.now(),
-        message: "Error al procesar la solicitud",
+        message: errorMessage,
         type: "error",
       });
     } finally {
@@ -193,21 +245,9 @@ export default function DataStageFormulation({
     }
   };
 
-  const handleViewDocument = () => {
-    if (data?.url_documento) {
-      const fullUrl = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
-        data.url_documento,
-      )}`;
-      window.open(fullUrl, "_blank");
-    }
-  };
-
-  const isPdfUrl = (url: string) => {
-    return /\.pdf$/i.test(url);
-  };
-
   const showDocumentField = descargosValue === "true";
-  const documentRequired = descargosValue === "true" && !data?.url_documento;
+  const documentRequired =
+    descargosValue === "true" && !data?.documento_descargos_id;
 
   return (
     <div className="card bg-base-100 shadow-md border border-base-300">
@@ -268,7 +308,7 @@ export default function DataStageFormulation({
           <div className="space-y-4">
             <div
               className={`grid grid-cols-1 ${
-                data.descargos === true && data.url_documento
+                data.descargos === true && data.documento_descargos_id
                   ? "md:grid-cols-2"
                   : ""
               } gap-4`}
@@ -326,40 +366,18 @@ export default function DataStageFormulation({
                     <p className="text-xs font-medium text-base-content/60 uppercase tracking-wide mb-1">
                       Documento de Descargos
                     </p>
-                    {data.url_documento ? (
+                    {data.documento_descargos_id ? (
                       <button
                         onClick={handleViewDocument}
                         className="btn btn-ghost btn-sm gap-2 p-0 h-auto min-h-0 text-info hover:text-info-focus"
                       >
-                        {isPdfUrl(data.url_documento) ? (
-                          <svg
-                            className="w-5 h-5 text-error"
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" />
-                          </svg>
-                        ) : (
-                          <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                            />
-                          </svg>
-                        )}
+                        <svg
+                          className="w-5 h-5 text-error"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" />
+                        </svg>
                         Ver documento
                       </button>
                     ) : (
@@ -438,7 +456,7 @@ export default function DataStageFormulation({
                     {documentRequired ? (
                       <span className="text-error">*</span>
                     ) : (
-                      data?.url_documento && (
+                      data?.documento_descargos_id && (
                         <span className="text-xs text-base-content/50 ml-2">
                           (Opcional - Solo si desea reemplazar)
                         </span>
@@ -481,7 +499,7 @@ export default function DataStageFormulation({
                     </span>
                   </div>
                 )}
-                {data?.url_documento && !selectedFile && (
+                {data?.documento_descargos_id && !selectedFile && (
                   <p className="mt-2 text-xs text-base-content/60">
                     Archivo actual: Documento registrado
                   </p>

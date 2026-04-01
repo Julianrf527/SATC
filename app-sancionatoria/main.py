@@ -4,12 +4,27 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 import os
 # --- Endpoints ---
-from routes import town, file, involved, document
+from routes import town, file, involved, stage, acto
 # --- Scheduler de alertas ---
 from db.deps import get_db 
 from services.alertas_scheduler import configurar_scheduler_alertas, router as alertas_router
 
 app = FastAPI()
+
+# Startup event - inicializar BD y seedeo
+@app.on_event("startup")
+async def startup_event():
+    # Crear tablas desde models
+    from db.database import init_db
+    try:
+        await init_db()
+        print("Tablas de expedientes_db inicializadas correctamente")
+
+        # Ejecutar seedeo de datos iniciales si es necesario
+        from db.seeds import seed_initial_data
+        await seed_initial_data()
+    except Exception as e:
+        print(f"Error inicializando BD: {e}")
 
 # Middleware para forzar charset UTF-8 en todas las respuestas
 class CharsetMiddleware(BaseHTTPMiddleware):
@@ -35,9 +50,10 @@ configurar_scheduler_alertas(app, get_db)
 
 # Rutas
 app.include_router(town.router, prefix="/town", tags=["Town"])
+app.include_router(acto.router, prefix="/acto", tags=["Acto Administrativo"])
+app.include_router(stage.router, prefix="/stage", tags=["Stage"])
 app.include_router(file.router, prefix="/file", tags=["File"])
 app.include_router(involved.router, prefix="/involved", tags=["Involved"])
-app.include_router(document.router, prefix="/document", tags=["Documents"])
 app.include_router(alertas_router)
 
 # Health check endpoint (Caso 3: Alta Disponibilidad)

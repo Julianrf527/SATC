@@ -1,16 +1,16 @@
 import Input from "../../Input/Input";
 import { useEffect, useState, useRef } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
-import ConfirmDeleteRolePermissionModal from "./ConfirmDeleteRolePermissionModa";
+import ConfirmationModal from "./ConfirmationModal";
 
 type Permission = { id: number; name: string; menu_path: string };
 
 type Props = {
   setToast: (toast: {
-    id: number; 
-    message: string; 
+    id: number;
+    message: string;
     type: "success" | "error";
-    }) => void;
+  }) => void;
   onPermissionUpdated?: () => void;
 };
 
@@ -27,7 +27,7 @@ export default function EditPermission({
 
   const handlePermissionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const permissionTemp = permissions.find(
-      (p) => p.id === Number(e.target.value)
+      (p) => p.id === Number(e.target.value),
     );
     setSelectedPermissionId(e.target.value);
 
@@ -48,15 +48,27 @@ export default function EditPermission({
       !permissionNameRef.current ||
       permissionNameRef.current.value.trim() === ""
     ) {
-      setToast({id: Date.now(),message:"El nombre del permiso es obligatorio",type:"error"});
+      setToast({
+        id: Date.now(),
+        message: "El nombre del permiso es obligatorio",
+        type: "error",
+      });
       return;
     }
     if (!menuPathRef.current || menuPathRef.current.value.trim() === "") {
-      setToast({id: Date.now(),message:"El menu_path es obligatorio",type:"error"});
+      setToast({
+        id: Date.now(),
+        message: "El menu_path es obligatorio",
+        type: "error",
+      });
       return;
     }
     if (selectedPermissionId === "0" || selectedPermissionId === "") {
-      setToast({id: Date.now(),message:"Debe seleccionar un permiso",type:"error"});
+      setToast({
+        id: Date.now(),
+        message: "Debe seleccionar un permiso",
+        type: "error",
+      });
       return;
     }
 
@@ -69,11 +81,15 @@ export default function EditPermission({
             name: permissionNameRef.current.value,
             menu_path: menuPathRef.current.value,
           }),
-        }
+        },
       );
 
       if (res.ok) {
-        setToast({id: Date.now(),message:"Permiso actualizado correctamente",type:"success"});
+        setToast({
+          id: Date.now(),
+          message: "Permiso actualizado correctamente",
+          type: "success",
+        });
 
         const updatedName = permissionNameRef.current.value;
         const updatedPath = menuPathRef.current.value;
@@ -86,8 +102,8 @@ export default function EditPermission({
                   name: updatedName,
                   menu_path: updatedPath,
                 }
-              : p
-          )
+              : p,
+          ),
         );
 
         setSelectedPermissionId("0");
@@ -98,17 +114,29 @@ export default function EditPermission({
           onPermissionUpdated();
         }
       } else {
-        setToast({id: Date.now(),message:res.detail || "Error al actualizar el permiso",type:"error"});
+        setToast({
+          id: Date.now(),
+          message: res.detail || "Error al actualizar el permiso",
+          type: "error",
+        });
       }
     } catch (e) {
       /* console.error("Error al hacer fetch:", e); */
-      setToast({id: Date.now(),message:"Error al actualizar el permiso",type:"error"});
+      setToast({
+        id: Date.now(),
+        message: "Error al actualizar el permiso",
+        type: "error",
+      });
     }
   };
 
   const onDeletePermission = async () => {
     if (selectedPermissionId === "0" || selectedPermissionId === "") {
-      setToast({id: Date.now(),message:"Debe seleccionar un permiso",type:"error"});
+      setToast({
+        id: Date.now(),
+        message: "Debe seleccionar un permiso",
+        type: "error",
+      });
       return;
     }
 
@@ -123,13 +151,17 @@ export default function EditPermission({
         API_CONFIG.ENDPOINTS.PERMISSION_DELETE(selectedPermissionId),
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (res.ok) {
-        setToast({id: Date.now(),message:"Permiso eliminado correctamente", type:"success"});
+        setToast({
+          id: Date.now(),
+          message: "Permiso eliminado correctamente",
+          type: "success",
+        });
         setPermissions((prev) =>
-          prev.filter((p) => p.id !== Number(selectedPermissionId))
+          prev.filter((p) => p.id !== Number(selectedPermissionId)),
         );
 
         setSelectedPermissionId("0");
@@ -140,11 +172,19 @@ export default function EditPermission({
           onPermissionUpdated();
         }
       } else {
-        setToast({id: Date.now(),message: res.detail || "Error al eliminar el permiso",type:"error"});
+        setToast({
+          id: Date.now(),
+          message: res.detail || "Error al eliminar el permiso",
+          type: "error",
+        });
       }
     } catch (e) {
       /* console.error("Error al hacer fetch:", e); */
-      setToast({id: Date.now(), message:"Error al eliminar el permiso",type:"error"});
+      setToast({
+        id: Date.now(),
+        message: "Error al eliminar el permiso",
+        type: "error",
+      });
     } finally {
       setIsDeleting(false);
       setShowDeleteModal(false);
@@ -160,11 +200,19 @@ export default function EditPermission({
         if (res.ok) {
           setPermissions(res.data || []);
         } else {
-          setToast({id: Date.now(),message:"Error al cargar los permisos",type:"error"});
+          setToast({
+            id: Date.now(),
+            message: "Error al cargar los permisos",
+            type: "error",
+          });
         }
       } catch (e) {
         /* console.error("Error al hacer fetch:", e); */
-        setToast({id: Date.now(),message:"Error al cargar los permisos",type:"error"});
+        setToast({
+          id: Date.now(),
+          message: "Error al cargar los permisos",
+          type: "error",
+        });
       }
     }
     getPermissions();
@@ -172,15 +220,16 @@ export default function EditPermission({
 
   return (
     <div className="card bg-base-100 shadow-md border border-base-300 h-full flex flex-col">
-      <ConfirmDeleteRolePermissionModal
+      <ConfirmationModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleConfirmDelete}
-        type="permiso"
-        itemName={
+        typeOperation="eliminar"
+        typeChange="permiso"
+        itemIdentifier={
           permissions.find((p) => p.id === Number(selectedPermissionId))?.name
         }
-        isDeleting={isDeleting}
+        isSubmitting={isDeleting}
       />
 
       <div className="card-body flex flex-col h-full">

@@ -320,7 +320,6 @@ def copy_file_in_minio(source_object: str, dest_object: str) -> dict:
             "message": f"Error inesperado: {str(e)}"
         }
 
-
 # ============================================================================
 # FUNCIONES DE DEDUPLICACIÓN DE ARCHIVOS
 # ============================================================================
@@ -349,10 +348,9 @@ async def find_file_by_hash(db: Session, file_hash: str) -> Optional[dict]:
                 "id": file_record.id,
                 "file_hash": file_record.file_hash,
                 "file_url": file_record.file_url,
-                "original_filename": file_record.original_filename,
                 "content_type": file_record.content_type,
                 "file_size": file_record.file_size,
-                "reference_count": file_record.reference_count
+                "numero_usos": file_record.numero_usos
             }
         
         return None
@@ -361,43 +359,26 @@ async def find_file_by_hash(db: Session, file_hash: str) -> Optional[dict]:
         logger.error(f"Error buscando archivo por hash: {e}")
         return None
 
-
 async def create_file_hash_record(
     db: Session,
     file_hash: str,
     file_url: str,
-    original_filename: str,
     content_type: str,
     file_size: int
 ) -> bool:
     """
     Crea un nuevo registro de hash de archivo en la base de datos.
-    
-    Args:
-        db: Sesión de SQLAlchemy (AsyncSession)
-        file_hash: Hash SHA256 del archivo
-        file_url: URL del archivo en MinIO
-        original_filename: Nombre original del archivo
-        content_type: MIME type del archivo
-        file_size: Tamaño del archivo en bytes
-        
-    Returns:
-        True si se creó exitosamente, False en caso contrario
     """
     try:
         from db.models.file_hash import FileHash
-        
+
         new_hash = FileHash(
             file_hash=file_hash,
             file_url=file_url,
-            original_filename=original_filename,
             content_type=content_type,
             file_size=file_size,
-            reference_count=1,
-            created_at=datetime.now(ZoneInfo("America/Bogota")),
-            last_referenced_at=datetime.now(ZoneInfo("America/Bogota"))
+            created_at=datetime.now(ZoneInfo("America/Bogota"))
         )
-        
         db.add(new_hash)
         await db.commit()
         
@@ -408,41 +389,6 @@ async def create_file_hash_record(
         logger.error(f"Error creando registro de hash: {e}")
         await db.rollback()
         return False
-
-
-async def increment_file_reference(db: Session, file_hash: str) -> bool:
-    """
-    Incrementa el contador de referencias de un archivo existente.
-    
-    Args:
-        db: Sesión de SQLAlchemy (AsyncSession)
-        file_hash: Hash SHA256 del archivo
-        
-    Returns:
-        True si se actualizó exitosamente, False en caso contrario
-    """
-    try:
-        from db.models.file_hash import FileHash
-        
-        stmt = select(FileHash).where(FileHash.file_hash == file_hash)
-        result = await db.execute(stmt)
-        file_record = result.scalar_one_or_none()
-        
-        if file_record:
-            file_record.reference_count += 1
-            file_record.last_referenced_at = datetime.now(ZoneInfo("America/Bogota"))
-            await db.commit()
-            
-            logger.info(f"Referencia incrementada. Hash: {file_hash}, Nuevo count: {file_record.reference_count}")
-            return True
-        
-        return False
-        
-    except Exception as e:
-        logger.error(f"Error incrementando referencia: {e}")
-        await db.rollback()
-        return False
-
 
 async def upload_file_with_deduplication(
     db: Session,
@@ -455,34 +401,18 @@ async def upload_file_with_deduplication(
     Sube un archivo a MinIO con deduplicación por hash SHA256.
     Si el archivo ya existe (mismo hash), retorna la URL existente.
     Si no existe, lo sube y registra el hash.
-    
-    Args:
-        db: Sesión de SQLAlchemy (AsyncSession)
-        file_data: Contenido del archivo en bytes
-        original_filename: Nombre original del archivo
-        content_type: Tipo MIME del archivo
-        object_name: (Opcional) Ruta personalizada. Si no se proporciona, se genera automáticamente basada en hash
-        
-    Returns:
-        dict con 'ok' (bool), 'url' (str), 'message' (str), 'deduplicated' (bool)
     """
     try:
-        # Importar función de hash
         from utils.hash_utils import calcular_hash_archivo
-        
-        # 1. Calcular hash del archivo
+
         file_hash = calcular_hash_archivo(file_data)
         file_size = len(file_data)
-        
+
         logger.info(f"Hash calculado: {file_hash} para archivo: {original_filename}")
-        
-        # 2. Buscar si el archivo ya existe por hash
+
         existing_file = await find_file_by_hash(db, file_hash)
-        
+
         if existing_file:
-            # 3a. Archivo duplicado encontrado - reutilizar URL
-            await increment_file_reference(db, file_hash)
-            
             logger.info(f"Archivo duplicado reutilizado. Hash: {file_hash}, URL: {existing_file['file_url']}")
             return {
                 "ok": True,
@@ -490,30 +420,30 @@ async def upload_file_with_deduplication(
                 "message": "Archivo duplicado - URL reutilizada",
                 "deduplicated": True,
                 "file_hash": file_hash,
-                "reference_count": existing_file['reference_count'] + 1
+                "id": existing_file['id'],
+                "numero_usos": existing_file['numero_usos']
             }
-        
+
         else:
-            # 3b. Archivo nuevo - subir a MinIO
-            # Si no se proporcionó object_name, generar uno basado en hash
             if not object_name:
                 object_name = generate_hash_based_path(file_hash, original_filename)
                 logger.info(f"Ruta generada automáticamente: {object_name}")
-            
+
             upload_result = upload_file_to_minio(file_data, object_name, content_type)
-            
+
             if not upload_result["ok"]:
                 return upload_result
-            
-            # 4. Registrar hash en la base de datos
+
             await create_file_hash_record(
                 db=db,
                 file_hash=file_hash,
                 file_url=upload_result["url"],
-                original_filename=original_filename,
                 content_type=content_type,
                 file_size=file_size
             )
+            
+            # Busco el id insertado para retornarlo
+            new_file = await find_file_by_hash(db, file_hash)
             
             logger.info(f"Archivo nuevo subido y registrado. Hash: {file_hash}, URL: {upload_result['url']}")
             return {
@@ -522,9 +452,10 @@ async def upload_file_with_deduplication(
                 "message": "Archivo nuevo subido exitosamente",
                 "deduplicated": False,
                 "file_hash": file_hash,
-                "reference_count": 1
+                "id": new_file['id'] if new_file else None,
+                "numero_usos": 0
             }
-    
+            
     except Exception as e:
         logger.error(f"Error en upload con deduplicación: {e}")
         return {
@@ -533,4 +464,3 @@ async def upload_file_with_deduplication(
             "message": f"Error: {str(e)}",
             "deduplicated": False
         }
-

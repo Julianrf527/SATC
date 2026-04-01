@@ -74,9 +74,11 @@ export type InvolucradoNotificacion = {
   fecha_envio_citacion: string;
   fecha_constancia_citacion: string | null;
   notificacion_exitosa: boolean;
-  url_documento: string;
-  url_doc_citacion: string | null;
+  documento_notificacion_id: number | null;
+  documento_citacion_id: number;
   tipo_notificacion_id: number | null;
+  fecha_notificacion: string | null;
+  fecha_creacion: string;
 };
 
 export type NotificacionData = {
@@ -89,7 +91,7 @@ export type ActoAdminData = {
   id: number;
   numerado: string;
   fecha_numerado: string;
-  url_acto: string;
+  documento_acto_id: number;
   tipo_acto: string;
   fecha_creacion: string;
   etapa_id: number;
@@ -100,7 +102,7 @@ export type ActoAdminData = {
     fecha_numerado: string;
     fecha_envio: string;
     fecha_creacion: string;
-    url_documento?: string;
+    documento_comunicacion_id: number;
   } | null;
   notificacion?: NotificacionData | null;
 };

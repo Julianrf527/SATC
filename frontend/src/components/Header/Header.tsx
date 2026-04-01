@@ -5,7 +5,6 @@ import ImgProfile from "../Image/ImgProfile";
 import Notifications from "./Notifications";
 
 type Props = {
-  userId: number;
   setTheme: (theme: "emerald" | "dark") => void;
   permission: { name: string; path: string }[];
 };
@@ -17,7 +16,7 @@ type FormattedPermission = {
   path: string;
 };
 
-export default function Header({ userId, setTheme, permission }: Props) {
+export default function Header({setTheme, permission }: Props) {
   const [notification, setNotification] = useState<any[] | null>(null);
   const [isDark, setIsDark] = useState(() => {
     return localStorage.getItem("theme") === "dark";
@@ -120,44 +119,36 @@ export default function Header({ userId, setTheme, permission }: Props) {
   }, []);
 
   useEffect(() => {
-    async function GetNotifications(userId: number) {
+    // Usar el endpoint del api.ts para el stream SSE
+    const endpoint = API_CONFIG.ENDPOINTS.NOTIFICATION_STREAM;
+    let baseUrl =
+      (window as any).ENV?.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "";
+    if (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1);
+    const streamUrl = `${baseUrl}${endpoint}`;
+
+    const eventSource = new window.EventSource(streamUrl, {
+      withCredentials: true,
+    });
+
+    eventSource.onmessage = (event) => {
       try {
-        const res = await apiCall(API_CONFIG.ENDPOINTS.NOTIFICATION(userId), {
-          method: "GET",
-        });
-        if (res.ok) {
-          setNotification(res.data);
+        const data = JSON.parse(event.data);
+        if (data.notifications) {
+          setNotification(data.notifications);
         }
-      } catch (error) {
-        /* console.log(error); */
-      }
-    }
-
-    // Cargar notificaciones iniciales
-    GetNotifications(userId);
-
-    // Polling cada 60 segundos (optimizado para reducir carga)
-    const interval = setInterval(() => {
-      // Solo hacer polling si la pestaña está visible
-      if (!document.hidden) {
-        GetNotifications(userId);
-      }
-    }, 30000); // 30 segundos
-
-    // Listener para cargar notificaciones cuando el usuario vuelve a la pestaña
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        GetNotifications(userId);
+      } catch (e) {
+        // Puede ser heartbeat u otro mensaje
       }
     };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    eventSource.onerror = () => {
+      eventSource.close();
+    };
 
     return () => {
-      clearInterval(interval);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      eventSource.close();
     };
-  }, [userId]);
+  }, []);
 
   const logout = async () => {
     try {
@@ -490,7 +481,6 @@ export default function Header({ userId, setTheme, permission }: Props) {
           {/* Notifications - siempre mostrar, incluso sin notificaciones */}
           {notification !== null && (
             <Notifications
-              userId={userId}
               notification={notification}
               key={notification.length}
             />

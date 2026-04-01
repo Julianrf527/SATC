@@ -9,8 +9,8 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
 import logging
-import json
 import asyncio
+import json
 
 from db.deps import get_db
 from services.notificacion import (
@@ -21,8 +21,8 @@ from services.notificacion import (
     notificar_documento_aprobado,
     notificar_documento_finalizado
 )
-from services.usuarios import obtener_usuarios_por_permiso, verificar_permiso_externo
-from utils.verify_gateway_token import verify_gateway_token
+from services.usuarios import obtener_usuarios_por_permiso
+from utils.verify_token import verify_gateway_token
 from utils.minio_client import (
     upload_file_to_minio,
     upload_file_with_deduplication,
@@ -34,7 +34,6 @@ from utils.minio_client import (
 from utils.hash_utils import calcular_hash_uploadfile
 from utils.antivirus import escanear_archivo, verificar_clamav_disponible
 from utils.file_validator import validate_file_complete
-from utils.file_validator import validate_file_complete
 
 #--------- Modelos de BD ----------
 from db.models.documentos import Documento
@@ -44,6 +43,11 @@ from db.models.revisiones import Revision
 from db.models.auditoria_documentos import AuditoriaDocumento
 from db.models.v_documentos_detalle import VDocumentoDetalle
 
+from core.permission import permission
+
+PERMISO_CREADOR = permission.PERMISO_CREADOR
+PERMISO_REVISOR = permission.PERMISO_REVISOR
+
 
 load_dotenv()
 router = APIRouter()
@@ -51,10 +55,6 @@ logger = logging.getLogger(__name__)
 
 # URL del Gateway para comunicación entre servicios
 GATEWAY_URL = os.getenv("GATEWAY_URL")
-
-# Nombres de permisos
-PERMISO_CREADOR = os.getenv("PERMISO_CREADOR_DOC")
-PERMISO_REVISOR = os.getenv("PERMISO_REVISION_DOC")
 
 # Inicializar MinIO
 init_minio()
@@ -154,24 +154,13 @@ async def listar_documentos(
     Filtros opcionales: estado, rango de fechas
     OPTIMIZACIÓN: Paginación implementada (page, page_size)
     """
-    usuario_id = verify_gateway_token(request)
+    token_data = verify_gateway_token(request)
+    usuario_id = int(token_data["user_id"])
 
-    # Verificar permisos EN PARALELO usando asyncio.gather
-    import asyncio
-    tiene_permiso_creador = False
-    tiene_permiso_revisor = False
-    
-    try:
-        results = await asyncio.gather(
-            verificar_permiso_externo(usuario_id, PERMISO_CREADOR),
-            verificar_permiso_externo(usuario_id, PERMISO_REVISOR),
-            return_exceptions=True
-        )
-        tiene_permiso_creador = results[0].get("ok", False) if not isinstance(results[0], Exception) else False
-        tiene_permiso_revisor = results[1].get("ok", False) if not isinstance(results[1], Exception) else False
-    except Exception as e:
-        logger.warning(f"Error verificando permisos: {e}")
-    
+    # Verificar permisos desde el token (sin llamadas HTTP)
+    tiene_permiso_creador = PERMISO_CREADOR in token_data["permisos"]
+    tiene_permiso_revisor = PERMISO_REVISOR in token_data["permisos"]
+
     if not tiene_permiso_creador and not tiene_permiso_revisor:
         raise HTTPException(status_code=403, detail="No tienes permisos para ver documentos")
     
@@ -240,24 +229,13 @@ async def obtener_documento_completo(
     - Auditoría completa
     """
     try:
-        usuario_id = verify_gateway_token(request)
+        token_data = verify_gateway_token(request)
+        usuario_id = int(token_data["user_id"])
 
-        # Verificar permisos EN PARALELO
-        import asyncio
-        tiene_permiso_creador = False
-        tiene_permiso_revisor = False
-        
-        try:
-            results = await asyncio.gather(
-                verificar_permiso_externo(usuario_id, PERMISO_CREADOR),
-                verificar_permiso_externo(usuario_id, PERMISO_REVISOR),
-                return_exceptions=True
-            )
-            tiene_permiso_creador = results[0].get("ok", False) if not isinstance(results[0], Exception) else False
-            tiene_permiso_revisor = results[1].get("ok", False) if not isinstance(results[1], Exception) else False
-        except Exception as e:
-            logger.warning(f"Error verificando permisos: {e}")
-        
+        # Verificar permisos desde el token (sin llamadas HTTP)
+        tiene_permiso_creador = PERMISO_CREADOR in token_data["permisos"]
+        tiene_permiso_revisor = PERMISO_REVISOR in token_data["permisos"]
+
         if not tiene_permiso_creador and not tiene_permiso_revisor:
             raise HTTPException(status_code=403, detail="No tienes permisos para ver documentos")
         
@@ -401,13 +379,13 @@ async def crear_documento(
 ):
     """
     Crea un nuevo documento y lo asigna a revisores.
-    Requiere permiso: PERMISO_CREADOR_DOC
+    Requiere permiso: PERMISO_CREADOR
     """
-    usuario_creador_id = verify_gateway_token(request)
+    token_data = verify_gateway_token(request)
+    usuario_creador_id = int(token_data["user_id"])
 
     # Verificar permiso de creador
-    result = await verificar_permiso_externo(usuario_creador_id, PERMISO_CREADOR)
-    if not result.get("ok", False):
+    if PERMISO_CREADOR not in token_data["permisos"]:
         raise HTTPException(status_code=403, detail="No tienes permiso para crear documentos")
     
     # Validar tipo de archivo
@@ -592,13 +570,14 @@ async def subir_nueva_version(
     """
     Sube una nueva versión del documento tras una devolución.
     Requiere permiso: PERMISO_CREADOR_DOC
+
     """
     try:
-        usuario_id = verify_gateway_token(request)
+        token_data = verify_gateway_token(request)
+        usuario_id = int(token_data["user_id"])
 
         # Verificar permiso
-        result = await verificar_permiso_externo(usuario_id, PERMISO_CREADOR)
-        if not result.get("ok", False):
+        if PERMISO_CREADOR not in token_data["permisos"]:
             raise HTTPException(status_code=403, detail="No tienes permiso para subir documentos")
         
         stmt = select(Documento).where(Documento.id == documento_id)
@@ -759,12 +738,11 @@ async def revisar_documento(
     - Si devuelve: incrementa contador de devoluciones
     - Si llega a 3 devoluciones: estado -> 'finalizado'
     """
-    usuario_id = verify_gateway_token(request)
-    revisor_id = int(usuario_id)  # El revisor es el usuario autenticado
+    token_data = verify_gateway_token(request)
+    revisor_id = int(token_data["user_id"])  # El revisor es el usuario autenticado
 
     # Verificar permiso del usuario autenticado
-    result = await verificar_permiso_externo(revisor_id, PERMISO_REVISOR)
-    if not result.get("ok", False):
+    if PERMISO_REVISOR not in token_data["permisos"]:
         raise HTTPException(status_code=403, detail="No tienes permiso para revisar documentos")
     
     # Verificar que el usuario autenticado está asignado como revisor
@@ -876,7 +854,8 @@ async def descargar_archivo(
     Valida permisos antes de permitir la descarga.
     """
     try:
-        usuario_id = verify_gateway_token(request)
+        token_data = verify_gateway_token(request)
+        usuario_id = int(token_data["user_id"])
 
         stmt = select(VersionDocumento).where(VersionDocumento.id == version_id)
         result = await db.execute(stmt)
@@ -954,24 +933,14 @@ async def obtener_estadisticas(
     
     OPTIMIZACIÓN: Verificación de permisos en paralelo y queries optimizadas con CASE
     """
-    import asyncio
-    usuario_id = verify_gateway_token(request)
+    token_data = verify_gateway_token(request)
+    usuario_id = int(token_data["user_id"])
 
     stats = {}
     
-    # Verificar ambos permisos EN PARALELO
-    try:
-        results = await asyncio.gather(
-            verificar_permiso_externo(usuario_id, PERMISO_CREADOR),
-            verificar_permiso_externo(usuario_id, PERMISO_REVISOR),
-            return_exceptions=True
-        )
-        tiene_permiso_creador = results[0].get("ok", False) if not isinstance(results[0], Exception) else False
-        tiene_permiso_revisor = results[1].get("ok", False) if not isinstance(results[1], Exception) else False
-    except Exception as e:
-        logger.warning(f"Error verificando permisos: {e}")
-        tiene_permiso_creador = False
-        tiene_permiso_revisor = False
+    # Verificar permisos desde el token (sin llamadas HTTP)
+    tiene_permiso_creador = PERMISO_CREADOR in token_data["permisos"]
+    tiene_permiso_revisor = PERMISO_REVISOR in token_data["permisos"]
     
     # OPTIMIZACIÓN: Estadísticas de creador en UNA SOLA query usando CASE
     if tiene_permiso_creador:
@@ -996,8 +965,9 @@ async def obtener_estadisticas(
                 "finalizados": row.finalizados or 0
             }
         except Exception as e:
-            logger.error(f"Error obteniendo stats de creador: {e}")
-    
+            logger.error(f"Error obteniendo stats de creador: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Error obteniendo estadísticas de creador: {str(e)}")
+
     # OPTIMIZACIÓN: Estadísticas de revisor optimizadas
     if tiene_permiso_revisor:
         try:
@@ -1035,8 +1005,9 @@ async def obtener_estadisticas(
                 "devueltos": row_rev.devueltos or 0
             }
         except Exception as e:
-            logger.error(f"Error obteniendo stats de revisor: {e}")
-    
+            logger.error(f"Error obteniendo stats de revisor: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Error obteniendo estadísticas de revisor: {str(e)}")
+
     if not stats:
         raise HTTPException(status_code=403, detail="No tienes permisos en este módulo")
     
@@ -1059,33 +1030,18 @@ async def listar_revisores_disponibles(
     Requiere permiso: PERMISO_CREADOR_DOC o PERMISO_REVISOR_DOC
     OPTIMIZACIÓN: Verificación de permisos en paralelo
     """
-    import asyncio
-    usuario_id = verify_gateway_token(request)
+    token_data = verify_gateway_token(request)
     
-    # Verificar que el usuario tenga permiso de creador o revisor EN PARALELO
-    try:
-        results = await asyncio.gather(
-            verificar_permiso_externo(usuario_id, PERMISO_CREADOR),
-            verificar_permiso_externo(usuario_id, PERMISO_REVISOR),
-            return_exceptions=True
-        )
-        tiene_permiso_creador = results[0].get("ok", False) if not isinstance(results[0], Exception) else False
-        tiene_permiso_revisor = results[1].get("ok", False) if not isinstance(results[1], Exception) else False
-        
-        tiene_acceso = tiene_permiso_creador or tiene_permiso_revisor
-        
-        if not tiene_acceso:
-            raise HTTPException(
-                status_code=403, 
-                detail="No tienes permiso para consultar revisores. Se requiere permiso de creador o revisor."
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error verificando permisos: {e}")
+    # Verificar permisos desde el token (sin llamadas HTTP)
+    tiene_acceso = (
+        PERMISO_CREADOR in token_data["permisos"] or
+        PERMISO_REVISOR in token_data["permisos"]
+    )
+
+    if not tiene_acceso:
         raise HTTPException(
-            status_code=500,
-            detail="Error al verificar permisos"
+            status_code=403,
+            detail="No tienes permiso para consultar revisores. Se requiere permiso de creador o revisor."
         )
     
     # Obtener revisores usando la función helper

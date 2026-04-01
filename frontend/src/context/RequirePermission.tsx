@@ -23,10 +23,8 @@ export default function RequirePermission({ required, children }: Props) {
   }
 
   const requiredNorm = norm(required);
-  const isAdmin = user.rol === "admin";
 
   const hasPermission =
-    isAdmin ||
     (user.permisos ?? []).some((p) => {
       const permisoName = norm(p?.name);
       return permisoName === requiredNorm;

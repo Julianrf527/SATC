@@ -1,6 +1,5 @@
 import ComunicacionCard from "./ComunicacionCard";
 import NotificacionesTable from "./NotificationesTable";
-import { API_CONFIG, BASE_URL } from "../../../../utils/api";
 import type {
   Involved,
   TipoNotificacion,
@@ -22,7 +21,7 @@ type Props = {
   onAddNotificacion?: () => void;
   onEditNotificacion?: (notificacion: InvolucradoNotificacion) => void;
   onDeleteNotificacion?: (id: number) => void;
-  onViewDocument: (url: string) => void;
+  onViewDocument: (fileId: number) => void;
   involucrados?: Involved[];
   tiposNotificacion?: TipoNotificacion[];
   setToast: (toast: {
@@ -80,10 +79,9 @@ export default function ActoAdminCard({
   };
 
   const handleViewFile = () => {
-    const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
-      actoAdmin.url_acto,
-    )}`;
-    window.open(url, "_blank");
+    if (actoAdmin.documento_acto_id) {
+      onViewDocument(actoAdmin.documento_acto_id);
+    }
   };
 
   const isNotificacion = tipoActo === "notificacion";

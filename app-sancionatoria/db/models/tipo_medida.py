@@ -1,8 +1,11 @@
 from sqlalchemy import Column, Integer, Text
+from sqlalchemy.orm import relationship
 from .base import Base
 
 class TipoMedida(Base):
-    __tablename__ = "tipo_medida"
+    __tablename__ = 'tipo_medida'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     nombre = Column(Text)
+
+    medidas = relationship("MedidaPreventiva", back_populates="tipo_medida")

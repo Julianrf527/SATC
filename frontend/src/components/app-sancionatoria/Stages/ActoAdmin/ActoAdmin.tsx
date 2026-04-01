@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { apiCall, API_CONFIG, BASE_URL } from "../../../../utils/api";
+import { apiCall, API_CONFIG } from "../../../../utils/api";
+import { openDocumentById } from "../../../../utils/documentViewer";
 import type {
   ActoAdminData,
   Involved,
@@ -66,9 +67,15 @@ export default function ActoAdmin({
   const isNotificacion = tipoActo === "notificacion";
   const isComunicacion = tipoActo === "comunicacion";
 
-  const handleSaveActoAdmin = async (
-    formData: FormData,
-  ): Promise<{ ok: boolean; error?: string }> => {
+  const handleSaveActoAdmin = async (actoData: {
+    tipo_acto: string;
+    numerado: string;
+    fecha_numerado: string;
+    documento_acto_id?: number;
+    radicado_expediente: string;
+    etapa_id: number;
+    nivel_auxiliar?: boolean | null;
+  }): Promise<{ ok: boolean; error?: string }> => {
     try {
       const isEditing = hasActoAdmin && "id" in localActoAdmin;
       const endpoint = isEditing
@@ -79,13 +86,18 @@ export default function ActoAdmin({
 
       const method = isEditing ? "PUT" : "POST";
 
-      if (!formData.has("radicado_expediente"))
-        formData.append("radicado_expediente", radicado);
-      if (!formData.has("etapa_id"))
-        formData.append("etapa_id", etapaId.toString());
+      // Preparar los datos finales
+      const finalData = {
+        ...actoData,
+        radicado_expediente: radicado,
+        etapa_id: etapaId,
+      };
 
-      // Manejar nivel_auxiliar con prioridad: FormData > Prop > localActoAdmin > actoAdmin
-      if (!formData.has("nivel_auxiliar")) {
+      // Manejar nivel_auxiliar con prioridad
+      if (
+        finalData.nivel_auxiliar === null ||
+        finalData.nivel_auxiliar === undefined
+      ) {
         let nivel: boolean | null | undefined = undefined;
 
         // Prioridad 1: nivelAuxiliar prop
@@ -102,11 +114,17 @@ export default function ActoAdmin({
         }
 
         if (nivel !== null && nivel !== undefined) {
-          formData.append("nivel_auxiliar", nivel.toString());
+          finalData.nivel_auxiliar = nivel;
         }
       }
 
-      const res = await apiCall(endpoint, { method, body: formData });
+      const res = await apiCall(endpoint, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(finalData),
+      });
 
       if (res.ok) {
         const updatedActoAdmin = res.data;
@@ -253,9 +271,20 @@ export default function ActoAdmin({
     setShowNotificacionModal(true);
   };
 
-  const handleSaveNotificacion = async (
-    formData: FormData,
-  ): Promise<{ ok: boolean; error?: string }> => {
+  const handleSaveNotificacion = async (notificationData: {
+    involucrado_id?: number;
+    numerado: string;
+    fecha_numerado: string;
+    fecha_envio_citacion: string;
+    fecha_constancia_citacion: string;
+    notificacion_exitosa: boolean;
+    tipo_notificacion_id?: number;
+    fecha_notificacion?: string;
+    documento_notificacion_id?: number;
+    documento_citacion_id?: number;
+    notificacion_id: number;
+    radicado: string;
+  }): Promise<{ ok: boolean; error?: string }> => {
     const isEditing = editingNotificacion !== null;
 
     try {
@@ -268,13 +297,17 @@ export default function ActoAdmin({
 
       // Crear notificación base si no existe
       if (!actoAdminCasted.notificacion || !actoAdminCasted.notificacion.id) {
-        const notifFormData = new FormData();
-        notifFormData.append("radicado", radicado);
-        notifFormData.append("acto_admin_id", actoAdminCasted.id.toString());
+        const notifData = {
+          radicado: radicado,
+          acto_admin_id: actoAdminCasted.id,
+        };
 
         const notifRes = await apiCall(API_CONFIG.ENDPOINTS.FILE_NOTIFICACION, {
           method: "POST",
-          body: notifFormData,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(notifData),
         });
 
         if (!notifRes.ok) {
@@ -303,21 +336,28 @@ export default function ActoAdmin({
         notificacionId = actoAdminCasted.notificacion.id;
       }
 
-      // Agregar datos comunes al FormData
-      formData.append("notificacion_id", notificacionId.toString());
-      formData.append("radicado", radicado);
+      // Preparar datos finales para enviar
+      const finalData = {
+        ...notificationData,
+        notificacion_id: notificacionId,
+        radicado: radicado,
+      };
 
       // Determinar endpoint y método según si es edición o creación
       const endpoint = isEditing
-        ? API_CONFIG.ENDPOINTS.FILE_INVOLUCRADO_NOTIFICACION_UPDATE(
-            editingNotificacion!.id,
-          )
-        : API_CONFIG.ENDPOINTS.FILE_INVOLUCRADO_NOTIFICACION;
+        ? `${API_CONFIG.ENDPOINTS.FILE_NOTIFICACION}/${editingNotificacion!.id}`
+        : API_CONFIG.ENDPOINTS.FILE_NOTIFICACION;
 
       const method = isEditing ? "PUT" : "POST";
 
       // Ejecutar la petición
-      const res = await apiCall(endpoint, { method, body: formData });
+      const res = await apiCall(endpoint, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(finalData),
+      });
 
       // Verificar respuesta exitosa
       if (!res.ok) {
@@ -398,9 +438,8 @@ export default function ActoAdmin({
   const handleDeleteNotificacion = async (invNotificacionId: number) => {
     try {
       const res = await apiCall(
-        API_CONFIG.ENDPOINTS.FILE_INVOLUCRADO_NOTIFICACION_DELETE(
-          invNotificacionId,
-        ) + `?radicado=${radicado}`,
+        API_CONFIG.ENDPOINTS.FILE_NOTIFICACION_DELETE(invNotificacionId) +
+          `?radicado=${radicado}`,
         { method: "DELETE" },
       );
 
@@ -448,9 +487,8 @@ export default function ActoAdmin({
     }
   };
 
-  const handleViewDocument = (url: string) => {
-    const fullUrl = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(url)}`;
-    window.open(fullUrl, "_blank");
+  const handleViewDocument = (fileId: number) => {
+    openDocumentById(fileId);
   };
 
   const getYaNotificados = (): number[] => {

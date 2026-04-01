@@ -2,28 +2,37 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-import os
 from routes import auth, notification, role, user, email
 from utils.session_cleanup import start_cleanup_task
-from utils.redis_session import get_redis, close_redis, redis_health_check
+from utils.redis_session import init_redis, close_redis, redis_health_check
+import os
 
 app = FastAPI()
 
-# Startup event - iniciar tarea de limpieza de sesiones y conectar Redis
+# Startup event - inicializar BD, limpieza de sesiones y conectar Redis
 @app.on_event("startup")
 async def startup_event():
-    # Iniciar cleanup de sesiones PostgreSQL (fallback)
-    start_cleanup_task()
-    
-    # Conectar Redis
+    from db.database import init_db
     try:
-        redis_client = await get_redis()
-        if redis_client:
-            print("Redis conectado exitosamente para sesiones")
-        else:
-            print("Redis deshabilitado - usando PostgreSQL para sesiones")
+        await init_db()
+        print("Tablas de user_db inicializadas correctamente")
+        from db.seeds import seed_initial_data
+        await seed_initial_data()
     except Exception as e:
-        print(f"Error conectando Redis: {e}")
+        import traceback
+        print(f"Error inicializando BD: {e}")
+        print(f"Stacktrace completo: {traceback.format_exc()}")
+
+    # Redis primero
+    await init_redis()
+
+    # Cleanup de PG solo si Redis no está disponible
+    from utils.redis_session import get_redis_client
+    if get_redis_client() is None:
+        start_cleanup_task()
+        print("Redis no disponible — cleanup de sesiones PostgreSQL activo")
+    else:
+        print("Redis activo — cleanup de sesiones PostgreSQL omitido")
 
 # Shutdown event - cerrar Redis
 @app.on_event("shutdown")
@@ -51,7 +60,6 @@ app.add_middleware(
 )
 
 # Rutas
-
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(user.router, prefix="/user", tags=["Users"])
 app.include_router(notification.router, prefix="/notification", tags=["Notifications"])

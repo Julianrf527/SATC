@@ -1,21 +1,21 @@
 type Execution = {
   id?: number;
   cobro_coactivo: boolean;
-  cobro_coactivo_doc_url: string | null;
+  documento_cobro_coactivo_id: number | null;
   disposicion: boolean;
   ruia: boolean;
-  ruia_doc_url: string | null;
+  documento_ruia_id: number | null;
   memorando: boolean;
-  memorando_doc_url: string | null;
+  documento_memorando_id: number | null;
   auto_admin: string;
   fecha_auto: string | null;
-  auto_doc_url: string | null;
+  documento_auto_id: number | null;
   etapa_id: number;
 };
 
 type Props = {
   data: Execution;
-  onViewDocument: (url: string) => void;
+  onViewDocument: (documentId: number) => void;
 };
 
 const formatDate = (fecha: string | null) => {
@@ -65,9 +65,9 @@ export default function ExecutionView({ data, onViewDocument }: Props) {
             {data.cobro_coactivo ? "Sí" : "No"}
           </span>
           {/* ✨ Solo mostrar botón si está marcado como SÍ Y tiene documento */}
-          {data.cobro_coactivo && data.cobro_coactivo_doc_url && (
+          {data.cobro_coactivo && data.documento_cobro_coactivo_id && (
             <button
-              onClick={() => onViewDocument(data.cobro_coactivo_doc_url!)}
+              onClick={() => onViewDocument(data.documento_cobro_coactivo_id!)}
               className="btn btn-ghost btn-xs text-info hover:bg-info/10"
               title="Ver documento"
             >
@@ -95,9 +95,9 @@ export default function ExecutionView({ data, onViewDocument }: Props) {
             {data.ruia ? "Sí" : "No"}
           </span>
           {/* ✨ Solo mostrar botón si está marcado como SÍ Y tiene documento */}
-          {data.ruia && data.ruia_doc_url && (
+          {data.ruia && data.documento_ruia_id && (
             <button
-              onClick={() => onViewDocument(data.ruia_doc_url!)}
+              onClick={() => onViewDocument(data.documento_ruia_id!)}
               className="btn btn-ghost btn-xs text-info hover:bg-info/10"
               title="Ver documento"
             >
@@ -127,9 +127,9 @@ export default function ExecutionView({ data, onViewDocument }: Props) {
             {data.memorando ? "Sí" : "No"}
           </span>
           {/* ✨ Solo mostrar botón si está marcado como SÍ Y tiene documento */}
-          {data.memorando && data.memorando_doc_url && (
+          {data.memorando && data.documento_memorando_id && (
             <button
-              onClick={() => onViewDocument(data.memorando_doc_url!)}
+              onClick={() => onViewDocument(data.documento_memorando_id!)}
               className="btn btn-ghost btn-xs text-info hover:bg-info/10"
               title="Ver documento"
             >
@@ -195,10 +195,10 @@ export default function ExecutionView({ data, onViewDocument }: Props) {
               {formatDate(data.fecha_auto)}
             </p>
           </div>
-          {data.auto_doc_url && (
+          {data.documento_auto_id && (
             <div className="flex-shrink-0">
               <button
-                onClick={() => onViewDocument(data.auto_doc_url!)}
+                onClick={() => onViewDocument(data.documento_auto_id!)}
                 className="btn btn-ghost btn-xs text-info hover:bg-info/10"
                 title="Ver documento"
               >

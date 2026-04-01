@@ -146,7 +146,7 @@ export default function ExecutionOfSanction({
 
       const res = await apiCall(
         API_CONFIG.ENDPOINTS.FILE_CREATE_STAGE(radicado, tipoEtapaId),
-        { method: "POST" }
+        { method: "POST" },
       );
 
       if (res.ok && res.etapa_id) {
@@ -207,7 +207,7 @@ export default function ExecutionOfSanction({
 
         // Notificar cambio al componente padre
         onStageUpdate(STAGE_NAME);
-        
+
         // Deseleccionar y eliminar de la lista
         if (onArchiveSuccess) {
           onArchiveSuccess();
@@ -421,7 +421,7 @@ export default function ExecutionOfSanction({
     return (
       <div className="space-y-6">
         <DataStageExecution
-          data={executionData}
+          data={executionData as any} // TODO: Arreglar tipos después de migración completa
           idAuxiliar={idAuxiliar}
           setToast={setToast}
           etapaId={etapaId}

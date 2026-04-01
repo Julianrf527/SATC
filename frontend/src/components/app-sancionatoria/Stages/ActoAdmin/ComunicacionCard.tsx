@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { API_CONFIG, apiCall, BASE_URL } from "../../../../utils/api";
+import { API_CONFIG, apiCall } from "../../../../utils/api";
+import {
+  openDocumentById,
+  isValidDocumentId,
+} from "../../../../utils/documentViewer";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 
 type ComunicacionData = {
@@ -8,7 +12,7 @@ type ComunicacionData = {
   fecha_numerado: string;
   fecha_envio: string;
   fecha_creacion: string;
-  url_documento?: string;
+  documento_comunicacion_id?: number;
 };
 
 type Props = {
@@ -32,9 +36,7 @@ export default function ComunicacionCard({
   setToast,
   isEditable = true,
 }: Props) {
-  useEffect(() => {
-  }, [comunicacion]);
-  const [showPreview, setShowPreview] = useState(false);
+  useEffect(() => {}, [comunicacion]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -63,20 +65,12 @@ export default function ComunicacionCard({
     return numerado.toString().padStart(4, "0");
   };
 
-  const isImageUrl = (url: string) => {
-    return /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
-  };
-
-  const isPdfUrl = (url: string) => {
-    return /\.pdf$/i.test(url);
-  };
-
   const openDocument = () => {
-    if (comunicacion?.url_documento) {
-      const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
-        comunicacion.url_documento,
-      )}`;
-      window.open(url, "_blank");
+    if (
+      comunicacion?.documento_comunicacion_id &&
+      isValidDocumentId(comunicacion.documento_comunicacion_id)
+    ) {
+      openDocumentById(comunicacion.documento_comunicacion_id);
     }
   };
 
@@ -225,35 +219,19 @@ export default function ComunicacionCard({
           {/* Botones de acción a la derecha */}
           <div className="flex gap-2 flex-shrink-0">
             {/* Botón para abrir documento PDF */}
-            {comunicacion.url_documento && (
+            {isValidDocumentId(comunicacion.documento_comunicacion_id) && (
               <button
                 onClick={openDocument}
                 className="btn btn-success btn-sm gap-1 px-2 tooltip"
                 data-tip="Ver documento"
               >
-                {isPdfUrl(comunicacion.url_documento) ? (
-                  <svg
-                    className="w-4 h-4 text-white"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" />
-                  </svg>
-                ) : (
-                  <svg
-                    className="w-4 h-4 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                )}
+                <svg
+                  className="w-4 h-4 text-white"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" />
+                </svg>
                 <span className="text-xs font-medium text-white">
                   Comunicación
                 </span>
@@ -331,45 +309,6 @@ export default function ComunicacionCard({
           </div>
         </div>
       </div>
-
-      {/* Modal de vista previa para imágenes */}
-      {showPreview &&
-        comunicacion.url_documento &&
-        isImageUrl(comunicacion.url_documento) && (
-          <div
-            className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-            onClick={() => setShowPreview(false)}
-          >
-            <div className="relative max-w-5xl max-h-[90vh]">
-              <button
-                onClick={() => setShowPreview(false)}
-                className="absolute -top-12 right-0 btn btn-circle btn-ghost text-white hover:bg-white/20"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-              <img
-                src={`${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD(
-                  comunicacion.url_documento,
-                )}`}
-                alt="Vista previa del documento"
-                className="max-w-full max-h-[90vh] rounded-lg shadow-2xl"
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-          </div>
-        )}
 
       {/* Modal de confirmación de eliminación */}
       <ConfirmDeleteModal
