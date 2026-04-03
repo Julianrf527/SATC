@@ -44,7 +44,7 @@ from utils.funtions import calcular_dias_laborales
 #Crud Auxiliar
 from zoneinfo import ZoneInfo
 
-async def insert_auditoria(
+async def insert_log(
     db: AsyncSession,
     tipo_evento: str,
     resultado: str,

@@ -51,11 +51,11 @@ export const API_CONFIG = {
     TOWNS_SIDEWALK_BY_TOWN: (town_id: number) =>
       `/sanctioning/town/sidewalk/${town_id}`,
     BUSINESS_DAYS: "/sanctioning/town/utils/business-days",
-
-    INVOLVED_EXPEDIENTE_LINK: "/sanctioning/involved/involved-file",
-    INVOLVED_EXPEDIENTE_UNLINK: (file_involved_id: number) =>
+    /*involved route*/
+    FILE_INVOLVED_LINK: "/sanctioning/involved/involved-file",
+    FILE_INVOLVED_UNLINK: (file_involved_id: number) =>
       `/sanctioning/involved/involved-file/${file_involved_id}`,
-    EXPEDIENTE_INVOLVED_LIST: (file_id: string) =>
+    FILE_INVOLVED_LIST: (file_id: number) =>
       `/sanctioning/involved/involved-list/${file_id}`,
 
     //file route*/
@@ -65,61 +65,61 @@ export const API_CONFIG = {
     FILES_VIEW: "/sanctioning/file/get/all",
     FILES_BY_USER: (user_id: number) => `/sanctioning/file/${user_id}`,
     FILE_ADD: "/sanctioning/file/add",
-    FILE_UPDATE_ENCARGADO: (file_id: string, encargado_id?: number) =>
+    FILE_UPDATE_ENCARGADO: (file_id: number, encargado_id?: number) =>
       `/sanctioning/file/${file_id}/charge/${encargado_id ?? ""}`,
     FILE_BULK_UPDATE_ENCARGADO: "/sanctioning/file/charge/bulk",
-    FILE_ARCHIVE: (file_id: string) => `/sanctioning/file/${file_id}/archive`,
+    FILE_ARCHIVE: (file_id: number) => `/sanctioning/file/${file_id}/archive`,
     AUDIT_LOGS: "/sanctioning/file/audit/logs",
-    FILE_ALERTS: (file_id: string) => `/sanctioning/file/alerts/${file_id}`,
+    FILE_ALERTS: (file_id: number) => `/sanctioning/file/alerts/${file_id}`,
     FILE_ALERTS_ALL: "/sanctioning/file/alerts/all",
-    FILE_DOWNLOAD_ALL: (file_id: string) =>
+    FILE_DOWNLOAD_ALL: (file_id: number) =>
       `/sanctioning/file/download/${file_id}`,
+    FILE_FUll: (file_id: number) => `/sanctioning/stage/full/${file_id}`,
+    FILE_BASIC_DATA: (file_id: number) =>
+      `/sanctioning/stage/${file_id}/basic-data`,
 
     //stage route
-    FILE_CREATE_STAGE: (file_id: string, type?: number) =>
+    FILE_CREATE_STAGE: (file_id: number, type?: number) =>
       `/sanctioning/stage/${file_id}/stage/${type}`,
-    FILE_FUll: (file_id: string) => `/sanctioning/stage/full/${file_id}`,
-    FILE_BASIC_DATA: (file_id: string) =>
-      `/sanctioning/stage/${file_id}/basic-data`,
-    FILE_INVESTIGATION: (file_id: string) =>
+    FILE_INVESTIGATION: (file_id: number) =>
       `/sanctioning/stage/investigation/${file_id}`,
 
-    FILE_MEASURE: (file_id: string) => `/sanctioning/stage/measure/${file_id}`,
+    FILE_MEASURE: (file_id: number) => `/sanctioning/stage/measure/${file_id}`,
     FILE_MEASURE_CREATE: "/sanctioning/stage/measure",
     FILE_MEASURE_UPDATE: (medida_id: number) =>
       `/sanctioning/stage/measure/${medida_id}`,
 
-    FILE_START_PROCESS: (file_id: string) =>
+    FILE_START_PROCESS: (file_id: number) =>
       `/sanctioning/stage/start-process/${file_id}`,
 
-    FILE_CESSATION: (file_id: string) =>
+    FILE_CESSATION: (file_id: number) =>
       `/sanctioning/stage/cessation/${file_id}`,
     FILE_CESSATION_CREATE: "/sanctioning/stage/cessation",
     FILE_CESSATION_UPDATE: (cessation_id: number) =>
       `/sanctioning/stage/cessation/${cessation_id}`,
 
-    FILE_FORMULATION: (file_id: string) =>
+    FILE_FORMULATION: (file_id: number) =>
       `/sanctioning/stage/formulation/${file_id}`,
     FILE_FORMULATION_CREATE: "/sanctioning/stage/formulation",
     FILE_FORMULATION_UPDATE: (formulation_id: number) =>
       `/sanctioning/stage/formulation/${formulation_id}`,
 
-    FILE_OPENING_PROBATIONARY: (file_id: string) =>
+    FILE_OPENING_PROBATIONARY: (file_id: number) =>
       `/sanctioning/stage/opening/${file_id}`,
 
-    FILE_CLOSING_PROBATIONARY: (file_id: string) =>
+    FILE_CLOSING_PROBATIONARY: (file_id: number) =>
       `/sanctioning/stage/closing/${file_id}`,
 
-    FILE_DECISION: (file_id: string) =>
+    FILE_DECISION: (file_id: number) =>
       `/sanctioning/stage/decision/${file_id}`,
     FILE_DECISION_CREATE: "/sanctioning/stage/decision",
     FILE_DECISION_UPDATE: (decision_id: number) =>
       `/sanctioning/stage/decision/${decision_id}`,
 
-    FILE_RESOURCE: (file_id: string) =>
+    FILE_RESOURCE: (file_id: number) =>
       `/sanctioning/stage/resource/${file_id}`,
 
-    FILE_EXECUTION: (file_id: string) =>
+    FILE_EXECUTION: (file_id: number) =>
       `/sanctioning/stage/execution/${file_id}`,
     FILE_EXECUTION_CREATE: "/sanctioning/stage/execution",
     FILE_EXECUTION_UPDATE: (ejecucion_id: number) =>
@@ -172,6 +172,45 @@ export const API_CONFIG = {
       `/involveds/involved/${involved_id}`,
     INVOLVED_MANAGE: "/involveds/involved/manage",
     INVOLVED_LOG: "/involveds/involved/log",
+
+    /* --- infraction api --- */
+    //infraction route
+    INFRACTIONS: "/infractions/file/get",
+    INFRACTION_FILTER: "/infractions/file/filter",
+    INFRACTION_AFFECTED_RESOURCE: "/infractions/file/affected-resource",
+    INFRACTION_VIEW: "/infractions/file/get/all",
+    INFRACTION_BY_USER: (user_id: number) => `/infractions/file/${user_id}`,
+    INFRACTION_ADD: "/infractions/file/add",
+    INFRACTION_UPDATE_ENCARGADO: (
+      infraction_id: number,
+      encargado_id?: number,
+    ) => `/infractions/file/${infraction_id}/charge/${encargado_id ?? ""}`,
+    INFRACTION_BULK_UPDATE_ENCARGADO: "/infractions/file/charge/bulk",
+    INFRACTION_ARCHIVE: (infraction_id: number) =>
+      `/infractions/file/${infraction_id}/archive`,
+    INFRACTION_LOGS: "/infractions/file/audit/logs",
+    INFRACTION_ALERTS: (infraction_id: number) =>
+      `/infractions/file/alerts/${infraction_id}`,
+    INFRACTION_ALERTS_ALL: "/infractions/file/alerts/all",
+    INFRACTION_DOWNLOAD_ALL: (infraction_id: number) =>
+      `/infractions/file/download/${infraction_id}`,
+    INFRACTION_FUll: (infraction_id: number) =>
+      `/infractions/file/full/${infraction_id}`,
+    INFRACTION_BASIC_DATA: (infraction_id: number) =>
+      `/infractions/file/${infraction_id}/basic-data`,
+    INFRACTION_CAUSES: "/infractions/file/causes",
+    INFRACTION_COMPLAINER: "/infractions/file/complainer/list",
+    INFRACTION_CREATE_COMPLAINER: "/infractions/file/complainer/add",
+    /*involved route*/
+    INFRACTION_INVOLVED_LINK: "/infractions/involved/involved-file",
+    INFRACTION_INVOLVED_UNLINK: (infraction_involved_id: number) =>
+      `/infractions/involved/involved-file/${infraction_involved_id}`,
+    INFRACTION_INVOLVED_LIST: (infraction_id: number) =>
+      `/infractions/involved/involved-list/${infraction_id}`,
+    /*town route*/
+    INFRACTION_TOWNS_RURAL_DISTRICT: "/infractions/town/rural-district",
+    INFRACTION_RURAL_DISTRICT_BY_TOWN: (municipio_id: number) =>
+      `/infractions/town/rural-district/${municipio_id}`,
   },
 };
 

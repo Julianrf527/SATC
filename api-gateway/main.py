@@ -16,12 +16,14 @@ USER_ROUTE = os.getenv("USER_ROUTE", "http://app-users:8001")
 SANCTIONING_ROUTE = os.getenv("SANCTIONING_ROUTE", "http://app-sanctioning:8002")
 DOCUMENTS_ROUTE = os.getenv("DOCUMENTS_ROUTE", "http://app-docs:8003")
 INVOLVED_ROUTE = os.getenv("INVOLVED_ROUTE", "http://app-involved:8004")
+INFRACTION_ROUTE = os.getenv("INFRACTION_ROUTE", "http://app-infraction:8005")
 
 MICROSERVICES = {
     "users": USER_ROUTE,
     "sanctioning": SANCTIONING_ROUTE,
     "documents": DOCUMENTS_ROUTE,
     "involveds": INVOLVED_ROUTE,
+    "infractions": INFRACTION_ROUTE,
 }
 
 PUBLIC_ROUTES = {

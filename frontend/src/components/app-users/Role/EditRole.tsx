@@ -1,4 +1,4 @@
-import Input from "../../Input/Input";
+import Input from "../../Common/Input/Input";
 import { useEffect, useState, useRef } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import ConfirmationModal from "./ConfirmationModal";

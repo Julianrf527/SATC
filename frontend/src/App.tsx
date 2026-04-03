@@ -11,13 +11,17 @@ import RoleLayout from "./components/app-users/Layout/RoleLayout";
 import UserLogLayout from "./components/app-users/Layout/UserLogLayout";
 import ProfileLayout from "./components/app-users/Layout/ProfileLayout";
 import RequirePermission from "./context/RequirePermission";
-import FileManageLayout from "./components/app-sancionatoria/Layout/FileManageLayout";
-import FileViewLayout from "./components/app-sancionatoria/Layout/FileViewLayout";
-import ManagerFilesLayout from "./components/app-sancionatoria/Layout/ManagerFilesLayout";
-import AlertsLayout from "./components/app-sancionatoria/Layout/AlertsLayout";
-import FileLogLayout from "./components/app-sancionatoria/Layout/FileLogLayout";
+import FileManageLayout from "./components/app-sancionatorio/Layout/GestionExpedienteLayout";
+import FileViewLayout from "./components/app-sancionatorio/Layout/ConsultaExpedieneLayout";
+import ManagerFilesLayout from "./components/app-sancionatorio/Layout/EncargadoExpedienteLayout";
+import AlertsLayout from "./components/app-sancionatorio/Layout/AlertsLayout";
+import FileLogLayout from "./components/app-sancionatorio/Layout/ExpedienteLogLayout";
 import ManageInvolvedLayout from "./components/app-involved/Layout/ManageInvolvedLayout";
 import DocumentPage from "./components/app-documentos/layout/DocumentosPage";
+//infracciones Compoents
+
+
+
 
 // Configuración simplificada de rutas (solo path y componente)
 type RouteConfig = {
@@ -51,6 +55,12 @@ const inferPermissionFromPath = (path: string): string => {
     "/audit/users": "auditoria_usuarios",
     "/audit/files": "auditoria_expedientes",
     "/audit/involved": "auditoria_involucrados",
+
+    "/infraction/manage": "infracciones_gestionar",
+    "/infraction/consult": "infracciones_consultar",
+    "/infraction/alerts": "infracciones_alertas",
+    "/infraction/assign_manage": "infracciones_asignar"
+
   };
 
   const permission = pathToPermissionMap[path];
@@ -125,6 +135,12 @@ function App() {
 
     // === DOCUMENTOS ===
     { path: "/document/manage", component: DocumentPage },
+
+    // === INFRACCIONES ===
+    { path: "/infraction/manage", component: InfractionManageLayout },
+    { path: "/infraction/consult", component: InfractionViewLayout },
+    { path: "/infraction/assign_manage", component: InfractionAssignLayout }
+
   ];
 
   return (

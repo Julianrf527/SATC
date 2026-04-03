@@ -1,10 +1,14 @@
 import React, { useRef, useState } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
-import Input from "../../Input/Input";
+import Input from "../../Common/Input/Input";
 import RolList from "../Role/RolList";
 
 type Props = {
-  setToast: (toast: { id: number; message: string; type: "success" | "error" }) => void;
+  setToast: (toast: {
+    id: number;
+    message: string;
+    type: "success" | "error";
+  }) => void;
 };
 
 export default function SignUpLayout({ setToast }: Props) {
@@ -35,37 +39,70 @@ export default function SignUpLayout({ setToast }: Props) {
     e.preventDefault();
     const document = documentRef.current!.value;
     if (document.length < 6) {
-      setToast({ id: Date.now(), message: "El documento debe tener al menos 6 dígitos", type: "error" });
+      setToast({
+        id: Date.now(),
+        message: "El documento debe tener al menos 6 dígitos",
+        type: "error",
+      });
       documentRef.current?.focus();
       return;
     }
     const rolValue = rolRef.current!.value;
     if (!rolValue || rolValue === "0") {
-      setToast({ id: Date.now(), message: "Debe seleccionar un rol", type: "error" });
+      setToast({
+        id: Date.now(),
+        message: "Debe seleccionar un rol",
+        type: "error",
+      });
       return;
     }
     setIsSubmitting(true);
     try {
       const first_name = capitalize(firstNameRef.current!.value);
-      const middle_name = middleNameRef.current?.value.trim() ? capitalize(middleNameRef.current.value) : "";
+      const middle_name = middleNameRef.current?.value.trim()
+        ? capitalize(middleNameRef.current.value)
+        : "";
       const lastname = capitalize(lastNameRef.current!.value);
-      const second_lastname = secondLastNameRef.current?.value.trim() ? capitalize(secondLastNameRef.current.value) : "";
+      const second_lastname = secondLastNameRef.current?.value.trim()
+        ? capitalize(secondLastNameRef.current.value)
+        : "";
       const email = emailRef.current!.value.trim().toLowerCase();
       const rol = parseInt(rolValue);
 
       const res = await apiCall(API_CONFIG.ENDPOINTS.USER_REGISTER, {
         method: "POST",
-        body: JSON.stringify({ first_name, middle_name, lastname, second_lastname, document: parseInt(document), email, rol }),
+        body: JSON.stringify({
+          first_name,
+          middle_name,
+          lastname,
+          second_lastname,
+          document: parseInt(document),
+          email,
+          rol,
+        }),
       });
 
       if (res.ok) {
         cleanInputs();
-        setToast({ id: Date.now(), message: "Usuario registrado exitosamente. Se ha enviado la contraseña al correo.", type: "success" });
+        setToast({
+          id: Date.now(),
+          message:
+            "Usuario registrado exitosamente. Se ha enviado la contraseña al correo.",
+          type: "success",
+        });
       } else {
-        setToast({ id: Date.now(), message: res.detail || "Error al registrar usuario", type: "error" });
+        setToast({
+          id: Date.now(),
+          message: res.detail || "Error al registrar usuario",
+          type: "error",
+        });
       }
     } catch {
-      setToast({ id: Date.now(), message: "Error de conexión al registrar usuario", type: "error" });
+      setToast({
+        id: Date.now(),
+        message: "Error de conexión al registrar usuario",
+        type: "error",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -74,34 +111,56 @@ export default function SignUpLayout({ setToast }: Props) {
   return (
     <div className="w-full min-h-[calc(100vh-4rem)] bg-gradient-to-br from-base-200 to-base-300 p-4">
       <div className="max-w-4xl mx-auto space-y-4">
-
         {/* ── Header fuera del card ── */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-base-content flex items-center gap-3">
               <div className="w-12 h-12 bg-success/10 rounded-xl flex items-center justify-center">
-                <svg className="w-7 h-7 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                <svg
+                  className="w-7 h-7 text-success"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                  />
                 </svg>
               </div>
               Registrar Usuario
             </h1>
-            <p className="text-base-content/60 mt-1">Complete la información del nuevo usuario del sistema</p>
+            <p className="text-base-content/60 mt-1">
+              Complete la información del nuevo usuario del sistema
+            </p>
           </div>
 
           {/* Aviso contraseña temporal — a la derecha del título */}
           <div className="sm:max-w-xs flex-shrink-0">
             <div className="bg-warning/10 border border-warning/30 rounded-xl p-4 flex gap-3">
-              <svg className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              <svg
+                className="w-5 h-5 text-warning flex-shrink-0 mt-0.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                />
               </svg>
               <div>
-                <p className="text-sm font-semibold text-warning">Contraseña temporal</p>
+                <p className="text-sm font-semibold text-warning">
+                  Contraseña temporal
+                </p>
                 <p className="text-xs text-base-content/70 mt-1">
-                  El usuario registrado recibirá una contraseña temporal al correo registrado.
-                  Deberá cambiarla en su primer inicio de sesión.
+                  El usuario registrado recibirá una contraseña temporal al
+                  correo registrado. Deberá cambiarla en su primer inicio de
+                  sesión.
                 </p>
               </div>
             </div>
@@ -112,23 +171,61 @@ export default function SignUpLayout({ setToast }: Props) {
         <div className="card bg-base-100 shadow-xl border border-base-300">
           <div className="card-body p-6">
             <form onSubmit={handleSubmit} className="space-y-6">
-
               {/* Datos personales */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-8 h-8 bg-info/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    <svg
+                      className="w-4 h-4 text-info"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      />
                     </svg>
                   </div>
-                  <h2 className="font-semibold text-base-content">Datos personales</h2>
+                  <h2 className="font-semibold text-base-content">
+                    Datos personales
+                  </h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input title="Primer nombre *" placeholder="Primer nombre" type="text" required inputRef={firstNameRef} maxLength={20} />
-                  <Input title="Segundo nombre" placeholder="Segundo nombre (opcional)" type="text" required={false} inputRef={middleNameRef} maxLength={20} />
-                  <Input title="Primer apellido *" placeholder="Primer apellido" type="text" required inputRef={lastNameRef} maxLength={20} />
-                  <Input title="Segundo apellido" placeholder="Segundo apellido (opcional)" type="text" required={false} inputRef={secondLastNameRef} maxLength={20} />
+                  <Input
+                    title="Primer nombre *"
+                    placeholder="Primer nombre"
+                    type="text"
+                    required
+                    inputRef={firstNameRef}
+                    maxLength={20}
+                  />
+                  <Input
+                    title="Segundo nombre"
+                    placeholder="Segundo nombre (opcional)"
+                    type="text"
+                    required={false}
+                    inputRef={middleNameRef}
+                    maxLength={20}
+                  />
+                  <Input
+                    title="Primer apellido *"
+                    placeholder="Primer apellido"
+                    type="text"
+                    required
+                    inputRef={lastNameRef}
+                    maxLength={20}
+                  />
+                  <Input
+                    title="Segundo apellido"
+                    placeholder="Segundo apellido (opcional)"
+                    type="text"
+                    required={false}
+                    inputRef={secondLastNameRef}
+                    maxLength={20}
+                  />
                 </div>
               </div>
 
@@ -138,16 +235,40 @@ export default function SignUpLayout({ setToast }: Props) {
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    <svg
+                      className="w-4 h-4 text-primary"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                      />
                     </svg>
                   </div>
-                  <h2 className="font-semibold text-base-content">Contacto e identidad</h2>
+                  <h2 className="font-semibold text-base-content">
+                    Contacto e identidad
+                  </h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input title="Número de documento *" placeholder="Documento de identidad" type="number" required inputRef={documentRef} minLength={6} />
-                  <Input title="Correo electrónico *" placeholder="correo@ejemplo.com" type="email" required inputRef={emailRef} />
+                  <Input
+                    title="Número de documento *"
+                    placeholder="Documento de identidad"
+                    type="number"
+                    required
+                    inputRef={documentRef}
+                    minLength={6}
+                  />
+                  <Input
+                    title="Correo electrónico *"
+                    placeholder="correo@ejemplo.com"
+                    type="email"
+                    required
+                    inputRef={emailRef}
+                  />
                 </div>
               </div>
 
@@ -157,9 +278,18 @@ export default function SignUpLayout({ setToast }: Props) {
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-8 h-8 bg-success/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    <svg
+                      className="w-4 h-4 text-success"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                      />
                     </svg>
                   </div>
                   <h2 className="font-semibold text-base-content">Rol *</h2>
@@ -169,19 +299,54 @@ export default function SignUpLayout({ setToast }: Props) {
 
               {/* Botones */}
               <div className="flex justify-end gap-3 pt-4 border-t border-base-300">
-                <button type="button" className="btn btn-ghost gap-2" onClick={cleanInputs} disabled={isSubmitting}>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <button
+                  type="button"
+                  className="btn btn-ghost gap-2"
+                  onClick={cleanInputs}
+                  disabled={isSubmitting}
+                >
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                   Limpiar
                 </button>
-                <button type="submit" className="btn bg-green-600 hover:bg-green-700 text-white border-0 gap-2" disabled={isSubmitting}>
+                <button
+                  type="submit"
+                  className="btn bg-green-600 hover:bg-green-700 text-white border-0 gap-2"
+                  disabled={isSubmitting}
+                >
                   {isSubmitting ? (
-                    <><span className="loading loading-spinner loading-sm" />Registrando...</>
+                    <>
+                      <span className="loading loading-spinner loading-sm" />
+                      Registrando...
+                    </>
                   ) : (
-                    <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>Registrar Usuario</>
+                    <>
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                      Registrar Usuario
+                    </>
                   )}
                 </button>
               </div>

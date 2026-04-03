@@ -1,13 +1,13 @@
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import React from "react";
-import Input from "../../Input/Input";
+import Input from "../../Common/Input/Input";
 
 type Props = {
   setToast: (toast: {
-    id: number; 
-    message: string; 
+    id: number;
+    message: string;
     type: "success" | "error";
-    }) => void;
+  }) => void;
   onPermissionCreated?: () => void;
 };
 
@@ -23,11 +23,19 @@ export default function NewPermission({
       !permissionNameRef.current ||
       permissionNameRef.current.value.trim() === ""
     ) {
-      setToast({id: Date.now(),message:"El nombre del permiso es obligatorio",type:"error"});
+      setToast({
+        id: Date.now(),
+        message: "El nombre del permiso es obligatorio",
+        type: "error",
+      });
       return;
     }
     if (!menuPathRef.current || menuPathRef.current.value.trim() === "") {
-      setToast({id: Date.now(),message:"El menu_path es obligatorio",type:"error"});
+      setToast({
+        id: Date.now(),
+        message: "El menu_path es obligatorio",
+        type: "error",
+      });
       return;
     }
 
@@ -41,7 +49,11 @@ export default function NewPermission({
       });
 
       if (res.ok) {
-        setToast({id: Date.now(),message:"Permiso creado correctamente",type:"success"});
+        setToast({
+          id: Date.now(),
+          message: "Permiso creado correctamente",
+          type: "success",
+        });
         if (permissionNameRef.current) permissionNameRef.current.value = "";
         if (menuPathRef.current) menuPathRef.current.value = "";
 
@@ -49,11 +61,19 @@ export default function NewPermission({
           onPermissionCreated();
         }
       } else {
-        setToast({id: Date.now(), message:res.detail || "Error al crear el permiso",type:"error"});
+        setToast({
+          id: Date.now(),
+          message: res.detail || "Error al crear el permiso",
+          type: "error",
+        });
       }
     } catch (e) {
       /* console.error("Error al hacer fetch:", e); */
-      setToast({id: Date.now(),message:"Error al crear el permiso",type:"error"});
+      setToast({
+        id: Date.now(),
+        message: "Error al crear el permiso",
+        type: "error",
+      });
     }
   };
 

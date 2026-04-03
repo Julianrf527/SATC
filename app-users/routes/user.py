@@ -403,7 +403,6 @@ async def actualizar_estado(
         logger.error(f"Error en el servidor al cambiar estado: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.patch("/toggleRol/{user_id}/{rol_id}")
 async def actualizar_rol_usuario(
     request: Request,
