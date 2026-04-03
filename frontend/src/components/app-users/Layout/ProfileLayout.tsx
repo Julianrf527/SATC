@@ -1,20 +1,20 @@
 import React, { useEffect, useState } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import { useNavigate } from "react-router-dom";
-import TitleForm from "../../Label/TitleForm";
-import Input from "../../Input/Input";
-import MailInput from "../../Input/MailInput";
-import PasswordInput from "../../Input/PasswordInput";
+import TitleForm from "../../Common/Label/TitleForm";
+import Input from "../../Common/Input/Input";
+import MailInput from "../../Common/Input/MailInput";
+import PasswordInput from "../../Common/Input/PasswordInput";
 
 type Props = {
   setToast: (toast: {
-    id: number; 
-    message: string; 
+    id: number;
+    message: string;
     type: "success" | "error";
-    }) => void;
+  }) => void;
 };
 
-export default function ProfileLayout({setToast}: Props) {
+export default function ProfileLayout({ setToast }: Props) {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingData, setIsSavingData] = useState(false);
@@ -38,7 +38,6 @@ export default function ProfileLayout({setToast}: Props) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
-
 
   // Cargar datos del usuario al montar el componente
   useEffect(() => {
@@ -67,11 +66,19 @@ export default function ProfileLayout({setToast}: Props) {
           setSecondLastNameOriginal(segundoApellido);
           setEmailOriginal(correo);
         } else {
-          setToast({id: Date.now(), message:"Error al cargar los datos del usuario",type: "error"});
+          setToast({
+            id: Date.now(),
+            message: "Error al cargar los datos del usuario",
+            type: "error",
+          });
         }
       } catch (error) {
         /* console.error("Error al cargar datos:", error); */
-        setToast({id: Date.now(), message: "Error al cargar los datos del usuario",type: "error"});
+        setToast({
+          id: Date.now(),
+          message: "Error al cargar los datos del usuario",
+          type: "error",
+        });
       } finally {
         setIsLoading(false);
       }
@@ -107,12 +114,20 @@ export default function ProfileLayout({setToast}: Props) {
 
     // Validaciones
     if (!firstName.trim()) {
-      setToast({id: Date.now(), message: "El primer nombre es obligatorio",type: "error"});
+      setToast({
+        id: Date.now(),
+        message: "El primer nombre es obligatorio",
+        type: "error",
+      });
       return;
     }
 
     if (!lastName.trim()) {
-      setToast({id: Date.now(), message:"El primer apellido es obligatorio",type: "error"});
+      setToast({
+        id: Date.now(),
+        message: "El primer apellido es obligatorio",
+        type: "error",
+      });
       return;
     }
 
@@ -133,19 +148,31 @@ export default function ProfileLayout({setToast}: Props) {
       });
 
       if (res.ok) {
-        setToast({id: Date.now(), message: "Datos actualizados. Cerrando sesión...", type: "success"});
+        setToast({
+          id: Date.now(),
+          message: "Datos actualizados. Cerrando sesión...",
+          type: "success",
+        });
 
         // Esperar 2 segundos para que se vea el mensaje y luego hacer logout
         setTimeout(() => {
           handleLogout();
         }, 2000);
       } else {
-        setToast({id: Date.now(),message: res.detail || "Error al actualizar datos",type: "error"});
+        setToast({
+          id: Date.now(),
+          message: res.detail || "Error al actualizar datos",
+          type: "error",
+        });
         setIsSavingData(false);
       }
     } catch (error) {
       /* console.error("Error al actualizar datos:", error); */
-      setToast({id: Date.now(),message: "Error de conexión al actualizar datos",type: "error"});
+      setToast({
+        id: Date.now(),
+        message: "Error de conexión al actualizar datos",
+        type: "error",
+      });
       setIsSavingData(false);
     }
   };
@@ -186,19 +213,31 @@ export default function ProfileLayout({setToast}: Props) {
       });
 
       if (res.ok) {
-        setToast({id: Date.now(), message: "Contraseña actualizada. Cerrando sesión...",type: "success"});
+        setToast({
+          id: Date.now(),
+          message: "Contraseña actualizada. Cerrando sesión...",
+          type: "success",
+        });
 
         // Esperar 2 segundos para que se vea el mensaje y luego hacer logout
         setTimeout(() => {
           handleLogout();
         }, 2000);
       } else {
-        setToast({id: Date.now(),message:res.detail || "Error al cambiar contraseña",type: "error"});
+        setToast({
+          id: Date.now(),
+          message: res.detail || "Error al cambiar contraseña",
+          type: "error",
+        });
         setIsSavingPassword(false);
       }
     } catch (error) {
       /* console.error("Error al cambiar contraseña:", error); */
-      setToast({id: Date.now(),message:"Error de conexión al cambiar contraseña",type: "error"});
+      setToast({
+        id: Date.now(),
+        message: "Error de conexión al cambiar contraseña",
+        type: "error",
+      });
       setIsSavingPassword(false);
     }
   };

@@ -1,7 +1,7 @@
-from fastapi import Request, APIRouter, Depends, HTTPException, Query
+from fastapi import Request, APIRouter, Depends, HTTPException, Query,  Path as PathParam
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, and_, func, desc
+from sqlalchemy import select, update, and_, func, desc, insert
 from datetime import datetime, date
 from pydantic import BaseModel
 from pathlib import Path
@@ -27,6 +27,10 @@ from db.models.acto_admin import ActoAdministrativo
 from db.models.comunicacion import Comunicacion
 from db.models.notificacion import Notificacion
 from db.models.documento_anexo import DocumentoAnexo
+from db.models.tipo_notificacion import TipoNotificacion
+from db.models.auditoria import Auditoria
+
+from core.permission import Permission
 
 
 router = APIRouter()
@@ -34,14 +38,14 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXP_DAYS = os.getenv("JWT_EXP_DAYS")
-ENCARGADO_PERMISSION = os.getenv("ENCARGADO_PERMISSION")
-FILE_PERMISSION = os.getenv("FILE_PERMISSION")
-LOG_PERMISSION = os.getenv("LOG_PERMISSION")
 GATEWAY_URL = os.getenv("API_GATEWAY_URL")
 
+ASSIGN_PERMISSION = Permission.ASSIGN_PERMISSION
+FILE_MANAGE = Permission.FILE_MANAGE
+LOG_PERMISSION = Permission.LOG_PERMISSION
 
 bogota_tz = pytz.timezone("America/Bogota")
-BASE_DIR = Path(__file__).resolve().parent.parent.parent  # Subir a ApiCorp
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 DOCS_DIR = BASE_DIR / "uploads" / "expedientes"
 
 # ---------- LOGGER ------------
@@ -54,7 +58,7 @@ logger = logging.getLogger(__name__)
 
 # ---------- MODELOS ----------
 
-class FileModal(BaseModel):
+class ExpedienteSchema(BaseModel):
     radicado : str
     expediente : str
     recurso: List[int]
@@ -64,27 +68,16 @@ class FileModal(BaseModel):
     vereda: int
     direccion: str
 
-class Procedure(BaseModel):
-    radicado: str
-    etapaId: int
-    tipoNotificacion: int
-    nombre: str
-
-class Decision(BaseModel):
-    tipo_sancion_id: int
-    detalle: str
-    etapa_id: int
-
-class Execution(BaseModel):
-    cobro_coactivo: bool
-    disposicion: bool
-    ruia: bool
-    act_admin: str
-    fecha_act: date
-    etapa_id: int
+class FileUpdate(BaseModel):
+    radicado : str
+    expediente : str
+    recurso: List[int]
+    motivo: str
+    vereda: int
+    direccion: str
 
 class BulkEncargadoRequest(BaseModel):
-    radicados: List[str]
+    expediente_id: List[int]
     encargado_id: int
 
 class FiltroAvanzado(BaseModel):
@@ -98,12 +91,12 @@ class FiltroAvanzado(BaseModel):
 
 #----------- FUNCIONES ------------
 
-from utils.verify_gateway_token import verify_gateway_token
-from utils.involved_client import get_involucrados_por_radicados
-from services.usuarios import obtener_info_usuarios, obtener_usuarios_por_permiso, crear_notificacion_usuario, verificar_permiso_externo
-# from services.alertas import calcular_alertas_expediente  # Importar dinámicamente para evitar errores de carga
-
-from services.crud_file_operations import insert_auditoria
+from utils.verify_token import verify_gateway_token
+from utils.log import insert_log
+from services.involved import get_involucrados_by_ids
+from services.users import get_users_by_permission, get_user_info, verify_external_permission, create_user_notification
+from services.alertas import calcular_alertas_expediente
+from services.docs import download_unified_pdf
 
 # ---------- ENDPOINTS ----------
 
@@ -119,7 +112,7 @@ async def obtener_expedientes(
     encargado_id: int = Query(None),
 ):
     try:
-        usuario_id = verify_gateway_token(request)
+        verify_gateway_token(request)
 
         fecha = None
         if fecha_creacion:
@@ -164,7 +157,7 @@ async def obtener_expedientes(
         data_stmt = data_stmt.offset((page - 1) * limit).limit(limit)
         rows = (await db.execute(data_stmt)).all()
 
-        usuarios_disponibles = await obtener_usuarios_por_permiso(FILE_PERMISSION)
+        usuarios_disponibles = await get_users_by_permission(FILE_MANAGE)
 
         payload = [
             {
@@ -181,7 +174,7 @@ async def obtener_expedientes(
         usuarios_disponibles_lista = [
             {
                 "id": user_id,
-                "name": info["nombre"],
+                "nombre": info["nombre"],
             }
             for user_id, info in usuarios_disponibles.items()
         ]
@@ -211,12 +204,7 @@ async def filtrar_expedientes(
     
     """
     try:
-        usuario_id = verify_gateway_token(request)
-        
-        logger.info(f"====== INICIO FILTRADO AVANZADO ======")
-        logger.info(f"Usuario: {usuario_id}")
-        logger.info(f"Filtros recibidos: {filtros.model_dump()}")
-        print(f"\n[DEBUG] Filtros: {filtros.model_dump()}\n")
+        user_id = verify_gateway_token(request)["user_id"]
 
         # Consulta base con joins necesarios
         stmt = (
@@ -231,7 +219,7 @@ async def filtrar_expedientes(
                 Expediente.vereda_id
             )
             .join(Vereda, Vereda.id == Expediente.vereda_id, isouter=True)
-            .where(Expediente.encargado_id == usuario_id)
+            .where(Expediente.encargado_id == user_id)
         )
 
         condiciones = []
@@ -272,17 +260,18 @@ async def filtrar_expedientes(
             logger.info("No se encontraron expedientes con los filtros aplicados")
             return JSONResponse(content={"ok": True, "data": []}, status_code=200)
 
-        radicados = [r[0] for r in expedientes_raw]
+        expediente_ids = [r[0] for r in expedientes_raw]
+        radicados = [r[1] for r in expedientes_raw]
         radicados_filtrados = set(radicados)
 
         # Filtro: Recursos afectados (múltiples)
         if filtros.recurso_ids:
             logger.info(f"Filtrando por recursos: {filtros.recurso_ids}")
             stmt_recursos = (
-                select(ExpedienteRecurso.expediente_radicado)
+                select(ExpedienteRecurso.expediente_id)
                 .where(
                     and_(
-                        ExpedienteRecurso.expediente_radicado.in_(radicados),
+                        ExpedienteRecurso.expediente_id.in_(expediente_ids),
                         ExpedienteRecurso.recurso_id.in_(filtros.recurso_ids)
                     )
                 )
@@ -309,7 +298,7 @@ async def filtrar_expedientes(
             municipios_map = {m_id: {"id": m_id, "name": m_nombre} for m_id, m_nombre in res_mun.all()}
 
         # Obtener involucrados
-        involucrados_map = await get_involucrados_por_radicados(db, list(radicados_filtrados), GATEWAY_URL)
+        involucrados_map = await get_involucrados_by_ids(db, list(expediente_ids))
 
         # Construir respuesta
         data = []
@@ -331,16 +320,8 @@ async def filtrar_expedientes(
     except Exception as e:
         import traceback
         error_detail = traceback.format_exc()
-        logger.error(f"ERROR CRÍTICO en filtrado avanzado")
-        logger.error(f"Tipo de error: {type(e).__name__}")
-        logger.error(f"Mensaje: {str(e)}")
-        logger.error(f"Traceback completo:\n{error_detail}")
-        print(f"\n{'='*80}")
-        print(f"ERROR EN ENDPOINT /filter")
-        print(f"{'='*80}")
-        print(error_detail)
-        print(f"{'='*80}\n")
-        raise HTTPException(status_code=500, detail=f"Error al aplicar filtros: {str(e)}")
+        logger.error(f"Error en filtrar_expedientes: {e}\n{error_detail}")
+        raise HTTPException(status_code=500, detail=f"Error al aplicar filtros.")
 
 @router.get("/affected-resource")
 async def obtener_recurso_afectado(
@@ -348,7 +329,7 @@ async def obtener_recurso_afectado(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        usuario_id = verify_gateway_token(request)
+        verify_gateway_token(request)
         stmr = select(RecursoAfectado)
         result = await db.execute(stmr)
         result = result.scalars().all()
@@ -356,7 +337,7 @@ async def obtener_recurso_afectado(
         data = [
             {
                 "id": ra.id,
-                "name": ra.nombre
+                "nombre": ra.nombre
             }
             for ra in result
         ]
@@ -364,7 +345,248 @@ async def obtener_recurso_afectado(
         return JSONResponse(content={"ok": True, "data": data}, status_code=200)
 
     except Exception as e:
+        logger.error(f"Error en obtener_recurso_afectado: {e}")
         raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+#Nuevos
+@router.get("/full/{expediente_id}")
+async def obtener_expediente_completo_por_expediente_id(
+    request:Request,
+    expediente_id: int = PathParam(..., description="ID del expediente"),
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        user_id = verify_gateway_token(request)["user_id"]
+
+        # 1) Última etapa por expediente
+        latest_etapa_subq = (
+            select(
+                Etapa.expediente_id,
+                Etapa.tipo_etapa_id,
+                func.row_number().over(
+                    partition_by=Etapa.expediente_id,
+                    order_by=Etapa.fecha_inicio.desc()
+                ).label("rn")
+            ).subquery()
+        )
+
+        # 2) Consulta principal 
+        stmt = (
+            select(
+                Expediente.id,
+                Expediente.radicado,
+                Expediente.motivo_afectacion,
+                Expediente.direccion,
+                Expediente.vereda_id,
+                Expediente.id_auxiliar,
+                TipoEtapa.nombre.label("ultima_etapa")
+            )
+            .join(
+                latest_etapa_subq,
+                (latest_etapa_subq.c.expediente_id == Expediente.id)
+                & (latest_etapa_subq.c.rn == 1),
+                isouter=True
+            )
+            .join(TipoEtapa, TipoEtapa.id == latest_etapa_subq.c.tipo_etapa_id, isouter=True)
+            .where(Expediente.id == expediente_id)
+        )
+
+        res = await db.execute(stmt)
+        expedientes_raw = res.all()
+
+        if not expedientes_raw:
+            return JSONResponse(content={"ok": True, "data": []}, status_code=200)
+
+        # 3) Verificar permisos
+        stmt_check = select(Expediente.encargado_id).where(Expediente.id == expediente_id)
+        res_check = await db.execute(stmt_check)
+        current_encargado = res_check.scalar_one_or_none()
+
+        if current_encargado is None:
+            raise HTTPException(status_code=404, detail="Expediente no encontrado")
+
+        if current_encargado != user_id:
+            raise HTTPException(status_code=403, detail="No tiene permisos para ver este expediente")
+
+        expediente_ids = [r[0] for r in expedientes_raw]
+        vereda_ids = [r[4] for r in expedientes_raw if r[4]]
+
+        # 4) Recursos afectados 
+        recursos_map = defaultdict(list)
+        if expediente_ids:
+            stmr_rec = (
+                select(
+                    ExpedienteRecurso.expediente_id,
+                    ExpedienteRecurso.recurso_id,
+                )
+                .where(ExpedienteRecurso.expediente_id.in_(expediente_ids))
+            )
+            res_rec = await db.execute(stmr_rec)
+            for exp_id, recurso_id in res_rec.all():
+                recursos_map[exp_id].append(recurso_id)
+
+        # 5) Involucrados - TODA LA DATA (como en /file/{encargado_id})
+        involucrados_map = await get_involucrados_by_ids(db, expediente_ids)
+
+        # 6) Veredas (map id -> {id, name})
+        veredas_map = {}
+        if vereda_ids:
+            res_ver = await db.execute(
+                select(Vereda.id, Vereda.nombre)
+                .where(Vereda.id.in_(vereda_ids))
+            )
+            veredas_map = {v_id: {"id": v_id, "name": v_name} for v_id, v_name in res_ver.all()}
+
+        # 7) Armar respuesta con toda la data
+        exp_dict = {}
+        for expediente_id, radicado, motivo, direccion, vereda_id, id_auxiliar, ultima_etapa in expedientes_raw:
+            exp_dict = {
+                "radicado": radicado,
+                "recurso_afectado": recursos_map.get(expediente_id, []),
+                "motivo_afectacion": motivo,
+                "direccion": direccion,
+                "vereda": veredas_map.get(vereda_id),
+                "id_auxiliar": id_auxiliar,
+                "ultima_etapa": ultima_etapa,
+                "involucrados": involucrados_map.get(expediente_id, []),
+            }
+
+        # 8) Obtener las etapas que tiene el expediente (tipo_etapa_id)
+        stmt_etapas = (
+            select(TipoEtapa.id)
+            .join(Etapa, Etapa.tipo_etapa_id == TipoEtapa.id)
+            .where(Etapa.expediente_id == expediente_id)
+            .distinct()
+        )
+        res_etapas = await db.execute(stmt_etapas)
+        etapas_existentes = [etapa_id for (etapa_id,) in res_etapas.all()]
+
+        stmt = select(TipoNotificacion)
+        res = await db.execute(stmt)
+        tnotificaciones = res.scalars().all()
+        tnotificaciones_list = [{"id": tn.id, "nombre": tn.nombre} for tn in tnotificaciones]
+
+        return JSONResponse(
+            content={
+                "ok": True, 
+                "data": exp_dict,
+                "tipo_notificacion": tnotificaciones_list,
+                "etapas_existentes": etapas_existentes
+            }, 
+            status_code=200
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error en obtener_expediente_completo_por_expediente_id: {e}")
+        raise HTTPException(status_code=500, detail="Error del servidor")
+
+@router.put("/{expediente_id}/basic-data")
+async def actualizar_informacion_expediente(
+    request: Request,
+    expediente_id: int,
+    file: FileUpdate,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        user_id = verify_gateway_token(request)["user_id"]
+
+        stmt_check = select(Expediente).where(Expediente.int == expediente_id)
+        res_check = await db.execute(stmt_check)
+        expediente_actual = res_check.scalar_one_or_none()
+
+        if expediente_actual is None:
+            raise HTTPException(status_code=404, detail="Expediente no encontrado")
+        if expediente_actual.encargado_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="No tiene permisos para actualizar este expediente"
+            )
+
+        # Obtener recursos anteriores
+        stmt_recursos = select(ExpedienteRecurso.recurso_id).where(
+            ExpedienteRecurso.expediente_id == expediente_id
+        )
+        res_recursos = await db.execute(stmt_recursos)
+        recursos_anteriores = [row[0] for row in res_recursos.fetchall()]
+
+        datos_anteriores = {
+            "radicado": expediente_actual.radicado,
+            "nombre_expediente": expediente_actual.nombre_expediente,
+            "motivo_afectacion": expediente_actual.motivo_afectacion,
+            "direccion": expediente_actual.direccion,
+            "vereda_id": expediente_actual.vereda_id,
+            "recursos": recursos_anteriores
+        }
+
+        stmr = select(Expediente).where(Expediente.radicado == file.radicado)
+        result = await db.execute(stmr)
+        duplicate_rol = result.scalar_one_or_none()
+
+        if duplicate_rol:
+            raise HTTPException(status_code=409, detail="El radicado ya está en uso.")
+
+        stmr = (
+            update(Expediente)
+            .where(Expediente.id == expediente_id)
+            .values(
+                radicado=file.radicado,
+                nombre_expediente=file.expediente,
+                motivo_afectacion=file.motivo,
+                direccion=file.direccion,
+                vereda_id=file.vereda,
+            )
+        )
+        await db.execute(stmr)
+
+        if file.recurso:
+            for recurso_id in file.recurso:
+                insert_stmt = insert(ExpedienteRecurso).values(
+                    expediente_id=expediente_id,
+                    recurso_id=recurso_id
+                ).on_conflict_do_nothing()
+                await db.execute(insert_stmt)
+
+        datos_nuevos = {
+            "radicado": file.radicado,
+            "nombre_expediente": file.expediente,
+            "motivo_afectacion": file.motivo,
+            "direccion": file.direccion,
+            "vereda_id": file.vereda,
+            "recursos": file.recurso
+        }
+
+        audit_result = await insert_log(
+            db=db,
+            usuario_id=user_id,
+            tabla_afectada="expediente",
+            tipo_operacion="UPDATE",
+            descripcion=f"Actualización de expediente '{file.radicado}'",
+            expediente_radicado=file.radicado,
+            id_registro=file.radicado,
+            datos_anteriores=datos_anteriores,
+            datos_nuevos=datos_nuevos
+        )
+
+        if not audit_result["ok"]:
+            await db.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail="Error al guardar registro de auditoría"
+            )
+
+        await db.commit()
+
+        return JSONResponse(content={"ok": True}, status_code=200)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Error en actualizar_informacion_expediente: {e}")
+        raise HTTPException(status_code=500, detail="Error del servidor")
+
 
 @router.get("/get/all")
 async def obtener_expedientes_para_vista(
@@ -372,7 +594,7 @@ async def obtener_expedientes_para_vista(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        usuario_id = verify_gateway_token(request)
+        verify_gateway_token(request)
 
         latest_etapa_subq = (
             select(
@@ -392,7 +614,7 @@ async def obtener_expedientes_para_vista(
             )
             .join(
                 latest_etapa_subq,
-                (latest_etapa_subq.c.expediente_radicado == Expediente.radicado) &
+                (latest_etapa_subq.c.expediente_id == Expediente.id) &
                 (latest_etapa_subq.c.rn == 1),
                 isouter=True
             )
@@ -411,23 +633,23 @@ async def obtener_expedientes_para_vista(
             exp.nombre_tipo_etapa = nombre_tipo_etapa
             expedientes.append(exp)
 
-        radicados = [exp.radicado for exp in expedientes]
+        expediente_ids = [exp.id for exp in expedientes]
 
         recursos_map = defaultdict(list)
-        if radicados:
+        if expediente_ids:
             st_rec = (
                 select(
-                    ExpedienteRecurso.expediente_radicado,
+                    ExpedienteRecurso.expediente_id,
                     ExpedienteRecurso.recurso_id,
                 )
-                .where(ExpedienteRecurso.expediente_radicado.in_(radicados))
+                .where(ExpedienteRecurso.expediente_id.in_(expediente_ids))
             )
             res_rec = await db.execute(st_rec)
             for rad, recurso_id in res_rec.all():
                 recursos_map[rad].append(recurso_id)
 
         # Obtener involucrados
-        involucrados_map = await get_involucrados_por_radicados(db, radicados, GATEWAY_URL)
+        involucrados_map = await get_involucrados_by_ids(db, expediente_ids)
 
         vereda_ids = [exp.vereda_id for exp in expedientes if exp.vereda_id]
         veredas_map = {}
@@ -475,7 +697,8 @@ async def obtener_expedientes_para_vista(
 
         return JSONResponse(content={"ok": True, "data": data}, status_code=200)
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error en obtener_expedientes_para_vista: {e}")
         raise HTTPException(status_code=500, detail="Error del servidor")
 
 @router.get("/{encargado_id}")
@@ -533,8 +756,8 @@ async def obtener_expedientes_por_encargado(
         if not expedientes_raw:
             return JSONResponse(content={"ok": True, "data": []}, status_code=200)
 
-        radicados = [r[0] for r in expedientes_raw]
-        municipio_ids = [r[3] for r in expedientes_raw if r[3] is not None]
+        expediente_ids = [r[0] for r in expedientes_raw]
+        municipio_ids = [r[4] for r in expedientes_raw if r[4] is not None]
 
         municipios_map = {}
         if municipio_ids:
@@ -543,12 +766,12 @@ async def obtener_expedientes_por_encargado(
                 .where(Municipio.id.in_(municipio_ids))
             )
             municipios_map = {
-                m_id: {"id": m_id, "name": m_nombre}
+                m_id: {"id": m_id, "nombre": m_nombre}
                 for m_id, m_nombre in res_mun.all()
             }
 
         # Obtener involucrados
-        involucrados_map = await get_involucrados_por_radicados(db, radicados, GATEWAY_URL)
+        involucrados_map = await get_involucrados_by_ids(db, expediente_ids)
 
         data = []
         for id, rad, exp, fecha_crea, municipio_id, ultima_etapa in expedientes_raw:
@@ -558,81 +781,83 @@ async def obtener_expedientes_por_encargado(
                 "expediente": exp,
                 "fecha_creacion": fecha_crea.isoformat() if fecha_crea else None,
                 "municipio": municipios_map.get(municipio_id),
-                "involucrados": involucrados_map.get(rad, []),
+                "involucrados": involucrados_map.get(id, []),
                 "ultima_etapa": ultima_etapa
             })
 
         return JSONResponse(content={"ok": True, "data": data}, status_code=200)
 
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error en obtener_expedientes_por_encargado: {e}")
         raise HTTPException(status_code=500, detail="Error del servidor")
-
+#Revisado
 @router.post("/add")
 async def agregar_expediente(
     request: Request,
-    file: FileModal,
+    expediente: ExpedienteSchema,
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        usuario_id = verify_gateway_token(request)
+        user_id = verify_gateway_token(request)["user_id"]
 
-        stmt = select(Expediente).where(Expediente.radicado == file.radicado)
+        stmt = select(Expediente).where(Expediente.radicado == expediente.radicado)
         result = await db.execute(stmt)
         existing_file = result.scalar_one_or_none()
 
         if existing_file:
             raise HTTPException(status_code=400, detail="El radicado ya existe")
         
-        stmt = select(Expediente).where(Expediente.expediente == file.expediente)
+        stmt = select(Expediente).where(Expediente.expediente == expediente.expediente)
         result = await db.execute(stmt)
         existing_file = result.scalar_one_or_none()
         if existing_file:
             raise HTTPException(status_code=400, detail="El número de expediente ya existe")
 
-        new_file = Expediente(
-            radicado=file.radicado,
-            expediente=file.expediente,
-            motivo_afectacion=file.motivo,
-            encargado_id=file.encargado_id,
-            direccion=file.direccion,
-            vereda_id=file.vereda,
+        nuevo_expediente = Expediente(
+            radicado=expediente.radicado,
+            expediente=expediente.expediente,
+            motivo_afectacion=expediente.motivo,
+            encargado_id=expediente.encargado_id,
+            direccion=expediente.direccion,
+            vereda_id=expediente.vereda,
         )
 
-        db.add(new_file)
-        await db.flush()
+        db.add(nuevo_expediente)       
+        await db.flush()                
+        expediente_id = nuevo_expediente.id  
 
-        for recurso_id in file.recurso:
+        for recurso_id in expediente.recurso:
             db.add(
                 ExpedienteRecurso(
-                    expediente_radicado=file.radicado,
+                    expediente_radicado=expediente.radicado,
                     recurso_id=recurso_id,
                 )
             )
 
         datos_nuevos = {
-            "radicado": file.radicado,
-            "expediente": file.expediente,
-            "motivo_afectacion": file.motivo,
-            "encargado_id": file.encargado_id,
-            "direccion": file.direccion,
-            "vereda_id": file.vereda,
-            "recursos": file.recurso
+            "radicado": expediente.radicado,
+            "expediente": expediente.expediente,
+            "motivo_afectacion": expediente.motivo,
+            "encargado_id": expediente.encargado_id,
+            "direccion": expediente.direccion,
+            "vereda_id": expediente.vereda,
+            "recursos": expediente.recurso
         }
 
         # Obtener información del usuario para auditoría
-        user_info = get_user_info_from_headers(request)
+        user_info = await get_user_info([user_id])
 
-        audit_result = await insert_auditoria(
+        audit_result = await insert_log(
             db=db,
-            usuario_id=usuario_id,
-            documento_usuario=user_info["documento"],
-            nombre_usuario=user_info["nombre"],
+            usuario_id=user_id,
+            documento_usuario=user_info[user_id]["documento"],
+            nombre_usuario=user_info[user_id]["nombre"],
             tabla_afectada="expediente",
             tipo_operacion="INSERT",
-            descripcion=f"Creación de expediente {file.radicado}",
-            expediente_id=new_file.id,
-            expediente_radicado=file.radicado,
-            id_registro=file.radicado,
+            descripcion=f"Creación de expediente {expediente.radicado}",
+            expediente_id=expediente_id,
+            expediente_radicado=expediente.radicado,
+            id_registro=expediente.id,
             datos_nuevos=datos_nuevos
         )
 
@@ -644,10 +869,10 @@ async def agregar_expediente(
             )
 
         await db.commit()
-        await db.refresh(new_file)
+        await db.refresh(nuevo_expediente)
 
         return JSONResponse(
-            content={"ok": True, "radicado": new_file.radicado},
+            content={"ok": True, "expediente_id": expediente_id},
             status_code=200
         )
 
@@ -665,8 +890,8 @@ async def actualizar_encargado_de_expediente(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        usuario_id = verify_gateway_token(request)
-        res = await verificar_permiso_externo(usuario_id, ENCARGADO_PERMISSION)
+        user_id = verify_gateway_token(request)["user_id"]
+        res = await verify_external_permission(user_id, ASSIGN_PERMISSION)
 
         if not res["ok"]:
             raise HTTPException(status_code=403, detail="No cuenta con permisos")
@@ -704,14 +929,14 @@ async def actualizar_encargado_de_expediente(
         }
 
         # Obtener información del usuario para auditoría
-        user_info = get_user_info_from_headers(request)
+        user_info = await get_user_info([user_id])
 
         # Guardar auditoría
-        audit_result = await insert_auditoria(
+        audit_result = await insert_log(
             db=db,
-            usuario_id=usuario_id,
-            documento_usuario=user_info["documento"],
-            nombre_usuario=user_info["nombre"],
+            usuario_id=user_id,
+            documento_usuario=user_info[user_id]["documento"],
+            nombre_usuario=user_info[user_id]["nombre"],
             tabla_afectada="expediente",
             tipo_operacion="UPDATE",
             descripcion=f"Actualización de encargado del expediente {expediente.radicado}",
@@ -733,7 +958,7 @@ async def actualizar_encargado_de_expediente(
 
         # Crear notificación si se asignó un encargado
         if encargado_id != 0:
-            notif_result = await crear_notificacion_usuario(
+            notif_result = await create_user_notification(
                 mensaje=f"Se te ha asignado el expediente {expediente.radicado}",
                 ruta=f"/expedientes/{expediente_id}",
                 usuario_id=encargado_id
@@ -764,57 +989,75 @@ async def actualizar_encargado_bulk(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        usuario_id = verify_gateway_token(request)
-        res = await verificar_permiso_externo(usuario_id, ENCARGADO_PERMISSION)
+        user_id = verify_gateway_token(request)["user_id"]
+        res = await verify_external_permission(user_id, ASSIGN_PERMISSION)
 
         if not res["ok"]:
             raise HTTPException(status_code=403, detail="No cuenta con permisos")
 
         # Obtener información del usuario para auditoría
-        user_info = get_user_info_from_headers(request)
+        user_info_map = await get_user_info([user_id])
+        user_info = user_info_map.get(user_id, {"documento": "N/A", "nombre": "N/A"})
+
+        expediente_ids = list(dict.fromkeys(data.expediente_id or []))
+        if not expediente_ids:
+            raise HTTPException(status_code=400, detail="Debe enviar al menos un expediente_id")
 
         new_value = None if data.encargado_id == 0 else data.encargado_id
         updated = []
 
-        for radicado in data.radicados:
-            stmt_check = select(Expediente).where(Expediente.radicado == radicado)
-            res_check = await db.execute(stmt_check)
-            expediente = res_check.scalar_one_or_none()
-            if expediente is None:
-                continue
+        # Cargar expedientes existentes en una sola consulta.
+        res_check = await db.execute(
+            select(Expediente).where(Expediente.id.in_(expediente_ids))
+        )
+        expedientes = res_check.scalars().all()
 
-            datos_anteriores = {"radicado": radicado, "encargado_id": expediente.encargado_id}
-
-            await db.execute(
-                update(Expediente)
-                .where(Expediente.radicado == radicado)
-                .values({Expediente.encargado_id: new_value})
-                .execution_options(synchronize_session=False)
+        if not expedientes:
+            return JSONResponse(
+                content={"ok": True, "updated": [], "msg": "No se encontraron expedientes para actualizar"},
+                status_code=200,
             )
 
-            await insert_auditoria(
+        ids_existentes = [exp.id for exp in expedientes]
+
+        # Actualización masiva en una sola sentencia SQL.
+        await db.execute(
+            update(Expediente)
+            .where(Expediente.id.in_(ids_existentes))
+            .values({Expediente.encargado_id: new_value})
+            .execution_options(synchronize_session=False)
+        )
+
+        # Se mantiene auditoría por cada expediente actualizado.
+        for expediente in expedientes:
+            datos_anteriores = {
+                "radicado": expediente.radicado,
+                "encargado_id": expediente.encargado_id,
+            }
+
+            await insert_log(
                 db=db,
-                usuario_id=usuario_id,
+                usuario_id=user_id,
                 documento_usuario=user_info["documento"],
                 nombre_usuario=user_info["nombre"],
                 tabla_afectada="expediente",
                 tipo_operacion="UPDATE",
-                descripcion=f"Actualización masiva de encargado del expediente {radicado}",
+                descripcion=f"Actualización masiva de encargado del expediente {expediente.radicado}",
                 expediente_id=expediente.id,
-                expediente_radicado=radicado,
-                id_registro=radicado,
+                expediente_radicado=expediente.radicado,
+                id_registro=expediente.id,
                 datos_anteriores=datos_anteriores,
-                datos_nuevos={"radicado": radicado, "encargado_id": new_value}
+                datos_nuevos={"radicado": expediente.radicado, "encargado_id": new_value},
             )
-            updated.append(radicado)
+            updated.append({"id": expediente.id, "radicado": expediente.radicado})
 
         await db.commit()
 
         if new_value:
-            for radicado in updated:
-                await crear_notificacion_usuario(
-                    mensaje=f"Se te ha asignado el expediente {radicado}",
-                    ruta=f"/expedientes/{radicado}",
+            for expediente_actualizado in updated:
+                await create_user_notification(
+                    mensaje=f"Se te ha asignado el expediente {expediente_actualizado['radicado']}",
+                    ruta=f"/expedientes/{expediente_actualizado['id']}",
                     usuario_id=new_value
                 )
 
@@ -834,7 +1077,7 @@ async def actualizar_encargado_bulk(
 @router.patch("/{expediente_id}/archive")
 async def archivar_expediente(
     request: Request,
-    expediente_id: str,
+    expediente_id: int,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -842,7 +1085,7 @@ async def archivar_expediente(
     Esta acción no se puede revertir.
     """
     try:
-        usuario_id = verify_gateway_token(request)
+        user_id = verify_gateway_token(request)["user_id"]
 
         # Obtener datos anteriores
         stmt_check = select(Expediente).where(Expediente.id == expediente_id)
@@ -853,7 +1096,7 @@ async def archivar_expediente(
             raise HTTPException(status_code=404, detail="Expediente no encontrado")
 
         # Verificar que el usuario es el encargado
-        if expediente.encargado_id != usuario_id:
+        if expediente.encargado_id != user_id:
             raise HTTPException(status_code=403, detail="No tiene permisos para archivar este expediente")
 
         # Verificar si ya está archivado
@@ -883,12 +1126,12 @@ async def archivar_expediente(
         }
 
         # Obtener información del usuario para auditoría
-        user_info = get_user_info_from_headers(request)
+        user_info = await get_user_info([user_id])
 
         # Guardar auditoría
-        audit_result = await insert_auditoria(
+        audit_result = await insert_log(
             db=db,
-            usuario_id=usuario_id,
+            usuario_id=user_id,
             documento_usuario=user_info["documento"],
             nombre_usuario=user_info["nombre"],
             tabla_afectada="expediente",
@@ -942,46 +1185,46 @@ async def obtener_logs_auditoria(
     Solo accesible para usuarios con rol Admin o permisos especiales.
     """
     try:
-        user_id = verify_gateway_token(request) 
+        user_id = verify_gateway_token(request)["user_id"]
         #Consultar permisos
-        res = verificar_permiso_externo(user_id, LOG_PERMISSION)
+        res = await verify_external_permission(user_id, LOG_PERMISSION)
         
         # Consulta base (sin JOIN a Usuario porque está en otro servicio)
         query = select(
-            LogAuditoria.id,
-            LogAuditoria.usuario_id,
-            LogAuditoria.tabla_afectada,
-            LogAuditoria.tipo_operacion,
-            LogAuditoria.descripcion,
-            LogAuditoria.expediente_radicado,
-            LogAuditoria.id_registro,
-            LogAuditoria.fecha,
-            LogAuditoria.datos_anteriores,
-            LogAuditoria.datos_nuevos
+            Auditoria.id,
+            Auditoria.usuario_id,
+            Auditoria.tabla_afectada,
+            Auditoria.tipo_operacion,
+            Auditoria.descripcion,
+            Auditoria.expediente_radicado,
+            Auditoria.id_registro,
+            Auditoria.fecha,
+            Auditoria.datos_anteriores,
+            Auditoria.datos_nuevos
         )
 
         # Aplicar filtros
         conditions = []
         
         if usuario_id:
-            conditions.append(LogAuditoria.usuario_id == usuario_id)
+            conditions.append(Auditoria.usuario_id == usuario_id)
         
         if expediente_radicado:
-            conditions.append(LogAuditoria.expediente_radicado == expediente_radicado)
+            conditions.append(Auditoria.expediente_radicado == expediente_radicado)
         
         if tipo_operacion:
-            conditions.append(LogAuditoria.tipo_operacion == tipo_operacion.upper())
+            conditions.append(Auditoria.tipo_operacion == tipo_operacion.upper())
         
         if tabla_afectada:
-            conditions.append(LogAuditoria.tabla_afectada.ilike(f"%{tabla_afectada}%"))
+            conditions.append(Auditoria.tabla_afectada.ilike(f"%{tabla_afectada}%"))
         
         if id_registro:
-            conditions.append(LogAuditoria.id_registro == id_registro)
+            conditions.append(Auditoria.id_registro == id_registro)
         
         if fecha_inicio:
             try:
                 fecha_inicio_date = datetime.strptime(fecha_inicio, "%Y-%m-%d")
-                conditions.append(LogAuditoria.fecha >= fecha_inicio_date)
+                conditions.append(Auditoria.fecha >= fecha_inicio_date)
             except ValueError:
                 raise HTTPException(
                     status_code=400,
@@ -993,7 +1236,7 @@ async def obtener_logs_auditoria(
                 fecha_fin_date = datetime.strptime(fecha_fin, "%Y-%m-%d")
                 # Incluir todo el día final
                 fecha_fin_date = fecha_fin_date.replace(hour=23, minute=59, second=59)
-                conditions.append(LogAuditoria.fecha <= fecha_fin_date)
+                conditions.append(Auditoria.fecha <= fecha_fin_date)
             except ValueError:
                 raise HTTPException(
                     status_code=400,
@@ -1004,7 +1247,7 @@ async def obtener_logs_auditoria(
             query = query.where(and_(*conditions))
         
         # Contar total de registros
-        count_query = select(func.count()).select_from(LogAuditoria)
+        count_query = select(func.count()).select_from(Auditoria)
         if conditions:
             count_query = count_query.where(and_(*conditions))
         
@@ -1012,7 +1255,7 @@ async def obtener_logs_auditoria(
         total_records = total_result.scalar()
         
         # Ordenar por fecha descendente y aplicar paginación
-        query = query.order_by(LogAuditoria.fecha.desc()).limit(limit).offset(offset)
+        query = query.order_by(Auditoria.fecha.desc()).limit(limit).offset(offset)
         
         result = await db.execute(query)
         logs = result.fetchall()
@@ -1024,7 +1267,7 @@ async def obtener_logs_auditoria(
         users_info = {}
         if user_ids:
             try:
-                users_info = await obtener_info_usuarios(user_ids)
+                users_info = await get_user_info(user_ids)
                 logger.info(f"Usuarios obtenidos: {len(users_info)} de {len(user_ids)} solicitados")
             except Exception as e:
                 logger.warning(f"No se pudo obtener información de usuarios: {e}")
@@ -1152,7 +1395,7 @@ async def obtener_alertas_todos_expedientes(
 
 @router.get("/alerts/{expediente_id}")
 async def obtener_alertas_expediente(
-    expediente_id: str,
+    expediente_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
@@ -1371,9 +1614,6 @@ async def descargar_todos_documentos(
         logger.info(
             f"[DOWNLOAD-ALL] Total documentos únicos a combinar: {len(documentos_ids)}"
         )
-
-        # Llamar a app-docs para generar el PDF unificado
-        from utils.docs_client import download_unified_pdf
 
         # Convertir cookies del request a diccionario
         cookies_dict = {k: v for k, v in request.cookies.items()}

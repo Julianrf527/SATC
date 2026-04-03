@@ -36,12 +36,16 @@ PERMISOS = [
     {"nombre": "auditoria_usuarios", "menu_path": "/audit/users"},
     {"nombre": "auditoria_expedientes", "menu_path": "/audit/files"},
     {"nombre": "auditoria_involucrados", "menu_path": "/audit/involved"},
+    {"nombre": "auditoria_infracciones", "menu_path": "/audit/infractions"},
     # === INFRACCIONES (prefix: infraccion_) ===
-    {"nombre": "infraccion_gestionar", "menu_path": "/infraction/manage"},
+    {"nombre": "infracciones_gestionar", "menu_path": "/infraction/manage"},
+    {"nombre": "infracciones_consultar", "menu_path": "/infraction/consult"},
+    {"nombre": "infracciones_alertas", "menu_path": "/infraction/alerts"},
+    {"nombre": "infracciones_asignar", "menu_path": "/infraction/assign_manage"},
 ]
 
-# Rol admin con todos los permisos (1-15)
-PERMISOS_ROL_ADMIN = list(range(1, 16))
+# Rol admin con todos los permisos (1-20)
+PERMISOS_ROL_ADMIN = list(range(1, 21))
 
 
 async def seed_initial_data():

@@ -34,6 +34,8 @@ volumes:
     driver: local
   postgres-involved-data:
     driver: local
+  postgres-infraction-data:
+    driver: local
 
   # MinIO Storage
   minio-data:
@@ -266,6 +268,57 @@ services:
         max-file: "3"
 
   # ==========================================
+  # BASE DE DATOS - PostgreSQL Infraction
+  # ==========================================
+  postgres-infraction:
+    image: postgres:15-alpine
+    container_name: satc-postgres-infraction
+    environment:
+      POSTGRES_DB: infracciones_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: America/Bogota
+      PGTZ: America/Bogota
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 200M
+        reservations:
+          cpus: "0.75"
+          memory: 100M
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=250"
+      - "-c"
+      - "shared_buffers=50MB"
+      - "-c"
+      - "effective_cache_size=150MB"
+      - "-c"
+      - "maintenance_work_mem=12MB"
+      - "-c"
+      - "work_mem=1MB"
+    volumes:
+      - postgres-infraction-data:/var/lib/postgresql/data
+      - ./backups/postgres-infraction:/backups
+    networks:
+      - satc-network
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d infracciones_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================
   # OBJECT STORAGE - MinIO
   # ==========================================
   minio:
@@ -486,7 +539,6 @@ services:
         max-size: "10m"
         max-file: "3"
 
-
   # ==========================================
   # MICROSERVICIO - Sanctioning (instancia· 4 workers)
   # ==========================================
@@ -665,6 +717,65 @@ services:
         max-file: "3"
 
   # ==========================================
+  # MICROSERVICIO - Infraction
+  # ==========================================
+  app-infraction:
+    build:
+      context: ./app-infraction
+      dockerfile: Dockerfile
+    container_name: satc-app-infraction
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0" # 4 workers Gunicorn (consolida 2 réplicas × 2 workers)
+          memory: 450M # Cubre uso real pico con --preload
+        reservations:
+          cpus: "1.0"
+          memory: 225M
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres-infraction:5432/infracciones_db
+
+      # JWT
+      SECRET_GATEWAY: ${SECRET_GATEWAY}
+      SERVICE_SECRET_KEY: ${SECRET_GATEWAY}
+
+      # Services URLs
+      GATEWAY_URL: http://api-gateway:8000
+      USER_SERVICE_URL: http://app-users:8001
+
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
+
+      # Timezone
+      TZ: America/Bogota
+    depends_on:
+      postgres-infraction:
+        condition: service_healthy
+      app-users:
+        condition: service_healthy
+    networks:
+      - satc-network
+    ports:
+      - "8005:8005"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python3 -c "import urllib.request; urllib.request.urlopen(''http://localhost:8005/health'')" || exit 1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================
   # API GATEWAY (instancia única · 6 workers)
   # ==========================================
   api-gateway:
@@ -691,6 +802,7 @@ services:
       SANCTIONING_ROUTE: http://app-sanctioning:8002
       DOCUMENTS_ROUTE: http://app-docs:8003
       INVOLVED_ROUTE: http://app-involved:8004
+      INFRACTION_ROUTE: http://app-infraction:8005
 
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
@@ -717,6 +829,8 @@ services:
       app-docs:
         condition: service_healthy
       app-involved:
+        condition: service_healthy
+      app-infraction:
         condition: service_healthy
     networks:
       - satc-network

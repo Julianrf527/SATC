@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
-import TitleForm from "../../Label/TitleForm";
+import TitleForm from "../../Common/Label/TitleForm";
 import TableAudit from "../../app-users/Table/TableUserLog";
 
 type Auditoria = {

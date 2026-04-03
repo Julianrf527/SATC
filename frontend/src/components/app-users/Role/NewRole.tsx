@@ -1,6 +1,6 @@
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import React from "react";
-import Input from "../../Input/Input";
+import Input from "../../Common/Input/Input";
 
 type Props = {
   permission: { id: number; name: string; menu_path: string }[];

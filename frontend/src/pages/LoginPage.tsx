@@ -1,7 +1,7 @@
 import { apiCall, API_CONFIG } from "../utils/api";
 import { useState, useEffect } from "react";
-import MailInput from "../components/Input/MailInput";
-import PasswordInput from "../components/Input/PasswordInput";
+import MailInput from "../components/Common/Input/MailInput";
+import PasswordInput from "../components/Common/Input/PasswordInput";
 
 type Props = {
   theme: "emerald" | "dark";

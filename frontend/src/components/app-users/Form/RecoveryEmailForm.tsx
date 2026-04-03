@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
-import MailInput from "../../Input/MailInput";
+import MailInput from "../../Common/Input/MailInput";
 
 type Props = {
   setActiveForm: (form: "email" | "code") => void;
