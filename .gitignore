@@ -108,9 +108,6 @@ uploads/expedientes/*
 # PDFs generados
 *.pdf
 
-#Documentacion del sisetma
-documentacion/
-
 # Sistema operativo
 .DS_Store
 Thumbs.db
