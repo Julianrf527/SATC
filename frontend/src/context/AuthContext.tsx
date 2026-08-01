@@ -1,8 +1,12 @@
 import { createContext, useContext } from "react";
 
 export type User = {
-  id: number;
-  rol: string;
+  user_id: number;
+  primer_nombre: string;
+  segundo_nombre: string;
+  primer_apellido: string;
+  segundo_apellido: string;
+  correo: string;
   permisos: { name: string; path: string }[];
 };
 

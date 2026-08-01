@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { API_CONFIG, apiCall } from "../../../utils/api";
+import { API_CONFIG, apiCall, formatApiErrorDetail } from "../../../utils/api";
 import { X, Upload, FileText } from "lucide-react";
 
 type Props = {
@@ -40,7 +40,6 @@ export default function CrearDocumentoModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
 
-  // Detectar tema actual
   useEffect(() => {
     const updateTheme = () => {
       const currentTheme =
@@ -64,7 +63,6 @@ export default function CrearDocumentoModal({
     return () => observer.disconnect();
   }, []);
 
-  // Reset form cuando se abre el modal
   useEffect(() => {
     if (isOpen) {
       setNombre("");
@@ -82,7 +80,6 @@ export default function CrearDocumentoModal({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Verificar tamaño
       if (file.size > 10 * 1024 * 1024) {
         setToast({
           id: Date.now(),
@@ -95,7 +92,6 @@ export default function CrearDocumentoModal({
         return;
       }
 
-      // Detectar tipo de archivo automáticamente
       let detectedType: "pdf" | "docx" | "doc" | null = null;
       const fileName = file.name.toLowerCase();
 
@@ -185,15 +181,10 @@ export default function CrearDocumentoModal({
         onSuccess();
         onClose();
       } else {
-        let errorMessage = "Error al crear el documento";
-
-        if (res.detail) {
-          if (typeof res.detail === "string") {
-            errorMessage = res.detail;
-          } else if (Array.isArray(res.detail)) {
-            errorMessage = res.detail.map((err: any) => err.msg).join(", ");
-          }
-        }
+        const errorMessage = formatApiErrorDetail(
+          res.detail,
+          "Error al crear el documento",
+        );
 
         setToast({
           id: Date.now(),
@@ -202,7 +193,6 @@ export default function CrearDocumentoModal({
         });
       }
     } catch (error) {
-      /* console.error("Error al crear documento:", error); */
       setToast({
         id: Date.now(),
         message: "Error de conexión al crear el documento",

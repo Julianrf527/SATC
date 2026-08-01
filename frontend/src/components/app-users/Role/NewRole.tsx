@@ -1,6 +1,6 @@
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import React from "react";
-import Input from "../../Input/Input";
+import Input from "../../Common/Input/Input";
 
 type Props = {
   permission: { id: number; name: string; menu_path: string }[];
@@ -11,7 +11,7 @@ type Props = {
   }) => void;
 };
 
-export default function NewRole({ permission, setToast }: Props) {
+export default function NewRole({ permission = [], setToast }: Props) {
   const roleNameRef = React.useRef<HTMLInputElement>(null);
   const [permissionList, setPermissionList] = React.useState<number[]>([]);
   const [searchTerm, setSearchTerm] = React.useState("");
@@ -24,18 +24,15 @@ export default function NewRole({ permission, setToast }: Props) {
     );
   };
 
-  // Filtrar permisos según búsqueda
-  const filteredPermissions = permission.filter((p) =>
+  const filteredPermissions = (permission || []).filter((p) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  // Calcular paginación
   const totalPages = Math.ceil(filteredPermissions.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentPermissions = filteredPermissions.slice(startIndex, endIndex);
 
-  // Resetear página cuando cambia el término de búsqueda
   React.useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
@@ -61,7 +58,7 @@ export default function NewRole({ permission, setToast }: Props) {
       const res = await apiCall(API_CONFIG.ENDPOINTS.ROL_ADD, {
         method: "POST",
         body: JSON.stringify({
-          name: roleNameRef.current.value,
+              nombre: roleNameRef.current.value,
           permission: permissionList,
         }),
       });
@@ -81,7 +78,6 @@ export default function NewRole({ permission, setToast }: Props) {
         });
       }
     } catch (e) {
-      /* console.error("Error al hacer fetch:", e); */
       setToast({
         id: Date.now(),
         message: "Error al crear el rol",

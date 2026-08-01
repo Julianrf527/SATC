@@ -1,7 +1,7 @@
 import { apiCall, API_CONFIG } from "../utils/api";
 import { useState, useEffect } from "react";
-import MailInput from "../components/Input/MailInput";
-import PasswordInput from "../components/Input/PasswordInput";
+import MailInput from "../components/Common/Input/MailInput";
+import PasswordInput from "../components/Common/Input/PasswordInput";
 
 type Props = {
   theme: "emerald" | "dark";
@@ -48,7 +48,6 @@ export default function LoginPage({ theme }: Props) {
         }
       }
     } catch (error) {
-      /* console.error("Error al hacer fetch:", error); */
       setErrorMsg("No se pudo conectar al servidor.");
     } finally {
       setIsLoading(false);

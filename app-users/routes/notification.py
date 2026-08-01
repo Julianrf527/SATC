@@ -10,7 +10,7 @@ import asyncio
 import json
 
 #----- DB -----
-from db.deps import get_db
+from db.deps import get_db_managed
 from db.models.notificacion import Notificacion
 
 router = APIRouter()
@@ -21,154 +21,101 @@ class NotificacionRequest(BaseModel):
     tipo: str
     usuario_id: int
 
-#----------- LOGGER ------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-#----------- FUNCIONES ------------
-
 from utils.insertLog import insert_auditoria
-from utils.verify_gateway_token import verify_gateway_token, verify_service_token
+from utils.verify_token import verify_gateway_token, verify_service_token
 
 # ---------- ENDPOINTS ----------
-
-@router.get("/all/{id_user}")
-async def cargar_notificaciones(
-    request: Request,
-    id_user: int,
-    db: AsyncSession = Depends(get_db),
-):  
-    try:
-        user_id = verify_gateway_token(request)
-        if id_user != user_id:
-            raise HTTPException(status_code=401, detail="No cuenta con los permisos")
-        
-        stmr = select(
-            Notificacion.id,
-            Notificacion.mensaje,
-            Notificacion.id_vinculada,
-            Notificacion.tipo
-        ).where(Notificacion.usuario_id == id_user)
-        
-        result = await db.execute(stmr)
-        result = result.all()
-
-        data = [
-            {
-                "id": noti[0], 
-                "mensaje": noti[1], 
-                "id_vinculada": noti[2],
-                "tipo": noti[3]
-            }
-            for noti in result
-        ]
-
-        return JSONResponse(content={"ok": True, "data": data}, status_code=200)
-    
-    except Exception as e:
-        logger.error(f"Error al obtener notificaciones para el usuario ID: {id_user} - {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Error en el servidor.")
 
 @router.post("/add")
 async def crear_notificacion(
     request: Request,
     data: NotificacionRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db_managed)
 ):
-    """
-    Crea una nueva notificación para un usuario.
-    Este endpoint es llamado por otros microservicios (ej: sancionatorio, documentos).
-    Requiere X-Gateway-Token para autenticación servicio-a-servicio.
-    """
-    try:
-        # Verificar que la petición viene de un servicio autenticado (no requiere user_id)
-        verify_service_token(request)
-        
-        # Validar que el mensaje no esté vacío
-        if not data.mensaje.strip():
-            raise HTTPException(
-                status_code=400,
-                detail="El mensaje no puede estar vacío"
-            )
-        
-        # Validar que el id_vinculada no esté vacío
-        if not data.id_vinculada.strip():
-            raise HTTPException(
-                status_code=400,
-                detail="El id_vinculada no puede estar vacío"
-            )
-        
-        # Validar que el tipo no esté vacío
-        if not data.tipo.strip():
-            raise HTTPException(
-                status_code=400,
-                detail="El tipo no puede estar vacío"
-            )
-        
-        # Eliminar notificaciones duplicadas con el mismo id_vinculada
-        stmt = delete(Notificacion).where(
-            Notificacion.id_vinculada == data.id_vinculada,
-            Notificacion.usuario_id == data.usuario_id
-        )
-        await db.execute(stmt)
-        await db.commit()
+    """Crea una notificación para un usuario. Solo service-to-service."""
+    verify_service_token(request)
 
-        # Insertar notificación
-        stmt = insert(Notificacion).values(
-            mensaje=data.mensaje.strip(),
-            id_vinculada=data.id_vinculada.strip(),
-            tipo=data.tipo.strip(),
-            usuario_id=data.usuario_id,
-            fecha_creacion=datetime.now(ZoneInfo("America/Bogota"))
+    if not data.mensaje.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El mensaje no puede estar vacío"
         )
-        
-        await db.execute(stmt)
-        await db.commit()
-        
-        logger.info(f"Notificación creada exitosamente para usuario {data.usuario_id}: {data.mensaje[:50]}...")
-        
+
+    if not data.id_vinculada.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El id_vinculada no puede estar vacío"
+        )
+
+    if not data.tipo.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El tipo no puede estar vacío"
+        )
+
+    # Una entidad vinculada tiene a lo sumo una notificación viva por usuario:
+    # se borra la anterior antes de insertar la nueva.
+    stmt = delete(Notificacion).where(
+        Notificacion.id_vinculada == data.id_vinculada,
+        Notificacion.usuario_id == data.usuario_id
+    )
+    await db.execute(stmt)
+    await db.commit()
+
+    stmt = insert(Notificacion).values(
+        mensaje=data.mensaje.strip(),
+        id_vinculada=data.id_vinculada.strip(),
+        tipo=data.tipo.strip(),
+        usuario_id=data.usuario_id,
+        fecha_creacion=datetime.now(ZoneInfo("America/Bogota"))
+    )
+
+    await db.execute(stmt)
+    await db.commit()
+
+    logger.info(f"Notificación creada exitosamente para usuario {data.usuario_id}: {data.mensaje[:50]}...")
+
+    return JSONResponse(
+        content={
+            "ok": True,
+            "message": "Notificación creada exitosamente"
+        },
+        status_code=201
+    )
+
+@router.delete("/delete-all")
+async def borrar_todas_notificaciones_usuario(
+    request: Request,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    """Elimina todas las notificaciones del usuario ("marcar todas como leídas")."""
+    token_data = verify_gateway_token(request)
+    user_id = token_data["user_id"]
+
+    query = select(Notificacion).where(Notificacion.usuario_id == user_id)
+    res = await db.execute(query)
+    notificaciones = res.scalars().all()
+
+    if not notificaciones:
         return JSONResponse(
             content={
                 "ok": True,
-                "message": "Notificación creada exitosamente"
+                "msg": "No hay notificaciones para eliminar",
+                "count": 0
             },
-            status_code=201
-        )
-    
-    except HTTPException:
-        raise
-    except Exception as e:
-        await db.rollback()
-        logger.error(f"Error creando notificación: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Error al crear la notificación"
+            status_code=200
         )
 
-@router.delete("/{id_noti}")
-async def borrar_notificacion(
-    request: Request,
-    id_noti: int,
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        user_id = verify_gateway_token(request)
-        
-        # Obtener la notificación completa antes de eliminarla
-        query = select(Notificacion).where(Notificacion.id == id_noti)
-        res = await db.execute(query)
-        notificacion = res.scalar_one_or_none()
+    count = len(notificaciones)
+    ids_eliminados = []
 
-        if notificacion is None:
-            raise HTTPException(status_code=404, detail="Notificación no encontrada")
-        
-        if notificacion.usuario_id != user_id:
-            raise HTTPException(status_code=401, detail="No cuenta con los permisos")
-
-        # Guardar datos para auditoría antes de eliminar
+    for notificacion in notificaciones:
         datos_anteriores = {
             "id": notificacion.id,
             "usuario_id": notificacion.usuario_id,
@@ -178,216 +125,156 @@ async def borrar_notificacion(
             "fecha_creacion": notificacion.fecha_creacion.isoformat() if notificacion.fecha_creacion else None
         }
 
-        # Eliminar la notificación
-        stmr = delete(Notificacion).where(Notificacion.id == id_noti)
-        await db.execute(stmr)
-
-        # Guardar auditoría
-        audit_result = await insert_auditoria(
+        await insert_auditoria(
             db=db,
-            usuario_id=user_id,
-            tabla_afectada="notificacion",
-            tipo_operacion="DELETE",
-            descripcion=f"Eliminación de notificación tipo '{notificacion.tipo}' (ID: {id_noti})",
-            id_registro=str(id_noti),
+            usuario_id=token_data["user_id"],
+            tipo_evento="ELIMINACION_NOTIFICACION",
+            resultado="EXITOSO",
+            detalle=f"Eliminación masiva - Marcar todas como leídas",
             datos_anteriores=datos_anteriores
         )
+        ids_eliminados.append(notificacion.id)
 
-        if not audit_result["ok"]:
-            await db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Error al guardar registro de auditoría"
-            )
+    stmr = delete(Notificacion).where(Notificacion.usuario_id == token_data["user_id"])
+    await db.execute(stmr)
+    await db.commit()
 
-        await db.commit()
+    return JSONResponse(
+        content={
+            "ok": True,
+            "msg": f"{count} notificación(es) eliminada(s) exitosamente",
+            "count": count,
+            "ids_eliminados": ids_eliminados
+        },
+        status_code=200
+    )
 
-        return JSONResponse(content={"ok": True, "msg": "Notificación eliminada exitosamente"}, status_code=200)
-        
-    except HTTPException:
-        raise 
-    except Exception as e:
-        await db.rollback()
-        logger.exception(f"Error al eliminar notificación con ID {id_noti}: {e}")
-        raise HTTPException(status_code=500, detail="Error en el servidor")
-
-@router.delete("/linked/{id_linked}")
+@router.delete("/linked/{linked_id}")
 async def borrar_notificacion_por_vinculada(
     request: Request,
-    id_linked: str,
-    db: AsyncSession = Depends(get_db),
+    linked_id: str,
+    db: AsyncSession = Depends(get_db_managed),
 ):
-    """
-    Elimina todas las notificaciones asociadas a un id_vinculada específico.
-    Útil cuando se elimina o finaliza una entidad relacionada.
-    """
-    try:
-        user_id = verify_gateway_token(request)
-        
-        # Obtener todas las notificaciones con ese id_vinculada
-        query = select(Notificacion).where(Notificacion.id_vinculada == id_linked)
-        res = await db.execute(query)
-        notificaciones = res.scalars().all()
+    """Elimina las notificaciones asociadas a un id_vinculada (entidad cerrada o borrada)."""
+    token_data = verify_gateway_token(request)
 
-        if not notificaciones:
-            raise HTTPException(status_code=404, detail="No se encontraron notificaciones con ese ID vinculado")
-        
-        # Guardar datos para auditoría
-        ids_eliminados = []
-        for notificacion in notificaciones:
-            datos_anteriores = {
-                "id": notificacion.id,
-                "usuario_id": notificacion.usuario_id,
-                "mensaje": notificacion.mensaje,
-                "id_vinculada": notificacion.id_vinculada,
-                "tipo": notificacion.tipo,
-                "fecha_creacion": notificacion.fecha_creacion.isoformat() if notificacion.fecha_creacion else None
-            }
-            
-            await insert_auditoria(
-                db=db,
-                usuario_id=user_id,
-                tabla_afectada="notificacion",
-                tipo_operacion="DELETE",
-                descripcion=f"Eliminación masiva de notificación vinculada a '{id_linked}'",
-                id_registro=str(notificacion.id),
-                datos_anteriores=datos_anteriores
-            )
-            ids_eliminados.append(notificacion.id)
+    query = select(Notificacion).where(Notificacion.id_vinculada == linked_id)
+    res = await db.execute(query)
+    notificaciones = res.scalars().all()
 
-        # Eliminar todas las notificaciones con ese id_vinculada
-        stmr = delete(Notificacion).where(Notificacion.id_vinculada == id_linked)
-        result = await db.execute(stmr)
-        await db.commit()
+    if not notificaciones:
+        raise HTTPException(status_code=404, detail="No se encontraron notificaciones con ese ID vinculado")
 
-        return JSONResponse(
-            content={
-                "ok": True, 
-                "msg": f"{result.rowcount} notificación(es) eliminada(s) exitosamente",
-                "ids_eliminados": ids_eliminados
-            }, 
-            status_code=200
+    ids_eliminados = []
+    for notificacion in notificaciones:
+        datos_anteriores = {
+            "id": notificacion.id,
+            "usuario_id": notificacion.usuario_id,
+            "mensaje": notificacion.mensaje,
+            "id_vinculada": notificacion.id_vinculada,
+            "tipo": notificacion.tipo,
+            "fecha_creacion": notificacion.fecha_creacion.isoformat() if notificacion.fecha_creacion else None
+        }
+
+        await insert_auditoria(
+            db=db,
+            usuario_id=token_data["user_id"],
+            tipo_evento="ELIMINACION_NOTIFICACION",
+            resultado="EXITOSO",
+            detalle=f"Eliminación masiva de notificación vinculada a '{linked_id}'",
+            datos_anteriores=datos_anteriores
         )
-        
-    except HTTPException:
-        raise 
-    except Exception as e:
-        await db.rollback()
-        logger.exception(f"Error al eliminar notificaciones con id_vinculada {id_linked}: {e}")
-        raise HTTPException(status_code=500, detail="Error en el servidor")
-    
-@router.delete("/user/{user_id}")
-async def borrar_todas_notificaciones_usuario(
+        ids_eliminados.append(notificacion.id)
+
+    stmr = delete(Notificacion).where(Notificacion.id_vinculada == linked_id)
+    result = await db.execute(stmr)
+    await db.commit()
+
+    return JSONResponse(
+        content={
+            "ok": True,
+            "msg": f"{result.rowcount} notificación(es) eliminada(s) exitosamente",
+            "ids_eliminados": ids_eliminados
+        },
+        status_code=200
+    )
+
+@router.delete("/{noti_id}")
+async def borrar_notificacion(
     request: Request,
-    user_id: int,
-    db: AsyncSession = Depends(get_db),
+    noti_id: int,
+    db: AsyncSession = Depends(get_db_managed),
 ):
-    """
-    Elimina todas las notificaciones de un usuario específico.
-    Útil para la función "Marcar todas como leídas".
-    """
-    try:
-        authenticated_user_id = verify_gateway_token(request)
-        
-        # Verificar que el usuario solo pueda eliminar sus propias notificaciones
-        if authenticated_user_id != user_id:
-            raise HTTPException(
-                status_code=403, 
-                detail="No tienes permisos para eliminar notificaciones de otro usuario"
-            )
-        
-        # Obtener todas las notificaciones del usuario
-        query = select(Notificacion).where(Notificacion.usuario_id == user_id)
-        res = await db.execute(query)
-        notificaciones = res.scalars().all()
+    token_data = verify_gateway_token(request)
 
-        if not notificaciones:
-            return JSONResponse(
-                content={
-                    "ok": True, 
-                    "msg": "No hay notificaciones para eliminar",
-                    "count": 0
-                }, 
-                status_code=200
-            )
-        
-        # Guardar datos para auditoría
-        count = len(notificaciones)
-        ids_eliminados = []
-        
-        for notificacion in notificaciones:
-            datos_anteriores = {
-                "id": notificacion.id,
-                "usuario_id": notificacion.usuario_id,
-                "mensaje": notificacion.mensaje,
-                "id_vinculada": notificacion.id_vinculada,
-                "tipo": notificacion.tipo,
-                "fecha_creacion": notificacion.fecha_creacion.isoformat() if notificacion.fecha_creacion else None
-            }
-            
-            await insert_auditoria(
-                db=db,
-                usuario_id=authenticated_user_id,
-                tabla_afectada="notificacion",
-                tipo_operacion="DELETE",
-                descripcion=f"Eliminación masiva - Marcar todas como leídas",
-                id_registro=str(notificacion.id),
-                datos_anteriores=datos_anteriores
-            )
-            ids_eliminados.append(notificacion.id)
+    # id + usuario_id en el mismo WHERE: una notificación ajena da el mismo 404
+    # que una inexistente, así no se pueden enumerar IDs de otros usuarios.
+    query = select(Notificacion).where(
+        Notificacion.id == noti_id,
+        Notificacion.usuario_id == token_data["user_id"],
+    )
+    res = await db.execute(query)
+    notificacion = res.scalar_one_or_none()
 
-        # Eliminar todas las notificaciones del usuario
-        stmr = delete(Notificacion).where(Notificacion.usuario_id == user_id)
-        await db.execute(stmr)
-        await db.commit()
+    if notificacion is None:
+        raise HTTPException(status_code=404, detail="Notificación no encontrada")
 
-        return JSONResponse(
-            content={
-                "ok": True, 
-                "msg": f"{count} notificación(es) eliminada(s) exitosamente",
-                "count": count,
-                "ids_eliminados": ids_eliminados
-            }, 
-            status_code=200
-        )
-        
-    except HTTPException:
-        raise 
-    except Exception as e:
+    datos_anteriores = {
+        "id": notificacion.id,
+        "usuario_id": notificacion.usuario_id,
+        "mensaje": notificacion.mensaje,
+        "id_vinculada": notificacion.id_vinculada,
+        "tipo": notificacion.tipo,
+        "fecha_creacion": notificacion.fecha_creacion.isoformat() if notificacion.fecha_creacion else None
+    }
+
+    stmr = delete(Notificacion).where(Notificacion.id == noti_id)
+    await db.execute(stmr)
+
+    audit_result = await insert_auditoria(
+        db=db,
+        usuario_id=token_data["user_id"],
+        tipo_evento="ELIMINACION_NOTIFICACION",
+        resultado="EXITOSO",
+        detalle=f"Eliminación de notificación tipo '{notificacion.tipo}' (ID: {noti_id})",
+        datos_anteriores=datos_anteriores
+    )
+
+    if not audit_result["ok"]:
         await db.rollback()
-        logger.exception(f"Error al eliminar todas las notificaciones del usuario {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Error en el servidor")
+        raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
 
+    await db.commit()
 
-@router.get("/stream/{id_user}")
+    return JSONResponse(content={"ok": True, "msg": "Notificación eliminada exitosamente"}, status_code=200)
+
+@router.get("/stream")
 async def stream_notificaciones(
     request: Request,
-    id_user: int,
 ):
+    """Stream SSE de notificaciones (actualización cada 30s).
+
+    No usa get_db_managed: abre una sesión nueva por consulta dentro del
+    generador, porque una sesión de request no sobrevive a una conexión de
+    larga vida.
     """
-    Endpoint SSE (Server-Sent Events) para notificaciones en tiempo real.
-    Mantiene una conexión abierta y envía actualizaciones cada 30 segundos.
-    """
+    user_id = None
     try:
-        user_id = verify_gateway_token(request)
-        if id_user != user_id:
-            raise HTTPException(status_code=401, detail="No cuenta con los permisos")
-        
+        token_data = verify_gateway_token(request)
+        user_id = token_data["user_id"]
+
         async def event_generator():
             from db.database import SessionLocal
-            
+
             try:
                 logger.info(f"Iniciando stream SSE para usuario {user_id}")
-                
+
                 while True:
-                    # Verificar si el cliente cerró la conexión
                     if await request.is_disconnected():
                         logger.info(f"Cliente {user_id} desconectado del stream SSE")
                         break
-                    
-                    # Crear una nueva sesión para cada consulta
+
                     async with SessionLocal() as db:
-                        # Obtener notificaciones actuales
                         stmt = select(
                             Notificacion.id,
                             Notificacion.mensaje,
@@ -396,12 +283,12 @@ async def stream_notificaciones(
                         ).where(
                             Notificacion.usuario_id == user_id
                         ).order_by(
-                            Notificacion.creado.desc()
+                            Notificacion.fecha_creacion.desc()
                         )
-                        
+
                         result = await db.execute(stmt)
                         notificaciones = result.all()
-                        
+
                         notificaciones_list = [
                             {
                                 "id": n.id,
@@ -411,24 +298,21 @@ async def stream_notificaciones(
                             }
                             for n in notificaciones
                         ]
-                    
-                    # Enviar datos en formato SSE
+
                     data = json.dumps({"notifications": notificaciones_list})
                     yield f"data: {data}\n\n"
-                    
-                    # Enviar heartbeat cada 15 segundos para mantener la conexión viva
-                    # Dividir el sleep de 30s en 2 partes con heartbeat
-                    for _ in range(3):  # 3 x 10s = 30s total
+
+                    # El intervalo de 30s se parte en 3 para intercalar heartbeats
+                    # (líneas ':' en SSE) y detectar desconexiones sin esperar todo el ciclo.
+                    for _ in range(3):
                         await asyncio.sleep(10)
-                        
-                        # Verificar desconexión antes del heartbeat
+
                         if await request.is_disconnected():
                             logger.info(f"Cliente {user_id} desconectado durante heartbeat")
                             return
-                        
-                        # Enviar comentario como heartbeat (los comentarios en SSE empiezan con :)
+
                         yield ": heartbeat\n\n"
-                    
+
             except asyncio.CancelledError:
                 logger.info(f"Stream SSE cancelado para usuario {user_id}")
             except Exception as e:
@@ -436,7 +320,7 @@ async def stream_notificaciones(
                 import traceback
                 logger.error(traceback.format_exc())
                 yield f"data: {json.dumps({'error': 'Error interno del servidor'})}\n\n"
-        
+
         return StreamingResponse(
             event_generator(),
             media_type="text/event-stream",
@@ -446,9 +330,9 @@ async def stream_notificaciones(
                 "X-Accel-Buffering": "no",  # Para nginx
             }
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception(f"Error al iniciar stream SSE para usuario {id_user}: {e}")
+        logger.exception(f"Error al iniciar stream SSE para usuario {user_id}: {e}")
         raise HTTPException(status_code=500, detail="Error en el servidor")

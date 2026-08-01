@@ -1,12 +1,5 @@
-﻿# ====================================
-# SATC - Sistema ApiCorp
 # ====================================
-# Changelog:
-# - 2026-02-13: ConfiguraciÃ³n inicial con mejoras de arquitectura
-# - Timezone: America/Bogota en todos los servicios
-# - Healthchecks y restart policies configurados
-# - VolÃºmenes persistentes para datos y backups
-# - Network aislada para comunicaciÃ³n interna
+# SATC - Sistema ApiCorp
 # ====================================
 
 version: "3.8"
@@ -15,7 +8,9 @@ version: "3.8"
 # NETWORKS
 # ============================================
 networks:
-  satc-network:
+  satc-public:
+    driver: bridge
+  satc-private:
     driver: bridge
     ipam:
       config:
@@ -31,6 +26,10 @@ volumes:
   postgres-sanctioning-data:
     driver: local
   postgres-docs-data:
+    driver: local
+  postgres-involved-data:
+    driver: local
+  postgres-infraction-data:
     driver: local
 
   # MinIO Storage
@@ -68,7 +67,7 @@ services:
     environment:
       POSTGRES_DB: user_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       TZ: America/Bogota
       PGTZ: America/Bogota
     deploy:
@@ -93,17 +92,15 @@ services:
       - "work_mem=1MB"
     volumes:
       - postgres-users-data:/var/lib/postgresql/data
-      - ./db-script/user_db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./backups/postgres-users:/backups
     networks:
-      - satc-network
-    ports:
-      - "5432:5432"
+      - satc-private
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d user_db"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -120,7 +117,7 @@ services:
     environment:
       POSTGRES_DB: expedientes_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       TZ: America/Bogota
       PGTZ: America/Bogota
     deploy:
@@ -145,17 +142,15 @@ services:
       - "work_mem=512kB"
     volumes:
       - postgres-sanctioning-data:/var/lib/postgresql/data
-      - ./db-script/expedientes_db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./backups/postgres-sanctioning:/backups
     networks:
-      - satc-network
-    ports:
-      - "5433:5432"
+      - satc-private
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d expedientes_db"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -172,7 +167,7 @@ services:
     environment:
       POSTGRES_DB: documentos_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       TZ: America/Bogota
       PGTZ: America/Bogota
     deploy:
@@ -197,17 +192,115 @@ services:
       - "work_mem=512kB"
     volumes:
       - postgres-docs-data:/var/lib/postgresql/data
-      - ./db-script/documentos_db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./backups/postgres-docs:/backups
     networks:
-      - satc-network
-    ports:
-      - "5434:5432"
+      - satc-private
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d documentos_db"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================
+  # BASE DE DATOS - PostgreSQL Involved
+  # ==========================================
+  postgres-involved:
+    image: postgres:15-alpine
+    container_name: satc-postgres-involved
+    environment:
+      POSTGRES_DB: involucrados_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: America/Bogota
+      PGTZ: America/Bogota
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 96M
+        reservations:
+          cpus: "0.5"
+          memory: 48M
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=200"
+      - "-c"
+      - "shared_buffers=24MB"
+      - "-c"
+      - "effective_cache_size=72MB"
+      - "-c"
+      - "maintenance_work_mem=6MB"
+      - "-c"
+      - "work_mem=512kB"
+    volumes:
+      - postgres-involved-data:/var/lib/postgresql/data
+      - ./backups/postgres-involved:/backups
+    networks:
+      - satc-private
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d involucrados_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================
+  # BASE DE DATOS - PostgreSQL Infraction
+  # ==========================================
+  postgres-infraction:
+    image: postgres:15-alpine
+    container_name: satc-postgres-infraction
+    environment:
+      POSTGRES_DB: infracciones_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: America/Bogota
+      PGTZ: America/Bogota
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 200M
+        reservations:
+          cpus: "0.75"
+          memory: 100M
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=250"
+      - "-c"
+      - "shared_buffers=50MB"
+      - "-c"
+      - "effective_cache_size=150MB"
+      - "-c"
+      - "maintenance_work_mem=12MB"
+      - "-c"
+      - "work_mem=1MB"
+    volumes:
+      - postgres-infraction-data:/var/lib/postgresql/data
+      - ./backups/postgres-infraction:/backups
+    networks:
+      - satc-private
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d infracciones_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -230,18 +323,15 @@ services:
           cpus: "1.0"
           memory: 96M
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       TZ: America/Bogota
     command: server /data --console-address ":9001"
     volumes:
       - minio-data:/data
       - ./backups/minio:/backups
     networks:
-      - satc-network
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+      - satc-private
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
@@ -271,9 +361,7 @@ services:
     environment:
       TZ: America/Bogota
     networks:
-      - satc-network
-    ports:
-      - "3310:3310"
+      - satc-private
     volumes:
       - clamav-data:/var/lib/clamav
     healthcheck:
@@ -281,7 +369,7 @@ services:
       interval: 60s
       timeout: 30s
       retries: 3
-      start_period: 300s # ClamAV tarda en actualizar definiciones
+      start_period: 600s # ClamAV tarda en actualizar definiciones
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -307,9 +395,7 @@ services:
     environment:
       TZ: America/Bogota
     networks:
-      - satc-network
-    ports:
-      - "6379:6379"
+      - satc-private
     volumes:
       - redis-data:/data
     healthcheck:
@@ -326,7 +412,7 @@ services:
     # Redis SIEMPRE activo para sesiones (OptimizaciÃ³n de performance)
 
   # ==========================================
-  # NGINX LOAD BALANCER
+  # NGINX REVERSE PROXY
   # ==========================================
   nginx-lb:
     image: nginx:alpine
@@ -342,17 +428,17 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     networks:
-      - satc-network
+      - satc-public
+      - satc-private
     ports:
-      - "8000:80"
+      - "8000:8080"
     depends_on:
       api-gateway:
         condition: service_healthy
       frontend:
         condition: service_healthy
     healthcheck:
-      test:
-        ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -366,7 +452,7 @@ services:
       TZ: America/Bogota
 
   # ==========================================
-  # MICROSERVICIO - Users (instancia Ãºnica Â· 4 workers)
+  # MICROSERVICIO - Users (instancia · 4 workers)
   # ==========================================
   app-users:
     build:
@@ -383,22 +469,31 @@ services:
           memory: 200M
     environment:
       # Database
-      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres-users:5432/user_db
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres-users:5432/user_db
 
-      # Redis Sessions (OptimizaciÃ³n: 96% mÃ¡s rÃ¡pido que PostgreSQL)
+      # Redis Sessions (PostgreSQL)
       REDIS_SESSIONS_ENABLED: "true"
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDIS_DB_SESSIONS: 1
 
       # JWT
       SECRET_KEY: ${SECRET_KEY}
       SECRET_KEY_GATEWAY: ${SECRET_KEY_GATEWAY}
       SECRET_GATEWAY: ${SECRET_GATEWAY}
-      SERVICE_SECRET_KEY: ${SECRET_GATEWAY}
+      SERVICE_SECRET_KEY: ${USERS_SERVICE_SECRET}
+      # Secretos de los callers este-oeste que app-users valida (sanctioning/infraction/docs/involved)
+      SANCTIONING_SERVICE_SECRET: ${SANCTIONING_SERVICE_SECRET}
+      INFRACTION_SERVICE_SECRET: ${INFRACTION_SERVICE_SECRET}
+      DOCS_SERVICE_SECRET: ${DOCS_SERVICE_SECRET}
+      INVOLVED_SERVICE_SECRET: ${INVOLVED_SERVICE_SECRET}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS}
       JWT_ALGORITHM: HS256
       JWT_EXP_DAYS: 1
+      # false solo en desarrollo local (HTTP plano). En producción (HTTPS) no
+      # se setea acá y el default seguro de auth.py (True) queda vigente.
+      COOKIE_SECURE: "false"
 
       # Email
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
@@ -409,12 +504,6 @@ services:
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
 
-      # Permisos
-      PERMISO_ROL: ${PERMISO_ROL:-admin_roles y permisos}
-      PERMISO_USER: ${PERMISO_USER:-admin_registrar usuario}
-      GESTION_USER: ${GESTION_USER:-admin_gestionar usuarios}
-      USER_LOG: ${USER_LOG:-admin_auditoria usuarios}
-
       # Timezone
       TZ: America/Bogota
     depends_on:
@@ -423,7 +512,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - satc-network
+      - satc-private
     healthcheck:
       test:
         [
@@ -442,73 +531,13 @@ services:
         max-file: "3"
 
   # ==========================================
-  # MICROSERVICIO - Users (Replica 3) - DESHABILITADO
-  # ConfiguraciÃ³n ajustada para 30 usuarios: Solo 2 rÃ©plicas necesarias
+  # MICROSERVICIO - Sanctioning (instancia· 4 workers)
   # ==========================================
-  # app-users-3:
-  #   build:
-  #     context: ./app-users
-  #     dockerfile: Dockerfile
-  #   container_name: satc-app-users-3
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: "1.0"
-  #         memory: 400M
-  #       reservations:
-  #         cpus: "0.5"
-  #         memory: 200M
-  #   environment:
-  #     DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres-users:5432/user_db
-  #     REDIS_SESSIONS_ENABLED: "true"
-  #     REDIS_HOST: redis
-  #     REDIS_PORT: 6379
-  #     REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
-  #     REDIS_DB_SESSIONS: 1
-  #     SECRET_KEY: ${SECRET_KEY}
-  #     SECRET_KEY_GATEWAY: ${SECRET_KEY_GATEWAY}
-  #     SECRET_GATEWAY: ${SECRET_GATEWAY}
-  #     JWT_ALGORITHM: HS256
-  #     JWT_EXP_DAYS: 1
-  #     SMTP_SERVER: ${SMTP_SERVER}
-  #     SMTP_PORT: ${SMTP_PORT:-587}
-  #     SMTP_USERNAME: ${SMTP_USERNAME}
-  #     SMTP_PASSWORD: ${SMTP_PASSWORD}
-  #     SMTP_FROM: ${SMTP_FROM}
-  #     CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
-  #     PERMISO_ROL: ${PERMISO_ROL:-admin_roles y permisos}
-  #     PERMISO_USER: ${PERMISO_USER:-admin_registrar usuario}
-  #     GESTION_USER: ${GESTION_USER:-admin_gestionar usuarios}
-  #     USER_LOG: ${USER_LOG:-admin_auditoria usuarios}
-  #     TZ: America/Bogota
-  #   depends_on:
-  #     postgres-users:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   networks:
-  #     - satc-network
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 3
-  #     start_period: 10s
-  #   restart: unless-stopped
-  #   logging:
-  #     driver: "json-file"
-  #     options:
-  #       max-size: "10m"
-  #       max-file: "3"
-
-  # ==========================================
-  # MICROSERVICIO - Sanctioning (instancia Ãºnica Â· 4 workers)
-  # ==========================================
-  app-sanctioning:
+  app-sancionatoria:
     build:
       context: ./app-sancionatoria
       dockerfile: Dockerfile
-    container_name: satc-app-sanctioning
+    container_name: satc-app-sancionatoria
     deploy:
       resources:
         limits:
@@ -519,35 +548,17 @@ services:
           memory: 225M
     environment:
       # Database
-      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres-sanctioning:5432/expedientes_db
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres-sanctioning:5432/expedientes_db
 
       # JWT
       SECRET_GATEWAY: ${SECRET_GATEWAY}
-      SERVICE_SECRET_KEY: ${SECRET_GATEWAY}
-
-      # MinIO
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
-      MINIO_BUCKET: satc-expedientes
-      MINIO_SECURE: "false"
+      SERVICE_SECRET_KEY: ${SANCTIONING_SERVICE_SECRET}
 
       # Services URLs
       GATEWAY_URL: http://api-gateway:8000
       USER_SERVICE_URL: http://app-users:8001
-
-      # Permissions
-      FILE_PERMISSION: expediente_gestionar
-      ENCARGADO_PERMISSION: expediente_gestionar
-
-      # File Security (Caso 8)
-      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-10}
-      UPLOAD_DIR: /app/secure-uploads
-
-      # ClamAV Antivirus
-      CLAMAV_ENABLED: ${CLAMAV_ENABLED:-true}
-      CLAMAV_HOST: clamav
-      CLAMAV_PORT: 3310
+      DOCS_SERVICE_URL: http://app-docs:8003
+      INVOLVED_SERVICE_URL: http://app-involved:8004
 
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
@@ -557,18 +568,12 @@ services:
     depends_on:
       postgres-sanctioning:
         condition: service_healthy
-      minio:
-        condition: service_healthy
       app-users:
-        condition: service_healthy
-      clamav:
         condition: service_healthy
     volumes:
       - secure-uploads-sanctioning:/app/secure-uploads
     networks:
-      - satc-network
-    ports:
-      - "8002:8002"
+      - satc-private
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -594,21 +599,24 @@ services:
           memory: 64M
     environment:
       # Database
-      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@postgres-docs:5432/documentos_db
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres-docs:5432/documentos_db
 
       # JWT
       SECRET_GATEWAY: ${SECRET_GATEWAY}
+      SERVICE_SECRET_KEY: ${DOCS_SERVICE_SECRET}
+      # Secretos de los callers este-oeste que app-docs valida (sanctioning/infraction)
+      SANCTIONING_SERVICE_SECRET: ${SANCTIONING_SERVICE_SECRET}
+      INFRACTION_SERVICE_SECRET: ${INFRACTION_SERVICE_SECRET}
 
       # MinIO
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: satc-documentos
       MINIO_SECURE: "false"
 
       # Services URLs
       USER_SERVICE_URL: http://app-users:8001
-      API_GATEWAY_URL: http://nginx-lb:80
 
       # File Security (Caso 8)
       MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-10}
@@ -636,9 +644,7 @@ services:
     volumes:
       - secure-uploads-docs:/app/secure-uploads
     networks:
-      - satc-network
-    ports:
-      - "8003:8003"
+      - satc-private
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -647,7 +653,119 @@ services:
         max-file: "3"
 
   # ==========================================
-  # API GATEWAY (instancia Ãºnica Â· 6 workers)
+  # MICROSERVICIO - Involved
+  # ==========================================
+  app-involved:
+    build:
+      context: ./app-involved
+      dockerfile: Dockerfile
+    container_name: satc-app-involved
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 384M # Subido de 256M: pico real de 226M (88%) con 50 usuarios concurrentes
+        reservations:
+          cpus: "0.5"
+          memory: 160M
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres-involved:5432/involucrados_db
+
+      # JWT
+      SECRET_GATEWAY: ${SECRET_GATEWAY}
+      SERVICE_SECRET_KEY: ${INVOLVED_SERVICE_SECRET}
+      # Secretos de los callers este-oeste que app-involved valida (sanctioning/infraction)
+      SANCTIONING_SERVICE_SECRET: ${SANCTIONING_SERVICE_SECRET}
+      INFRACTION_SERVICE_SECRET: ${INFRACTION_SERVICE_SECRET}
+
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
+
+      # Timezone
+      TZ: America/Bogota
+    depends_on:
+      postgres-involved:
+        condition: service_healthy
+    networks:
+      - satc-private
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python3 -c "import urllib.request; urllib.request.urlopen(''http://localhost:8004/health'')" || exit 1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================
+  # MICROSERVICIO - Infraction
+  # ==========================================
+  app-infraction:
+    build:
+      context: ./app-infraction
+      dockerfile: Dockerfile
+    container_name: satc-app-infraction
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0" # 4 workers Gunicorn (consolida 2 réplicas × 2 workers)
+          memory: 450M # Cubre uso real pico con --preload
+        reservations:
+          cpus: "1.0"
+          memory: 225M
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres-infraction:5432/infracciones_db
+
+      # JWT
+      SECRET_GATEWAY: ${SECRET_GATEWAY}
+      SERVICE_SECRET_KEY: ${INFRACTION_SERVICE_SECRET}
+
+      # Services URLs
+      GATEWAY_URL: http://api-gateway:8000
+      USER_SERVICE_URL: http://app-users:8001
+      DOCS_SERVICE_URL: http://app-docs:8003
+
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
+
+      # Timezone
+      TZ: America/Bogota
+    depends_on:
+      postgres-infraction:
+        condition: service_healthy
+      app-users:
+        condition: service_healthy
+    networks:
+      - satc-private
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python3 -c "import urllib.request; urllib.request.urlopen(''http://localhost:8005/health'')" || exit 1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================
+  # API GATEWAY (instancia única · 6 workers)
   # ==========================================
   api-gateway:
     build:
@@ -657,7 +775,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "4.0" # 6 workers Gunicorn (consolida 3 rÃ©plicas Ã— 2 workers)
+          cpus: "4.0" # 6 workers Gunicorn (consolida 3 — 2 workers)
           memory: 900M # Cubre uso real pico con --preload
         reservations:
           cpus: "2.0"
@@ -670,8 +788,10 @@ services:
 
       # Services Routes
       USER_ROUTE: http://app-users:8001
-      SANCTIONING_ROUTE: http://app-sanctioning:8002
+      SANCTIONING_ROUTE: http://app-sancionatoria:8002
       DOCUMENTS_ROUTE: http://app-docs:8003
+      INVOLVED_ROUTE: http://app-involved:8004
+      INFRACTION_ROUTE: http://app-infraction:8005
 
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
@@ -680,12 +800,12 @@ services:
       TZ: America/Bogota
 
       # Cache Distribuido (Caso 4)
-      CACHE_TYPE: ${CACHE_TYPE:-local} # local, redis, none
-      CACHE_TTL: ${CACHE_TTL:-900} # 15 minutos (para pruebas de carga)
+      CACHE_TYPE: ${CACHE_TYPE} # local, redis, none
+      CACHE_TTL: ${CACHE_TTL} # 15 minutos (para pruebas de carga)
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_DB: 0
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
 
       # Rate Limiting (Caso 12)
       RATE_LIMIT_ENABLED: "true"
@@ -693,12 +813,16 @@ services:
     depends_on:
       app-users:
         condition: service_healthy
-      app-sanctioning:
+      app-sancionatoria:
         condition: service_healthy
       app-docs:
         condition: service_healthy
+      app-involved:
+        condition: service_healthy
+      app-infraction:
+        condition: service_healthy
     networks:
-      - satc-network
+      - satc-private
     healthcheck:
       test:
         [
@@ -724,7 +848,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost:8000
+        VITE_API_URL: ""
     container_name: satc-frontend
     deploy:
       resources:
@@ -739,9 +863,7 @@ services:
       VITE_API_URL: ""
       TZ: America/Bogota
     networks:
-      - satc-network
-    ports:
-      - "80:80"
+      - satc-public
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
       interval: 30s
@@ -757,7 +879,7 @@ services:
 
   # ==========================================
   # BACKUP SERVICE (Caso 11: Disaster Recovery)
-  # Backups automÃ¡ticos cada 30 minutos
+  # Backups automaticos cada 30 minutos
   # ==========================================
   backup-service:
     image: postgres:15-alpine
@@ -773,12 +895,16 @@ services:
     environment:
       TZ: America/Bogota
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - ./backups:/backups
+      - minio-data:/minio-data:ro
       - ./scripts/backup-all.sh:/backup-all.sh:ro
+      - ./scripts/backup-minio.sh:/backup-minio.sh:ro
       - ./scripts/setup-cron-backup.sh:/setup-cron-backup.sh:ro
     networks:
-      - satc-network
+      - satc-private
     entrypoint: ["sh", "/setup-cron-backup.sh"]
     depends_on:
       postgres-users:
@@ -787,8 +913,14 @@ services:
         condition: service_healthy
       postgres-docs:
         condition: service_healthy
+      postgres-involved:
+        condition: service_healthy
+      postgres-infraction:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pgrep crond || exit 1"]
+      test: ["CMD-SHELL", "test -f /var/log/backup-cron.log || exit 1"]
       interval: 60s
       timeout: 10s
       retries: 3
@@ -803,7 +935,7 @@ services:
 # ==========================================
 # CONFIGURACIONES ADICIONALES
 # ==========================================
-# Backups automÃ¡ticos:
+# Backups automaticos:
 #   - Frecuencia: Cada 30 minutos
 #   - UbicaciÃ³n: ./backups/
 #   - RetenciÃ³n: 30 dÃ­as

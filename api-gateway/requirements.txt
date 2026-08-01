@@ -1,82 +1,45 @@
 # ====================================
-# ApiCorp - Requirements Backend
+# API Gateway - Requirements
 # Python 3.11+
 # ====================================
+#
+# Este archivo era una copia del requirements del backend completo: traía
+# SQLAlchemy, asyncpg, psycopg2, MinIO, pyclamd, pypdf, python-magic, passlib,
+# bcrypt, APScheduler, aiosmtplib, holidays, aiofiles, loguru, python-multipart
+# y email-validator, ninguno de los cuales importa el gateway. El gateway no
+# tiene base de datos, no toca disco, no manda correo y no procesa archivos:
+# solo enruta. Cada paquete de más era superficie de vulnerabilidades (y CVEs
+# que auditar) sin ninguna función, además de imagen y tiempo de build.
+#
+# Todo lo que queda está respaldado por un import real:
+#   fastapi, starlette   -> main.py
+#   uvicorn, gunicorn    -> proceso de arranque (Dockerfile CMD)
+#   python-jose[crypto]  -> utils/funciones.py (jwe)
+#   httpx[http2]         -> main.py (proxy) y el HEALTHCHECK del Dockerfile
+#   python-dotenv        -> main.py, utils/funciones.py
+#   redis[asyncio]       -> utils/redis_client.py, utils/rate_limit.py
+#   pytz / tzdata        -> zona horaria America/Bogota
+#
+# pydantic no se lista: no se importa directamente, entra como dependencia
+# obligatoria de fastapi.
 
 # Framework Web
 fastapi>=0.100.0
 uvicorn[standard]>=0.23.0
 gunicorn>=21.2.0
-python-multipart>=0.0.6
 
-# Base de Datos
-sqlalchemy>=2.0.0
-asyncpg>=0.28.0
-psycopg2-binary>=2.9.7
-
-# Autenticación y Seguridad
+# Autenticación (desencriptado del JWE de sesión)
 python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-bcrypt>=4.1.2
 
-# Validación
-pydantic>=2.0.0
-pydantic[email]>=2.0.0
-email-validator>=2.0.0
-
-# HTTP Client (comunicación entre microservicios)
+# HTTP Client (proxy hacia los microservicios)
 httpx[http2]>=0.24.0
 
 # Variables de Entorno
 python-dotenv>=1.0.0
 
-# Manejo de Archivos
-aiofiles>=23.0.0
+# Sesiones y rate limiting distribuido
+redis[asyncio]>=5.0.0
 
-# Almacenamiento de objetos MinIO
-minio>=7.2.0
-
-# Antivirus ClamAV
-pyclamd>=0.4.0
-
-# Manejo y combinación de PDFs
-pypdf>=3.17.0
-
-# Detección de tipos MIME de archivos (Caso 8: Seguridad de archivos)
-python-magic>=0.4.27
-
-# Utilidades
+# Zona horaria
 pytz>=2023.3
-# On Windows, the stdlib zoneinfo may not have the IANA tz database available.
-# Provide timezone data via `tzdata` instead of the non-existent `zoneinfo` PyPI package.
 tzdata>=2023.3; sys_platform == "win32"
-
-# Email async SMTP client used by `app-users/utils/emailUtil.py`
-aiosmtplib>=1.1.6
-
-# Holiday calendars for business-day calculations used by `app-sancionatoria/utils/funtions.py`
-holidays>=0.28.0
-
-# Background scheduler used by `app-sancionatoria/services/alertas_scheduler.py`
-APScheduler>=3.10.1
-
-# Logging
-loguru>=0.7.0
-
-# ====================================
-# Dependencias Específicas por Módulo
-# ====================================
-
-# app-users (Email)
-# Usa smtplib (built-in Python)
-
-# app-docs (Archivos)
-# aiofiles ya incluido arriba
-
-# api-gateway (Caché y Circuit Breaker)
-# Implementación custom, sin deps adicionales
-
-# ====================================
-# Instalación
-# ====================================
-# pip install -r requirements.txt

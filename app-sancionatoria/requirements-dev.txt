@@ -1,0 +1,5 @@
+# Dependencias solo para tests — no se instalan en la imagen de producción.
+-r requirements.txt
+
+pytest>=8.0.0
+pytest-asyncio>=1.4.0

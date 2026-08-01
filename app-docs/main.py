@@ -5,30 +5,35 @@ from starlette.requests import Request
 import logging
 import os
 
-# Configurar logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
-# --- Endpoints ---
-from routes import docs
+from routes import documentos, revision, docs_service, files
 
 app = FastAPI()
 
-# Middleware para forzar charset UTF-8 en todas las respuestas
+@app.on_event("startup")
+async def startup_event():
+    from db.database import init_db
+    try:
+        await init_db()
+        print("Tablas de documentos_db inicializadas correctamente")
+    except Exception as e:
+        print(f"Error inicializando BD: {e}")
+
 class CharsetMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
-        if "application/json" in response.headers.get("content-type", ""):
+        if "application/json" in response.headers.get("content-type", ""):      
             response.headers["content-type"] = "application/json; charset=utf-8"
         return response
 
 app.add_middleware(CharsetMiddleware)
 
-# CORS configurable desde variables de entorno
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:8000").split(",")
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:8000").split(",")    
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -37,9 +42,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(docs.router, prefix="/docs", tags=["Documents"])
+from db.deps import get_db
+from services.cleanup_scheduler import configurar_scheduler_limpieza
+configurar_scheduler_limpieza(app, get_db)
 
-# Health check endpoint (Caso 3: Alta Disponibilidad)
+# Los tres routers comparten el prefijo "/docs": el frontend los ve como una
+# sola API, la división es solo organización interna.
+app.include_router(documentos.router, prefix="/docs", tags=["Documents"])
+app.include_router(revision.router, prefix="/docs", tags=["Documents - Revisión"])
+app.include_router(docs_service.router, prefix="/docs", tags=["Documents - Service"])
+app.include_router(files.router, prefix="/files", tags=["Files Hash Centralized"])
+
 @app.get("/health")
 async def health_check():
     return {

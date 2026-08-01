@@ -1,13 +1,14 @@
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 import logging
+import asyncio
 
-router = APIRouter(prefix="/email", tags=["email"])
+router = APIRouter(tags=["email"])
 logger = logging.getLogger(__name__)
 
 from utils.emailUtil import send_single_email, generar_html_reporte_alertas
-from utils.verify_token_service import verify_service_jwt
+from utils.verify_token import verify_service_token
 
 class EmailRequest(BaseModel):
     title: str
@@ -31,9 +32,9 @@ async def enviar_email(
 ):
     """
     Endpoint para enviar un email individual.
-    Requiere autenticación con X-API-Key en el header.
+    Solo servicio-a-servicio: requiere X-Service-Token válido.
     """
-    verify_service_jwt(request)
+    verify_service_token(request)
     
     try:
         await send_single_email(
@@ -53,7 +54,7 @@ async def enviar_email(
         logger.error(f"Error en endpoint de envío: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Error al enviar email: {str(e)}"
+            detail=f"Error al enviar email"
         )
 
 @router.post("/send-bulk")
@@ -63,27 +64,30 @@ async def enviar_emails_masivo(
 ):
     """
     Endpoint para enviar emails masivos.
-    Requiere autenticación con X-API-Key en el header.
+    Solo servicio-a-servicio: requiere X-Service-Token válido.
     """
-    verify_service_jwt(request)
+    verify_service_token(request)
     
     enviados = []
     fallidos = []
     
-    for email in email_data.emails:
-        try:
-            await send_single_email(
-                title=email_data.title,
-                message=email_data.message,
-                email=email,
-                subject=email_data.subject,
-                html_content=email_data.html_content
-            )
+    results = await asyncio.gather(
+        *[send_single_email(
+            title=email_data.title,
+            message=email_data.message,
+            email=email,
+            subject=email_data.subject,
+            html_content=email_data.html_content
+        ) for email in email_data.emails],
+        return_exceptions=True
+    )
+
+    for email, result in zip(email_data.emails, results):
+        if isinstance(result, Exception):
+            logger.error(f"Error enviando a {email}: {result}")
+            fallidos.append({"email": email, "error": str(result)})
+        else:
             enviados.append(email)
-            
-        except Exception as e:
-            logger.error(f"Error enviando a {email}: {e}")
-            fallidos.append({"email": email, "error": str(e)})
     
     return {
         "ok": True,
@@ -103,7 +107,7 @@ async def enviar_reporte_alertas(
     """
     Endpoint especializado para enviar reportes de alertas del sistema sancionatorio.
     """
-    verify_service_jwt(request)
+    verify_service_token(request)
     
     # Generar HTML del reporte de alertas
     html_content = generar_html_reporte_alertas(title, alertas_data)
@@ -111,20 +115,23 @@ async def enviar_reporte_alertas(
     enviados = []
     fallidos = []
     
-    for email in emails:
-        try:
-            await send_single_email(
-                title=title,
-                message="Reporte de alertas adjunto",
-                email=email,
-                subject=title,
-                html_content=html_content
-            )
+    results = await asyncio.gather(
+        *[send_single_email(
+            title=title,
+            message="Reporte de alertas adjunto",
+            email=email,
+            subject=title,
+            html_content=html_content
+        ) for email in emails],
+        return_exceptions=True
+    )
+
+    for email, result in zip(emails, results):
+        if isinstance(result, Exception):
+            logger.error(f"Error enviando reporte a {email}: {result}")
+            fallidos.append({"email": email, "error": str(result)})
+        else:
             enviados.append(email)
-            
-        except Exception as e:
-            logger.error(f"Error enviando reporte a {email}: {e}")
-            fallidos.append({"email": email, "error": str(e)})
     
     return {
         "ok": True,

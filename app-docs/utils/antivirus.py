@@ -18,20 +18,15 @@ CLAMAV_ENABLED = os.getenv("CLAMAV_ENABLED", "false").lower() == "true"
 def verificar_clamav_disponible() -> bool:
     """
     Verifica si ClamAV está disponible y corriendo.
-    
-    Returns:
-        True si ClamAV está disponible, False si no
     """
     if not CLAMAV_ENABLED:
         logger.info("ClamAV está deshabilitado en configuración")
         return False
     
     try:
-        # Intentar conectar con clamd usando pyclamd
         import pyclamd
         cd = pyclamd.ClamdNetworkSocket(host=CLAMAV_HOST, port=CLAMAV_PORT)
-        
-        # Ping para verificar conexión
+
         if cd.ping():
             logger.info("ClamAV está disponible y respondiendo")
             return True
@@ -50,19 +45,10 @@ def verificar_clamav_disponible() -> bool:
 def escanear_archivo(file_data: bytes, filename: str) -> Dict[str, any]:
     """
     Escanea un archivo en busca de virus usando ClamAV.
-    
-    Args:
-        file_data: Contenido del archivo en bytes
-        filename: Nombre del archivo (para logging)
-        
-    Returns:
-        Dict con:
-        - ok: bool - True si el archivo está limpio
-        - virus_encontrado: Optional[str] - Nombre del virus si se encuentra
-        - mensaje: str - Mensaje descriptivo
-        - escaneado: bool - True si se escaneó, False si ClamAV no está disponible
+
+    Devuelve {ok, virus_encontrado, mensaje, escaneado}; `escaneado` distingue
+    "limpio" de "no se pudo verificar" (ClamAV deshabilitado o ausente).
     """
-    # Si ClamAV está deshabilitado, permitir el archivo
     if not CLAMAV_ENABLED:
         logger.info(f"ClamAV deshabilitado. Archivo {filename} se considera seguro.")
         return {
@@ -74,14 +60,12 @@ def escanear_archivo(file_data: bytes, filename: str) -> Dict[str, any]:
     
     try:
         import pyclamd
-        
-        # Conectar con ClamAV
+
         cd = pyclamd.ClamdNetworkSocket(host=CLAMAV_HOST, port=CLAMAV_PORT)
-        
-        # Escanear el archivo desde memoria
+
         resultado = cd.scan_stream(file_data)
-        
-        # Si resultado es None, el archivo está limpio
+
+        # scan_stream devuelve None cuando el archivo está limpio.
         if resultado is None:
             logger.info(f"Archivo limpio: {filename}")
             return {
@@ -91,8 +75,7 @@ def escanear_archivo(file_data: bytes, filename: str) -> Dict[str, any]:
                 "escaneado": True
             }
         
-        # Si hay resultado, se encontró un virus
-        # resultado es un dict: {'stream': ('FOUND', 'Virus.Name')}
+        # Con hallazgo, el dict es {'stream': ('FOUND', 'Virus.Name')}.
         virus_info = resultado.get('stream', ('UNKNOWN', 'UNKNOWN'))
         virus_nombre = virus_info[1] if len(virus_info) > 1 else 'Desconocido'
         
@@ -115,8 +98,8 @@ def escanear_archivo(file_data: bytes, filename: str) -> Dict[str, any]:
     except Exception as e:
         logger.error(f"Error durante escaneo de {filename}: {e}")
         
-        # En caso de error, decidir política: ¿permitir o bloquear?
-        # Por seguridad, se recomienda BLOQUEAR si ClamAV está habilitado pero falla
+        # Fail-closed: con ClamAV habilitado, un escaneo fallido bloquea el
+        # archivo en vez de dejarlo pasar sin verificar.
         if CLAMAV_ENABLED:
             return {
                 "ok": False,
@@ -125,7 +108,6 @@ def escanear_archivo(file_data: bytes, filename: str) -> Dict[str, any]:
                 "escaneado": False
             }
         else:
-            # Si está deshabilitado, permitir
             return {
                 "ok": True,
                 "virus_encontrado": None,
@@ -137,9 +119,6 @@ def escanear_archivo(file_data: bytes, filename: str) -> Dict[str, any]:
 def obtener_version_clamav() -> Dict[str, any]:
     """
     Obtiene la versión de ClamAV instalada.
-    
-    Returns:
-        Dict con información de versión o error
     """
     if not CLAMAV_ENABLED:
         return {
@@ -168,12 +147,6 @@ def obtener_version_clamav() -> Dict[str, any]:
 def escanear_archivo_desde_path(file_path: Path) -> Dict[str, any]:
     """
     Escanea un archivo desde su ruta en el filesystem.
-    
-    Args:
-        file_path: Ruta del archivo a escanear
-        
-    Returns:
-        Dict con resultado del escaneo
     """
     try:
         with open(file_path, 'rb') as f:

@@ -1,9 +1,8 @@
-import Input from "../../Input/Input";
+import Input from "../../Common/Input/Input";
 import { useEffect, useState, useRef } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
-import ConfirmDeleteRolePermissionModal from "./ConfirmDeleteRolePermissionModa";
-
-type Roles = { id: number; name: string; permission: number[] };
+import ConfirmationModal from "./ConfirmationModal";
+import type { Rol } from "../../../types/userApp";
 
 type Props = {
   permission: { id: number; name: string; menu_path: string }[];
@@ -14,9 +13,9 @@ type Props = {
   }) => void;
 };
 
-export default function EditRol({ permission, setToast }: Props) {
+export default function EditRol({ permission = [], setToast }: Props) {
   const roleNameRef = useRef<HTMLInputElement>(null);
-  const [role, setRole] = useState<Roles[]>([]);
+  const [rolList, setRolList] = useState<Rol[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState("0");
   const [permissionList, setPermissionList] = useState<number[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -26,10 +25,10 @@ export default function EditRol({ permission, setToast }: Props) {
   const itemsPerPage = 8;
 
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const roleTemp = role.find((r) => r.id === Number(e.target.value));
-    setPermissionList(roleTemp ? roleTemp.permission : []);
+    const rolTemp = rolList.find((r) => r.id === Number(e.target.value));
+    setPermissionList(rolTemp ? rolTemp.permisos : []);
     setSelectedRoleId(e.target.value);
-    roleNameRef.current!.value = roleTemp ? roleTemp.name : "";
+    roleNameRef.current!.value = rolTemp ? rolTemp.nombre : "";
   };
 
   const togglePermission = (id: number) => {
@@ -38,18 +37,15 @@ export default function EditRol({ permission, setToast }: Props) {
     );
   };
 
-  // Filtrar permisos según búsqueda
-  const filteredPermissions = permission.filter((p) =>
+  const filteredPermissions = (permission || []).filter((p) =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  // Calcular paginación
   const totalPages = Math.ceil(filteredPermissions.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentPermissions = filteredPermissions.slice(startIndex, endIndex);
 
-  // Resetear página cuando cambia el término de búsqueda
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
@@ -86,8 +82,8 @@ export default function EditRol({ permission, setToast }: Props) {
         {
           method: "PUT",
           body: JSON.stringify({
-            name: roleNameRef.current.value,
-            permission: permissionList,
+            nombre: roleNameRef.current.value,
+            permisos: permissionList,
           }),
         },
       );
@@ -100,13 +96,13 @@ export default function EditRol({ permission, setToast }: Props) {
 
         const updatedName = roleNameRef.current!.value;
 
-        setRole((prev) =>
+        setRolList((prev) =>
           prev.map((r) =>
             r.id === Number(selectedRoleId)
               ? {
                   ...r,
-                  name: updatedName,
-                  permission: permissionList,
+                  nombre: updatedName,
+                  permisos: permissionList,
                 }
               : r,
           ),
@@ -123,7 +119,6 @@ export default function EditRol({ permission, setToast }: Props) {
         });
       }
     } catch (e) {
-      /* console.error("Error al hacer fetch:", e); */
       setToast({
         id: Date.now(),
         message: "Error al actualizar el rol",
@@ -162,7 +157,7 @@ export default function EditRol({ permission, setToast }: Props) {
           message: "Rol eliminado correctamente",
           type: "success",
         });
-        setRole((prev) => prev.filter((r) => r.id !== Number(selectedRoleId)));
+        setRolList((prev) => prev.filter((r) => r.id !== Number(selectedRoleId)));
 
         setPermissionList([]);
         setSelectedRoleId("0");
@@ -175,7 +170,6 @@ export default function EditRol({ permission, setToast }: Props) {
         });
       }
     } catch (e) {
-      /* console.error("Error al hacer fetch:", e); */
       setToast({
         id: Date.now(),
         message: "Error al eliminar el rol",
@@ -194,7 +188,7 @@ export default function EditRol({ permission, setToast }: Props) {
           method: "GET",
         });
         if (res.ok) {
-          setRole(res.data);
+          setRolList(res.data || []);
         } else {
           setToast({
             id: Date.now(),
@@ -203,7 +197,6 @@ export default function EditRol({ permission, setToast }: Props) {
           });
         }
       } catch (e) {
-        /* console.error("Error al hacer fetch:", e); */
         setToast({
           id: Date.now(),
           message: "Error al cargar los permisos",
@@ -216,13 +209,14 @@ export default function EditRol({ permission, setToast }: Props) {
 
   return (
     <div className="card bg-base-100 shadow-md border border-base-300 h-full flex flex-col">
-      <ConfirmDeleteRolePermissionModal
+      <ConfirmationModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleConfirmDelete}
-        type="rol"
-        itemName={role.find((r) => r.id === Number(selectedRoleId))?.name}
-        isDeleting={isDeleting}
+        typeOperation="actualizar"
+        typeChange="rol"
+        itemIdentifier={rolList.find((r) => r.id === Number(selectedRoleId))?.nombre}
+        isSubmitting={isDeleting}
       />
 
       <div className="card-body flex flex-col h-full">
@@ -260,9 +254,9 @@ export default function EditRol({ permission, setToast }: Props) {
               value={selectedRoleId}
             >
               <option value="0">Seleccione un rol</option>
-              {role.map((role) => (
-                <option key={role.id} value={role.id}>
-                  {role.name}
+              {rolList.map((rol) => (
+                <option key={rol.id} value={rol.id}>
+                  {rol.nombre}
                 </option>
               ))}
             </select>

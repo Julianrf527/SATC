@@ -75,6 +75,7 @@ type Props = {
   onClose: () => void;
   documentoId: number;
   onUpdate: () => void;
+  setToast?: (toast: { id: number; message: string; type: "success" | "error" }) => void;
 };
 
 const formatDate = (dateString: string) => {
@@ -99,6 +100,7 @@ export default function DocumentoDetalleModal({
   onClose,
   documentoId,
   onUpdate,
+  setToast,
 }: Props) {
   const [documento, setDocumento] = useState<DocumentoCompleto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,11 +108,9 @@ export default function DocumentoDetalleModal({
   const [showSubirVersionModal, setShowSubirVersionModal] = useState(false);
   const [showRevisarModal, setShowRevisarModal] = useState(false);
 
-  // Obtener usuario actual del contexto
   const { user } = useAuth();
-  const usuarioActualId = user?.id || 0;
+  const usuarioActualId = user?.user_id || 0;
 
-  // Detectar tema
   useEffect(() => {
     const updateTheme = () => {
       const currentTheme =
@@ -134,7 +134,6 @@ export default function DocumentoDetalleModal({
     return () => observer.disconnect();
   }, []);
 
-  // Cargar documento completo
   useEffect(() => {
     if (isOpen && documentoId) {
       cargarDocumento();
@@ -152,7 +151,6 @@ export default function DocumentoDetalleModal({
         setDocumento(res);
       }
     } catch (error) {
-      /* console.error("Error cargando documento:", error); */
     } finally {
       setLoading(false);
     }
@@ -166,18 +164,15 @@ export default function DocumentoDetalleModal({
     try {
       const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.DOCS_DOWNLOAD(versionId)}`;
 
-      // Si es PDF, abrir en nueva pestaña
       if (tipo_archivo === "pdf") {
         window.open(url, "_blank");
       } else {
-        // Si es Word, descargar directamente
         const link = document.createElement("a");
         link.href = url;
         link.download = archivo_nombre;
         link.click();
       }
     } catch (error) {
-      /* console.error("Error descargando archivo:", error); */
     }
   };
 
@@ -232,6 +227,8 @@ export default function DocumentoDetalleModal({
     switch (accion) {
       case "crear":
         return "Creado";
+      case "subir_version_inicial":
+        return "Cargado";
       case "subir_version":
         return "Nueva Versión";
       case "devolver":
@@ -243,7 +240,7 @@ export default function DocumentoDetalleModal({
       case "finalizar":
         return "Finalizado";
       default:
-        return accion.replace("_", " ");
+        return accion.replace(/_/g, " ");
     }
   };
 
@@ -251,6 +248,8 @@ export default function DocumentoDetalleModal({
     switch (accion) {
       case "crear":
         return <Upload className="text-yellow-500" size={16} />;
+      case "subir_version_inicial":
+        return <Upload className="text-blue-600" size={16} />;
       case "subir_version":
         return <Upload className="text-blue-500" size={16} />;
       case "devolver":
@@ -270,6 +269,8 @@ export default function DocumentoDetalleModal({
     switch (accion) {
       case "crear":
         return "border-yellow-500";
+      case "subir_version_inicial":
+        return "border-blue-600";
       case "subir_version":
         return "border-blue-500";
       case "devolver":
@@ -285,15 +286,18 @@ export default function DocumentoDetalleModal({
     }
   };
 
-  // Determinar permisos y acciones disponibles
   const esCreador =
     Number(documento?.usuario_creador_id) === Number(usuarioActualId);
   const esRevisor = documento?.revisores_asignados.some(
     (r) => Number(r.revisor_id) === Number(usuarioActualId),
   );
-  const puedeSubirVersion = esCreador && documento?.estado === "rechazado";
+  const sinVersiones = (documento?.versiones?.length ?? 0) === 0;
+  // Puede subir: si fue rechazado (re-entrega) O si aún no hay ninguna versión (primera carga)
+  const puedeSubirVersion =
+    esCreador &&
+    (documento?.estado === "rechazado" ||
+      (documento?.estado === "en_revision" && sinVersiones));
 
-  // Verificar si ya revisó la versión actual
   const yaRevisoVersionActual = documento?.revisiones.some(
     (r) =>
       Number(r.revisor_id) === Number(usuarioActualId) &&
@@ -301,7 +305,10 @@ export default function DocumentoDetalleModal({
   );
 
   const puedeRevisar =
-    esRevisor && documento?.estado === "en_revision" && !yaRevisoVersionActual;
+    esRevisor &&
+    documento?.estado === "en_revision" &&
+    !yaRevisoVersionActual &&
+    (documento?.versiones?.length ?? 0) > 0;
 
   const handleClose = () => {
     setDocumento(null);
@@ -397,7 +404,7 @@ export default function DocumentoDetalleModal({
                     className="btn btn-sm btn-primary gap-2"
                   >
                     <Upload size={16} />
-                    Subir Nueva Versión
+                    {sinVersiones ? "Subir Documento" : "Subir Nueva Versión"}
                   </button>
                 )}
                 {puedeRevisar && (
@@ -618,6 +625,7 @@ export default function DocumentoDetalleModal({
           onClose={() => setShowSubirVersionModal(false)}
           documentoId={documento.documento_id}
           onSuccess={handleVersionSubida}
+          setToast={setToast}
         />
       )}
 

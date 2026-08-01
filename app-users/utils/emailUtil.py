@@ -83,120 +83,144 @@ async def send_single_email(title: str, message: str, email: str, subject: str, 
 def generar_html_reporte_alertas(title: str, alertas_data: dict) -> str:
     """Genera el HTML del reporte de alertas"""
     from datetime import datetime
-    
+
+    NOMBRE_SISTEMA = "Sistema de Administración de Trámites de Corpochivor"
+
+    ESTADO_COLOR = {
+        "verde": "#15803d",
+        "amarillo": "#b45309",
+        "rojo": "#b91c1c",
+        "vencido": "#1f2937",
+    }
+    ESTADO_LABEL = {
+        "verde": "En término",
+        "amarillo": "Próximo a vencer",
+        "rojo": "Urgente",
+        "vencido": "Vencido",
+    }
+    # Orden de severidad para mostrar primero lo más urgente
+    ORDEN_ESTADO = {"vencido": 0, "rojo": 1, "amarillo": 2, "verde": 3}
+
     html = f"""
     <html>
     <head>
         <style>
-            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }}
-            .container {{ max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }}
-            .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; }}
-            .header h1 {{ margin: 0; font-size: 28px; }}
-            .header p {{ margin: 10px 0 0 0; opacity: 0.9; }}
-            .stats {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; padding: 20px; background: #f7fafc; }}
-            .stat-card {{ padding: 20px; border-radius: 8px; text-align: center; color: white; }}
-            .stat-card h3 {{ margin: 0 0 10px 0; font-size: 16px; opacity: 0.9; }}
-            .stat-card p {{ margin: 0; font-size: 32px; font-weight: bold; }}
-            .verde {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }}
-            .amarillo {{ background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }}
-            .rojo {{ background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }}
-            .vencido {{ background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }}
-            .content {{ padding: 30px; }}
-            .resumen {{ background: #edf2f7; padding: 20px; border-radius: 8px; margin-bottom: 20px; }}
-            .resumen h2 {{ margin: 0 0 15px 0; color: #2d3748; }}
-            .expediente {{ border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 15px 0; }}
-            .expediente h3 {{ margin: 0 0 15px 0; color: #2d3748; border-bottom: 2px solid #667eea; padding-bottom: 10px; }}
-            .alerta {{ background: #f7fafc; padding: 15px; margin: 10px 0; border-radius: 6px; border-left: 4px solid #667eea; }}
-            .alerta h4 {{ margin: 0 0 10px 0; color: #4a5568; }}
-            .alerta-info {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
-            .alerta-info-item {{ font-size: 14px; color: #718096; }}
-            .alerta-info-item strong {{ color: #2d3748; }}
-            .footer {{ background: #2d3748; color: white; padding: 20px; text-align: center; font-size: 12px; }}
+            body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eef1f5; margin: 0; padding: 20px; color: #1f2937; }}
+            .container {{ max-width: 760px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #d8dde3; }}
+            .header {{ background: #1e3a5f; color: #ffffff; padding: 24px 30px; }}
+            .header .marca {{ font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.85; margin: 0 0 6px 0; }}
+            .header h1 {{ margin: 0; font-size: 22px; font-weight: 600; }}
+            .header .fecha {{ margin: 10px 0 0 0; font-size: 13px; opacity: 0.85; }}
+            .stats {{ display: table; width: 100%; border-collapse: collapse; }}
+            .stats-row {{ display: table-row; }}
+            .stat-cell {{ display: table-cell; width: 25%; text-align: center; padding: 16px 8px; border-bottom: 1px solid #d8dde3; border-right: 1px solid #d8dde3; }}
+            .stat-cell:last-child {{ border-right: none; }}
+            .stat-num {{ font-size: 26px; font-weight: 700; margin: 0; }}
+            .stat-label {{ font-size: 12px; color: #4b5563; margin: 4px 0 0 0; text-transform: uppercase; letter-spacing: 0.03em; }}
+            .content {{ padding: 24px 30px; }}
+            .resumen {{ background: #f3f5f8; border: 1px solid #d8dde3; padding: 14px 18px; border-radius: 6px; margin-bottom: 22px; font-size: 14px; }}
+            .resumen strong {{ color: #1e3a5f; }}
+            .seccion-titulo {{ font-size: 15px; font-weight: 600; color: #1e3a5f; margin: 0 0 12px 0; border-bottom: 2px solid #1e3a5f; padding-bottom: 6px; }}
+            .expediente {{ border: 1px solid #d8dde3; border-radius: 6px; padding: 16px 18px; margin: 0 0 16px 0; }}
+            .expediente-titulo {{ margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: #1f2937; }}
+            .alerta {{ background: #f9fafb; border: 1px solid #e5e7eb; border-left: 4px solid #9ca3af; border-radius: 4px; padding: 12px 14px; margin: 10px 0 0 0; }}
+            .alerta-top {{ display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; }}
+            .alerta-etapa {{ font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: #6b7280; }}
+            .alerta-estado {{ font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; padding: 2px 8px; border-radius: 10px; color: #ffffff; white-space: nowrap; }}
+            .alerta-accion {{ font-size: 14px; font-weight: 600; color: #1f2937; margin: 0 0 4px 0; }}
+            .alerta-msg {{ font-size: 13px; color: #4b5563; margin: 0 0 8px 0; }}
+            .alerta-meta {{ font-size: 12px; color: #6b7280; }}
+            .alerta-meta b {{ color: #374151; }}
+            .footer {{ background: #1e3a5f; color: #ffffff; padding: 16px 30px; text-align: center; font-size: 11px; }}
+            .footer p {{ margin: 2px 0; opacity: 0.9; }}
         </style>
     </head>
     <body>
         <div class="container">
             <div class="header">
+                <p class="marca">{NOMBRE_SISTEMA}</p>
                 <h1>{title}</h1>
-                <p>📅 {datetime.now().strftime("%d de %B de %Y")}</p>
+                <p class="fecha">{datetime.now().strftime("%d de %B de %Y")}</p>
             </div>
     """
-    
+
     # Estadísticas
     stats = alertas_data.get("estadisticas_semaforo", {})
+    html += '<div class="stats"><div class="stats-row">'
+    for estado in ("verde", "amarillo", "rojo", "vencido"):
+        html += f"""
+                <div class="stat-cell">
+                    <p class="stat-num" style="color:{ESTADO_COLOR[estado]}">{stats.get(estado, 0)}</p>
+                    <p class="stat-label">{ESTADO_LABEL[estado]}</p>
+                </div>
+        """
+    html += "</div></div>"
+
     html += f"""
-            <div class="stats">
-                <div class="stat-card verde">
-                    <h3>✅ Verde</h3>
-                    <p>{stats.get('verde', 0)}</p>
-                </div>
-                <div class="stat-card amarillo">
-                    <h3>⚠️ Amarillo</h3>
-                    <p>{stats.get('amarillo', 0)}</p>
-                </div>
-                <div class="stat-card rojo">
-                    <h3>🚨 Rojo</h3>
-                    <p>{stats.get('rojo', 0)}</p>
-                </div>
-                <div class="stat-card vencido">
-                    <h3>❌ Vencido</h3>
-                    <p>{stats.get('vencido', 0)}</p>
-                </div>
-            </div>
-            
             <div class="content">
                 <div class="resumen">
-                    <h2>📊 Resumen General</h2>
-                    <p><strong>Total de expedientes:</strong> {alertas_data.get('total_expedientes', 0)}</p>
-                    <p><strong>Expedientes con alertas:</strong> {alertas_data.get('expedientes_con_alertas', 0)}</p>
+                    <strong>Total de expedientes a cargo:</strong> {alertas_data.get('total_expedientes', 0)}
+                    &nbsp;&middot;&nbsp;
+                    <strong>Con alertas pendientes:</strong> {alertas_data.get('expedientes_con_alertas', 0)}
                 </div>
     """
-    
+
     # Detalles por expediente
     alertas = alertas_data.get("alertas", {})
     if alertas:
-        html += "<h2>📋 Detalle de Alertas por Expediente</h2>"
+        html += '<p class="seccion-titulo">Detalle de alertas por expediente</p>'
         for radicado, alertas_exp in alertas.items():
             html += f"""
             <div class="expediente">
-                <h3>📁 Expediente: {radicado}</h3>
+                <p class="expediente-titulo">Expediente: {radicado}</p>
             """
-            for tipo, alerta in alertas_exp.items():
+            alertas_ordenadas = sorted(
+                alertas_exp.values(),
+                key=lambda a: ORDEN_ESTADO.get(a.get("semaforo", {}).get("estado"), 9),
+            )
+            for alerta in alertas_ordenadas:
                 semaforo = alerta.get("semaforo", {})
-                emoji = {"verde": "✅", "amarillo": "⚠️", "rojo": "🚨", "vencido": "❌"}.get(semaforo.get('estado', ''), "ℹ️")
-                
+                estado = semaforo.get("estado", "verde")
+                color = ESTADO_COLOR.get(estado, "#6b7280")
+                label = ESTADO_LABEL.get(estado, estado.upper())
+                dias_restantes = semaforo.get("dias_restantes")
+                dias_txt = "Vencido" if semaforo.get("esta_vencido") else f"{dias_restantes} día(s) restante(s)" if dias_restantes is not None else "N/A"
+
                 html += f"""
-                <div class="alerta">
-                    <h4>{emoji} {tipo.replace('_', ' ').title()}</h4>
-                    <div class="alerta-info">
-                        <div class="alerta-info-item">
-                            <strong>Estado:</strong> {semaforo.get('estado', 'N/A').upper()}
-                        </div>
-                        <div class="alerta-info-item">
-                            <strong>Días restantes:</strong> {alerta.get('dias_restantes', 'N/A')}
-                        </div>
+                <div class="alerta" style="border-left-color:{color}">
+                    <div class="alerta-top">
+                        <span class="alerta-etapa">{alerta.get('etapa', '')}</span>
+                        <span class="alerta-estado" style="background:{color}">{label}</span>
                     </div>
-                    <p style="margin: 10px 0 0 0; color: #4a5568;">{alerta.get('mensaje', '')}</p>
+                    <p class="alerta-accion">{alerta.get('accion_requerida', '')}</p>
+                    <p class="alerta-msg">{alerta.get('msg', '')}</p>
+                    <p class="alerta-meta">
+                        <b>Plazo legal:</b> {alerta.get('plazo_legal', 'N/A')}
+                        &nbsp;&middot;&nbsp;
+                        <b>Fecha límite:</b> {alerta.get('fecha_limite', 'N/A')}
+                        &nbsp;&middot;&nbsp;
+                        <b>{dias_txt}</b>
+                    </p>
                 </div>
                 """
             html += "</div>"
     else:
         html += """
-        <div style="text-align: center; padding: 40px; color: #718096;">
-            <h3>🎉 No hay alertas pendientes</h3>
-            <p>Todos los expedientes están al día.</p>
+        <div style="text-align: center; padding: 30px 10px; color: #4b5563;">
+            <p style="font-size: 15px; font-weight: 600; margin: 0 0 4px 0;">No hay alertas pendientes</p>
+            <p style="font-size: 13px; margin: 0;">Todos los expedientes a su cargo están al día.</p>
         </div>
         """
-    
-    html += """
+
+    html += f"""
             </div>
             <div class="footer">
-                <p>© 2025 Corpochivor. Todos los derechos reservados.</p>
-                <p style="margin-top: 10px; opacity: 0.8;">Este es un mensaje automático, por favor no responder.</p>
+                <p>{NOMBRE_SISTEMA}</p>
+                <p>&copy; {datetime.now().year} Corpochivor. Este es un mensaje automático, por favor no responder.</p>
             </div>
         </div>
     </body>
     </html>
     """
-    
+
     return html
