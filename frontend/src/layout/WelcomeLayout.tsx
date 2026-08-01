@@ -1,5 +1,6 @@
-import gifDia from "../assets/video_dia.gif";
-import gifNoche from "../assets/video_noche.gif";
+import { useState, useEffect } from "react";
+import webmDia from "../assets/video_dia.webm";
+import webmNoche from "../assets/video_noche.webm";
 import logo from "../assets/logo.png";
 
 type Props = {
@@ -7,6 +8,19 @@ type Props = {
 };
 
 export default function WelcomeLayout({ theme }: Props) {
+  // Solo se ve un tema a la vez: el video del tema inactivo ni se monta hasta
+  // que el usuario cambie de tema alguna vez (evita la descarga que dispara
+  // un <video> aunque esté con opacity: 0).
+  const [temasVistos, setTemasVistos] = useState<Set<Props["theme"]>>(
+    () => new Set([theme])
+  );
+
+  useEffect(() => {
+    setTemasVistos((prev) =>
+      prev.has(theme) ? prev : new Set(prev).add(theme)
+    );
+  }, [theme]);
+
   return (
     <section className="w-full min-h-[calc(100vh-4rem)] bg-base-100 flex items-center justify-center overflow-hidden relative">
       {/* Logo como marca de agua */}
@@ -43,12 +57,18 @@ export default function WelcomeLayout({ theme }: Props) {
                   : "opacity-0 pointer-events-none"
               }`}
             >
-              <img
-                src={gifDia}
-                alt="Colibri día"
-                className="w-full h-full object-cover select-none pointer-events-none"
-                draggable="false"
-              />
+              {temasVistos.has("emerald") && (
+                <video
+                  src={webmDia}
+                  className="w-full h-full object-cover select-none pointer-events-none"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  disablePictureInPicture
+                  aria-label="Colibrí día"
+                />
+              )}
             </div>
 
             {/* Animación noche */}
@@ -59,12 +79,18 @@ export default function WelcomeLayout({ theme }: Props) {
                   : "opacity-0 pointer-events-none"
               }`}
             >
-              <img
-                src={gifNoche}
-                alt="Colibri noche"
-                className="w-full h-full object-cover select-none pointer-events-none"
-                draggable="false"
-              />
+              {temasVistos.has("dark") && (
+                <video
+                  src={webmNoche}
+                  className="w-full h-full object-cover select-none pointer-events-none"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  disablePictureInPicture
+                  aria-label="Colibrí noche"
+                />
+              )}
             </div>
           </div>
         </div>

@@ -339,22 +339,29 @@ export const apiCall = async (
   // Se intercepta antes del parseo genérico: el 401 dispara logout y redirección.
   if (response.status === 401) {
     const data = await response.json().catch(() => ({}));
-    if (data.detail === "session_replaced") {
-      showSessionExpiredToast(
-        "Tu sesión ha sido reemplazada por otro inicio de sesión. Si no fuiste tú, por favor cambia tu contraseña.",
-      );
-    } else {
-      showSessionExpiredToast(
-        "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.",
-      );
-    }
+    const yaEnLogin = window.location.pathname.startsWith("/login");
 
     document.cookie =
       "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
-    setTimeout(() => {
-      window.location.href = "/login";
-    }, 500);
+    // Ya está viendo el login: recargar la misma página solo le tumba el
+    // toast a medio mostrar sin aportar nada (no hay sesión que perder).
+    if (!yaEnLogin) {
+      if (data.detail === "session_replaced") {
+        showSessionExpiredToast(
+          "Tu sesión ha sido reemplazada por otro inicio de sesión. Si no fuiste tú, por favor cambia tu contraseña.",
+        );
+      } else {
+        showSessionExpiredToast(
+          "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.",
+        );
+      }
+
+      // Da tiempo a leer el toast antes de que el reload completo lo borre.
+      setTimeout(() => {
+        window.location.href = "/login";
+      }, 2500);
+    }
 
     return {
       ok: false,

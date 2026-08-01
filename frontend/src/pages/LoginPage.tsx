@@ -17,7 +17,7 @@ export default function LoginPage({ theme }: Props) {
 
   useEffect(() => {
     const img = new window.Image();
-    img.src = "/static/login-bg.jpg";
+    img.src = "/static/login-bg.webp";
     img.onload = () => setImgLoaded(true);
   }, []);
 
@@ -108,7 +108,7 @@ export default function LoginPage({ theme }: Props) {
           </div>
           <div
             className={`hidden md:block md:w-1/2 bg-cover bg-center bg-base-300 transition-opacity duration-700 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
-            style={{ backgroundImage: `url(/static/login-bg.jpg)` }}
+            style={{ backgroundImage: `url(/static/login-bg.webp)` }}
             role="img"
           />
         </div>
