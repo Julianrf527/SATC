@@ -23,7 +23,6 @@ export default function Input({
   onKeyUp,
   inputRef,
 }: Props) {
-  // Determinar si es un input controlado o no controlado
   const isControlled = value !== undefined;
 
   return (

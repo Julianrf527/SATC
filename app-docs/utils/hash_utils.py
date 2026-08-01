@@ -12,12 +12,6 @@ logger = logging.getLogger(__name__)
 def calcular_hash_archivo(file_data: bytes) -> str:
     """
     Calcula el hash SHA256 de un archivo.
-    
-    Args:
-        file_data: Contenido del archivo en bytes
-        
-    Returns:
-        Hash SHA256 en formato hexadecimal
     """
     try:
         sha256_hash = hashlib.sha256()
@@ -30,22 +24,13 @@ def calcular_hash_archivo(file_data: bytes) -> str:
 
 def calcular_hash_uploadfile(file) -> tuple[str, bytes]:
     """
-    Calcula el hash SHA256 de un UploadFile de FastAPI.
-    
-    Args:
-        file: UploadFile de FastAPI
-        
-    Returns:
-        Tupla (hash_str, file_data) - El hash y los datos del archivo
+    Hash SHA256 de un UploadFile de FastAPI, como (hash_str, file_data).
+
+    Deja el puntero del archivo en 0 para que el llamador pueda releerlo.
     """
     try:
-        # Leer todo el archivo
         file_data = file.file.read()
-        
-        # Resetear el puntero del archivo por si se necesita leer después
         file.file.seek(0)
-        
-        # Calcular hash
         hash_str = calcular_hash_archivo(file_data)
         
         logger.info(f"Hash calculado para {file.filename}: {hash_str}")
@@ -62,14 +47,7 @@ def verificar_duplicado_por_hash(
     archivos_existentes: Dict[str, str]
 ) -> Optional[str]:
     """
-    Verifica si un archivo con el mismo hash ya existe.
-    
-    Args:
-        file_hash: Hash SHA256 del archivo
-        archivos_existentes: Diccionario {hash: url} de archivos existentes
-        
-    Returns:
-        URL del archivo duplicado si existe, None si no existe
+    URL del archivo con este hash si ya existe, None si no.
     """
     if file_hash in archivos_existentes:
         logger.warning(f"Archivo duplicado detectado. Hash: {file_hash}")
@@ -80,15 +58,7 @@ def verificar_duplicado_por_hash(
 
 def generar_metadata_hash(file_hash: str, filename: str, size: int) -> dict:
     """
-    Genera metadata que incluye el hash del archivo.
-    
-    Args:
-        file_hash: Hash SHA256 del archivo
-        filename: Nombre original del archivo
-        size: Tamaño del archivo en bytes
-        
-    Returns:
-        Diccionario con metadata
+    Genera la metadata del objeto, incluyendo el hash del archivo.
     """
     return {
         "sha256": file_hash,
@@ -98,8 +68,8 @@ def generar_metadata_hash(file_hash: str, filename: str, size: int) -> dict:
     }
 
 
-# Cache en memoria para hashes de archivos (opcional)
-# Para uso en producción, considerar Redis o base de datos
+# Cache local al proceso: con varios workers cada uno tiene el suyo, así que
+# es solo un atajo, no la fuente de verdad de la deduplicación.
 _hash_cache: Dict[str, str] = {}
 
 

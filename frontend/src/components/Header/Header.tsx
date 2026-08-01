@@ -16,7 +16,7 @@ type FormattedPermission = {
   path: string;
 };
 
-export default function Header({setTheme, permission }: Props) {
+export default function Header({ setTheme, permission = [] }: Props) {
   const [notification, setNotification] = useState<any[] | null>(null);
   const [isDark, setIsDark] = useState(() => {
     return localStorage.getItem("theme") === "dark";
@@ -90,7 +90,7 @@ export default function Header({setTheme, permission }: Props) {
       return;
     }
 
-    const formatted = formatPermissions(permission);
+    const formatted = formatPermissions(permission || []);
     const searchLower = searchValue.toLowerCase();
 
     const filtered = formatted.filter(
@@ -119,47 +119,67 @@ export default function Header({setTheme, permission }: Props) {
   }, []);
 
   useEffect(() => {
-    // Usar el endpoint del api.ts para el stream SSE
     const endpoint = API_CONFIG.ENDPOINTS.NOTIFICATION_STREAM;
     let baseUrl =
-      (window as any).ENV?.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "";
+      window.ENV?.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "";
     if (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1);
     const streamUrl = `${baseUrl}${endpoint}`;
 
-    const eventSource = new window.EventSource(streamUrl, {
-      withCredentials: true,
-    });
+    let eventSource: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.notifications) {
-          setNotification(data.notifications);
+    const connect = () => {
+      eventSource = new window.EventSource(streamUrl, {
+        withCredentials: true,
+      });
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.notifications) {
+            setNotification(data.notifications);
+          }
+        } catch (e) {
+          // Puede ser heartbeat u otro mensaje
         }
-      } catch (e) {
-        // Puede ser heartbeat u otro mensaje
-      }
+      };
+
+      eventSource.onerror = () => {
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+
+        // Reintento simple para mantener el stream activo
+        if (!reconnectTimer) {
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            connect();
+          }, 2000);
+        }
+      };
     };
 
-    eventSource.onerror = () => {
-      eventSource.close();
-    };
+    connect();
 
     return () => {
-      eventSource.close();
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+      if (eventSource) {
+        eventSource.close();
+      }
     };
   }, []);
 
   const logout = async () => {
     try {
-      const res = await apiCall(API_CONFIG.ENDPOINTS.AUTH_LOGOUT, {
+      await apiCall(API_CONFIG.ENDPOINTS.AUTH_LOGOUT, {
         method: "POST",
       });
-      if (res.ok) {
-        window.location.href = "/login";
-      }
     } catch (error) {
-      /* console.log(error); */
+    } finally {
+      window.location.href = "/login";
     }
   };
 
@@ -168,7 +188,6 @@ export default function Header({setTheme, permission }: Props) {
     setTheme(newTheme);
     setIsDark(!isDark);
     localStorage.setItem("theme", newTheme);
-    // Disparar evento para que los modales detecten el cambio
     window.dispatchEvent(
       new CustomEvent("themeChange", { detail: { theme: newTheme } }),
     );
@@ -481,8 +500,8 @@ export default function Header({setTheme, permission }: Props) {
           {/* Notifications - siempre mostrar, incluso sin notificaciones */}
           {notification !== null && (
             <Notifications
-              notification={notification}
-              key={notification.length}
+              notifications={notification}
+              onUpdate={setNotification}
             />
           )}
 

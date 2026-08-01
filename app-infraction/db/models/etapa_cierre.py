@@ -16,5 +16,5 @@ class EtapaCierre(Base):
     acto_administrativo = relationship("ActoAdministrativo", back_populates="etapa_cierre")
 
     __table_args__ = (
-        Index('ix_etapa_cierre_expediente', 'expediente_id')
+        Index('ix_etapa_cierre_expediente', 'expediente_id'),
     )

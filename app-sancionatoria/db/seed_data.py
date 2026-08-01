@@ -485,3 +485,50 @@ VEREDAS = [
     (466, "Casco Urbano", 24),
     (467, "Casco Urbano", 25),
 ]
+
+RECUROS = [
+    (1, "Agua"),
+    (2, "Aire"),
+    (3, "Bosque"),
+    (4, "Fauna"),
+    (5, "Flora"),
+    (6, "Suelo"),
+]
+
+# Alias del typo RECUROS, que es el nombre que usa el código de seedeo.
+RECURSOS = RECUROS
+
+TIPO_CESACION = [
+    (1, "Muerte de investigado"),
+    (2, "No es constitutivo de infracción ambiental"),
+    (3, "Conducta investigada no es imputable al presunto infractor"),
+    (4, "La actividad está legalmente amparada/autorizada"),
+]
+
+
+TIPO_MEDIDA = [
+    (1, "Decomiso preventivo"),
+    (2, "Suspensión del proyecto"),
+    (3, "Estudios y evaluaciones requeridas para conocer la naturaleza de los daños"),
+    (4, "Suspensión de actividades o de obras"),
+    (5, "Clausura temporal"),
+    (6, "Aprehensión preventiva"),
+    (7, "Congelación o suspensión de venta-empleo"),
+    (8, "Amonestación escrita"),
+    (9, "Elaboración de estudios ambientales"),
+]
+
+TIPO_NOTIFICACION = [
+    (1, "Personal"),
+    (2, "Correo"),
+    (3, "Publicación"),
+]
+
+TIPO_SANCION = [
+    (1, "Amonestación escrita"),
+    (2, "Cierre temporal o definitivo"),
+    (3, "Revocatoria o caducidad de licencia ambiental, autorización, concesión, permiso o registro"),
+    (4, "Demolición de obra a costa del infractor"),
+    (5, "Decomiso preventivo de especímenes, especies silvestres"),
+    (6, "Restitución de especímenes de flora y fauna silvestres o acuática"),
+]

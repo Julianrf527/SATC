@@ -2,16 +2,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+import logging
 import os
 
 from routes import involved
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+)
+
 app = FastAPI()
 
-# Startup event - inicializar BD
 @app.on_event("startup")
 async def startup_event():
-    # Crear tablas desde models
     from db.database import init_db
     try:
         await init_db()

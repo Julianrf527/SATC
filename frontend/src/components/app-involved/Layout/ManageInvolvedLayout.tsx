@@ -9,8 +9,9 @@ type Involved = {
   digito_verificacion: string | null;
   tipo_documento: string;
   nombre: string;
-  celular: number;
-  correo: string;
+  celular: number | null;
+  correo: string | null;
+  direccion?: string | null;
 };
 
 type Props = {
@@ -26,7 +27,6 @@ export default function ManageInvolvedLayout({ setToast }: Props) {
   const [involved, setInvolved] = useState<Involved[]>([]);
   const [selectedInvolved, setSelectedInvolved] = useState<Involved | null>(null);
 
-  // Filtros
   const [numeroDocumentoFilter, setNumeroDocumentoFilter] = useState("");
   const [tipoDocumentoFilter, setTipoDocumentoFilter] = useState("");
   const [nombreFilter, setNombreFilter] = useState("");
@@ -42,7 +42,6 @@ export default function ManageInvolvedLayout({ setToast }: Props) {
     setPage(1);
   };
 
-  // Cargar involucrados
   useEffect(() => {
     async function loadInvolved() {
       setLoading(true);
@@ -80,7 +79,15 @@ export default function ManageInvolvedLayout({ setToast }: Props) {
   // Editar involucrado — usa el endpoint INVOLVED_UPDATE del ms dedicado
   const handleSaveEdit = async (
     id: number,
-    data: { nombre: string; celular: string; correo: string; digito_verificacion: string }
+    data: {
+      nombre: string;
+      numero_documento?: number;
+      tipo_documento?: string;
+      celular: number | null;
+      correo: string | null;
+      digito_verificacion: string | null;
+      direccion: string | null;
+    }
   ) => {
     try {
       const res = await apiCall(API_CONFIG.ENDPOINTS.INVOLVED_UPDATE(id), {
@@ -92,7 +99,16 @@ export default function ManageInvolvedLayout({ setToast }: Props) {
         setInvolved((prev) =>
           prev.map((inv) =>
             inv.id === id
-              ? { ...inv, nombre: data.nombre, celular: parseInt(data.celular), correo: data.correo, digito_verificacion: data.digito_verificacion || null }
+              ? {
+                  ...inv,
+                  nombre: data.nombre,
+                  numero_documento: data.numero_documento ?? inv.numero_documento,
+                  tipo_documento: data.tipo_documento ?? inv.tipo_documento,
+                  celular: data.celular,
+                  correo: data.correo,
+                  digito_verificacion: data.digito_verificacion,
+                  direccion: data.direccion,
+                }
               : inv
           )
         );
@@ -107,34 +123,50 @@ export default function ManageInvolvedLayout({ setToast }: Props) {
   };
 
   return (
-    <div className="w-full min-h-[calc(100vh-4rem)] bg-gradient-to-br from-base-200 to-base-300 p-4">
-      <div className="max-w-7xl mx-auto space-y-4">
-
-        {/* ── Header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-base-content flex items-center gap-3">
-              <div className="w-12 h-12 bg-secondary/10 rounded-xl flex items-center justify-center">
-                <svg className="w-7 h-7 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <>
+      <div className="bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm sticky top-0 z-10">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-secondary/10 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
               </div>
-              Gestión de Involucrados
-            </h1>
-            <p className="text-base-content/60 mt-1">Visualiza y edita la información de los involucrados en los expedientes</p>
-          </div>
-
-          {!loading && (
-            <div className="stats shadow-sm bg-base-100 border border-base-300">
-              <div className="stat py-3 px-5">
-                <div className="stat-title text-xs">Total involucrados</div>
-                <div className="stat-value text-2xl text-secondary">{totalCount}</div>
-                <div className="stat-desc">página {page} de {totalPages}</div>
+              <div>
+                <p className="text-[10px] font-semibold text-base-content/50 uppercase tracking-wider">
+                  Módulo de Involucrados
+                </p>
+                <h1 className="text-lg font-bold text-base-content">
+                  Gestión de Involucrados
+                </h1>
+                <p className="text-xs text-base-content/50 hidden sm:block">
+                  Visualiza y edita la información de los involucrados en los expedientes
+                </p>
               </div>
             </div>
-          )}
+            {!loading && (
+              <div className="flex items-center gap-3">
+                <div className="text-right hidden sm:block">
+                  <p className="text-[10px] font-semibold text-base-content/50 uppercase tracking-wider">
+                    Total involucrados
+                  </p>
+                  <p className="text-lg font-bold text-secondary leading-tight">
+                    {totalCount}
+                    <span className="text-xs font-normal text-base-content/50 ml-1">
+                      (pág. {page} de {totalPages})
+                    </span>
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+      </div>
+
+    <div className="w-full min-h-[calc(100vh-4rem)] bg-gradient-to-br from-base-200 to-base-300 p-4">
+      <div className="max-w-7xl mx-auto space-y-4">
 
         {/* ── Card: Filtros ── */}
         <div className="card bg-base-100 shadow border border-base-300">
@@ -200,7 +232,7 @@ export default function ManageInvolvedLayout({ setToast }: Props) {
         <div className="card bg-base-100 shadow border border-base-300">
           <div className="card-body p-4">
             <TableInvolved
-              titles={["Número Documento", "Tipo", "Nombre", "Celular", "Correo", "Acciones"]}
+              titles={["Número Documento", "Tipo", "Nombre", "Celular", "Correo", "Dirección", "Acciones"]}
               data={involved}
               page={page}
               totalPages={totalPages}
@@ -219,5 +251,6 @@ export default function ManageInvolvedLayout({ setToast }: Props) {
         onSave={handleSaveEdit}
       />
     </div>
+    </>
   );
 }

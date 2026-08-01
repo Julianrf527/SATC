@@ -46,7 +46,6 @@ export default function EmailForm({
         setToast({ message: res.detail || "Error inesperado", type: "error" });
       }
     } catch (error) {
-      /* console.error("Error al hacer fetch:", error); */
       setToast({
         message: "Error de conexión, intenta más tarde",
         type: "error",

@@ -1,15 +1,10 @@
 import { useState } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import ConfirmationModal from "./ConfirmationModal";
-
-type Permission = {
-  id: number;
-  name: string;
-  menu_path: string;
-};
+import type { Permiso } from "../../../types/userApp";
 
 type Props = {
-  permissions: Permission[];
+  permisoList: Permiso[];
   setToast: (toast: {
     id: number;
     message: string;
@@ -19,7 +14,7 @@ type Props = {
 };
 
 export default function PermissionForm({
-  permissions,
+  permisoList = [],
   setToast,
   onPermissionChange,
 }: Props) {
@@ -30,7 +25,6 @@ export default function PermissionForm({
   const [searchTerm, setSearchTerm] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Estados para el modal de confirmación dinámico
   const [confirmationModal, setConfirmationModal] = useState<{
     isOpen: boolean;
     typeOperation: "eliminar" | "crear" | "actualizar";
@@ -41,15 +35,14 @@ export default function PermissionForm({
   }>({
     isOpen: false,
     typeOperation: "crear",
-    onConfirm: () => { },
+    onConfirm: () => {},
   });
 
-  // Manejar selección de permiso para editar
   const handlePermissionSelect = (permissionId: string) => {
     setSelectedPermissionId(permissionId);
-    const permission = permissions.find((p) => p.id === Number(permissionId));
+    const permission = permisoList.find((p) => p.id === Number(permissionId));
     if (permission) {
-      setPermissionName(permission.name);
+      setPermissionName(permission.nombre);
       setMenuPath(permission.menu_path);
     } else {
       setPermissionName("");
@@ -57,20 +50,18 @@ export default function PermissionForm({
     }
   };
 
-  // Funciones auxiliares del modal de confirmación
   const showConfirmationModal = (
     typeOperation: "eliminar" | "crear" | "actualizar",
     typeChange: "rol" | "permiso" | undefined,
     itemIdentifier: number | string,
     onConfirm: () => void,
-
   ) => {
     setConfirmationModal({
       isOpen: true,
       typeOperation,
       typeChange,
       itemIdentifier,
-      onConfirm
+      onConfirm,
     });
   };
 
@@ -80,12 +71,10 @@ export default function PermissionForm({
       typeOperation: "crear",
       typeChange: undefined,
       itemIdentifier: undefined,
-      onConfirm: () => { }
-
+      onConfirm: () => {},
     });
   };
 
-  // Función interna para ejecutar crear/actualizar
   const executeSubmit = async () => {
     setIsSubmitting(true);
     hideConfirmationModal();
@@ -111,12 +100,10 @@ export default function PermissionForm({
           type: "success",
         });
 
-        // Resetear formulario
         setPermissionName("");
         setMenuPath("");
         setSelectedPermissionId("");
 
-        // Recargar permisos
         onPermissionChange();
       } else {
         setToast({
@@ -138,9 +125,7 @@ export default function PermissionForm({
     }
   };
 
-  // Crear o actualizar permiso (con modal de confirmación)
   const handleSubmit = async () => {
-    // Validaciones
     if (!permissionName.trim()) {
       setToast({
         id: Date.now(),
@@ -159,18 +144,11 @@ export default function PermissionForm({
       return;
     }
 
-    // Mostrar modal de confirmación
     const actionText = mode === "create" ? "crear" : "actualizar";
 
-    showConfirmationModal(
-      actionText,
-      "permiso",
-      permissionName,
-      executeSubmit
-    );
+    showConfirmationModal(actionText, "permiso", permissionName, executeSubmit);
   };
 
-  // Función interna para ejecutar eliminación
   const executeDelete = async () => {
     if (!selectedPermissionId) return;
 
@@ -181,7 +159,7 @@ export default function PermissionForm({
         API_CONFIG.ENDPOINTS.PERMISSION_DELETE(selectedPermissionId),
         {
           method: "DELETE",
-        }
+        },
       );
 
       if (res.ok) {
@@ -211,52 +189,46 @@ export default function PermissionForm({
     }
   };
 
-  // Eliminar permiso (con modal de confirmación)
   const handleDelete = () => {
     if (!selectedPermissionId || !permissionName) return;
 
-    showConfirmationModal(
-      "eliminar",
-      "permiso",
-      permissionName,
-      executeDelete
-    );
+    showConfirmationModal("eliminar", "permiso", permissionName, executeDelete);
   };
 
-  // Limpiar formulario
   const handleClear = () => {
     setPermissionName("");
     setMenuPath("");
     setSelectedPermissionId("");
   };
 
-  // Filtrar permisos
-  const filteredPermissions = permissions.filter(
+  const filteredPermissions = permisoList.filter(
     (p) =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.menu_path.toLowerCase().includes(searchTerm.toLowerCase())
+      p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.menu_path.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  // Generar categorías dinámicamente basándose en los permisos
   const generateDynamicCategories = () => {
     const prefixes = new Set<string>();
 
-    // Extraer todos los prefijos únicos
-    permissions.forEach(perm => {
-      const prefix = perm.name.split('_')[0] + '_';
-      if (prefix !== '_') prefixes.add(prefix);
+    permisoList.forEach((perm) => {
+      const prefix = perm.nombre.split("_")[0] + "_";
+      if (prefix !== "_") prefixes.add(prefix);
     });
 
-    // Colores para las categorías
     const colorPalette = [
-      "badge-primary", "badge-success", "badge-warning",
-      "badge-error", "badge-info", "badge-secondary", "badge-accent"
+      "badge-primary",
+      "badge-success",
+      "badge-warning",
+      "badge-error",
+      "badge-info",
+      "badge-secondary",
+      "badge-accent",
     ];
 
     // Mapeo de nombres especiales para consistencia
     const nameMap: { [key: string]: string } = {
       admin_: "Administración",
-      expediente_: "Expedientes",
+      sancionatorio_: "Sancionatorio",
       documento_: "Documentos",
       auditoria_: "Auditoría",
       infracciones_: "Infracciones",
@@ -265,48 +237,45 @@ export default function PermissionForm({
       reportes_: "Reportes",
     };
 
-    // Convertir a objeto de categorías
-    const categoryNames: { [key: string]: { name: string; color: string } } = {};
+    const categoryNames: { [key: string]: { name: string; color: string } } =
+      {};
     let index = 0;
 
-    Array.from(prefixes).forEach(prefix => {
+    Array.from(prefixes).forEach((prefix) => {
       // Usar nameMap si existe, si no, capitalizar el prefijo de forma limpia
-      const rawName = prefix.replace(/_/g, '');
-      const name = nameMap[prefix] ||
-        rawName.charAt(0).toUpperCase() + rawName.slice(1);
+      const rawName = prefix.replace(/_/g, "");
+      const name =
+        nameMap[prefix] || rawName.charAt(0).toUpperCase() + rawName.slice(1);
 
       categoryNames[prefix] = {
         name,
-        color: colorPalette[index % colorPalette.length]
+        color: colorPalette[index % colorPalette.length],
       };
       index++;
     });
 
     // Agregar categoría "otros"
-    categoryNames['otros'] = { name: "Otros", color: "badge-ghost" };
+    categoryNames["otros"] = { name: "Otros", color: "badge-ghost" };
 
     return categoryNames;
   };
 
-  // Agrupar permisos por categoría dinámicamente
   const groupPermissionsByCategory = () => {
-    const grouped: { [key: string]: Permission[] } = {};
+    const grouped: { [key: string]: Permiso[] } = {};
 
-    // Inicializar todas las categorías vacías
     const prefixes = new Set<string>();
-    permissions.forEach(perm => {
-      const prefix = perm.name.split('_')[0] + '_';
-      if (prefix !== '_') prefixes.add(prefix);
+    permisoList.forEach((perm) => {
+      const prefix = perm.nombre.split("_")[0] + "_";
+      if (prefix !== "_") prefixes.add(prefix);
     });
 
-    Array.from(prefixes).forEach(prefix => {
+    Array.from(prefixes).forEach((prefix) => {
       grouped[prefix] = [];
     });
-    grouped['otros'] = [];
+    grouped["otros"] = [];
 
-    // Agrupar permisos
     filteredPermissions.forEach((perm) => {
-      const prefix = perm.name.split('_')[0] + '_';
+      const prefix = perm.nombre.split("_")[0] + "_";
       if (grouped[prefix]) {
         grouped[prefix].push(perm);
       } else {
@@ -329,8 +298,11 @@ export default function PermissionForm({
             {/* Selector de modo */}
             <div className="flex gap-2 mb-4">
               <button
-                className={`btn btn-sm flex-1 ${mode === "create" ? "bg-blue-600 text-white hover:bg-blue-700 border-0" : "btn-ghost"
-                  }`}
+                className={`btn btn-sm flex-1 ${
+                  mode === "create"
+                    ? "bg-blue-600 text-white hover:bg-blue-700 border-0"
+                    : "btn-ghost"
+                }`}
                 onClick={() => {
                   setMode("create");
                   handleClear();
@@ -352,8 +324,11 @@ export default function PermissionForm({
                 Crear
               </button>
               <button
-                className={`btn btn-sm flex-1 ${mode === "edit" ? "bg-cyan-600 text-white hover:bg-cyan-700 border-0" : "btn-ghost"
-                  }`}
+                className={`btn btn-sm flex-1 ${
+                  mode === "edit"
+                    ? "bg-cyan-600 text-white hover:bg-cyan-700 border-0"
+                    : "btn-ghost"
+                }`}
                 onClick={() => {
                   setMode("edit");
                   handleClear();
@@ -392,9 +367,9 @@ export default function PermissionForm({
                   onChange={(e) => handlePermissionSelect(e.target.value)}
                 >
                   <option value="">-- Seleccione un permiso --</option>
-                  {permissions.map((permission) => (
+                  {permisoList.map((permission) => (
                     <option key={permission.id} value={permission.id}>
-                      {permission.name}
+                      {permission.nombre}
                     </option>
                   ))}
                 </select>
@@ -449,8 +424,11 @@ export default function PermissionForm({
             {/* Botones de acción */}
             <div className="flex flex-col gap-2">
               <button
-                className={`btn ${mode === "create" ? "bg-blue-600 text-white hover:bg-blue-700 border-0" : "bg-cyan-600 text-white hover:bg-cyan-700 border-0"
-                  } w-full`}
+                className={`btn ${
+                  mode === "create"
+                    ? "bg-blue-600 text-white hover:bg-blue-700 border-0"
+                    : "bg-cyan-600 text-white hover:bg-cyan-700 border-0"
+                } w-full`}
                 onClick={handleSubmit}
                 disabled={isSubmitting}
               >
@@ -597,7 +575,7 @@ export default function PermissionForm({
                         >
                           <div className="flex-1">
                             <div className="font-medium text-sm">
-                              {permission.name}
+                              {permission.nombre}
                             </div>
                             <div className="text-xs text-base-content/60">
                               {permission.menu_path || "Sin ruta de menú"}

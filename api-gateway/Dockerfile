@@ -19,8 +19,12 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Crear usuario no-root para seguridad
-RUN groupadd -r apigateway && useradd -r -g apigateway apigateway
+# Crear usuario no-root para seguridad.
+# Con directorio home propio: `useradd -r` no lo crea, y gunicorn >= 26 escribe
+# en $HOME al levantar su control server, así que sin él el arranque emitía un
+# `Control server error: [Errno 13] Permission denied: '/home/apigateway'` en
+# cada despliegue.
+RUN groupadd -r apigateway && useradd -r -m -d /home/apigateway -g apigateway apigateway
 
 # Directorio de trabajo
 WORKDIR /app

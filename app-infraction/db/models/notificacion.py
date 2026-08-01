@@ -8,7 +8,6 @@ class Notificacion(Base):
     __tablename__ = 'notificacion'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    fecha_creacion = Column(Date)
     acto_administrativo_id = Column(Integer, ForeignKey('acto_administrativo.id', onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     numerado = Column(Integer)
     fecha_numerado = Column(Date)
@@ -20,6 +19,7 @@ class Notificacion(Base):
     fecha_notificacion = Column(TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(ZoneInfo("America/Bogota")))
     tipo_notificacion_id = Column(Integer, ForeignKey('tipo_notificacion.id', onupdate="CASCADE", ondelete="RESTRICT"))
     documento_notificacion_id = Column(Integer)
+    fecha_creacion = Column(TIMESTAMP(timezone=True), default=lambda: datetime.now(ZoneInfo("America/Bogota")))
 
     acto_administrativo = relationship("ActoAdministrativo", back_populates="notificaciones")
     tipo_notificacion = relationship("TipoNotificacion", back_populates="notificaciones")

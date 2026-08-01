@@ -68,7 +68,7 @@ export type ActoAdministrativo = {
   id: number;
   numerado: string;
   fecha_numerado: string;
-  documento_acto_id: number;
+  documento_acto_administrativo_id: number;
   tipo_acto: string;
   fecha_creacion: string;
   etapa_id: number;

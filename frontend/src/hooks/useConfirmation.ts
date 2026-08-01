@@ -27,9 +27,6 @@ export const useConfirmation = () => {
     onConfirm: null
   });
 
-  /**
-   * Abre el modal de confirmación
-   */
   const openConfirmation = (
     options: UseConfirmationOptions,
     onConfirm: () => void | Promise<void>
@@ -42,9 +39,6 @@ export const useConfirmation = () => {
     });
   };
 
-  /**
-   * Cierra el modal de confirmación
-   */
   const closeConfirmation = () => {
     setState(prev => ({
       ...prev,
@@ -53,30 +47,23 @@ export const useConfirmation = () => {
     }));
   };
 
-  /**
-   * Ejecuta la acción confirmada
-   */
   const handleConfirm = async () => {
     if (!state.onConfirm) return;
 
     try {
       setState(prev => ({ ...prev, isSubmitting: true }));
 
-      // Ejecutar la acción (puede ser síncrona o asíncrona)
+      // El callback puede ser síncrono o asíncrono.
       await state.onConfirm();
 
-      // Cerrar modal después de éxito
       closeConfirmation();
     } catch (error) {
-      console.error('Error durante la confirmación:', error);
-      // Mantener modal abierto en caso de error para que el usuario see el error
+      if (import.meta.env.DEV) console.error('Error durante la confirmación:', error);
+      // El modal queda abierto a propósito para que el usuario vea el error.
       setState(prev => ({ ...prev, isSubmitting: false }));
     }
   };
 
-  /**
-   * Atajos para operaciones específicas
-   */
   const confirmCreate = (
     entityType: string,
     entityName: string | undefined,
@@ -129,17 +116,14 @@ export const useConfirmation = () => {
   };
 
   return {
-    // Estado
     isOpen: state.isOpen,
     isSubmitting: state.isSubmitting,
     options: state.options,
 
-    // Métodos genericos
     openConfirmation,
     closeConfirmation,
     handleConfirm,
 
-    // Atajos específicos
     confirmCreate,
     confirmUpdate,
     confirmDelete

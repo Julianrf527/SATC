@@ -1,13 +1,8 @@
 import { useState, useEffect } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import RoleForm from "./RoleForm";
+import type { Permiso } from "../../../types/userApp";
 import PermissionForm from "./PermissionForm";
-
-type Permission = {
-  id: number;
-  name: string;
-  menu_path: string;
-};
 
 type Props = {
   setToast: (toast: {
@@ -18,8 +13,10 @@ type Props = {
 };
 
 export default function RoleManager({ setToast }: Props) {
-  const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [activeView, setActiveView] = useState<"roles" | "permissions">("roles");
+  const [permisoList, setPermisoList] = useState<Permiso[]>([]);
+  const [activeView, setActiveView] = useState<"roles" | "permissions">(
+    "roles",
+  );
   const [loading, setLoading] = useState(true);
 
   const loadPermissions = async () => {
@@ -30,7 +27,7 @@ export default function RoleManager({ setToast }: Props) {
       });
 
       if (res.ok) {
-        setPermissions(res.data || []);
+        setPermisoList(res.data || []);
       } else {
         setToast({
           id: Date.now(),
@@ -56,35 +53,8 @@ export default function RoleManager({ setToast }: Props) {
   return (
     <div className="w-full min-h-[calc(100vh-4rem)] bg-gradient-to-br from-base-200 to-base-300 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header con título y navegación */}
+        {/* Navegación entre vistas */}
         <div className="mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-base-content flex items-center gap-3">
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <svg
-                    className="w-7 h-7 text-primary"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-                    />
-                  </svg>
-                </div>
-                Gestión de Roles y Permisos
-              </h1>
-              <p className="text-base-content/60 mt-2">
-                Administra roles y permisos del sistema de forma centralizada
-              </p>
-            </div>
-          </div>
-
-          {/* Navegación entre vistas */}
           <div className="tabs tabs-boxed bg-base-100 shadow-md p-1">
             <button
               className={`tab tab-lg flex-1 gap-2 transition-all ${
@@ -145,13 +115,10 @@ export default function RoleManager({ setToast }: Props) {
               </div>
             </div>
           ) : activeView === "roles" ? (
-            <RoleForm
-              permissions={permissions}
-              setToast={setToast}
-            />
+            <RoleForm permisoList={permisoList} setToast={setToast} />
           ) : (
             <PermissionForm
-              permissions={permissions}
+              permisoList={permisoList}
               setToast={setToast}
               onPermissionChange={loadPermissions}
             />

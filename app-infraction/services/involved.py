@@ -9,10 +9,21 @@ import os
 
 from db.models.expediente import Expediente
 from db.models.expediente_involucrado import ExpedienteInvolucrado
+from utils.generate_service_jwt import generate_service_jwt
 
 load_dotenv()
 
-gateway_url = os.getenv("GATEWAY_URL", "http://localhost:8000")
+_raw_involved_url = (
+    os.getenv("INVOLVED_SERVICE_URL")
+    or os.getenv("INVOLVED_ROUTE")
+    or "http://app-involved:8004"
+).rstrip("/")
+involved_service_url = (
+    _raw_involved_url
+    if _raw_involved_url.endswith("/involved")
+    else f"{_raw_involved_url}/involved"
+)
+service_secret = os.getenv("SERVICE_SECRET_KEY")
 logger = logging.getLogger(__name__)
 
 
@@ -29,9 +40,15 @@ async def get_involucrado_by_id(db: AsyncSession, involucrado_id: int) -> Dict:
     """
     try:
         async with httpx.AsyncClient() as client:
+            if not service_secret:
+                raise RuntimeError("SERVICE_SECRET_KEY no configurado, no se puede autenticar contra app-involved")
+            headers = {
+                "x-service-token": generate_service_jwt("infraction-service", service_secret),
+            }
             response = await client.post(
-                f"{gateway_url}/involveds/bulk",
+                f"{involved_service_url}/bulk",
                 json={"ids": [involucrado_id]},
+                headers=headers,
                 timeout=10.0
             )
             
@@ -78,9 +95,15 @@ async def get_involucrados_by_ids(
         payload = {"ids": involucrados_ids}
         
         async with httpx.AsyncClient() as client:
+            if not service_secret:
+                raise RuntimeError("SERVICE_SECRET_KEY no configurado, no se puede autenticar contra app-involved")
+            headers = {
+                "x-service-token": generate_service_jwt("infraction-service", service_secret),
+            }
             response = await client.post(
-                f"{gateway_url}/involveds/bulk",
+                f"{involved_service_url}/bulk",
                 json=payload,
+                headers=headers,
                 timeout=10.0
             )
             
@@ -147,9 +170,15 @@ async def get_involved_by_expedientes_ids(
     # 3. Llamar al bulk endpoint para obtener todos los involucrados
     try:
         async with httpx.AsyncClient() as client:
+            if not service_secret:
+                raise RuntimeError("SERVICE_SECRET_KEY no configurado, no se puede autenticar contra app-involved")
+            headers = {
+                "x-service-token": generate_service_jwt("infraction-service", service_secret),
+            }
             response = await client.post(
-                f"{gateway_url}/involveds/bulk",
+                f"{involved_service_url}/bulk",
                 json={"ids": involucrados_ids},
+                headers=headers,
                 timeout=10.0
             )
             

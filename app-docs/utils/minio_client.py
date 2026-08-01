@@ -1,6 +1,7 @@
 """
 Utilidades para manejo de MinIO - Almacenamiento de objetos
 """
+import asyncio
 import os
 import io
 from minio import Minio
@@ -17,18 +18,15 @@ from typing import Optional
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-# Configuración de MinIO desde variables de entorno
 MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "minio:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() == "true"
 MINIO_BUCKET = os.getenv("MINIO_BUCKET", "satc-expedientes")
 
-# Configuración de encriptación (SSE-S3 para red local)
-# DESACTIVADO: MinIO no tiene KMS configurado
+# SSE-S3 apagado por defecto: este MinIO no tiene KMS configurado.
 MINIO_SSE_ENABLED = os.getenv("MINIO_SSE_ENABLED", "false").lower() == "true"
 
-# Cliente MinIO
 minio_client = Minio(
     MINIO_ENDPOINT,
     access_key=MINIO_ACCESS_KEY,
@@ -54,29 +52,14 @@ def init_minio():
 
 def generate_hash_based_path(file_hash: str, original_filename: str) -> str:
     """
-    Genera una ruta de almacenamiento basada en el hash del archivo.
-    Estructura: files/{prefix}/{hash}.{extension}
-    
-    Args:
-        file_hash: Hash SHA256 del archivo (64 caracteres)
-        original_filename: Nombre original del archivo para obtener extensión
-        
-    Returns:
-        Ruta del objeto en MinIO
-        
-    Ejemplo:
-        hash: a3f5c8d9e2b1...
-        filename: documento.pdf
-        resultado: files/a3/a3f5c8d9e2b1....pdf
+    Ruta de almacenamiento derivada del hash: files/{prefix}/{hash}{ext}
+    (ej. files/a3/a3f5c8d9e2b1....pdf).
+
+    El prefijo de 2 caracteres reparte los archivos en ~256 subdirectorios;
+    todo en uno solo degrada el listado del bucket.
     """
-    # Obtener extensión del archivo original
     extension = Path(original_filename).suffix or ""
-    
-    # Usar los primeros 2 caracteres del hash como prefijo de directorio
-    # Esto distribuye archivos en ~256 subdirectorios para mejor performance
     hash_prefix = file_hash[:2]
-    
-    # Ruta: files/{prefix}/{hash_completo}{extension}
     object_path = f"files/{hash_prefix}/{file_hash}{extension}"
     
     logger.debug(f"Ruta generada: {object_path} para hash {file_hash[:8]}...")
@@ -84,32 +67,21 @@ def generate_hash_based_path(file_hash: str, original_filename: str) -> str:
 
 def upload_file_to_minio(file_data: bytes, object_name: str, content_type: str = "application/octet-stream") -> dict:
     """
-    Sube un archivo a MinIO con encriptación SSE-S3 (AES-256)
-    
-    Args:
-        file_data: Contenido del archivo en bytes
-        object_name: Ruta/nombre del objeto en MinIO (ej: "expedientes/123/acto_admin/archivo.pdf")
-        content_type: Tipo MIME del archivo
-    
-    Returns:
-        dict con 'ok' (bool), 'url' (str) y 'message' (str)
+    Sube un archivo a MinIO, con encriptación SSE-S3 si está habilitada.
+    Devuelve {'ok', 'url', 'message'}.
     """
     try:
-        # Asegurar que el bucket existe
         if not minio_client.bucket_exists(MINIO_BUCKET):
             init_minio()
-        
-        # Crear stream desde bytes
+
         file_stream = io.BytesIO(file_data)
         file_size = len(file_data)
-        
-        # Configurar headers para encriptación SSE-S3 (AES-256)
+
         metadata = {}
         if MINIO_SSE_ENABLED:
             metadata["X-Amz-Server-Side-Encryption"] = "AES256"
             logger.debug(f"Encriptación SSE-S3 habilitada para {object_name}")
         
-        # Subir archivo con encriptación
         minio_client.put_object(
             bucket_name=MINIO_BUCKET,
             object_name=object_name,
@@ -119,7 +91,7 @@ def upload_file_to_minio(file_data: bytes, object_name: str, content_type: str =
             metadata=metadata
         )
         
-        # Generar URL del objeto (interno, no público)
+        # URL interna (bucket/objeto), no una URL pública servible.
         url = f"{MINIO_BUCKET}/{object_name}"
         
         encryption_status = "encriptado" if MINIO_SSE_ENABLED else "sin encriptar"
@@ -147,20 +119,14 @@ def upload_file_to_minio(file_data: bytes, object_name: str, content_type: str =
 
 def delete_file_from_minio(object_name: str) -> dict:
     """
-    Elimina un archivo de MinIO
-    
-    Args:
-        object_name: Ruta del objeto en MinIO (puede incluir o no el bucket)
-    
-    Returns:
-        dict con 'ok' (bool) y 'message' (str)
+    Elimina un archivo de MinIO. `object_name` puede venir con o sin el
+    prefijo del bucket. Devuelve {'ok', 'message'}.
     """
     try:
-        # Limpiar el nombre del objeto (remover bucket si viene en la URL)
+        # object_name puede venir prefijado con el bucket.
         if object_name.startswith(f"{MINIO_BUCKET}/"):
             object_name = object_name.replace(f"{MINIO_BUCKET}/", "")
         
-        # Eliminar objeto
         minio_client.remove_object(MINIO_BUCKET, object_name)
         
         logger.info(f"Archivo eliminado exitosamente de MinIO: {object_name}")
@@ -184,20 +150,12 @@ def delete_file_from_minio(object_name: str) -> dict:
 
 def get_file_from_minio(object_name: str) -> dict:
     """
-    Obtiene un archivo de MinIO
-    
-    Args:
-        object_name: Ruta del objeto en MinIO
-    
-    Returns:
-        dict con 'ok' (bool), 'data' (bytes) y 'message' (str)
+    Obtiene un archivo de MinIO. Devuelve {'ok', 'data', 'message'}.
     """
     try:
-        # Limpiar el nombre del objeto
         if object_name.startswith(f"{MINIO_BUCKET}/"):
             object_name = object_name.replace(f"{MINIO_BUCKET}/", "")
         
-        # Obtener objeto
         response = minio_client.get_object(MINIO_BUCKET, object_name)
         file_data = response.read()
         response.close()
@@ -227,21 +185,14 @@ def get_file_from_minio(object_name: str) -> dict:
 
 def get_presigned_url(object_name: str, expires: timedelta = timedelta(hours=1)) -> dict:
     """
-    Genera una URL pre-firmada para acceder temporalmente a un archivo
-    
-    Args:
-        object_name: Ruta del objeto en MinIO
-        expires: Tiempo de expiración de la URL (default: 1 hora)
-    
-    Returns:
-        dict con 'ok' (bool), 'url' (str) y 'message' (str)
+    URL pre-firmada para acceso temporal directo a un objeto.
+    Devuelve {'ok', 'url', 'message'}.
     """
     try:
         # Limpiar el nombre del objeto
         if object_name.startswith(f"{MINIO_BUCKET}/"):
             object_name = object_name.replace(f"{MINIO_BUCKET}/", "")
         
-        # Generar URL pre-firmada
         url = minio_client.presigned_get_object(
             bucket_name=MINIO_BUCKET,
             object_name=object_name,
@@ -272,23 +223,14 @@ def get_presigned_url(object_name: str, expires: timedelta = timedelta(hours=1))
 
 def copy_file_in_minio(source_object: str, dest_object: str) -> dict:
     """
-    Copia un archivo dentro de MinIO (mismo bucket)
-    
-    Args:
-        source_object: Ruta del objeto origen
-        dest_object: Ruta del objeto destino
-    
-    Returns:
-        dict con 'ok' (bool), 'url' (str) y 'message' (str)
+    Copia un objeto dentro del mismo bucket. Devuelve {'ok', 'url', 'message'}.
     """
     try:
-        # Limpiar nombres de objetos
         if source_object.startswith(f"{MINIO_BUCKET}/"):
             source_object = source_object.replace(f"{MINIO_BUCKET}/", "")
         if dest_object.startswith(f"{MINIO_BUCKET}/"):
             dest_object = dest_object.replace(f"{MINIO_BUCKET}/", "")
         
-        # Copiar objeto
         from minio.commonconfig import CopySource
         minio_client.copy_object(
             bucket_name=MINIO_BUCKET,
@@ -320,20 +262,9 @@ def copy_file_in_minio(source_object: str, dest_object: str) -> dict:
             "message": f"Error inesperado: {str(e)}"
         }
 
-# ============================================================================
-# FUNCIONES DE DEDUPLICACIÓN DE ARCHIVOS
-# ============================================================================
-
 async def find_file_by_hash(db: Session, file_hash: str) -> Optional[dict]:
     """
-    Busca un archivo existente por su hash SHA256 en la base de datos.
-    
-    Args:
-        db: Sesión de SQLAlchemy (AsyncSession)
-        file_hash: Hash SHA256 del archivo
-        
-    Returns:
-        dict con información del archivo si existe, None si no existe
+    Busca un archivo ya almacenado por su hash SHA256, o None si no existe.
     """
     try:
         from db.models.file_hash import FileHash
@@ -429,7 +360,7 @@ async def upload_file_with_deduplication(
                 object_name = generate_hash_based_path(file_hash, original_filename)
                 logger.info(f"Ruta generada automáticamente: {object_name}")
 
-            upload_result = upload_file_to_minio(file_data, object_name, content_type)
+            upload_result = await asyncio.to_thread(upload_file_to_minio, file_data, object_name, content_type)
 
             if not upload_result["ok"]:
                 return upload_result
@@ -442,7 +373,6 @@ async def upload_file_with_deduplication(
                 file_size=file_size
             )
             
-            # Busco el id insertado para retornarlo
             new_file = await find_file_by_hash(db, file_hash)
             
             logger.info(f"Archivo nuevo subido y registrado. Hash: {file_hash}, URL: {upload_result['url']}")

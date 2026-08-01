@@ -1,18 +1,20 @@
-from utils.verify_token import verify_gateway_token
+from utils.verify_token import verify_gateway_token, verify_service_token
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
 from pydantic import BaseModel
+import asyncio
 import logging
 import os
 import io
 
-from db.deps import get_db
+from db.deps import get_db_managed
 from db.models.file_hash import FileHash
 from utils.minio_client import upload_file_with_deduplication, get_file_from_minio
 from utils.file_validator import validate_file_complete
+from utils.antivirus import escanear_archivo
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -23,69 +25,90 @@ class FilesBatchRequest(BaseModel):
 class FileStateUpdateRequest(BaseModel):
     file_ids: List[int]
 
+def verify_internal_access(request: Request) -> None:
+    service_token = request.headers.get("x-service-token")
+    gateway_token = request.headers.get("x-gateway-token")
+
+    if service_token:
+        verify_service_token(request)
+    elif gateway_token:
+        verify_gateway_token(request)
+    else:
+        raise HTTPException(status_code=401, detail="No se proporcionó token de autenticación")
+
+def verify_service_only_access(request: Request) -> None:
+    """
+    Para endpoints exclusivamente service-to-service (nunca llamados desde el
+    frontend vía gateway): exige X-Service-Token estricto, sin fallback a
+    X-Gateway-Token. El gateway inyecta X-Gateway-Token en toda petición que
+    reenvía, incluidas las que no exigen sesión de usuario — aceptarlo acá
+    permitiría a cualquiera con acceso a la red interna suplantar un servicio.
+    """
+    verify_service_token(request)
+
 @router.post("/upload")
 async def upload_file(
     archivo: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db_managed)
 ):
     """
-    Sube un archivo con deduplicación por hash.
-    Retorna el ID del archivo y su numero_usos actual. Si es nuevo, numero_usos será 0.
+    Sube un archivo con deduplicación por hash. Devuelve su ID y numero_usos
+    actual (0 si es nuevo): quien lo asocie a un recurso debe incrementarlo.
     """
-    try:
-        # 1. Leer archivo
-        file_data = await archivo.read()
+    file_data = await archivo.read()
 
-        # 2. Validacion de seguridad
-        max_size = int(os.getenv("MAX_FILE_SIZE_MB", "10"))
-        try:
-            validation_result = await validate_file_complete(
-                file_data=file_data,
-                filename=archivo.filename,
-                max_size_mb=max_size
-            )
-            sanitized_filename = validation_result["sanitized_filename"]
-            mime_type = validation_result["mime_type"]
-        except HTTPException as e:
-            raise e
+    max_size = int(os.getenv("MAX_FILE_SIZE_MB", "10"))
+    validation_result = await validate_file_complete(
+        file_data=file_data,
+        filename=archivo.filename,
+        max_size_mb=max_size
+    )
+    sanitized_filename = validation_result["sanitized_filename"]
+    mime_type = validation_result["mime_type"]
 
-        # 3. Subir con deduplicación
-        resultado_upload = await upload_file_with_deduplication(
-            db=db,
-            file_data=file_data,
-            original_filename=sanitized_filename,
-            content_type=mime_type
+    resultado_escaneo = escanear_archivo(file_data, archivo.filename)
+    if not resultado_escaneo["ok"]:
+        logger.error(f"Archivo rechazado por antivirus: {resultado_escaneo['mensaje']}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Archivo rechazado: {resultado_escaneo['mensaje']}"
         )
 
-        if not resultado_upload.get("ok"):
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error subiendo archivo: {resultado_upload.get('message', 'Error desconocido')}"
-            )
-
-        return JSONResponse(
-            content={
-                "ok": True,
-                "file_id": resultado_upload["id"],
-                "file_url": resultado_upload["url"],
-                "file_hash": resultado_upload["file_hash"],
-                "message": resultado_upload["message"],
-                "deduplicated": resultado_upload.get("deduplicated", False),
-                "numero_usos": resultado_upload.get("numero_usos", 0)
-            }
+    resultado_upload = await upload_file_with_deduplication(
+        db=db,
+        file_data=file_data,
+        original_filename=sanitized_filename,
+        content_type=mime_type
+    )
+    if not resultado_upload.get("ok"):
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error subiendo archivo: {resultado_upload.get('message', 'Error desconocido')}"
         )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error en /upload: {e}")
-        raise HTTPException(status_code=500, detail="Error en el servidor al subir documento")
+    return JSONResponse(
+        content={
+            "ok": True,
+            "file_id": resultado_upload["id"],
+            "file_url": resultado_upload["url"],
+            "file_hash": resultado_upload["file_hash"],
+            "message": resultado_upload["message"],
+            "deduplicated": resultado_upload.get("deduplicated", False),
+            "numero_usos": resultado_upload.get("numero_usos", 0)
+        }
+    )
 
 @router.get("/{file_id}")
-async def get_file_by_id(file_id: int, db: AsyncSession = Depends(get_db)):
+async def get_file_by_id(
+    request: Request,
+    file_id: int,
+    db: AsyncSession = Depends(get_db_managed)
+):
     """
     Retorna la información de un documento por su ID unico.
     """
+    verify_internal_access(request)
+
     stmt = select(FileHash).where(FileHash.id == file_id)
     result = await db.execute(stmt)
     file_record = result.scalar_one_or_none()
@@ -107,14 +130,20 @@ async def get_file_by_id(file_id: int, db: AsyncSession = Depends(get_db)):
     )
 
 @router.post("/batch")
-async def get_files_batch(request: FilesBatchRequest, db: AsyncSession = Depends(get_db)):
+async def get_files_batch(
+    request: Request,
+    file_request: FilesBatchRequest,
+    db: AsyncSession = Depends(get_db_managed)
+):
     """
     Retorna las URLs de múltiples documentos dados sus IDs.
     """
-    if not request.file_ids:
+    verify_service_only_access(request)
+
+    if not file_request.file_ids:
         return JSONResponse(content={"ok": True, "data": []})
 
-    stmt = select(FileHash).where(FileHash.id.in_(request.file_ids))
+    stmt = select(FileHash).where(FileHash.id.in_(file_request.file_ids))
     result = await db.execute(stmt)
     files = result.scalars().all()
 
@@ -134,237 +163,149 @@ async def get_files_batch(request: FilesBatchRequest, db: AsyncSession = Depends
 async def download_file_by_id(
     request: Request,
     file_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db_managed)
 ):
     """
     Descarga o visualiza un archivo desde MinIO dado su ID.
     """
-    try:
-        verify_gateway_token(request)
-        # Obtener el registro de la base de datos
-        stmt = select(FileHash).where(FileHash.id == file_id)
-        result = await db.execute(stmt)
-        file_record = result.scalar_one_or_none()
+    verify_internal_access(request)
 
-        if not file_record:
-            raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    file_record = (await db.execute(
+        select(FileHash).where(FileHash.id == file_id)
+    )).scalar_one_or_none()
 
-        # El file_url generalmente tiene el formato 'bucket/path/to/file'
-        # o solo 'path/to/file'. Necesitamos extraer el object_name para MinIO.
-        # Si la url empieza con el bucket, lo removemos para el object_name
-        # Pero get_file_from_minio asume el object_name dentro del MINIO_BUCKET por defecto,
-        # O quiza get_file_from_minio espera todo el path.
-        
-        object_name = file_record.file_url
+    if not file_record:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
 
-        # Obtener archivo de MinIO
-        result_minio = get_file_from_minio(object_name)
-        
-        if not result_minio.get("ok"):
-            raise HTTPException(status_code=404, detail="Archivo no encontrado en almacenamiento")
-        
-        file_data = result_minio["data"]
-        content_type = file_record.content_type or "application/octet-stream"
-        
-        # Extraer el nombre del archivo de la ruta
-        filename = object_name.split('/')[-1] if '/' in object_name else object_name
-        
-        return StreamingResponse(
-            io.BytesIO(file_data),
-            media_type=content_type,
-            headers={
-                "Content-Disposition": f'inline; filename="{filename}"'
-            }
-        )
+    object_name = file_record.file_url
+    result_minio = await asyncio.to_thread(get_file_from_minio, object_name)
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error descargando archivo {file_id}: {e}")
-        raise HTTPException(status_code=500, detail="Error descargando archivo")
+    if not result_minio.get("ok"):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado en almacenamiento")
 
-# servicios internos
+    file_data = result_minio["data"]
+    content_type = file_record.content_type or "application/octet-stream"
+    filename = object_name.split('/')[-1] if '/' in object_name else object_name
+
+    return StreamingResponse(
+        io.BytesIO(file_data),
+        media_type=content_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'}
+    )
 
 @router.put("/increment-usage")
-async def increment_file_usage(request: FileStateUpdateRequest, db: AsyncSession = Depends(get_db)):
+async def increment_file_usage(
+    request: Request,
+    file_request: FileStateUpdateRequest,
+    db: AsyncSession = Depends(get_db_managed)
+):
     """
-    Incrementa el contador de uso (numero_usos) de uno o varios archivos.
-    Se utiliza cuando un archivo se asocia/vincula a un recurso.
+    Incrementa numero_usos al asociar archivos a un recurso. Mientras el
+    contador sea > 0, el cleanup no los borra.
     """
-    if not request.file_ids:
+    verify_service_only_access(request)
+
+    if not file_request.file_ids:
         return JSONResponse(status_code=400, content={"ok": False, "message": "No file_ids provided."})
 
-    try:
-        # Incrementar numero_usos en 1 para cada archivo
-        stmt = select(FileHash).where(FileHash.id.in_(request.file_ids))
-        result = await db.execute(stmt)
-        files = result.scalars().all()
+    files = (await db.execute(
+        select(FileHash).where(FileHash.id.in_(file_request.file_ids))
+    )).scalars().all()
 
-        for file_record in files:
-            file_record.numero_usos += 1
+    for file_record in files:
+        file_record.numero_usos += 1
 
-        await db.commit()
+    await db.commit()
 
-        return JSONResponse(
-            content={
-                "ok": True,
-                "message": f"Uso incrementado para {len(files)} archivo(s)"
-            }
-        )
-    except Exception as e:
-        logger.error(f"Error en /increment-usage: {e}")
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Error al incrementar uso de archivos")
+    return JSONResponse(content={"ok": True, "message": f"Uso incrementado para {len(files)} archivo(s)"})
 
 @router.put("/decrement-usage")
-async def decrement_file_usage(request: FileStateUpdateRequest, db: AsyncSession = Depends(get_db)):
+async def decrement_file_usage(
+    request: Request,
+    file_request: FileStateUpdateRequest,
+    db: AsyncSession = Depends(get_db_managed)
+):
     """
-    Decrementa el contador de uso (numero_usos) de uno o varios archivos.
-    Solo decrementa si numero_usos > 0.
-    Se utiliza cuando un archivo se desvincula de un recurso.
+    Decrementa numero_usos al desvincular archivos de un recurso (nunca por
+    debajo de 0). Al llegar a 0 quedan elegibles para el cleanup.
     """
-    if not request.file_ids:
+    verify_service_only_access(request)
+
+    if not file_request.file_ids:
         return JSONResponse(status_code=400, content={"ok": False, "message": "No file_ids provided."})
 
-    try:
-        # Decrementar numero_usos en 1 para cada archivo (solo si > 0)
-        stmt = select(FileHash).where(FileHash.id.in_(request.file_ids))
-        result = await db.execute(stmt)
-        files = result.scalars().all()
+    files = (await db.execute(
+        select(FileHash).where(FileHash.id.in_(file_request.file_ids))
+    )).scalars().all()
 
-        decremented_count = 0
-        for file_record in files:
-            if file_record.numero_usos > 0:
-                file_record.numero_usos -= 1
-                decremented_count += 1
+    decremented_count = 0
+    for file_record in files:
+        if file_record.numero_usos > 0:
+            file_record.numero_usos -= 1
+            decremented_count += 1
 
-        await db.commit()
+    await db.commit()
 
-        return JSONResponse(
-            content={
-                "ok": True,
-                "message": f"Uso decrementado para {decremented_count} archivo(s)"
-            }
-        )
-    except Exception as e:
-        logger.error(f"Error en /decrement-usage: {e}")
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Error al decrementar uso de archivos")
+    return JSONResponse(content={"ok": True, "message": f"Uso decrementado para {decremented_count} archivo(s)"})
 
 @router.post("/download-unified")
 async def download_unified_pdf(
     request: Request,
     file_request: FilesBatchRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db_managed)
 ):
     """
-    Descarga múltiples archivos y los combina en un único PDF.
-    Los archivos se ordenan según el orden de file_ids recibido.
-
-    Args:
-        file_request: Lista de IDs de archivos a combinar
-
-    Returns:
-        PDF unificado con todos los documentos
+    Combina varios archivos en un único PDF, en el orden de file_ids.
     """
-    try:
-        verify_gateway_token(request)
+    verify_service_only_access(request)
 
-        if not file_request.file_ids:
-            raise HTTPException(
-                status_code=400,
-                detail="No se proporcionaron IDs de archivos"
-            )
+    if not file_request.file_ids:
+        raise HTTPException(status_code=400, detail="No se proporcionaron IDs de archivos")
 
-        logger.info(f"[DOWNLOAD-UNIFIED] Iniciando descarga unificada de {len(file_request.file_ids)} archivos")
+    result = await db.execute(select(FileHash).where(FileHash.id.in_(file_request.file_ids)))
+    files_dict = {f.id: f for f in result.scalars().all()}
 
-        # Obtener información de los archivos en el orden recibido
-        stmt = select(FileHash).where(FileHash.id.in_(file_request.file_ids))
-        result = await db.execute(stmt)
-        files_dict = {f.id: f for f in result.scalars().all()}
+    # Mantener el orden solicitado en file_ids (el consumidor decide el orden del PDF).
+    files_ordered = []
+    for file_id in file_request.file_ids:
+        if file_id in files_dict:
+            files_ordered.append(files_dict[file_id])
+        else:
+            logger.warning(f"[DOWNLOAD-UNIFIED] Archivo {file_id} no encontrado en BD")
 
-        # Mantener el orden de file_ids
-        files_ordered = []
-        for file_id in file_request.file_ids:
-            if file_id in files_dict:
-                files_ordered.append(files_dict[file_id])
-            else:
-                logger.warning(f"[DOWNLOAD-UNIFIED] Archivo {file_id} no encontrado en BD")
+    if not files_ordered:
+        raise HTTPException(status_code=404, detail="No se encontraron archivos válidos")
 
-        if not files_ordered:
-            raise HTTPException(
-                status_code=404,
-                detail="No se encontraron archivos válidos"
-            )
+    from pypdf import PdfWriter, PdfReader
 
-        # Importar PyPDF2 para combinar PDFs
-        from pypdf import PdfWriter, PdfReader
+    pdf_writer = PdfWriter()
+    documentos_procesados = 0
 
-        pdf_writer = PdfWriter()
-        documentos_procesados = 0
-
-        # Descargar y combinar cada PDF
-        for file_record in files_ordered:
-            try:
-                object_name = file_record.file_url
-
-                logger.info(f"  [DOWNLOAD-UNIFIED] Descargando: {object_name}")
-
-                # Descargar de MinIO
-                resultado = get_file_from_minio(object_name)
-
-                if not resultado["ok"]:
-                    logger.warning(f"  ⚠ [DOWNLOAD-UNIFIED] No se pudo descargar archivo ID {file_record.id}")
-                    continue
-
-                file_data = resultado["data"]
-
-                # Agregar al PDF combinado
-                pdf_reader = PdfReader(io.BytesIO(file_data))
-
-                for page in pdf_reader.pages:
-                    pdf_writer.add_page(page)
-
-                documentos_procesados += 1
-                logger.info(f"  ✓ [DOWNLOAD-UNIFIED] Agregado ID {file_record.id} ({len(pdf_reader.pages)} páginas)")
-
-            except Exception as e:
-                logger.warning(f"[DOWNLOAD-UNIFIED] Error procesando archivo ID {file_record.id}: {e}")
+    for file_record in files_ordered:
+        # Un archivo dañado o ausente en MinIO no debe abortar el PDF completo.
+        try:
+            resultado = await asyncio.to_thread(get_file_from_minio, file_record.file_url)
+            if not resultado["ok"]:
+                logger.warning(f"[DOWNLOAD-UNIFIED] No se pudo descargar archivo ID {file_record.id}")
                 continue
 
-        if documentos_procesados == 0:
-            raise HTTPException(
-                status_code=500,
-                detail="No se pudo procesar ningún documento"
-            )
+            pdf_reader = PdfReader(io.BytesIO(resultado["data"]))
+            for page in pdf_reader.pages:
+                pdf_writer.add_page(page)
+            documentos_procesados += 1
+        except Exception as e:
+            logger.warning(f"[DOWNLOAD-UNIFIED] Error procesando archivo ID {file_record.id}: {e}")
+            continue
 
-        logger.info(f"[DOWNLOAD-UNIFIED] Documentos procesados: {documentos_procesados}/{len(files_ordered)}")
+    if documentos_procesados == 0:
+        raise HTTPException(status_code=500, detail="No se pudo procesar ningún documento")
 
-        # Generar PDF final en memoria
-        output_buffer = io.BytesIO()
-        pdf_writer.write(output_buffer)
-        output_buffer.seek(0)
+    output_buffer = io.BytesIO()
+    pdf_writer.write(output_buffer)
+    output_buffer.seek(0)
 
-        filename = "documentos_unificados.pdf"
-
-        logger.info(f"[DOWNLOAD-UNIFIED] PDF generado exitosamente: {filename}")
-
-        # Retornar PDF combinado
-        return StreamingResponse(
-            output_buffer,
-            media_type="application/pdf",
-            headers={
-                "Content-Disposition": f'attachment; filename="{filename}"'
-            }
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        logger.error(f"[DOWNLOAD-UNIFIED] Error al generar PDF combinado: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al generar PDF combinado: {str(e)}"
-        )
+    return StreamingResponse(
+        output_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="documentos_unificados.pdf"'}
+    )

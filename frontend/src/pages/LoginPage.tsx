@@ -48,7 +48,6 @@ export default function LoginPage({ theme }: Props) {
         }
       }
     } catch (error) {
-      /* console.error("Error al hacer fetch:", error); */
       setErrorMsg("No se pudo conectar al servidor.");
     } finally {
       setIsLoading(false);

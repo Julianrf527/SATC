@@ -4,6 +4,7 @@ export interface Involucrado {
   digito_verificacion?: string | null;
   tipo_documento: string;
   nombre: string;
-  celular: number;
-  correo: string;
+  celular: number | null;
+  correo: string | null;
+  direccion?: string | null;
 }

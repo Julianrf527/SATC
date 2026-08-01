@@ -8,4 +8,5 @@ class RecursoAfectado(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     nombre = Column(String(15), nullable=False)
 
-    expedientes = relationship("Expediente", secondary="recurso_expediente", back_populates="recursos")
+    expedientes = relationship("Expediente", secondary="expediente_recurso", back_populates="recursos")
+    tipos_afectacion = relationship("TipoAfectacion", back_populates="recurso")

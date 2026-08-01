@@ -121,7 +121,6 @@ export default function EditPermission({
         });
       }
     } catch (e) {
-      /* console.error("Error al hacer fetch:", e); */
       setToast({
         id: Date.now(),
         message: "Error al actualizar el permiso",
@@ -179,7 +178,6 @@ export default function EditPermission({
         });
       }
     } catch (e) {
-      /* console.error("Error al hacer fetch:", e); */
       setToast({
         id: Date.now(),
         message: "Error al eliminar el permiso",
@@ -207,7 +205,6 @@ export default function EditPermission({
           });
         }
       } catch (e) {
-        /* console.error("Error al hacer fetch:", e); */
         setToast({
           id: Date.now(),
           message: "Error al cargar los permisos",

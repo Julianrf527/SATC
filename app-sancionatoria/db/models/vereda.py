@@ -7,7 +7,7 @@ class Vereda(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     nombre = Column(String(25))
-    municipio_id = Column(Integer, ForeignKey('municipio.id', onupdate="CASCADE"))
+    municipio_id = Column(Integer, ForeignKey('municipio.id', onupdate="CASCADE"), index=True)
 
     municipio = relationship("Municipio", back_populates="veredas")
     expedientes = relationship("Expediente", back_populates="vereda")

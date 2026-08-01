@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { toastService } from "./utils/toastService";
 import Toast from "./components/Toast";
 import LoginPage from "./pages/LoginPage";
 import RecoverPage from "./pages/RecoverPage";
@@ -11,40 +12,41 @@ import RoleLayout from "./components/app-users/Layout/RoleLayout";
 import UserLogLayout from "./components/app-users/Layout/UserLogLayout";
 import ProfileLayout from "./components/app-users/Layout/ProfileLayout";
 import RequirePermission from "./context/RequirePermission";
-import FileManageLayout from "./components/app-sancionatorio/Layout/GestionExpedienteLayout";
-import FileViewLayout from "./components/app-sancionatorio/Layout/ConsultaExpedieneLayout";
-import ManagerFilesLayout from "./components/app-sancionatorio/Layout/EncargadoExpedienteLayout";
-import AlertsLayout from "./components/app-sancionatorio/Layout/AlertsLayout";
-import FileLogLayout from "./components/app-sancionatorio/Layout/ExpedienteLogLayout";
+import GestionExpedienteLayout from "./components/app-sancionatorio/Layout/GestionExpedienteLayout";
+import ConsultaExpedieneLayout from "./components/app-sancionatorio/Layout/ConsultaExpedieneLayout";
+import EncargadoExpedienteLayout from "./components/app-sancionatorio/Layout/EncargadoExpedienteLayout";
+import AlertasExpediente from "./components/app-sancionatorio/Layout/AlertasExpediente";
+import ExpedienteLogLayout from "./components/app-sancionatorio/Layout/ExpedienteLogLayout";
+import GestionInfraccionLayout from "./components/app-infraccion/Layout/GestionInfraccionLayout";
+import ConsultaInfraccionLayout from "./components/app-infraccion/Layout/ConsultaInfraccionLayout";
+import EncargadoInfraccionLayout from "./components/app-infraccion/Layout/EncargadoInfraccionLayout";
+import InfraccionLogLayout from "./components/app-infraccion/Layout/InfraccionLogLayout";
+import AsignarInformes from "./components/app-infraccion/Layout/AsignarInformes";
+import AlertasInfraccionLayout from "./components/app-infraccion/Layout/AlertasInfraccionLayout";
+import InvolucradoLogLayout from "./components/app-involved/Layout/InvolucradoLogLayout";
 import ManageInvolvedLayout from "./components/app-involved/Layout/ManageInvolvedLayout";
 import DocumentPage from "./components/app-documentos/layout/DocumentosPage";
-//infracciones Compoents
 
-
-
-
-// Configuración simplificada de rutas (solo path y componente)
 type RouteConfig = {
   path: string;
   component: React.ComponentType<any>;
   props?: Record<string, any>;
 };
 
-// Inferencia automática de permisos basada en el path
 const inferPermissionFromPath = (path: string): string => {
-  // Mapeo de paths a permisos siguiendo exactamente el patrón actualizado de seeds.py
+  // Las claves deben coincidir con los permisos sembrados en seeds.py del backend.
   const pathToPermissionMap: Record<string, string> = {
     // === ADMINISTRACIÓN ===
     "/user/role": "admin_roles",
     "/user/add": "admin_crear_usuarios",
     "/user/manage": "admin_gestionar_usuarios",
 
-    // === EXPEDIENTES ===
-    "/file/manage": "expediente_gestionar",
-    "/file/consult": "expediente_consultar",
-    "/file/alerts": "expediente_alertas",
-    "/file/assign_manage": "expediente_asignar",
-    
+    // === SANCIONATORIO ===
+    "/file/manage": "sancionatorio_gestionar",
+    "/file/consult": "sancionatorio_consultar",
+    "/file/alerts": "sancionatorio_alertas",
+    "/file/assign_manage": "sancionatorio_asignar",
+
     // === INVOLUCRADOS ===
     "/involved/manage": "involucrado_gestionar",
 
@@ -55,35 +57,41 @@ const inferPermissionFromPath = (path: string): string => {
     "/audit/users": "auditoria_usuarios",
     "/audit/files": "auditoria_expedientes",
     "/audit/involved": "auditoria_involucrados",
+    "/audit/infractions": "auditoria_infracciones",
 
-    "/infraction/manage": "infracciones_gestionar",
-    "/infraction/consult": "infracciones_consultar",
-    "/infraction/alerts": "infracciones_alertas",
-    "/infraction/assign_manage": "infracciones_asignar"
-
+    "/infraction/manage": "infraccion_gestionar",
+    "/infraction/consult": "infraccion_consultar",
+    "/infraction/alerts": "infraccion_alertas",
+    "/infraction/assign_manage": "infraccion_asignar",
+    "/infraction/reports": "infraccion_asignar_informes",
   };
 
   const permission = pathToPermissionMap[path];
 
   if (!permission) {
     console.warn(`No se encontró permiso para el path: ${path}`);
-    return `unknown_permission_${path.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    return `unknown_permission_${path.replace(/[^a-zA-Z0-9]/g, "_")}`;
   }
 
   return permission;
 };
 
-// Componente helper para rutas protegidas con inferencia automática
 const ProtectedRoute = ({
   component: Component,
   path,
   props = {},
-  setToast
+  setToast,
 }: {
   component: React.ComponentType<any>;
   path: string;
   props?: Record<string, any>;
-  setToast: React.Dispatch<React.SetStateAction<{ id: number; message: string; type: "success" | "error" } | null>>;
+  setToast: React.Dispatch<
+    React.SetStateAction<{
+      id: number;
+      message: string;
+      type: "success" | "error";
+    } | null>
+  >;
 }) => {
   const permission = inferPermissionFromPath(path);
 
@@ -101,8 +109,12 @@ function App() {
     message: string;
     type: "success" | "error";
   } | null>(null);
+  
+  // Registrar el handler global permite lanzar toasts sin prop drilling.
+  useEffect(() => {
+    toastService.setHandler(setToast);
+  }, []);
 
-  // === cargar tema guardado en localStorage al inicio ===
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as
       | "emerald"
@@ -113,11 +125,13 @@ function App() {
     }
   }, [setTheme]);
 
-  // Configuración simplificada - permisos se infieren automáticamente del path
+  // No se declara permiso: se infiere del path vía inferPermissionFromPath.
   const protectedRoutes: RouteConfig[] = [
     // === AUDITORÍA ===
     { path: "/audit/users", component: UserLogLayout },
-    { path: "/audit/files", component: FileLogLayout },
+    { path: "/audit/files", component: ExpedienteLogLayout },
+    { path: "/audit/infractions", component: InfraccionLogLayout },
+    { path: "/audit/involved", component: InvolucradoLogLayout },
 
     // === ADMINISTRACIÓN ===
     { path: "/user/add", component: SignUpLayout },
@@ -125,11 +139,11 @@ function App() {
     { path: "/user/role", component: RoleLayout },
 
     // === EXPEDIENTES ===
-    { path: "/file/manage", component: FileManageLayout },
-    { path: "/file/consult", component: FileViewLayout },
-    { path: "/file/alerts", component: AlertsLayout },
-    { path: "/file/assign_manage", component: ManagerFilesLayout },
-    
+    { path: "/file/manage", component: GestionExpedienteLayout },
+    { path: "/file/consult", component: ConsultaExpedieneLayout },
+    { path: "/file/alerts", component: AlertasExpediente },
+    { path: "/file/assign_manage", component: EncargadoExpedienteLayout },
+
     // === INVOLUCRADOS ===
     { path: "/involved/manage", component: ManageInvolvedLayout },
 
@@ -137,10 +151,11 @@ function App() {
     { path: "/document/manage", component: DocumentPage },
 
     // === INFRACCIONES ===
-    { path: "/infraction/manage", component: InfractionManageLayout },
-    { path: "/infraction/consult", component: InfractionViewLayout },
-    { path: "/infraction/assign_manage", component: InfractionAssignLayout }
-
+    { path: "/infraction/manage", component: GestionInfraccionLayout },
+    { path: "/infraction/consult", component: ConsultaInfraccionLayout },
+    { path: "/infraction/assign_manage", component: EncargadoInfraccionLayout },
+    { path: "/infraction/reports", component: AsignarInformes },
+    { path: "/infraction/alerts", component: AlertasInfraccionLayout },
   ];
 
   return (

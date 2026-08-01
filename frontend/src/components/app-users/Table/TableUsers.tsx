@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-type Role = { id: number; name: string };
+type Rol = { id: number; nombre: string };
 
 type Props = {
   titles: string[];
@@ -12,12 +12,12 @@ type Props = {
     rol_id: number;
     state: boolean;
   }[];
-  roles: Role[];
+  rolList: Rol[];
   onToggleState: (id: number) => void;
   onToggleRol: (id: number, rol_id: number) => void;
 };
 
-export default function TableUsers({ titles, data, roles, onToggleState, onToggleRol }: Props) {
+export default function TableUsers({ titles, data, rolList, onToggleState, onToggleRol }: Props) {
   const [page, setPage] = useState(1);
   const rowsPerPage = 10;
   const paginatedData = data.slice((page - 1) * rowsPerPage, page * rowsPerPage);
@@ -67,7 +67,7 @@ export default function TableUsers({ titles, data, roles, onToggleState, onToggl
                       value={user.rol_id}
                       onChange={(e) => onToggleRol(user.id, Number(e.target.value))}
                     >
-                      {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      {rolList.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
                     </select>
                   </td>
                   <td className="w-[20%]">

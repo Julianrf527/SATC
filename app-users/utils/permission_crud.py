@@ -10,8 +10,6 @@ from db.models.rol_permiso import RolPermiso
 from db.models.usuario import Usuario
 from db.models.rol import Rol
 
-# ---------- LOGGER ------------
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s"
@@ -19,41 +17,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def get_user_permissions(user_id: int, db: AsyncSession) -> set[int]:
-    """
-    Obtiene el conjunto de IDs de permisos que posee un usuario.
-    
-    Args:
-        user_id: Número de documento del usuario
-        db: Sesión de base de datos
-    
-    Returns:
-        set[int]: Conjunto de IDs de permisos del usuario
-    """
-    stmt = (
-        select(Permiso.id)
-        .select_from(RolPermiso)
-        .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-        .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-        .where(Usuario.numero_documento == user_id)
-    )
-    
-    result = await db.execute(stmt)
-    permission_ids = result.scalars().all()
-    
-    return set(permission_ids)
-
 async def get_role_permissions(rol_id: int, db: AsyncSession) -> set[int]:
-    """
-    Obtiene el conjunto de IDs de permisos que tiene un rol.
-    
-    Args:
-        rol_id: ID del rol
-        db: Sesión de base de datos
-    
-    Returns:
-        set[int]: Conjunto de IDs de permisos del rol
-    """
+    """IDs de los permisos que tiene un rol."""
     stmt = (
         select(RolPermiso.permiso_id)
         .where(RolPermiso.rol_id == rol_id)
@@ -65,16 +30,7 @@ async def get_role_permissions(rol_id: int, db: AsyncSession) -> set[int]:
     return set(permission_ids)
 
 async def get_user_permission_names(permissions_ids: list[int], db: AsyncSession) -> set[str]:
-    """
-    Obtiene el conjunto de nombres de permisos que tiene un usuario basado en su rol.
-
-    Args:
-        permissions_ids: Lista de IDs de permisos
-        db: Sesión de base de datos
-
-    Returns:
-        set[str]: Conjunto de nombres de permisos del usuario
-    """
+    """Nombres de los permisos correspondientes a una lista de IDs."""
     stmt = (
         select(Permiso.nombre)
         .where(Permiso.id.in_(permissions_ids))
@@ -86,17 +42,10 @@ async def get_user_permission_names(permissions_ids: list[int], db: AsyncSession
     return set(permission_names)
 
 async def get_permissions_by_rol_id(rol_id: int, db: AsyncSession) -> list:
-    """
-    Obtiene todos los permisos de un rol consultando directamente la BD.
-    A diferencia de get_user_permission_avaliable, no depende de los permisos
-    del token (que pueden estar desactualizados si se crean nuevos permisos).
+    """Permisos de un rol leídos de la BD.
 
-    Args:
-        rol_id: ID del rol del usuario
-        db: Sesión de base de datos
-
-    Returns:
-        list: Lista de dicts con id, name y menu_path de cada permiso
+    Se consulta siempre la BD y no el token: un permiso creado después de
+    emitirse el token no aparecería en él.
     """
     stmt = (
         select(Permiso.id, Permiso.nombre, Permiso.menu_path)
@@ -106,7 +55,12 @@ async def get_permissions_by_rol_id(rol_id: int, db: AsyncSession) -> list:
     result = await db.execute(stmt)
     rows = result.all()
     return [
-        {"id": row.id, "name": row.nombre, "menu_path": row.menu_path}
+        {
+            "id": row.id,
+            "nombre": row.nombre,
+            "name": row.nombre,
+            "menu_path": row.menu_path,
+        }
         for row in rows
     ]
 
@@ -114,9 +68,13 @@ async def get_user_permission_avaliable(permissions_user: set[str], db: AsyncSes
     stmt = select(Permiso.id, Permiso.nombre, Permiso.menu_path).where(Permiso.nombre.in_(permissions_user))
     permission = await db.execute(stmt)
     permission = permission.all()
-    # Convertir a lista de dicts para JSON serializable
     return [
-        {"id": row.id, "name": row.nombre, "menu_path": row.menu_path}
+        {
+            "id": row.id,
+            "nombre": row.nombre,
+            "name": row.nombre,
+            "menu_path": row.menu_path,
+        }
         for row in permission
     ]
 
@@ -152,8 +110,9 @@ async def get_user_rol_avaliable(permissions_user: set[str], db: AsyncSession) -
     role_avaliable = [
         {
             "id": r["id"],
-            "name": r["name"],
-            "permission": list(r["permission_ids"])
+            "nombre": r["name"],
+            "permission": list(r["permission_ids"]),
+            "permisos": list(r["permission_ids"]),
         }
         for r in roles.values()
         if r["permission_names"].issubset(permissions_user_set)

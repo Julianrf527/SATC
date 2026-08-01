@@ -16,14 +16,10 @@ async def insert_auditoria(
     user_agent: str | None = None,
     datos_anteriores: dict | None = None,
     datos_nuevos: dict | None = None,
-    documento_usuario: str | None = None,
-    nombre_usuario: str | None = None,
 ):
     try:
         stmt = insert(Auditoria).values(
             usuario_id=usuario_id,
-            documento_usuario=documento_usuario,
-            nombre_usuario=nombre_usuario,
             tipo_evento=tipo_evento,
             resultado=resultado,
             detalle=detalle,

@@ -22,7 +22,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Crear usuario no-root
-RUN groupadd -r infraction && useradd -r -g infraction infraction
+RUN groupadd -r infraction && useradd -r -g infraction -d /home/infraction -m infraction
 
 # Directorio de trabajo
 WORKDIR /app
@@ -35,7 +35,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Cambiar permisos
-RUN chown -R infraction:infraction /app
+RUN mkdir -p /home/infraction && chown -R infraction:infraction /app /home/infraction
+
+ENV HOME=/home/infraction
 
 # Cambiar a usuario no-root
 USER infraction

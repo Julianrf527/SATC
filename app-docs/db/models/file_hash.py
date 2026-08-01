@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, TIMESTAMP, Index, Text
+from sqlalchemy import Column, Integer, String, TIMESTAMP, Text
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from .base import Base
@@ -7,7 +7,8 @@ class FileHash(Base):
     __tablename__ = "file_hash"
 
     id = Column(Integer, autoincrement=True, primary_key=True)
-    file_hash = Column(String(64), unique=True, nullable=False, index=True)
+    # unique=True ya crea el índice de búsqueda por hash (deduplicación).
+    file_hash = Column(String(64), unique=True, nullable=False)
     file_url = Column(Text, nullable=False)
     content_type = Column(String(100))
     file_size = Column(Integer)
@@ -16,8 +17,4 @@ class FileHash(Base):
         TIMESTAMP(timezone=True),
         default=lambda: datetime.now(ZoneInfo("America/Bogota")),
         nullable=False
-    )
-
-    __table_args__ = (
-        Index('ix_file_hash_hash', 'file_hash'),
     )

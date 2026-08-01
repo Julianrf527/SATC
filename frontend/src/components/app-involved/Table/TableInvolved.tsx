@@ -4,8 +4,9 @@ type Involved = {
   digito_verificacion: string | null;
   tipo_documento: string;
   nombre: string;
-  celular: number;
-  correo: string;
+  celular: number | null;
+  correo: string | null;
+  direccion?: string | null;
 };
 
 type Props = {
@@ -66,8 +67,9 @@ export default function TableInvolved({
                     <span className="badge badge-ghost badge-sm">{inv.tipo_documento}</span>
                   </td>
                   <td className="select-text">{inv.nombre}</td>
-                  <td className="select-text">{inv.celular}</td>
-                  <td className="select-text max-w-xs truncate">{inv.correo}</td>
+                  <td className="select-text">{inv.celular ?? ""}</td>
+                  <td className="select-text max-w-xs truncate">{inv.correo ?? ""}</td>
+                  <td className="select-text max-w-xs truncate">{inv.direccion ?? ""}</td>
                   <td>
                     <button
                       onClick={() => onEdit(inv)}

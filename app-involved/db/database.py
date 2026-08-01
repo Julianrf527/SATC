@@ -11,7 +11,7 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL"
 )
 
-# Optimización para alta concurrencia (50+ usuarios simultáneos)
+# Dimensionado para ~50 usuarios simultáneos.
 engine = create_async_engine(
     DATABASE_URL,
     pool_size=10,          # 10 conexiones base (5 por worker)
