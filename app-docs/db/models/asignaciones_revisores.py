@@ -8,13 +8,12 @@ class AsignacionRevisor(Base):
     __tablename__ = "asignaciones_revisores"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    documento_id = Column(Integer, ForeignKey("documentos.id", ondelete="CASCADE"))
-    revisor_id = Column(Integer)
+    documento_id = Column(Integer, ForeignKey("documentos.id", ondelete="CASCADE"), index=True)
+    revisor_id = Column(Integer, index=True)
     fecha_asignacion = Column(
         TIMESTAMP(timezone=True),
         default=lambda: datetime.now(ZoneInfo("America/Bogota"))
     )
     notificado = Column(Boolean)
 
-    # Relación inversa actualizada
     documento = relationship("Documento", back_populates="asignaciones_revisores")

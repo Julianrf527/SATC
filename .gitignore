@@ -156,3 +156,9 @@ cython_debug/
 minio-server/minio.exe
 minio-server/data/*
 !minio-server/data/.gitkeep
+
+# Backups de runtime (generados por backup-service, no son código fuente)
+backups/
+
+# Config local de Claude Code (contiene rutas/IPs/permisos específicos de esta máquina)
+.claude/

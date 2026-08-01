@@ -1,11 +1,12 @@
-# ApiCorp - Sistema de Gestión Corporativa
+# SATC - Sistema de Administración de Trámites de Corpochivor
 
-> Sistema empresarial modular para gestión de expedientes sancionatorios, control documental con versionamiento y administración centralizada de usuarios bajo arquitectura de microservicios.
+> Sistema modular de arquitectura de microservicios para la gestión de expedientes sancionatorios, infracciones ambientales, involucrados, control documental con versionamiento, y administración centralizada de usuarios.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-green.svg)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-19.1-61DAFB.svg)](https://react.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://docs.docker.com/compose/)
 
 ---
 
@@ -19,27 +20,23 @@
 
 ### [2. Seguridad](#2-seguridad)
 
-- [2.1 Sistema JWT](#21-sistema-jwt-dual-key)
+- [2.1 Autenticación y Sesiones](#21-autenticación-y-sesiones)
 - [2.2 Flujo de Autenticación](#22-flujo-de-autenticación)
 - [2.3 Control de Permisos](#23-control-de-permisos)
+- [2.4 Comunicación Servicio-a-Servicio](#24-comunicación-servicio-a-servicio)
+- [2.5 Otras Capas de Seguridad](#25-otras-capas-de-seguridad)
 
 ### [3. Base de Datos](#3-base-de-datos)
 
 - [3.1 Arquitectura](#31-arquitectura-de-datos)
-- [3.2 Esquemas](#32-esquemas-por-microservicio)
-- [3.3 Optimizaciones](#33-optimizaciones)
+- [3.2 Modelos Principales por Microservicio](#32-modelos-principales-por-microservicio)
 
-### [4. Flujos de Negocio](#4-flujos-de-negocio)
+### [4. Implementación](#4-implementación)
 
-- [4.1 Gestión Documental](#41-gestión-documental)
-- [4.2 Expedientes Sancionatorios](#42-expedientes-sancionatorios)
-
-### [5. Implementación](#5-implementación)
-
-- [5.1 Stack Tecnológico](#51-stack-tecnológico)
-- [5.2 Instalación](#52-instalación)
-- [5.3 Configuración](#53-configuración)
-- [5.4 Despliegue](#54-despliegue)
+- [4.1 Stack Tecnológico](#41-stack-tecnológico)
+- [4.2 Despliegue con Docker Compose](#42-despliegue-con-docker-compose)
+- [4.3 Variables de Entorno](#43-variables-de-entorno)
+- [4.4 Testing](#44-testing)
 
 ---
 
@@ -47,218 +44,97 @@
 
 ### 1.1 Visión General
 
-ApiCorp implementa una arquitectura de microservicios desacoplados que se comunican a través de un API Gateway centralizado, siguiendo el patrón Database-per-Service para aislamiento de datos.
+SATC implementa una arquitectura de microservicios desacoplados que se comunican a través de un API Gateway centralizado, siguiendo el patrón Database-per-Service para aislamiento de datos. Todo el stack corre en contenedores Docker orquestados por Docker Compose, detrás de un proxy Nginx.
 
-```mermaid
-flowchart TB
-    %% CAPA DE PRESENTACIÓN
-    subgraph Cliente["CAPA DE PRESENTACIÓN"]
-        WEB["Cliente Web<br/>React + TypeScript<br/>Puerto: 5173"]
-    end
+#### Diagramas del Sistema
 
-    %% CAPA DE GATEWAY
-    subgraph Gateway["CAPA DE GATEWAY"]
-        GW["API Gateway<br/>FastAPI + httpx<br/>Puerto: 8000"]
-    end
+**Componentes y Conectores (CYC)** — flujo desde el navegador, el reverse proxy como único punto de entrada, el API Gateway como nodo central, los 5 microservicios con sus bases de datos propias, y los servicios compartidos (Redis, MinIO, ClamAV, Backup Service):
 
-    %% CAPA DE SERVICIOS
-    subgraph Microservicios["CAPA DE SERVICIOS"]
-        USERS["app-users<br/>FastAPI<br/>Puerto: 8002"]
-        SANC["app-sancionatoria<br/>FastAPI<br/>Puerto: 8001"]
-        DOCS["app-docs<br/>FastAPI<br/>Puerto: 8003"]
-    end
+![Componentes y Conectores](documentacion/assets/CYC%20SATC.jpg)
 
-    %% CAPA DE PERSISTENCIA
-    subgraph Persistencia["CAPA DE PERSISTENCIA"]
-        DB1[("user_db<br/>PostgreSQL 15")]
-        DB2[("sancionatoria_db<br/>PostgreSQL 15")]
-        DB3[("documentos_db<br/>PostgreSQL 15")]
-    end
+**Vista por Capas** — Edge (reverse proxy) → Presentación (frontend) → Comunicación (API Gateway) → Lógica (microservicios de dominio) → Datos (PostgreSQL × 5, Redis, MinIO):
 
-    %% FLUJO PRINCIPAL
-    WEB -->|HTTP/REST<br/>JWT Cookie| GW
+![Vista por Capas](documentacion/assets/Layered%20View.jpg)
 
-    GW -->|REST<br/>/users/*| USERS
-    GW -->|REST<br/>/sancionatoria/*| SANC
-    GW -->|REST<br/>/docs/*| DOCS
+**Despliegue** — separación entre red pública (frontend + Nginx) y red privada (microservicios, bases de datos, servicios compartidos) sobre un único nodo:
 
-    %% COMUNICACIÓN ENTRE SERVICIOS VÍA GATEWAY
-    SANC -.->|REST consume<br/>/users/*| GW
-    DOCS -.->|REST consume<br/>/users/*| GW
+![Despliegue](documentacion/assets/DEPLOYMENT%20SATC.jpg)
 
-    %% PERSISTENCIA
-    USERS -->|SQLAlchemy<br/>Pool| DB1
-    SANC -->|SQLAlchemy<br/>Pool| DB2
-    DOCS -->|SQLAlchemy<br/>Pool| DB3
+**Mapeo de Puertos**:
 
-    %% ESTILOS
-    style WEB fill:#e1f5ff,stroke:#01579b,stroke-width:2px
-    style GW fill:#fff9c4,stroke:#f57f17,stroke-width:3px
-
-    style USERS fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style SANC fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style DOCS fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-
-    style DB1 fill:#ffccbc,stroke:#bf360c,stroke-width:2px
-    style DB2 fill:#ffccbc,stroke:#bf360c,stroke-width:2px
-    style DB3 fill:#ffccbc,stroke:#bf360c,stroke-width:2px
-```
+![Mapeo de Puertos](documentacion/assets/Mapeo%20Puertos.jpg)
 
 **Principios de Diseño:**
 
-- **Separación de Responsabilidades**: Cada microservicio gestiona su dominio de negocio
-- **Database per Service**: Cada servicio posee su propia base de datos aislada
-- **API Gateway Pattern**: Punto único de entrada, autenticación y enrutamiento
-- **Service-to-Service**: Comunicación REST a través del Gateway con tokens internos
-- **Comunicación Asíncrona**: httpx AsyncClient con HTTP/2 y connection pooling
-- **Escalabilidad Horizontal**: Servicios stateless, fácil replicación y balanceo
-- **Desacoplamiento**: Sin dependencias directas entre bases de datos de servicios
-
-**Leyenda de Conectores:**
-
-- **Líneas sólidas (→)**: Comunicación HTTP/REST directa
-- **Líneas punteadas (⋯→)**: Comunicación inter-servicio vía Gateway
-- **X-Gateway-\***: Headers personalizados (User-Id, Token, Permissions)
+- **Separación de Responsabilidades**: cada microservicio gestiona un dominio de negocio (identidad, expedientes sancionatorios, documentos, involucrados, infracciones).
+- **Database per Service**: cada servicio posee su propia base de datos PostgreSQL aislada, sin dependencias cruzadas entre esquemas.
+- **API Gateway Pattern**: único punto de entrada público; valida sesión, inyecta contexto (`X-Gateway-*`) y aplica rate limiting antes de reenviar al backend correspondiente.
+- **Service-to-Service con identidad verificable**: cada microservicio tiene su propio secreto de firma; el receptor determina quién lo llamó por cuál secreto validó la firma, no por lo que el token dice ser.
+- **Comunicación Asíncrona**: `httpx.AsyncClient` con HTTP/2 y connection pooling en gateway y microservicios.
+- **Stateless a nivel de proceso**: la sesión vive en Redis, no en memoria de un worker — permite escalar cada servicio horizontalmente (Gunicorn multi-worker) sin pegar sesiones a un proceso.
 
 **Nota de Implementación:**
 
-> Aunque en el entorno actual las 3 bases de datos PostgreSQL están en el mismo servidor (localhost), la arquitectura está diseñada para permitir la distribución de cada base de datos en servidores independientes sin modificar el código de los microservicios. Cada servicio solo conoce su propia cadena de conexión.
+> Las 5 bases de datos PostgreSQL corren en contenedores independientes en la red privada `satc-private`; solo `nginx-lb` está expuesto al exterior. Cada microservicio solo conoce su propia cadena de conexión y las URLs internas de los servicios con los que colabora.
 
 ---
 
 ### 1.2 Microservicios
 
-#### app-users (Puerto 8002)
+#### app-users (Puerto 8001)
 
-**Dominio:** Identidad, Acceso y Comunicaciones
+**Dominio:** Identidad, Acceso, RBAC y Comunicaciones
 
-```
-┌─────────────────────────────────────────┐
-│           app-users (8002)              │
-├─────────────────────────────────────────┤
-│ Responsabilidades:                      │
-│ • Autenticación (Login/Logout)          │
-│ • Gestión de usuarios (CRUD)            │
-│ • Roles y permisos (RBAC)               │
-│ • Notificaciones en sistema             │
-│ • Envío de emails (SMTP)                │
-│ • Auditoría de acciones                 │
-│ • Recuperación de contraseñas           │
-├─────────────────────────────────────────┤
-│ Endpoints Clave:                        │
-│ POST   /auth/login                      │
-│ POST   /auth/register                   │
-│ GET    /auth/me                         │
-│ POST   /auth/logout                     │
-│ GET    /user/list                       │
-│ PATCH  /user/toggle-state/{id}          │
-│ GET    /role/list                       │
-│ POST   /notification/create             │
-│ POST   /email/send                      │
-└─────────────────────────────────────────┘
-```
+Responsabilidades: autenticación (login/logout, sesiones en Redis), CRUD de usuarios, roles y permisos, notificaciones en sistema, envío de emails, auditoría de acciones, recuperación de contraseñas. Es el único servicio consultado por los demás para verificar permisos (`POST /role/verify`) y resolver identidad de usuarios (`POST /user/batch`).
 
-**Base de Datos:** `user_db`
+**Base de datos:** `user_db`
 
----
+#### app-sancionatoria (Puerto 8002)
 
-#### app-sancionatoria (Puerto 8001)
+**Dominio:** Expedientes Sancionatorios
 
-**Dominio:** Expedientes y Procesos Legales
+Gestión de expedientes, involucrados vinculados, actos administrativos (con notificación y comunicación), flujo de etapas procesales (indagación preliminar, medida preventiva, formulación de cargos, decisión de fondo, recursos, cesación, cierre), alertas automáticas por vencimiento, geografía (municipios/veredas).
 
-```
-┌─────────────────────────────────────────┐
-│      app-sancionatoria (8001)           │
-├─────────────────────────────────────────┤
-│ Responsabilidades:                      │
-│ • Gestión de expedientes                │
-│ • Control de involucrados               │
-│ • Documentos de expediente              │
-│ • Flujo de etapas procesales            │
-│ • Actos administrativos                 │
-│ • Sistema de alertas automáticas        │
-│ • Gestión geográfica                    │
-├─────────────────────────────────────────┤
-│ Endpoints Clave:                        │
-│ GET    /file/list                       │
-│ POST   /file/create                     │
-│ PATCH  /file/encargado/{id}             │
-│ GET    /involved/manage                 │
-│ PUT    /involved/manage/{id}            │
-│ POST   /document/upload                 │
-│ GET    /town/municipalities             │
-└─────────────────────────────────────────┘
-```
-
-**Base de Datos:** `sancionatoria_db`
-
----
+**Base de datos:** `expedientes_db`
 
 #### app-docs (Puerto 8003)
 
 **Dominio:** Control Documental y Versionamiento
 
-```
-┌─────────────────────────────────────────┐
-│          app-docs (8003)                │
-├─────────────────────────────────────────┤
-│ Responsabilidades:                      │
-│ • Gestión de documentos corporativos    │
-│ • Control de versiones automático       │
-│ • Flujo de revisión multi-revisor       │
-│ • Aprobación/Devolución documentos      │
-│ • Auditoría de cambios                  │
-│ • Notificaciones de workflow            │
-│ • Gestión de revisores                  │
-├─────────────────────────────────────────┤
-│ Endpoints Clave:                        │
-│ GET    /docs/list                       │
-│ POST   /docs/create                     │
-│ GET    /docs/detail/{id}                │
-│ POST   /docs/upload-version/{id}        │
-│ POST   /docs/review/{id}                │
-│ GET    /docs/stats                      │
-│ GET    /docs/reviewers                  │
-└─────────────────────────────────────────┘
-```
+Gestión de documentos corporativos con versionamiento automático, flujo de revisión multi-revisor, deduplicación de archivos por hash (MinIO), escaneo antivirus (ClamAV) antes de aceptar cualquier archivo, endpoint centralizado de hashes de archivo (`/files/*`) consumido por sancionatoria e infraction.
 
-**Base de Datos:** `documentos_db`
+**Base de datos:** `documentos_db`
 
-**Estados del Documento:**
+#### app-involved (Puerto 8004)
 
-```
-en_revision → aprobado → finalizado
-            ↘ rechazado → (nueva versión) → en_revision
-```
+**Dominio:** Registro Centralizado de Involucrados
 
----
+Fuente única de verdad de personas/entidades involucradas en expedientes (por documento de identidad), consumido por sancionatoria e infraction vía `X-Service-Token`. Índice único `(numero_documento, tipo_documento)` evita duplicados incluso bajo altas concurrentes.
 
-#### api-gateway (Puerto 8000)
+**Base de datos:** `involucrados_db`
 
-**Dominio:** Enrutamiento y Seguridad
+#### app-infraction (Puerto 8005)
 
-```
-┌─────────────────────────────────────────┐
-│         api-gateway (8000)              │
-├─────────────────────────────────────────┤
-│ Responsabilidades:                      │
-│ • Proxy reverso a microservicios        │
-│ • Decodificación y validación JWT       │
-│ • Inyección de headers de contexto      │
-│ • Caché de tokens (LRU, TTL: 120s)      │
-│ • Circuit breaker (5 fallos, 30s)       │
-│ • Compresión GZip                       │
-│ • Enrutamiento basado en prefijo        │
-├─────────────────────────────────────────┤
-│ Configuración:                          │
-│ • Cache Size: 500 tokens                │
-│ • Cache TTL: 120 segundos               │
-│ • Circuit Threshold: 5 fallos           │
-│ • Circuit Timeout: 30 segundos          │
-│ • HTTP Client: httpx AsyncClient        │
-│ • Compression: GZip                     │
-└─────────────────────────────────────────┘
-```
+**Dominio:** Infracciones Ambientales
+
+Gestión de infracciones y su ciclo de vida: actos administrativos, etapas (respuesta, informe técnico, concepto, cierre), solicitudes de información, medidas preventivas, reportes. Estructura análoga a app-sancionatoria pero como dominio de negocio independiente.
+
+**Base de datos:** `infracciones_db`
+
+#### api-gateway (Puerto 8000 interno)
+
+**Dominio:** Enrutamiento, Autenticación y Seguridad Perimetral
+
+Responsabilidades:
+
+- Proxy reverso hacia los 5 microservicios, enrutado por prefijo de path.
+- Decodificación y validación de la cookie de sesión JWT.
+- Inyección de headers de contexto confiables (`X-Gateway-Token`, `X-Gateway-User-Id`, `X-Gateway-Role-Id`) — siempre despojados de cualquier valor que el cliente haya intentado inyectar.
+- Rate limiting por IP y por usuario (Redis, ventana fija).
+- Circuit breaker por servicio (5 fallos → circuito abierto 30s).
+- Caché de tokens decodificados (Redis o local, configurable).
+- `PUBLIC_ROUTES` scopeadas por servicio: una ruta pública en un microservicio no expone homónimas en los demás.
+- `follow_redirects=False`: ningún backend puede hacer que el gateway repita una petición autenticada contra un destino arbitrario.
 
 ---
 
@@ -267,251 +143,106 @@ en_revision → aprobado → finalizado
 #### Patrón de Comunicación
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│              FLUJO DE REQUEST/RESPONSE                       │
-└─────────────────────────────────────────────────────────────┘
-
-Cliente → Gateway
+Cliente → nginx-lb → api-gateway
 ┌────────────────────────────────┐
-│ Cookie: access_token=<JWT>     │
+│ Cookie: session=<opaco>        │
 │ Content-Type: application/json │
-│ Accept: application/json       │
 └────────────────────────────────┘
 
-Gateway → Microservicio
+api-gateway → Microservicio
 ┌─────────────────────────────────────────────────────┐
-│ X-Gateway-Token: validated_token                    │
+│ X-Gateway-Token: SECRET_GATEWAY                     │
 │ X-Gateway-User-Id: 123                              │
-│ X-Gateway-Permissions: ["perm_1", "perm_2", ...]    │
+│ X-Gateway-Role-Id: 2                                │
 │ Content-Type: application/json                      │
 └─────────────────────────────────────────────────────┘
 
-Microservicio ↔ Microservicio (via Gateway)
+Microservicio → Microservicio (directo, red privada)
 ┌────────────────────────────────────────────────────┐
-│ X-Service-Token: internal_jwt                      │
-│ Gateway-URL: http://localhost:8000                 │
+│ X-Service-Token: <JWT firmado con secreto propio>   │
 └────────────────────────────────────────────────────┘
 ```
 
-#### Mapeo de Rutas
+#### Mapeo de Rutas (Gateway)
 
-| Prefijo          | Destino           | Puerto |
-| ---------------- | ----------------- | ------ |
-| `/users/*`       | app-users         | 8002   |
-| `/sanctioning/*` | app-sancionatoria | 8001   |
-| `/documents/*`   | app-docs          | 8003   |
+| Prefijo          | Destino           | Puerto interno |
+| ----------------- | ------------------ | -------------- |
+| `/users/*`        | app-users          | 8001           |
+| `/sanctioning/*`  | app-sancionatoria  | 8002           |
+| `/documents/*`    | app-docs           | 8003           |
+| `/involveds/*`    | app-involved       | 8004           |
+| `/infraction/*`   | app-infraction     | 8005           |
 
-**Rutas Públicas** (sin autenticación):
+**Rutas públicas** (sin sesión, scopeadas por servicio — ver `api-gateway/main.py::PUBLIC_ROUTES`):
 
-- `auth/login`
-- `auth/register`
-- `auth/recovery-code`
-- `auth/recovery`
-
-**Rutas sin Caché**:
-
-- `auth/logout`
-- `user/delete`
-- `admin/*`
+- `users`: `auth/login`, `auth/recovery-code`, `auth/recovery`, `auth/logout`, `role/verify`, `user/batch`, `user/permission`, `notification/add`, `email/send`, `email/send-bulk`, `email/send-alert-report`
+- `documents`: `files/increment-usage`, `files/decrement-usage`, `files/batch` (protegidas igual por `X-Service-Token` en el destino, no por sesión de usuario)
+- `health` es pública en los 5 servicios (healthchecks de Docker)
 
 ---
 
 ## 2. Seguridad
 
-### 2.1 Sistema JWT Dual-Key
+### 2.1 Autenticación y Sesiones
 
-ApiCorp implementa un sistema de seguridad con dos niveles de claves secretas:
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                 DUAL SECRET KEY SYSTEM                    │
-├──────────────────────────────────────────────────────────┤
-│                                                           │
-│  SECRET_KEY 🔒                                           │
-│  ├─ Alcance: Privada de cada microservicio              │
-│  ├─ Uso: Tokens internos, operaciones locales           │
-│  ├─ Ubicación: .env de cada servicio                    │
-│  └─ Generación: openssl rand -hex 32                    │
-│                                                           │
-│  SECRET_KEY_GATEWAY 🔑                                   │
-│  ├─ Alcance: Compartida (api-gateway ↔ app-users)       │
-│  ├─ Uso: JWT de autenticación principal                 │
-│  ├─ Ubicación: .env de gateway y app-users              │
-│  └─ Requisito: DEBE SER IDÉNTICA en ambos servicios     │
-│                                                           │
-└──────────────────────────────────────────────────────────┘
-```
-
-**Ventajas del Modelo Dual:**
-
-- ✅ Aislamiento de seguridad entre servicios
-- ✅ Tokens de autenticación validados solo por gateway
-- ✅ Reducción de superficie de ataque
-- ✅ Flexibilidad para rotación de keys
-
----
+El login vive en `app-users`. Tras validar credenciales (bcrypt), la sesión se guarda en Redis (no en JWT autocontenido) y se referencia con una cookie httpOnly. Esto permite invalidar sesiones en tiempo real (logout, expiración forzada) sin esperar a que expire un token.
 
 ### 2.2 Flujo de Autenticación
 
 ```mermaid
 sequenceDiagram
     participant C as Cliente
-    participant G as Gateway
+    participant G as api-gateway
     participant U as app-users
-    participant S as app-sancionatoria
+    participant S as microservicio destino
 
-    Note over C,S: FASE 1 - LOGIN
-    C->>G: POST /auth/login {user, password}
+    Note over C,S: LOGIN
+    C->>G: POST /users/auth/login {correo, password}
     G->>U: Proxy request
     U->>U: Validar credenciales (bcrypt)
-    U->>U: Query permisos FROM roles
-    U->>U: JWT encode con SECRET_KEY_GATEWAY
-    U->>G: Set-Cookie access_token=JWT
+    U->>U: Crear sesión en Redis
+    U->>G: Set-Cookie (sesión)
     G->>C: 200 OK + Cookie
 
-    Note over C,S: FASE 2 - REQUEST AUTENTICADO
-    C->>G: GET /sanctioning/file/list + Cookie
-    G->>G: JWT decode con SECRET_KEY_GATEWAY
-    G->>G: Extract user_id y permissions
-    G->>S: Headers X-Gateway-User-Id + Permissions
-    S->>S: verify_permission(required_perm)
-    S->>S: Process business logic
-    S->>G: Response data
-    G->>C: Response data
+    Note over C,S: REQUEST AUTENTICADO
+    C->>G: GET /sanctioning/expediente/list + Cookie
+    G->>G: Resolver sesión (Redis / caché)
+    G->>G: Rate limit + circuit breaker
+    G->>S: X-Gateway-User-Id, X-Gateway-Role-Id
+    S->>U: POST /role/verify (X-Service-Token)
+    U->>S: {ok: true/false}
+    S->>S: Procesar lógica de negocio
+    S->>G: Response
+    G->>C: Response
 
-    Note over C,S: FASE 3 - LOGOUT
-    C->>G: POST /auth/logout
+    Note over C,S: LOGOUT
+    C->>G: POST /users/auth/logout
     G->>U: Proxy request
-    U->>U: Invalidar sesión
-    U->>G: Clear-Cookie access_token
+    U->>U: Invalidar sesión en Redis
+    U->>G: Clear-Cookie
     G->>C: 200 OK
 ```
 
-**Diagrama de Flujo Detallado:**
-
-```
-┌─────────────┐
-│   LOGIN     │
-└──────┬──────┘
-       │
-       ├─► 1. Usuario envía credenciales
-       │
-       ├─► 2. app-users valida (bcrypt)
-       │   └─ SELECT * FROM usuarios WHERE correo = ?
-       │
-       ├─► 3. Query permisos del rol
-       │   └─ SELECT p.name FROM roles_permisos
-       │      JOIN permisos p ON ...
-       │
-       ├─► 4. Generar JWT
-       │   └─ Payload: {
-       │       "sub": user_id,
-       │       "permissions": ["perm_1", "perm_2", ...],
-       │       "exp": now() + 24h
-       │      }
-       │   └─ Firma: SECRET_KEY_GATEWAY
-       │
-       └─► 5. Set Cookie httpOnly
-           └─ access_token=<JWT>
-
-┌──────────────────┐
-│  REQUEST A API   │
-└────────┬─────────┘
-         │
-         ├─► 6. Gateway extrae Cookie
-         │
-         ├─► 7. Decodificar JWT
-         │   └─ jwt.decode(token, SECRET_KEY_GATEWAY)
-         │   └─ Resultado: {user_id: 123, permissions: [...]}
-         │
-         ├─► 8. Inyectar Headers
-         │   └─ X-Gateway-Token: validated_token
-         │   └─ X-Gateway-User-Id: 123
-         │   └─ X-Gateway-Permissions: JSON([...])
-         │
-         ├─► 9. Microservicio valida en memoria
-         │   └─ verify_permission(request, "required_perm")
-         │   └─ if "required_perm" in permissions: OK
-         │      else: HTTP 403
-         │
-         └─► 10. Procesar lógica de negocio
-             └─ SIN consultas a DB para auth
-```
-
----
-
 ### 2.3 Control de Permisos
 
-#### Modelo de Permisos
+El modelo es RBAC clásico (Usuario → Rol → Permisos), pero la verificación **no** vive en un JWT autocontenido: cada microservicio que necesita comprobar un permiso llama a `app-users` (`POST /role/verify`) vía `X-Service-Token`, con resultado cacheado en memoria por proceso (TTL corto) para no golpear la red en cada request. Fail-closed: cualquier error de red o respuesta no-200 se trata como "sin permiso", nunca como acceso concedido por defecto.
 
-```
-┌──────────────────────────────────────────────────────┐
-│              ESTRUCTURA RBAC                         │
-├──────────────────────────────────────────────────────┤
-│                                                       │
-│  Usuario                                              │
-│  ├─ id: 123                                          │
-│  ├─ correo: "user@corp.com"                         │
-│  ├─ rol_id: 2                                        │
-│  └─ permisos: ["perm_1", "perm_2", "perm_3"]  ◄─┐   │
-│                                                  │   │
-│  Rol                                             │   │
-│  ├─ id: 2                                        │   │
-│  ├─ nombre: "Revisor"                            │   │
-│  └─ permisos: ─────────────────────────────────────┘   │
-│      ├─ "documento_revisar"                          │
-│      ├─ "expediente_ver"                             │
-│      └─ "notificacion_recibir"                       │
-│                                                       │
-│  Permiso                                              │
-│  ├─ id: 5                                            │
-│  ├─ nombre: "documento_revisar"                      │
-│  ├─ path: "/documents/review"                        │
-│  └─ descripcion: "Revisar documentos asignados"      │
-│                                                       │
-└──────────────────────────────────────────────────────┘
-```
+Las categorías de permiso en el frontend se derivan dinámicamente del prefijo del nombre del permiso (`sancionatorio_*`, `infraction_*`, `documento_*`, etc.) — no hay listas hardcodeadas que haya que sincronizar manualmente al agregar un permiso nuevo.
 
-#### Verificación Zero-DB-Query
+### 2.4 Comunicación Servicio-a-Servicio
 
-```python
-# En Microservicio (app-sancionatoria/routes/involved.py)
+Cada microservicio tiene su **propio secreto** de firma (`SERVICE_SECRET_KEY`), distinto entre sí y distinto del secreto que usa el gateway (`SECRET_GATEWAY`). Un servicio que recibe una llamada este-oeste prueba el token contra el secreto de cada caller que espera (`EXPECTED_CALLERS`); la identidad del llamante la determina **cuál secreto validó la firma**, no el campo `service` que el propio token declara — se exige además que ambos coincidan, así una firma válida con identidad falseada también se rechaza.
 
-from utils.verify_gateway_token import verify_permission
+Endpoints marcados como *service-only* exigen `X-Service-Token` estricto y rechazan `X-Gateway-Token`, aunque el gateway lo inyecte en toda petición que reenvía.
 
-@router.get("/manage")
-async def manage_involved(request: Request):
-    # Validación de permiso SIN consultar base de datos
-    user_id = verify_permission(request, "expediente_gestionar involucrados")
+### 2.5 Otras Capas de Seguridad
 
-    # user_id ya está validado, continuar con lógica de negocio
-    # ...
-```
-
-**Proceso Interno de verify_permission:**
-
-```
-1. Extraer header X-Gateway-Permissions
-   └─ JSON.parse → ["perm_1", "perm_2", "perm_3"]
-
-2. Verificar si permiso requerido está en lista
-   └─ "expediente_gestionar involucrados" in permissions?
-
-3. Si SÍ: retornar user_id
-   Si NO: raise HTTPException(403, "No tienes permiso")
-
-Tiempo de ejecución: ~0.1ms (solo operaciones en memoria)
-```
-
-**Comparación con Modelo Tradicional:**
-
-| Aspecto       | Modelo JWT (ApiCorp) | Modelo DB Query          |
-| ------------- | -------------------- | ------------------------ |
-| Latencia      | ~0.1ms               | ~5-50ms                  |
-| Carga DB      | 0 queries/request    | 1+ queries/request       |
-| Escalabilidad | Alta (stateless)     | Limitada (DB bottleneck) |
-| Actualización | Re-login             | Tiempo real              |
-| Seguridad     | Alta (firmado)       | Alta (centralizado)      |
+- **Rate limiting** (api-gateway): ventana fija en Redis, por IP (`X-Forwarded-For` leído de derecha a izquierda, como lo agrega nginx) y por usuario autenticado. Fail-open si Redis no responde.
+- **Antivirus** (app-docs): todo archivo subido pasa por ClamAV antes de guardarse; rechazo fail-closed si el escaneo falla.
+- **Deduplicación por hash** (app-docs): evita almacenar el mismo archivo dos veces y centraliza el contador de referencias (`numero_usos`) que decide cuándo el cleanup scheduler puede purgarlo.
+- **Cookies**: `Secure` activo por defecto en producción (HTTPS); solo se desactiva explícitamente en desarrollo local sobre HTTP plano.
+- **Path-traversal guard** (api-gateway): rechaza segmentos `.`/`..` en el path antes de construir la URL de destino.
+- **UNIQUE constraints a nivel de BD** como última línea de defensa contra condiciones de carrera (ej. involucrados duplicados en altas concurrentes), no solo checks a nivel de aplicación.
 
 ---
 
@@ -519,891 +250,160 @@ Tiempo de ejecución: ~0.1ms (solo operaciones en memoria)
 
 ### 3.1 Arquitectura de Datos
 
-**Estrategia:** Database per Service Pattern
+**Estrategia:** Database per Service. Cinco instancias PostgreSQL 15 independientes, una por microservicio, cada una en su propio contenedor y volumen:
 
-```
-┌──────────────────────────────────────────────────────────┐
-│         PostgreSQL 15 Server (localhost:5432)            │
-├──────────────────────────────────────────────────────────┤
-│                                                           │
-│  ┌────────────┐  ┌─────────────────┐  ┌──────────────┐  │
-│  │  user_db   │  │sancionatoria_db │  │documentos_db │  │
-│  ├────────────┤  ├─────────────────┤  ├──────────────┤  │
-│  │ 7 tablas   │  │ 15 tablas       │  │ 6 tablas     │  │
-│  │ ~50 MB     │  │ ~200 MB         │  │ ~100 MB      │  │
-│  └────────────┘  └─────────────────┘  └──────────────┘  │
-│                                                           │
-│  Owner:          Owner:              Owner:              │
-│  app-users       app-sancionatoria   app-docs            │
-│                                                           │
-└──────────────────────────────────────────────────────────┘
+| Base de datos      | Propietario         |
+| ------------------- | -------------------- |
+| `user_db`            | app-users            |
+| `expedientes_db`     | app-sancionatoria    |
+| `documentos_db`      | app-docs             |
+| `involucrados_db`    | app-involved         |
+| `infracciones_db`    | app-infraction       |
 
-Ventajas:
-✓ Aislamiento de datos
-✓ Esquemas independientes
-✓ Escalado independiente
-✓ Backups granulares
-✓ Sin dependencias cruzadas
-```
+Sin foreign keys entre bases de datos distintas: las referencias cruzadas (ej. `usuario_id` en una tabla de auditoría de otro servicio) son IDs sueltos, resueltos vía llamada HTTP cuando se necesita mostrar el nombre/documento del usuario.
+
+### 3.2 Modelos Principales por Microservicio
+
+**user_db**: `usuarios`, `roles`, `permisos`, `roles_permisos`, `notificaciones`, `auditoria`.
+
+**expedientes_db**: `expedientes`, `involucrado_expediente` (relación), etapas como tablas propias (`etapa_indagacion`, `etapa_medida_preventiva`, `etapa_formulacion_cargos`, `etapa_decision_fondo`, `etapa_probatoria_recurso`, `etapa_cesacion`, `etapa_cierre_probatoria`, `etapa_ejecucion_sancion`, `etapa_apertura_probatoria`, `etapa_inicio_sancionatorio`), `acto_administrativo`, `notificacion`, `municipios`/`veredas`, `auditoria`.
+
+**documentos_db**: `documentos`, `versiones_documento`, `revisiones`, `asignaciones_revisores`, `auditoria_documentos`, `file_hash` (deduplicación centralizada).
+
+**involucrados_db**: `involucrado` (con índice UNIQUE `numero_documento, tipo_documento`), `auditoria`.
+
+**infracciones_db**: `expediente` (infracciones), `acto_administrativo`, `comunicacion`, `etapa_respuesta`, `informe_tecnico`, `etapa_acoger_concepto`, `etapa_cierre`, `medida_preventiva`, `solicitud_informacion`, `notificacion`, `quejoso`, `recurso_afectado`, `auditoria`.
 
 ---
 
-### 3.2 Esquemas por Microservicio
+## 4. Implementación
 
-#### user_db
+### 4.1 Stack Tecnológico
 
-```sql
--- Autenticación e Identidad
-┌───────────────────────────────────────────────┐
-│ usuarios                                      │
-├───────────────────────────────────────────────┤
-│ id (PK, SERIAL)                               │
-│ cedula (UNIQUE, BIGINT)                       │
-│ primer_nombre, segundo_nombre (VARCHAR)       │
-│ primer_apellido, segundo_apellido (VARCHAR)   │
-│ correo (UNIQUE, VARCHAR)                      │
-│ contraseña (VARCHAR - bcrypt hash)            │
-│ rol_id (FK → roles.id)                        │
-│ state (BOOLEAN - activo/inactivo)             │
-│ fecha_creacion (TIMESTAMP)                    │
-└───────────────────────────────────────────────┘
+#### Capacidad (Gunicorn workers por servicio)
 
--- RBAC
-┌─────────────────┐  ┌──────────────────┐  ┌───────────────────┐
-│ roles           │  │ permisos         │  │ roles_permisos    │
-├─────────────────┤  ├──────────────────┤  ├───────────────────┤
-│ id (PK)         │  │ id (PK)          │  │ rol_id (FK)       │
-│ name (UNIQUE)   │  │ name (UNIQUE)    │  │ permiso_id (FK)   │
-│ descripcion     │  │ path             │  │ (PK compuesta)    │
-└─────────────────┘  │ descripcion      │  └───────────────────┘
-                      └──────────────────┘
+| Servicio | Workers |
+| --- | --- |
+| api-gateway | 6 |
+| app-users | 4 |
+| app-sancionatoria | 4 |
+| app-involved | 4 |
+| app-infraction | 4 |
+| app-docs | 1 |
 
--- Notificaciones
-┌───────────────────────────────────────────────┐
-│ notificaciones                                │
-├───────────────────────────────────────────────┤
-│ id (PK, SERIAL)                               │
-│ usuario_id (FK → usuarios.id)                 │
-│ mensaje (TEXT)                                │
-│ tipo (VARCHAR - expediente, documento, etc)   │
-│ leida (BOOLEAN, DEFAULT false)                │
-│ id_vinculada (VARCHAR - radicado/doc_id)      │
-│ fecha_creacion (TIMESTAMP)                    │
-└───────────────────────────────────────────────┘
+`--preload` activo en todos: el proceso maestro carga la app una vez y los workers heredan la memoria por copy-on-write, en vez de duplicarla por worker.
 
--- Auditoría
-┌───────────────────────────────────────────────┐
-│ auditoria                                     │
-├───────────────────────────────────────────────┤
-│ id (PK, BIGSERIAL)                            │
-│ usuario_id (FK → usuarios.id)                 │
-│ accion (VARCHAR - crear, editar, eliminar)   │
-│ tabla (VARCHAR)                               │
-│ datos_anteriores (JSON)                       │
-│ datos_nuevos (JSON)                           │
-│ fecha (TIMESTAMP)                             │
-└───────────────────────────────────────────────┘
-```
 
----
+**Backend:** FastAPI (async), SQLAlchemy 2.0 async, PostgreSQL 15, `python-jose` (JWT), `httpx` (HTTP/2, connection pooling), Gunicorn multi-worker, Redis (sesiones, caché, rate limiting), MinIO (object storage), ClamAV (antivirus).
 
-#### sancionatoria_db
+**Frontend:** React 19 + TypeScript 5.8 + Vite 7, TailwindCSS + DaisyUI, React Router DOM 7.7, Storybook para desarrollo aislado de componentes.
 
-```sql
--- Expedientes
-┌───────────────────────────────────────────────┐
-│ expedientes                                   │
-├───────────────────────────────────────────────┤
-│ radicado (PK, VARCHAR - formato: EXP-YYYYMMDD-NNNN) │
-│ nombre (VARCHAR)                              │
-│ descripcion (TEXT)                            │
-│ etapa_id (FK → etapas.id)                     │
-│ encargado_id (INT - ref externa user_db)      │
-│ estado (VARCHAR - activo, cerrado, archivado) │
-│ fecha_creacion (TIMESTAMP)                    │
-└───────────────────────────────────────────────┘
+**Infraestructura:** Docker Compose, Nginx como proxy/load balancer, backups automáticos programados (Postgres + MinIO).
 
--- Involucrados
-┌───────────────────────────────────────────────┐
-│ involucrados                                  │
-├───────────────────────────────────────────────┤
-│ id (PK, SERIAL)                               │
-│ numero_documento (BIGINT)                     │
-│ tipo_documento (VARCHAR - CC, CE, NIT, etc)   │
-│ digito_verificacion (VARCHAR, NULLABLE)       │
-│ nombre (VARCHAR)                              │
-│ celular (BIGINT)                              │
-│ correo (VARCHAR)                              │
-│ UNIQUE(numero_documento, tipo_documento)      │
-└───────────────────────────────────────────────┘
+### 4.2 Despliegue con Docker Compose
 
--- Relación Expediente-Involucrado
-┌───────────────────────────────────────────────┐
-│ involucrado_expediente                        │
-├───────────────────────────────────────────────┤
-│ id (PK, SERIAL)                               │
-│ expediente_radicado (FK → expedientes)        │
-│ involucrado_id (FK → involucrados.id)         │
-│ rol (VARCHAR - demandante, demandado, etc)    │
-│ observaciones (TEXT)                          │
-│ UNIQUE(expediente_radicado, involucrado_id)   │
-└───────────────────────────────────────────────┘
-
--- Etapas Procesales
-┌───────────────────────────────────────────────┐
-│ etapas                                        │
-├───────────────────────────────────────────────┤
-│ id (PK, SERIAL)                               │
-│ nombre (VARCHAR - Formulación, Decisión, etc) │
-│ descripcion (TEXT)                            │
-│ orden (INT)                                   │
-└───────────────────────────────────────────────┘
-
--- Geografía
-┌───────────────────────┐  ┌──────────────────────┐
-│ municipios            │  │ veredas              │
-├───────────────────────┤  ├──────────────────────┤
-│ codigo (PK, VARCHAR)  │  │ id (PK, SERIAL)      │
-│ nombre (VARCHAR)      │  │ nombre (VARCHAR)     │
-│ departamento (VARCHAR)│  │ municipio_codigo (FK)│
-└───────────────────────┘  └──────────────────────┘
-```
-
----
-
-#### documentos_db
-
-```sql
--- Control Documental
-┌───────────────────────────────────────────────┐
-│ documentos                                    │
-├───────────────────────────────────────────────┤
-│ id (PK, SERIAL)                               │
-│ nombre (VARCHAR)                              │
-│ descripcion (TEXT)                            │
-│ tipo_archivo (VARCHAR - pdf, docx, xlsx)     │
-│ usuario_creador_id (INT - ref user_db)        │
-│ estado (VARCHAR - en_revision, aprobado,      │
-│         rechazado, finalizado)                │
-│ version_actual (INT, DEFAULT 1)               │
-│ numero_devoluciones (INT, DEFAULT 0)          │
-│ fecha_creacion (TIMESTAMP)                    │
-│ fecha_ultima_actualizacion (TIMESTAMP)        │
-└───────────────────────────────────────────────┘
-
--- Versionamiento
-┌───────────────────────────────────────────────┐
-│ versiones_documento                           │
-├───────────────────────────────────────────────┤
-│ id (PK, SERIAL)                               │
-│ documento_id (FK → documentos.id, CASCADE)    │
-│ numero_version (INT)                          │
-│ archivo_url (VARCHAR - path relativo)         │
-│ archivo_nombre_original (VARCHAR)             │
-│ archivo_size (BIGINT - bytes)                 │
-│ usuario_subida_id (INT - ref user_db)         │
-│ comentario (TEXT)                             │
-│ fecha_subida (TIMESTAMP)                      │
-│ UNIQUE(documento_id, numero_version)          │
-└───────────────────────────────────────────────┘
-
--- Flujo de Revisión
-┌───────────────────────────────────────────────┐
-│ revisiones                                    │
-├───────────────────────────────────────────────┤
-│ id (PK, SERIAL)                               │
-│ documento_id (FK → documentos.id)             │
-│ revisor_id (INT - ref user_db)                │
-│ version_revisada (INT)                        │
-│ estado_revision (VARCHAR - aprobado, devuelto)│
-│ comentarios (TEXT)                            │
-│ fecha_revision (TIMESTAMP)                    │
-└───────────────────────────────────────────────┘
-
-┌───────────────────────────────────────────────┐
-│ asignaciones_revisores                        │
-├───────────────────────────────────────────────┤
-│ id (PK, SERIAL)                               │
-│ documento_id (FK → documentos.id, CASCADE)    │
-│ revisor_id (INT - ref user_db)                │
-│ notificado (BOOLEAN, DEFAULT false)           │
-│ fecha_asignacion (TIMESTAMP)                  │
-│ UNIQUE(documento_id, revisor_id)              │
-└───────────────────────────────────────────────┘
-
--- Auditoría de Cambios
-┌───────────────────────────────────────────────┐
-│ auditoria_documentos                          │
-├───────────────────────────────────────────────┤
-│ id (PK, SERIAL)                               │
-│ documento_id (FK → documentos.id, CASCADE)    │
-│ usuario_id (INT - ref user_db)                │
-│ accion (VARCHAR - crear, subir_version,       │
-│         devolver, aprobar, actualizar,        │
-│         finalizar)                            │
-│ descripcion (TEXT)                            │
-│ datos_adicionales (JSON)                      │
-│ fecha_accion (TIMESTAMP)                      │
-└───────────────────────────────────────────────┘
-```
-
----
-
-### 3.3 Optimizaciones
-
-#### Índices Estratégicos
-
-```sql
--- documentos_db
-CREATE INDEX idx_documentos_estado ON documentos(estado);
-CREATE INDEX idx_documentos_creador ON documentos(usuario_creador_id);
-CREATE INDEX idx_documentos_fecha ON documentos(fecha_creacion DESC);
-CREATE INDEX idx_versiones_documento ON versiones_documento(documento_id, numero_version);
-CREATE INDEX idx_revisiones_compound ON revisiones(documento_id, version_revisada, revisor_id);
-CREATE INDEX idx_auditoria_documento ON auditoria_documentos(documento_id, fecha_accion DESC);
-
--- sancionatoria_db
-CREATE INDEX idx_expedientes_encargado ON expedientes(encargado_id);
-CREATE INDEX idx_expedientes_etapa ON expedientes(etapa_id);
-CREATE INDEX idx_expedientes_estado ON expedientes(estado);
-CREATE INDEX idx_involucrado_expediente ON involucrado_expediente(expediente_radicado);
-CREATE INDEX idx_involucrados_documento ON involucrados(numero_documento, tipo_documento);
-
--- user_db
-CREATE INDEX idx_usuarios_correo ON usuarios(correo);
-CREATE INDEX idx_usuarios_rol ON usuarios(rol_id);
-CREATE INDEX idx_notificaciones_usuario ON notificaciones(usuario_id, leida);
-CREATE INDEX idx_auditoria_usuario ON auditoria(usuario_id, fecha DESC);
-```
-
-#### Consultas Optimizadas (SQLAlchemy)
-
-```python
-# Lazy loading vs Eager loading
-
-# ❌ N+1 Problem
-documentos = await db.execute(select(Documento))
-for doc in documentos:
-    versiones = doc.versiones  # Query adicional por documento!
-
-# ✅ Eager loading con selectinload
-stmt = select(Documento).options(
-    selectinload(Documento.versiones),
-    selectinload(Documento.revisiones),
-    selectinload(Documento.asignaciones_revisores),
-    selectinload(Documento.auditoria)
-)
-documentos = await db.execute(stmt)  # Solo 2 queries total
-```
-
----
-
-## 4. Flujos de Negocio
-
-### 4.1 Gestión Documental
-
-#### Estados y Transiciones
-
-```
-┌────────────────────────────────────────────────────────────┐
-│           MÁQUINA DE ESTADOS - DOCUMENTO                   │
-└────────────────────────────────────────────────────────────┘
-
-                    ┌───────────────┐
-                    │    CREAR      │
-                    │  (v1 inicial) │
-                    └───────┬───────┘
-                            │
-                            ▼
-                    ┌───────────────┐
-              ┌────►│ en_revision   │
-              │     └───────┬───────┘
-              │             │
-              │             ├─► Todos aprueban
-              │             │   └─► ┌───────────┐
-              │             │       │ aprobado  │
-              │             │       └─────┬─────┘
-              │             │             │
-              │             │             ▼
-              │             │       ┌────────────┐
-              │             │       │finalizado  │
-              │             │       └────────────┘
-              │             │
-              │             └─► Al menos 1 devuelve
-              │                 └─► ┌───────────┐
-              │                     │ rechazado │
-              │                     └─────┬─────┘
-              │                           │
-              │                           ▼
-              │                     ┌──────────────┐
-              │                     │ Subir nueva  │
-              │                     │ versión (v2) │
-              │                     └──────┬───────┘
-              │                            │
-              └────────────────────────────┘
-                      (vuelve a en_revision)
-```
-
-#### Flujo Completo de Creación
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│         FLUJO: CREACIÓN Y REVISIÓN DE DOCUMENTO              │
-└──────────────────────────────────────────────────────────────┘
-
-[FASE 1: CREACIÓN]
-Usuario Creador
-  ↓
-1. POST /documents/create
-   - nombre: "Manual de Procedimientos"
-   - descripcion: "..."
-   - tipo_archivo: "pdf"
-   - archivo: <file>
-   - revisores_ids: [10, 15, 23]
-  ↓
-2. app-docs procesa:
-   ├─ Guardar archivo en uploads/documentos/
-   ├─ INSERT INTO documentos (estado: en_revision, version_actual: 1)
-   ├─ INSERT INTO versiones_documento (numero_version: 1)
-   ├─ INSERT INTO asignaciones_revisores (3 registros)
-   ├─ INSERT INTO auditoria_documentos (accion: crear)
-   └─ Enviar 3 notificaciones a revisores
-  ↓
-3. Response: {documento_id: 42, estado: "en_revision"}
-
-[FASE 2: REVISIÓN]
-Revisor #1 (ID: 10)
-  ↓
-4. GET /documents/detail/42
-   - Ver detalle completo
-   - Descargar versión 1
-  ↓
-5. POST /documents/review/42
-   - accion: "devolver"
-   - comentarios: "Corregir sección 3.2"
-  ↓
-6. app-docs procesa:
-   ├─ INSERT INTO revisiones (revisor_id: 10, estado: devuelto)
-   ├─ UPDATE documentos SET estado = rechazado, numero_devoluciones++
-   ├─ INSERT INTO auditoria_documentos (accion: devolver)
-   └─ Notificar al creador
-  ↓
-7. Estado: rechazado (contador: 1/3 rechazos)
-
-[FASE 3: CORRECCIÓN]
-Usuario Creador
-  ↓
-8. POST /documents/upload-version/42
-   - archivo: <file_corregido>
-   - comentario: "Sección 3.2 corregida"
-  ↓
-9. app-docs procesa:
-   ├─ INSERT INTO versiones_documento (numero_version: 2)
-   ├─ UPDATE documentos SET version_actual = 2, estado = en_revision
-   ├─ INSERT INTO auditoria_documentos (accion: actualizar)
-   └─ Notificar a los 3 revisores (nueva versión disponible)
-  ↓
-10. Estado: en_revision (versión 2)
-
-[FASE 4: APROBACIÓN]
-Revisor #1 (ID: 10)
-  ↓
-11. POST /documents/review/42
-    - accion: "aprobar"
-    - comentarios: "Correcciones OK"
-  ↓
-Revisor #2 (ID: 15)
-  ↓
-12. POST /documents/review/42
-    - accion: "aprobar"
-  ↓
-Revisor #3 (ID: 23)
-  ↓
-13. POST /documents/review/42
-    - accion: "aprobar"
-  ↓
-14. app-docs verifica:
-    ├─ COUNT revisiones aprobadas versión 2 = 3
-    ├─ COUNT total revisores asignados = 3
-    ├─ 3 == 3 → TODOS APROBARON
-    ├─ UPDATE documentos SET estado = aprobado
-    ├─ INSERT INTO auditoria_documentos (accion: aprobar)
-    └─ Notificar al creador
-  ↓
-15. Estado FINAL: aprobado (puede pasar a finalizado manualmente)
-```
-
----
-
-### 4.2 Expedientes Sancionatorios
-
-#### Flujo de Gestión
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│           FLUJO: EXPEDIENTE SANCIONATORIO                     │
-└──────────────────────────────────────────────────────────────┘
-
-[ETAPA 1: APERTURA]
-Operador
-  ↓
-1. POST /sanctioning/file/create
-   - nombre: "Caso deforestación Z"
-   - descripcion: "..."
-   - municipio_codigo: "05001"
-  ↓
-2. app-sancionatoria procesa:
-   ├─ Generar radicado: EXP-20251205-0042
-   ├─ INSERT INTO expedientes (etapa_id: 1, estado: activo)
-   └─ Response: {radicado: "EXP-20251205-0042"}
-
-[ETAPA 2: INVOLUCRADOS]
-Operador
-  ↓
-3. POST /sanctioning/involved/create
-   - numero_documento: 900123456
-   - tipo_documento: "NIT"
-   - digito_verificacion: "3"
-   - nombre: "Empresa XYZ S.A."
-   - expediente_radicado: "EXP-20251205-0042"
-   - rol: "demandado"
-  ↓
-4. app-sancionatoria verifica:
-   ├─ Calcular DV con algoritmo DIAN
-   ├─ DV calculado == 3? ✓
-   ├─ INSERT INTO involucrados
-   ├─ INSERT INTO involucrado_expediente
-   └─ Response: {involucrado_id: 152}
-
-[ETAPA 3: FORMULACIÓN DE CARGOS]
-Encargado
-  ↓
-5. POST /sanctioning/acto-admin/create
-   - tipo: "formulacion_cargos"
-   - numero: "FC-001-2025"
-   - fecha: "2025-12-05"
-   - descripcion: "..."
-  ↓
-6. Adjuntar documentos:
-   POST /sanctioning/document/upload
-   - archivo: "formulacion_cargos.pdf"
-  ↓
-7. Avanzar etapa:
-   PATCH /sanctioning/file/{radicado}
-   - etapa_id: 2  (Decisión de Fondo)
-
-[ETAPA 4: DECISIÓN]
-Encargado
-  ↓
-8. POST /sanctioning/decision/create
-   - tipo_decision: "sancion"
-   - descripcion: "Multa + Cierre"
-  ↓
-9. Notificaciones automáticas:
-   ├─ Sistema genera alerta (7 días antes vencimiento)
-   ├─ Email a involucrados
-   └─ Notificación en sistema
-
-[ETAPA 5: RECURSO (Opcional)]
-Involucrado
-  ↓
-10. Presenta recurso de reposición
-    ├─ Encargado recibe y procesa
-    └─ Etapa: 3 (Recurso)
-
-[ETAPA 6: CIERRE]
-Encargado
-  ↓
-11. PATCH /sanctioning/file/{radicado}
-    - estado: "cerrado"
-  ↓
-12. Archivo permanente en sistema
-```
-
----
-
-## 5. Implementación
-
-### 5.1 Stack Tecnológico
-
-#### Backend Core
-
-```yaml
-FastAPI:
-  version: ">=0.100.0"
-  features:
-    - Async/await nativo
-    - Validación con Pydantic
-    - OpenAPI/Swagger auto-generado
-    - Dependencias inyectables
-
-SQLAlchemy:
-  version: ">=2.0.0"
-  mode: Async
-  features:
-    - ORM con AsyncSession
-    - Migrations con Alembic
-    - Eager loading (selectinload)
-    - Relaciones optimizadas
-
-PostgreSQL:
-  version: ">=15.0"
-  features:
-    - JSON/JSONB fields
-    - Full-text search (opcional)
-    - Replicación (producción)
-    - Índices parciales
-
-python-jose:
-  use: JWT encoding/decoding
-  algorithm: HS256
-  features:
-    - Dual-key system
-    - Payload encryption
-
-httpx:
-  use: HTTP client microservicios
-  features:
-    - AsyncClient
-    - HTTP/2 support
-    - Connection pooling
-    - Timeout configuration
-```
-
-#### Frontend Core
-
-```yaml
-React:
-  version: "19.1.0"
-  features:
-    - Hooks (useState, useEffect, useContext)
-    - Functional components
-    - React Router DOM 7.7
-    - Context API para auth
-
-TypeScript:
-  version: "5.8+"
-  strict: true
-  features:
-    - Type safety
-    - Interfaces
-    - Generics
-
-TailwindCSS + DaisyUI:
-  versions: "4.1 + 5.0"
-  features:
-    - Utility-first CSS
-    - Componentes pre-diseñados
-    - Temas dark/light
-    - Responsive design
-
-Vite:
-  version: "7.0+"
-  features:
-    - HMR ultra-rápido
-    - Build optimizado
-    - Tree-shaking
-    - Code splitting
-```
-
----
-
-### 5.2 Instalación
-
-#### Prerrequisitos
+El único método soportado de despliegue es Docker Compose — no hay instrucciones de instalación manual de PostgreSQL/MinIO/ClamAV en el host; todo corre en contenedores.
 
 ```bash
-# Sistema operativo
-Windows 10/11, Linux (Ubuntu 20.04+), macOS
-
-# Software requerido
-Docker & Docker Compose 20+
-PostgreSQL 15+
-Python 3.11+
-Node.js 18+ y npm
-Git
-MinIO Server (ver instrucciones abajo)
-```
-
-#### Clonar Repositorio
-
-```bash
-git clone https://github.com/Julianrf527/SATC.git
+git clone <repo-url>
 cd SATC
+
+# Completar .env en la raíz (ver sección 5.3)
+
+docker compose build
+docker compose up -d
 ```
 
-#### Instalar MinIO Server
+Servicios accesibles tras el arranque (esperar a que todos los healthchecks pasen):
 
-MinIO no está incluido en el repositorio por su tamaño. Descárgalo manualmente:
+- Aplicación completa: `http://localhost:8000` (vía `nginx-lb`)
+- Swagger de cada microservicio: disponible internamente en su puerto (no expuesto al host por defecto; usar `docker compose exec` o exponer temporalmente para depurar)
 
-**Windows:**
+Para cambios de solo código en desarrollo, sincronizar con `docker cp` + `docker restart` es más rápido que rebuild; para cambios de dependencias o variables de entorno, `docker compose up -d --no-deps <service>` o rebuild completo. Ver `REFACTOR_PLAYBOOK.md` para el detalle del flujo usado durante el desarrollo.
 
-```powershell
-# Descargar MinIO Server para Windows
-cd minio-server
-Invoke-WebRequest -Uri "https://dl.min.io/server/minio/release/windows-amd64/minio.exe" -OutFile "minio.exe"
+### 4.3 Variables de Entorno
 
-# Verificar descarga
-Get-FileHash minio.exe -Algorithm SHA256
+Archivo `.env` único en la raíz del repo (gitignored), consumido por `docker-compose.yml`. Claves relevantes:
+
+```env
+# Postgres
+POSTGRES_PASSWORD=
+
+# Redis
+REDIS_PASSWORD=
+
+# MinIO
+MINIO_ROOT_USER=
+MINIO_ROOT_PASSWORD=
+
+# JWT / Gateway
+SECRET_KEY=
+SECRET_KEY_GATEWAY=
+SECRET_GATEWAY=
+
+# Secreto propio de cada microservicio (identidad este-oeste)
+USERS_SERVICE_SECRET=
+SANCTIONING_SERVICE_SECRET=
+DOCS_SERVICE_SECRET=
+INVOLVED_SERVICE_SECRET=
+INFRACTION_SERVICE_SECRET=
+
+# CORS
+CORS_ORIGINS=
+
+# Email (Google OAuth para SMTP)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REFRESH_TOKEN=
+SMTP_FROM=
+
+# Antivirus / uploads
+CLAMAV_ENABLED=true
+MAX_FILE_SIZE_MB=10
+
+# Rate limiting / caché (gateway)
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_PER_MINUTE=100
+CACHE_TYPE=redis
+CACHE_TTL=
 ```
 
-**Linux:**
+Generar secretos:
 
 ```bash
-cd minio-server
-wget https://dl.min.io/server/minio/release/linux-amd64/minio
-chmod +x minio
+python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-**macOS:**
+> **Producción:** estos secretos deben ser distintos a los usados en desarrollo, `COOKIE_SECURE` no debe sobreescribirse a `"false"` (el default seguro queda vigente), y `CORS_ORIGINS` debe apuntar al dominio real, no a `localhost`.
+
+### 4.4 Testing
+
+Cada microservicio (incluido api-gateway) trae su propia suite `pytest` + `pytest-asyncio` en `tests/`, contra una base de datos Postgres de pruebas dedicada (aislamiento por `TRUNCATE`, no por rollback). Los tokens de servicio en los fixtures se firman con el secreto real del caller esperado, igual que en producción.
 
 ```bash
-cd minio-server
-wget https://dl.min.io/server/minio/release/darwin-amd64/minio
-chmod +x minio
+docker compose exec app-users pytest
+docker compose exec app-docs pytest
+docker compose exec app-sancionatoria pytest
+docker compose exec app-involved pytest
+docker compose exec app-infraction pytest
+docker compose exec api-gateway pytest
 ```
 
-**Verificar instalación:**
-
-```bash
-# Windows
-.\minio.exe --version
-
-# Linux/macOS
-./minio --version
-```
-
-#### Configurar Bases de Datos
-
-```sql
--- Conectar a PostgreSQL como superusuario
-psql -U postgres
-
--- Crear bases de datos
-CREATE DATABASE user_db;
-CREATE DATABASE sancionatoria_db;
-CREATE DATABASE documentos_db;
-
--- Crear usuario específico (opcional pero recomendado)
-CREATE USER apicorp_user WITH PASSWORD 'secure_password_here';
-GRANT ALL PRIVILEGES ON DATABASE user_db TO apicorp_user;
-GRANT ALL PRIVILEGES ON DATABASE sancionatoria_db TO apicorp_user;
-GRANT ALL PRIVILEGES ON DATABASE documentos_db TO apicorp_user;
-
-\q
-```
-
-#### Instalar Dependencias Backend
-
-```bash
-# Instalar dependencias globales
-pip install -r requirements.txt
-
-# O instalar por microservicio (desarrollo)
-cd app-users
-pip install fastapi uvicorn sqlalchemy asyncpg python-jose[cryptography] \
-            python-multipart bcrypt pydantic python-dotenv httpx
-
-cd ../app-sancionatoria
-pip install fastapi uvicorn sqlalchemy asyncpg python-jose[cryptography] \
-            pydantic python-dotenv httpx
-
-cd ../app-docs
-pip install fastapi uvicorn sqlalchemy asyncpg python-jose[cryptography] \
-            python-multipart pydantic python-dotenv httpx aiofiles
-
-cd ../api-gateway
-pip install fastapi uvicorn python-jose[cryptography] python-dotenv httpx
-```
-
-#### Instalar Dependencias Frontend
+Frontend:
 
 ```bash
 cd frontend
-npm install
-```
-
----
-
-### 5.3 Configuración
-
-#### Variables de Entorno
-
-**app-users/.env**
-
-```env
-DATABASE_URL=postgresql+asyncpg://apicorp_user:secure_password@localhost:5432/user_db
-SECRET_KEY=<generar con: openssl rand -hex 32>
-SECRET_KEY_GATEWAY=<DEBE SER IDÉNTICA EN api-gateway>
-JWT_ALGORITHM=HS256
-
-# Email SMTP
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=tu-email@gmail.com
-SMTP_PASSWORD=tu-app-password
-```
-
-**app-sancionatoria/.env**
-
-```env
-DATABASE_URL=postgresql+asyncpg://apicorp_user:secure_password@localhost:5432/sancionatoria_db
-SECRET_KEY=<generar única para este servicio>
-SECRET_KEY_GATEWAY=<MISMA QUE app-users>
-JWT_ALGORITHM=HS256
-GATEWAY_URL=http://localhost:8000
-```
-
-**app-docs/.env**
-
-```env
-DATABASE_URL=postgresql+asyncpg://apicorp_user:secure_password@localhost:5432/documentos_db
-SECRET_KEY=<generar única para este servicio>
-SECRET_KEY_GATEWAY=<MISMA QUE app-users>
-JWT_ALGORITHM=HS256
-GATEWAY_URL=http://localhost:8000
-PERMISO_CREADOR_DOC=documento_crear
-PERMISO_REVISION_DOC=documento_revisar
-```
-
-**api-gateway/.env**
-
-```env
-SECRET_GATEWAY=<generar única>
-SECRET_KEY_GATEWAY=<MISMA QUE app-users>
-JWT_ALGORITHM=HS256
-```
-
-**frontend/.env** (opcional)
-
-```env
-VITE_API_URL=http://localhost:8000
-```
-
-#### Generar Secret Keys
-
-```bash
-# Linux/macOS
-openssl rand -hex 32
-
-# Windows (PowerShell)
--join ((65..90) + (97..122) + (48..57) | Get-Random -Count 32 | % {[char]$_})
-
-# Python
-python -c "import secrets; print(secrets.token_hex(32))"
-```
-
----
-
-### 5.4 Despliegue
-
-#### Desarrollo Local
-
-```bash
-# Terminal 1: API Gateway
-cd api-gateway
-uvicorn main:app --reload --port 8000
-
-# Terminal 2: app-users
-cd app-users
-uvicorn main:app --reload --port 8002
-
-# Terminal 3: app-sancionatoria
-cd app-sancionatoria
-uvicorn main:app --reload --port 8001
-
-# Terminal 4: app-docs
-cd app-docs
-uvicorn main:app --reload --port 8003
-
-# Terminal 5: Frontend
-cd frontend
-npm run dev
-```
-
-**Acceder a:**
-
-- Frontend: http://localhost:5173
-- Gateway: http://localhost:8000
-- Swagger Users: http://localhost:8002/docs
-- Swagger Sancionatoria: http://localhost:8001/docs
-- Swagger Docs: http://localhost:8003/docs
-
-#### Estructura de Archivos
-
-```
-uploads/
-├── documentos/           # Archivos de app-docs
-│   ├── 20251205_120530_manual.pdf
-│   └── 20251205_143022_politicas.docx
-└── expedientes/          # Archivos de app-sancionatoria
-    └── EXP-20251205-0042/
-        ├── formulacion_cargos.pdf
-        └── decision_fondo.pdf
+npx tsc --noEmit
+npx eslint src
 ```
 
 ---
 
 ## 📚 Documentación Adicional
 
-- **EJEMPLO_USO_PERMISOS.md**: Guía completa del sistema de permisos con ejemplos de código
-- **app-docs/GUIA_APLICACION.md**: Documentación específica del módulo de documentos
-- **app-sancionatoria/GUIA_APLICACION.md**: Documentación específica del módulo sancionatorio
+- **`REFACTOR_PLAYBOOK.md`**: playbook reusable de refactor aplicado a cada microservicio.
+- **`documentacion/`**: manuales versionados de arquitectura, seguridad y manual de usuario.
 
 ---
 
-## 🐛 Troubleshooting
-
-### Error: Cannot find SECRET_KEY_GATEWAY
-
-**Causa:** Variable de entorno no configurada o servidor no reiniciado.
-
-```bash
-# Verificar que existe
-cat app-users/.env | grep SECRET_KEY_GATEWAY
-cat api-gateway/.env | grep SECRET_KEY_GATEWAY
-
-# Deben ser idénticas
-# Reiniciar ambos servicios
-```
-
-### Error 403: No tienes permiso
-
-**Diagnóstico:**
-
-```sql
--- Verificar permisos del usuario
-SELECT u.correo, r.name, p.name, p.path
-FROM usuarios u
-JOIN roles r ON u.rol_id = r.id
-JOIN roles_permisos rp ON r.id = rp.rol_id
-JOIN permisos p ON rp.permiso_id = p.id
-WHERE u.id = <user_id>;
-```
-
-### Frontend no conecta con Backend
-
-**Verificar CORS:**
-
-```python
-# En main.py de cada servicio
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Ajustar según necesidad
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-```
-
----
-
-## 📄 Licencia
-
-Proyecto propietario - ApiCorp © 2025
-
----
-
-**Última actualización:** Diciembre 5, 2025  
-**Versión:** 1.0.0  
-**Mantenedor:** Equipo de Desarrollo ApiCorp
+**Mantenedor:** Julian David Rodriguez Fernandez

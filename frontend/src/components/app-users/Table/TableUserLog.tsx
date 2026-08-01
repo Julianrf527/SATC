@@ -5,14 +5,15 @@ type Auditoria = {
   id: number;
   usuario_id: number;
   usuario_nombre: string;
+  usuario_documento?: string | null;
   usuario_correo: string;
   tabla_afectada: string;
   tipo_operacion: string;
   descripcion: string;
   id_registro: string | null;
   fecha: string;
-  datos_anteriores: any;
-  datos_nuevos: any;
+  datos_anteriores: Record<string, unknown>;
+  datos_nuevos: Record<string, unknown>;
 };
 
 type Props = {
@@ -22,12 +23,10 @@ type Props = {
   usuarioFilter: string;
   tablaFilter: string;
   operacionFilter: string;
-  idRegistroFilter: string;
   fechaFilter: string;
   onUsuarioFilterChange: (value: string) => void;
   onTablaFilterChange: (value: string) => void;
   onOperacionFilterChange: (value: string) => void;
-  onIdRegistroFilterChange: (value: string) => void;
   onFechaFilterChange: (value: string) => void;
   currentPage?: number;
   totalRecords?: number;
@@ -40,8 +39,8 @@ type ModalData = {
   titulo: string;
   tipoOperacion: string;
   tablaAfectada: string;
-  datos_anteriores: any;
-  datos_nuevos: any;
+  datos_anteriores: Record<string, unknown>;
+  datos_nuevos: Record<string, unknown>;
 };
 
 export default function TableUserLog({
@@ -51,12 +50,10 @@ export default function TableUserLog({
   usuarioFilter,
   tablaFilter,
   operacionFilter,
-  idRegistroFilter,
   fechaFilter,
   onUsuarioFilterChange,
   onTablaFilterChange,
   onOperacionFilterChange,
-  onIdRegistroFilterChange,
   onFechaFilterChange,
   currentPage = 1,
   totalRecords = 0,
@@ -71,8 +68,10 @@ export default function TableUserLog({
   // Paginación: usar servidor o cliente según isServerPagination
   const startIndex = isServerPagination ? 0 : (page - 1) * rowsPerPage;
   const endIndex = isServerPagination ? data.length : startIndex + rowsPerPage;
-  const paginatedData = isServerPagination ? data : data.slice(startIndex, endIndex);
-  const totalPages = isServerPagination 
+  const paginatedData = isServerPagination
+    ? data
+    : data.slice(startIndex, endIndex);
+  const totalPages = isServerPagination
     ? Math.max(1, Math.ceil(totalRecords / rowsPerPage))
     : Math.max(1, Math.ceil(data.length / rowsPerPage));
   const displayedPage = isServerPagination ? currentPage : page;
@@ -166,14 +165,6 @@ export default function TableUserLog({
                   <th>
                     <input
                       type="text"
-                      placeholder="Filtrar ID..."
-                      className="input input-bordered input-sm w-full"
-                      disabled
-                    />
-                  </th>
-                  <th>
-                    <input
-                      type="text"
                       placeholder="Filtrar usuario..."
                       className="input input-bordered input-sm w-full"
                       value={usuarioFilter}
@@ -207,21 +198,7 @@ export default function TableUserLog({
                     </select>
                   </th>
                   <th>
-                    <input
-                      type="text"
-                      placeholder="Filtrar descripción..."
-                      className="input input-bordered input-sm w-full"
-                      disabled
-                    />
-                  </th>
-                  <th>
-                    <input
-                      type="text"
-                      placeholder="Filtrar ID registro..."
-                      className="input input-bordered input-sm w-full"
-                      value={idRegistroFilter}
-                      onChange={(e) => onIdRegistroFilterChange(e.target.value)}
-                    />
+                    <div className="text-xs text-base-content/60">-</div>
                   </th>
                   <th>
                     <input
@@ -266,98 +243,90 @@ export default function TableUserLog({
                 ) : (
                   paginatedData.map((audit) => {
                     // Determinar si el nombre es un placeholder (Usuario {ID})
-                    const isPlaceholder = audit.usuario_nombre.startsWith("Usuario ") && 
-                                         !isNaN(Number(audit.usuario_nombre.split(" ")[1]));
-                    
+                    const isPlaceholder =
+                      audit.usuario_nombre.startsWith("Usuario ") &&
+                      !isNaN(Number(audit.usuario_nombre.split(" ")[1]));
+
                     return (
-                    <tr key={audit.id} className="hover">
-                      <td className="text-center">{audit.id}</td>
-                      <td>
-                        <div className="flex flex-col">
-                          {isPlaceholder ? (
-                            <>
-                              <span className="font-semibold text-warning">
-                                ID: {audit.usuario_id}
-                              </span>
-                              <span className="text-xs text-warning/70">
-                                ⚠ Nombre no disponible
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="font-semibold">
-                                {audit.usuario_nombre}
-                              </span>
-                              <span className="text-xs opacity-60">
-                                ID: {audit.usuario_id}
-                              </span>
-                              {audit.usuario_correo && (
-                                <span className="text-xs opacity-60">
-                                  {audit.usuario_correo}
+                      <tr key={audit.id} className="hover">
+                        <td>
+                          <div className="flex flex-col">
+                            {isPlaceholder ? (
+                              <>
+                                <span className="font-semibold text-warning">
+                                  {audit.usuario_documento || "Usuario desconocido"}
                                 </span>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </td>
-                      <td className="text-center">
-                        <span className="badge badge-outline">
-                          {audit.tabla_afectada}
-                        </span>
-                      </td>
-                      <td className="text-center">
-                        <span
-                          className={`badge ${getOperationBadge(
-                            audit.tipo_operacion
-                          )}`}
-                        >
-                          {translateOperation(audit.tipo_operacion)}
-                        </span>
-                      </td>
-                      <td>
-                        <div
-                          className="max-w-xs truncate"
-                          title={audit.descripcion}
-                        >
-                          {audit.descripcion}
-                        </div>
-                      </td>
-                      <td className="text-center">
-                        {audit.id_registro || (
-                          <span className="text-base-content/40">-</span>
-                        )}
-                      </td>
-                      <td className="text-center text-sm">
-                        {formatDate(audit.fecha)}
-                      </td>
-                      <td className="text-center">
-                        <button
-                          className="btn btn-ghost btn-xs"
-                          onClick={() => openModal(audit)}
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
+                                <span className="text-xs text-warning/70">
+                                  ⚠ Nombre no disponible
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-semibold">
+                                  {audit.usuario_nombre}
+                                </span>
+                                {audit.usuario_documento && (
+                                  <span className="text-xs opacity-60">
+                                    {audit.usuario_documento}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </td>
+                        <td className="text-center">
+                          <span className="badge badge-outline">
+                            {audit.tabla_afectada}
+                          </span>
+                        </td>
+                        <td className="text-center">
+                          <span
+                            className={`badge ${getOperationBadge(
+                              audit.tipo_operacion,
+                            )}`}
                           >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                            />
-                          </svg>
-                          Ver Detalles
-                        </button>
-                      </td>
-                    </tr>
+                            {translateOperation(audit.tipo_operacion)}
+                          </span>
+                        </td>
+                        <td>
+                          <div
+                            className="max-w-xs truncate"
+                            title={audit.descripcion}
+                          >
+                            {audit.descripcion}
+                          </div>
+                        </td>
+                        <td className="text-center text-sm">
+                          {formatDate(audit.fecha)}
+                        </td>
+                        <td className="text-center">
+                          <button
+                            className="btn btn-ghost btn-xs"
+                            onClick={() => openModal(audit)}
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                              />
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                              />
+                            </svg>
+                            Ver Detalles
+                          </button>
+                        </td>
+                      </tr>
                     );
                   })
                 )}
@@ -373,7 +342,11 @@ export default function TableUserLog({
               <>
                 Mostrando {paginatedData.length} de {totalRecords} registro
                 {totalRecords !== 1 ? "s" : ""}
-                {" (Página "}{displayedPage}{" de "}{totalPages}{")}"}
+                {" (Página "}
+                {displayedPage}
+                {" de "}
+                {totalPages}
+                {")}"}
               </>
             ) : (
               <>
@@ -438,6 +411,7 @@ export default function TableUserLog({
           tablaAfectada={modalData.tablaAfectada}
           datosAnteriores={modalData.datos_anteriores}
           datosNuevos={modalData.datos_nuevos}
+          auditScope="sanctioning"
         />
       )}
     </>

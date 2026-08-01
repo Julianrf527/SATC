@@ -8,7 +8,7 @@ class VersionDocumento(Base):
     __tablename__ = "versiones_documento"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    documento_id = Column(Integer, ForeignKey("documentos.id", ondelete="CASCADE"))
+    documento_id = Column(Integer, ForeignKey("documentos.id", ondelete="CASCADE"), index=True)
     numero_version = Column(Integer)
     archivo_url = Column(String(500))
     archivo_nombre_original = Column(String(255))
@@ -20,5 +20,4 @@ class VersionDocumento(Base):
     )
     comentario = Column(Text)
 
-    # Relación inversa
     documento = relationship("Documento", back_populates="versiones")

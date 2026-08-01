@@ -8,9 +8,9 @@ class Revision(Base):
     __tablename__ = "revisiones"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    documento_id = Column(Integer, ForeignKey("documentos.id", ondelete="CASCADE"))
+    documento_id = Column(Integer, ForeignKey("documentos.id", ondelete="CASCADE"), index=True)
     version_revisada = Column(Integer)
-    revisor_id = Column(Integer)
+    revisor_id = Column(Integer, index=True)
     estado_revision = Column(String(20))
     comentarios = Column(Text)
     fecha_revision = Column(
@@ -18,5 +18,4 @@ class Revision(Base):
         default=lambda: datetime.now(ZoneInfo("America/Bogota"))
     )
 
-    # Relación inversa
     documento = relationship("Documento", back_populates="revisiones")

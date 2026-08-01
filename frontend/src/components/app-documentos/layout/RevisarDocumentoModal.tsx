@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { API_CONFIG, apiCall } from "../../../utils/api";
+import { API_CONFIG, apiCall, formatApiErrorDetail } from "../../../utils/api";
 import { X, CheckCircle, XCircle, Eye } from "lucide-react";
 
 type Props = {
@@ -29,7 +29,6 @@ export default function RevisarDocumentoModal({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Detectar tema
   useEffect(() => {
     const updateTheme = () => {
       const currentTheme =
@@ -53,7 +52,6 @@ export default function RevisarDocumentoModal({
     return () => observer.disconnect();
   }, []);
 
-  // Reset form
   useEffect(() => {
     if (isOpen) {
       setEstadoRevision("aprobado");
@@ -108,15 +106,10 @@ export default function RevisarDocumentoModal({
         onSuccess();
         handleClose();
       } else {
-        let errorMessage = "Error al registrar la revisión";
-
-        if (res.detail) {
-          if (typeof res.detail === "string") {
-            errorMessage = res.detail;
-          } else if (Array.isArray(res.detail)) {
-            errorMessage = res.detail.map((err: any) => err.msg).join(", ");
-          }
-        }
+        const errorMessage = formatApiErrorDetail(
+          res.detail,
+          "Error al registrar la revisión",
+        );
 
         setErrors((prev) => ({
           ...prev,
@@ -124,7 +117,6 @@ export default function RevisarDocumentoModal({
         }));
       }
     } catch (error) {
-      /* console.error("Error al revisar documento:", error); */
       setErrors((prev) => ({
         ...prev,
         general: "Error de conexión al revisar el documento",

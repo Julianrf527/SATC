@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
-import MailInput from "../../Input/MailInput";
+import MailInput from "../../Common/Input/MailInput";
 
 type Props = {
   setActiveForm: (form: "email" | "code") => void;
@@ -46,7 +46,6 @@ export default function EmailForm({
         setToast({ message: res.detail || "Error inesperado", type: "error" });
       }
     } catch (error) {
-      /* console.error("Error al hacer fetch:", error); */
       setToast({
         message: "Error de conexión, intenta más tarde",
         type: "error",

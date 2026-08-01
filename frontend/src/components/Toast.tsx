@@ -20,11 +20,11 @@ export default function Toast({
     setVisible(true);
     const timer = setTimeout(() => setVisible(false), duration);
     return () => clearTimeout(timer);
-  }, [id, duration]); // 👈 depende de id, no de message
+    // Depende de id y no de message: dos toasts con el mismo texto deben re-mostrarse.
+  }, [id, duration]);
 
   if (!visible) return null;
 
-  // Convertir mensaje a string si es un objeto
   const displayMessage = typeof message === 'string' 
     ? message 
     : message?.detail || message?.message || JSON.stringify(message);

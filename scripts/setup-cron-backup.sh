@@ -1,39 +1,43 @@
 #!/bin/sh
 # ====================================
-# SATC - Setup Cron para Backups Automáticos
+# SATC - Setup de Backups Automáticos
 # ====================================
-# Este script configura cron para ejecutar backups cada 30 minutos
+# Loop simple cada 30 minutos (más compatible que crond en esta imagen).
+# Retención escalonada: ver backup-all.sh / backup-minio.sh
 # ====================================
-
-set -e
 
 echo "========================================="
 echo "SATC - Configurando Backups Automáticos"
-echo "Frecuencia: Cada 30 minutos"
+echo "Frecuencia: cada 30 minutos"
+echo "Retención: 48x30min (~24h) / 30 daily (~1 mes) / 12 weekly (~3 meses)"
 echo "========================================="
 
-# Crear directorios de backup si no existen
-mkdir -p /backups/postgres-users
-mkdir -p /backups/postgres-sanctioning
-mkdir -p /backups/postgres-docs
-mkdir -p /backups/minio
+for svc in postgres-users postgres-sanctioning postgres-docs postgres-involved postgres-infraction; do
+  mkdir -p "/backups/$svc/30min" "/backups/$svc/daily" "/backups/$svc/weekly"
+done
+mkdir -p /backups/minio/30min /backups/minio/daily /backups/minio/weekly
 
-# Crear log file
 touch /var/log/backup-cron.log
 
-# Ejecutar un backup inicial inmediatamente
 echo "Ejecutando backup inicial..."
-sh /backup-all.sh
+sh /backup-all.sh 2>&1 | tee -a /var/log/backup-cron.log
 
 echo ""
-echo "Backup inicial completado"
-echo "Iniciando loop de backups cada 30 minutos..."
+echo "Backup inicial completado. Iniciando loop cada 30 minutos..."
 echo ""
 
-# Loop simple cada 30 minutos (más compatible que crond en esta imagen)
 while true; do
   sleep 1800
-  echo "=========================================" >> /var/log/backup-cron.log 2>&1
-  echo "Iniciando backup programado: $(date)" >> /var/log/backup-cron.log 2>&1
-  sh /backup-all.sh >> /var/log/backup-cron.log 2>&1
+  {
+    echo "========================================="
+    echo "Backup programado: $(date)"
+    sh /backup-all.sh
+  } >> /var/log/backup-cron.log 2>&1
+
+  # Evita que el log crezca sin límite
+  if [ "$(wc -c < /var/log/backup-cron.log)" -gt 10485760 ]; then
+    tail -n 2000 /var/log/backup-cron.log > /var/log/backup-cron.log.tmp
+    mv /var/log/backup-cron.log.tmp /var/log/backup-cron.log
+    echo "[$(date)] Log rotado (excedía 10MB)" >> /var/log/backup-cron.log
+  fi
 done

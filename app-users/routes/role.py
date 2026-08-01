@@ -2,23 +2,22 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update, insert
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 import logging
 import os
 
 #----- DB -----
 
-from db.deps import get_db
+from db.deps import get_db_managed
 from db.models.rol import Rol
 from db.models.permiso import Permiso
 from db.models.rol_permiso import RolPermiso
 from db.models.usuario import Usuario
+from core.permissions import Permisos
 
 router = APIRouter()
 SECRET_KEY = os.getenv("SECRET_KEY")
-PERMISO_ROL = os.getenv("PERMISO_ROL")
-
-# ---------- LOGGER ------------
+PERMISO_ROL = Permisos.PERMISO_ROL
 
 logging.basicConfig(
     level=logging.INFO,
@@ -28,738 +27,560 @@ logger = logging.getLogger(__name__)
 
 # ---------- MODELOS ----------
 class RolCreate(BaseModel):
-    name: str
-    permission: list[int]
+    # El frontend envía {"nombre", "permisos"}; internamente el campo se llama
+    # `permission`. populate_by_name permite aceptar tanto el alias como el
+    # nombre del campo.
+    model_config = ConfigDict(populate_by_name=True)
+
+    nombre: str
+    permission: list[int] = Field(..., alias="permisos")
 
 class PerCreate(BaseModel):
     name:str
     menu_path: str
 
 class Permission(BaseModel):
-    name: str
+    permission_name: str
     user_id: int
 
-#----------- FUNCIONES ------------
-
 from utils.insertLog import insert_auditoria
-from utils.verify_gateway_token import verify_gateway_token
-
-async def get_user_permissions(user_id: int, db: AsyncSession) -> set[int]:
-    """
-    Obtiene el conjunto de IDs de permisos que posee un usuario.
-    
-    Args:
-        user_id: Número de documento del usuario
-        db: Sesión de base de datos
-    
-    Returns:
-        set[int]: Conjunto de IDs de permisos del usuario
-    """
-    stmt = (
-        select(Permiso.id)
-        .select_from(RolPermiso)
-        .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-        .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-        .where(Usuario.numero_documento == user_id)
-    )
-    
-    result = await db.execute(stmt)
-    permission_ids = result.scalars().all()
-    
-    return set(permission_ids)
+from utils.verify_token import verify_gateway_token, verify_service_token
+from utils.permission_crud import (
+    get_role_permissions,
+    get_user_permission_names,
+    get_user_permission_avaliable,
+    get_user_rol_avaliable,
+    get_permissions_by_rol_id,
+)
 
 
-async def get_role_permissions(rol_id: int, db: AsyncSession) -> set[int]:
-    """
-    Obtiene el conjunto de IDs de permisos que tiene un rol.
-    
-    Args:
-        rol_id: ID del rol
-        db: Sesión de base de datos
-    
-    Returns:
-        set[int]: Conjunto de IDs de permisos del rol
-    """
-    stmt = (
-        select(RolPermiso.permiso_id)
-        .where(RolPermiso.rol_id == rol_id)
-    )
-    
-    result = await db.execute(stmt)
-    permission_ids = result.scalars().all()
-    
-    return set(permission_ids)
+async def _get_user_perm_names(rol_id: int, db: AsyncSession) -> set[str]:
+    """Obtiene nombres de permisos del rol desde BD."""
+    perms = await get_permissions_by_rol_id(rol_id, db)
+    return {p["name"] for p in perms}
+
 
 # ---------- ENDPOINTS ----------
 
 @router.get("/all")
 async def cargar_roles(
     request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        user_id = verify_gateway_token(request)
+    db: AsyncSession = Depends(get_db_managed),
+    ):
+    token_data = verify_gateway_token(request)
+    user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
 
-        stmr = select(Rol)
-        result = await db.execute(stmr)
-        result = result.all()
+    if PERMISO_ROL not in user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permiso para ver los roles"
+        )
 
-        data = [{"id": rol[0].id, "name": rol[0].nombre} for rol in result]
+    data = await get_user_rol_avaliable(user_permission_names, db)
 
-        return JSONResponse(content={"ok": True, "data": data}, status_code=200)
-
-    except Exception as e:
-        logger.error(f"Error en /rol: {e}")
-        raise HTTPException(status_code=500, detail="Error en el servidor")
+    return JSONResponse(content={"ok": True, "data": data}, status_code=200)
 
 @router.get("/permissions")
 async def cargar_permisos(
     request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        user_id = verify_gateway_token(request)
+    db: AsyncSession = Depends(get_db_managed),
+    ):
+    token_data = verify_gateway_token(request)
+    user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
 
-        stmr = select(Permiso)
-        result = await db.execute(stmr)
-        result = result.all()
+    if PERMISO_ROL not in user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permiso para ver los permisos"
+        )
 
-        data = [
-            {"id": permiso[0].id, "name": permiso[0].nombre, "menu_path": permiso[0].menu_path}
-            for permiso in result
-        ]
+    permission = await get_permissions_by_rol_id(token_data["rol_id"], db)
 
-        return JSONResponse(content={"ok": True, "data": data}, status_code=200)
-
-    except Exception as e:
-        logger.error(f"Error en /permissions: {e}")
-        raise HTTPException(status_code=500, detail="Error en el servidor")
+    return JSONResponse(content={"ok": True, "data": permission}, status_code=200)
 
 @router.get("/role-permissions")
 async def cargar_permiso_y_roles(
     request: Request,
-    db: AsyncSession = Depends(get_db)
-):
-    try:
-        user_id = verify_gateway_token(request)
+    db: AsyncSession = Depends(get_db_managed)
+    ):
+    token_data = verify_gateway_token(request)
+    user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
 
-        stmr = select(Rol.id, Rol.nombre, RolPermiso.permiso_id).join(RolPermiso, Rol.id == RolPermiso.rol_id)
-        result = await db.execute(stmr)
-        result = result.all()
+    if PERMISO_ROL not in user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permiso para ver los roles y permisos"
+        )
 
-        data = {}
-        for rol_id, rol_nombre, permiso_id in result:
-            if rol_id not in data:
-                data[rol_id] = {"id": rol_id, "name": rol_nombre, "permission": []}
-            data[rol_id]["permission"].append(permiso_id)
-        data = list(data.values())
+    data = await get_user_rol_avaliable(user_permission_names, db)
+    logger.info(f"Permisos permitidos: {data}")
 
-        return JSONResponse(content={"ok": True, "data": data}, status_code=200)
-    except Exception as e:
-        logger.error(f"Error en /rol-permiso: {e}")
-        raise HTTPException(status_code=500, detail="Error en el servidor")
+    return JSONResponse(content={"ok": True, "data": data}, status_code=200)
 
-@router.post("/add/")
+@router.post("/add")
 async def agregar_rol(
     request: Request,
     rol: RolCreate,
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        user_id = verify_gateway_token(request)
-        stmt = (
-            select(1)
-            .select_from(RolPermiso)
-            .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-            .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-            .where(
-                Usuario.numero_documento == user_id,
-                Permiso.nombre == PERMISO_ROL
-            )
-            .limit(1)
+    db: AsyncSession = Depends(get_db_managed),
+    ):
+    token_data = verify_gateway_token(request)
+    user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
+
+    if PERMISO_ROL not in user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permiso para crear roles"
         )
 
-        tiene_permiso = await db.scalar(stmt)
-
-        if not tiene_permiso:
-            raise HTTPException(status_code=403, detail="No cuenta con permisos")
-
-        # VALIDACIÓN DE ESCALADA DE PRIVILEGIOS:
-        # El usuario solo puede asignar permisos que él mismo posee
-        user_permissions = await get_user_permissions(user_id, db)
-        requested_permissions = set(rol.permission)
-        
-        permisos_no_autorizados = requested_permissions - user_permissions
-        
-        if permisos_no_autorizados:
-            # Obtener nombres de permisos no autorizados para mensaje claro
-            stmt = select(Permiso.nombre).where(Permiso.id.in_(permisos_no_autorizados))
-            result = await db.execute(stmt)
-            nombres_permisos = result.scalars().all()
-            
-            raise HTTPException(
-                status_code=403, 
-                detail=f"No puede asignar permisos que no posee: {', '.join(nombres_permisos)}"
-            )
-
-        # Verificar si el rol ya existe
-        stmr = select(Rol).where(Rol.nombre == rol.name)
-        result = await db.execute(stmr)
-        existing_rol = result.scalar_one_or_none()
-        if existing_rol:
-            raise HTTPException(status_code=400, detail="El rol ya existe")
-
-        # Crear nuevo rol
-        stmt = (
-            insert(Rol)
-            .values(nombre=rol.name)
-            .returning(Rol.id)
+    # Anti escalada: no se pueden otorgar a un rol permisos que el actor no tiene.
+    requested_permission_names = await get_user_permission_names(rol.permission, db)
+    if requested_permission_names - user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail=f"No puede asignar permisos que no posee."
         )
 
-        result = await db.execute(stmt)
-        new_rol_id = result.scalar()
+    stmr = select(Rol).where(Rol.nombre == rol.nombre)
+    result = await db.execute(stmr)
+    existing_rol = result.scalar_one_or_none()
+    if existing_rol:
+        logger.warning(f"[agregar_rol] El rol '{rol.nombre}' ya existe")
+        raise HTTPException(status_code=400, detail="El rol ya existe")
 
-        # Asignar permisos al nuevo rol
-        for permiso_id in rol.permission:
-            rp = RolPermiso(rol_id=new_rol_id, permiso_id=permiso_id)
-            db.add(rp)
+    stmt = (
+        insert(Rol)
+        .values(nombre=rol.nombre)
+        .returning(Rol.id)
+    )
 
-        # Preparar datos para auditoría
-        datos_nuevos = {
-            "id": new_rol_id,
-            "nombre": rol.name,
-            "permisos": rol.permission
-        }
+    result = await db.execute(stmt)
+    new_rol_id = result.scalar()
+    logger.info(f"[agregar_rol] Nuevo rol creado con ID: {new_rol_id}")
 
-        # Guardar auditoría
-        audit_result = await insert_auditoria(
-            db=db,
-            usuario_id=user_id,
-            tabla_afectada="rol",
-            tipo_operacion="INSERT",
-            descripcion=f"Creacion de rol ID {new_rol_id} a nombre '{rol.name}'",
-            id_registro=str(new_rol_id),
-            datos_nuevos=datos_nuevos
-        )
+    for permiso_id in rol.permission:
+        logger.info(f"[agregar_rol] Asignando permiso {permiso_id} al rol {new_rol_id}")
+        rp = RolPermiso(rol_id=new_rol_id, permiso_id=permiso_id)
+        db.add(rp)
 
-        if not audit_result["ok"]:
-            await db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Error al guardar registro de auditoría"
-            )
+    datos_nuevos = {
+        "id": new_rol_id,
+        "nombre": rol.nombre,
+        "permisos": rol.permission
+    }
 
-        # Commit de todo
-        await db.commit()
+    audit_result = await insert_auditoria(
+        db=db,
+        usuario_id=token_data["user_id"],
+        tipo_evento="CREACION_ROL",
+        resultado="EXITOSO",
+        detalle=f"Creacion de rol ID {new_rol_id} a nombre '{rol.nombre}'",
+        datos_nuevos=datos_nuevos
+    )
 
-        return JSONResponse(content={"ok": True}, status_code=201)
-
-    except HTTPException:
-        raise
-    except Exception as e:
+    if not audit_result["ok"]:
+        logger.error(f"[agregar_rol] Error al guardar registro de auditoría: {audit_result}")
         await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Error al guardar registro de auditoría"
+        )
+
+    await db.commit()
+    logger.info(f"[agregar_rol] Rol creado exitosamente")
+    return JSONResponse(content={"ok": True}, status_code=201)
 
 @router.put("/update/{rol_id}")
 async def actualizar_rol(
     request: Request,
     rol_id: int,
     data: RolCreate,
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        user_id = verify_gateway_token(request)
+    db: AsyncSession = Depends(get_db_managed),
+    ):
+    token_data = verify_gateway_token(request)
+    user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
 
-        stmt = (
-            select(1)
-            .select_from(RolPermiso)
-            .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-            .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-            .where(
-                Usuario.numero_documento == user_id,
-                Permiso.nombre == PERMISO_ROL
-            )
-            .limit(1)
+    if PERMISO_ROL not in user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permiso para actualizar roles"
         )
 
-        tiene_permiso = await db.scalar(stmt)
-
-        if not tiene_permiso:
-            raise HTTPException(status_code=401, detail="No cuenta con permisos")
-
-        # VALIDACIÓN DE ESCALADA DE PRIVILEGIOS:
-        # El usuario solo puede asignar permisos que él mismo posee
-        user_permissions = await get_user_permissions(user_id, db)
-        requested_permissions = set(data.permission)
-        
-        permisos_no_autorizados = requested_permissions - user_permissions
-        
-        if permisos_no_autorizados:
-            stmt = select(Permiso.nombre).where(Permiso.id.in_(permisos_no_autorizados))
-            result = await db.execute(stmt)
-            nombres_permisos = result.scalars().all()
-            
-            raise HTTPException(
-                status_code=403, 
-                detail=f"No puede asignar permisos que no posee: {', '.join(nombres_permisos)}"
-            )
-
-        # Verificar si el rol existe y obtener datos anteriores
-        stmr = select(Rol).where(Rol.id == rol_id)
-        result = await db.execute(stmr)
-        existing_rol = result.scalar_one_or_none()
-        if not existing_rol:
-            raise HTTPException(status_code=404, detail="El rol no existe")
-
-        # Obtener permisos anteriores
-        stmr_permisos = select(RolPermiso.permiso_id).where(RolPermiso.rol_id == rol_id)
-        result_permisos = await db.execute(stmr_permisos)
-        permisos_anteriores = [row[0] for row in result_permisos.fetchall()]
-
-        datos_anteriores = {
-            "id": existing_rol.id,
-            "nombre": existing_rol.nombre,
-            "permisos": permisos_anteriores
-        }
-
-        # Verificar duplicado de nombre
-        stmr = select(Rol).where(Rol.nombre == data.name, Rol.id != rol_id)
-        result = await db.execute(stmr)
-        duplicate_rol = result.scalar_one_or_none()
-        if duplicate_rol:
-            raise HTTPException(status_code=400, detail="El nombre de rol ya está en uso")
-
-        # Actualizar nombre del rol
-        stmr = update(Rol).where(Rol.id == rol_id).values(nombre=data.name)
-        await db.execute(stmr)
-
-        # Actualizar permisos del rol
-        await db.execute(delete(RolPermiso).where(RolPermiso.rol_id == rol_id))
-        for permiso_id in data.permission:
-            rol_permiso = RolPermiso(rol_id=rol_id, permiso_id=permiso_id)
-            db.add(rol_permiso)
-
-        datos_nuevos = {
-            "id": rol_id,
-            "nombre": data.name,
-            "permisos": data.permission
-        }
-
-        # Guardar auditoría
-        audit_result = await insert_auditoria(
-            db=db,
-            usuario_id=user_id,
-            tabla_afectada="rol",
-            tipo_operacion="UPDATE",
-            descripcion=f"Actualización de rol ID {rol_id} a nombre '{data.name}'",
-            id_registro=str(rol_id),
-            datos_anteriores=datos_anteriores,
-            datos_nuevos=datos_nuevos
+    # Anti escalada: no se pueden otorgar a un rol permisos que el actor no tiene.
+    requested_permission_names = await get_user_permission_names(data.permission, db)
+    if requested_permission_names - user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail=f"No puede asignar permisos que no posee."
         )
 
-        if not audit_result["ok"]:
-            await db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Error al guardar registro de auditoría"
-            )
+    stmr = select(Rol).where(Rol.id == rol_id)
+    result = await db.execute(stmr)
+    existing_rol = result.scalar_one_or_none()
+    if not existing_rol:
+        raise HTTPException(status_code=404, detail="El rol no existe")
 
-        # Commit de todo
-        await db.commit()
+    stmr_permisos = select(RolPermiso.permiso_id).where(RolPermiso.rol_id == rol_id)
+    result_permisos = await db.execute(stmr_permisos)
+    permisos_anteriores = [row[0] for row in result_permisos.fetchall()]
 
-        return JSONResponse(content={"ok": True}, status_code=200)
+    datos_anteriores = {
+        "id": existing_rol.id,
+        "nombre": existing_rol.nombre,
+        "permisos": permisos_anteriores
+    }
 
-    except HTTPException:
-        raise
-    except Exception as e:
+    stmr = select(Rol).where(Rol.nombre == data.nombre, Rol.id != rol_id)
+    result = await db.execute(stmr)
+    duplicate_rol = result.scalar_one_or_none()
+    if duplicate_rol:
+        raise HTTPException(status_code=400, detail="El nombre de rol ya está en uso")
+
+    stmr = update(Rol).where(Rol.id == rol_id).values(nombre=data.nombre)
+    await db.execute(stmr)
+
+    # Se reemplaza el set completo de permisos: borrar y volver a insertar.
+    await db.execute(delete(RolPermiso).where(RolPermiso.rol_id == rol_id))
+    for permiso_id in data.permission:
+        rol_permiso = RolPermiso(rol_id=rol_id, permiso_id=permiso_id)
+        db.add(rol_permiso)
+
+    datos_nuevos = {
+        "id": rol_id,
+        "nombre": data.nombre,
+        "permisos": data.permission
+    }
+
+    audit_result = await insert_auditoria(
+        db=db,
+        usuario_id=token_data["user_id"],
+        tipo_evento="ACTUALIZACION_ROL",
+        resultado="EXITOSO",
+        detalle=f"Actualización de rol ID {rol_id} a nombre '{data.nombre}'",
+        datos_anteriores=datos_anteriores,
+        datos_nuevos=datos_nuevos
+    )
+
+    if not audit_result["ok"]:
         await db.rollback()
-        logger.error(f"Error en el servidor durante update rol: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Error al guardar registro de auditoría"
+        )
+
+    await db.commit()
+
+    return JSONResponse(content={"ok": True}, status_code=200)
 
 @router.delete("/delete/{rol_id}")
-async def borrar_rol(
+async def eliminar_rol(
     request: Request,
     rol_id: int,
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        user_id = verify_gateway_token(request)
-        stmt = (
-            select(1)
-            .select_from(RolPermiso)
-            .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-            .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-            .where(
-                Usuario.numero_documento == user_id,
-                Permiso.nombre == PERMISO_ROL
-            )
-            .limit(1)
+    db: AsyncSession = Depends(get_db_managed),
+    ):
+    token_data = verify_gateway_token(request)
+    user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
+
+    if PERMISO_ROL not in user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permiso para eliminar roles"
         )
 
-        tiene_permiso = await db.scalar(stmt)
+    stmr = select(Rol).where(Rol.id == rol_id)
+    result = await db.execute(stmr)
+    existing_rol = result.scalar_one_or_none()
+    if not existing_rol:
+        raise HTTPException(status_code=404, detail="El rol no existe")
 
-        if not tiene_permiso:
-            raise HTTPException(status_code=401, detail="No cuenta con permisos")
+    # Un rol en uso no se borra: dejaría usuarios sin rol (FK ON DELETE SET NULL).
+    stmt_usuarios = select(Usuario.id).where(Usuario.rol_id == rol_id).limit(1)
+    usuario_asignado = await db.scalar(stmt_usuarios)
 
-        # Verificar si el rol existe y obtener datos anteriores
-        stmr = select(Rol).where(Rol.id == rol_id)
-        result = await db.execute(stmr)
-        existing_rol = result.scalar_one_or_none()
-        if not existing_rol:
-            raise HTTPException(status_code=404, detail="El rol no existe")
-
-        # Obtener permisos anteriores
-        stmr_permisos = select(RolPermiso.permiso_id).where(RolPermiso.rol_id == rol_id)
-        result_permisos = await db.execute(stmr_permisos)
-        permisos_anteriores = [row[0] for row in result_permisos.fetchall()]
-
-        datos_anteriores = {
-            "id": existing_rol.id,
-            "nombre": existing_rol.nombre,
-            "permisos": permisos_anteriores
-        }
-
-        # Eliminar permisos asociados al rol
-        await db.execute(delete(RolPermiso).where(RolPermiso.rol_id == rol_id))
-
-        # Eliminar el rol
-        await db.execute(delete(Rol).where(Rol.id == rol_id))
-
-        # Guardar auditoría
-        audit_result = await insert_auditoria(
-            db=db,
-            usuario_id=user_id,
-            tabla_afectada="rol",
-            tipo_operacion="DELETE",
-            descripcion=f"Eliminación de rol ID {rol_id} con nombre '{existing_rol.nombre}'",
-            id_registro=str(rol_id),
-            datos_anteriores=datos_anteriores
+    if usuario_asignado:
+        raise HTTPException(
+            status_code=400,
+            detail="No se puede eliminar el rol porque está asignado a uno o más usuarios"
         )
 
-        if not audit_result["ok"]:
-            await db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Error al guardar registro de auditoría"
-            )
+    stmt = (
+        select(
+            Permiso.id,
+            Permiso.nombre,
+            Permiso.menu_path
+        )
+        .join(RolPermiso, RolPermiso.permiso_id == Permiso.id)
+        .where(RolPermiso.rol_id == rol_id)
+    )
 
-        # Commit de todo
-        await db.commit()
+    result = await db.execute(stmt)
+    rows = result.all()
 
-        return JSONResponse(content={"ok": True}, status_code=200)
+    # Anti escalada: no se puede borrar un rol con permisos que el actor no tiene.
+    permissions_name = {row.nombre for row in rows}
+    if permissions_name - user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail=f"No puede eliminar un rol que tiene permisos que no posee."
+        )
 
-    except HTTPException:
-        raise
-    except Exception as e:
+    data = {
+        "rol_id": existing_rol.id,
+        "rol_name": existing_rol.nombre,
+        "permisos": [
+            {
+                "id": row.id,
+                "nombre": row.nombre,
+                "menu_path": row.menu_path
+            }
+            for row in rows
+        ]
+    }
+
+    await db.execute(delete(RolPermiso).where(RolPermiso.rol_id == rol_id))
+    await db.execute(delete(Rol).where(Rol.id == rol_id))
+
+    audit_result = await insert_auditoria(
+        db=db,
+        usuario_id=token_data["user_id"],
+        tipo_evento="ELIMINACION_ROL",
+        resultado="EXITOSO",
+        detalle=f"Eliminación de rol ID {rol_id} con nombre '{existing_rol.nombre}'",
+        datos_anteriores=data
+    )
+
+    if not audit_result["ok"]:
         await db.rollback()
-        logger.error(f"Error en el servidor durante delete rol: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Error al guardar registro de auditoría"
+        )
+
+    await db.commit()
+
+    return JSONResponse(content={"ok": True}, status_code=200)
 
 @router.post("/permission/add")
 async def agregar_permiso(
     request: Request,
     permission: PerCreate,
-    db: AsyncSession = Depends(get_db)
-):
-    try:
-        user_id = verify_gateway_token(request)
+    db: AsyncSession = Depends(get_db_managed)
+    ):
+    token_data = verify_gateway_token(request)
+    user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
 
-        stmt = (
-            select(1)
-            .select_from(RolPermiso)
-            .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-            .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-            .where(
-                Usuario.numero_documento == user_id,
-                Permiso.nombre == PERMISO_ROL
-            )
-            .limit(1)
+    if PERMISO_ROL not in user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permiso para crear permisos"
         )
-        tiene_permiso = await db.scalar(stmt)
 
-        if not tiene_permiso:
-            raise HTTPException(status_code=401, detail="No cuenta con permisos")
+    stmt = select(Permiso.id).where(Permiso.nombre == permission.name)
+    permiso_id = await db.scalar(stmt)
 
-        
-        stmt = select(Permiso.id).where(Permiso.nombre == permission.name)
-        permiso_id = await db.scalar(stmt)
+    if permiso_id:
+        raise HTTPException(status_code=400, detail="El nombre de permiso ya está en uso")
 
-        if permiso_id:
-            raise HTTPException(status_code=400, detail="El nombre de permiso ya está en uso")
+    stmt = (
+        insert(Permiso)
+        .values(nombre = permission.name, menu_path = permission.menu_path)
+        .returning(Permiso.id)
+    )
+    permiso_id = await db.scalar(stmt)
+    # El creador se auto-asigna el permiso nuevo: si no, quedaría un permiso que
+    # nadie puede administrar (las rutas exigen poseerlo para editarlo/borrarlo).
+    rp = RolPermiso(rol_id=token_data["rol_id"], permiso_id=permiso_id)
+    db.add(rp)
 
-        stmt = select(Permiso.id).where(Permiso.menu_path == permission.menu_path)
-        permiso_id = await db.scalar(stmt)
+    datos_nuevos = {
+        "id": permiso_id,
+        "nombre": permission.name,
+        "menu_path": permission.menu_path,
+    }
 
-        if permiso_id:
-            raise HTTPException(status_code=400, detail="El menu_path de permiso ya está en uso")
+    audit_result = await insert_auditoria(
+        db=db,
+        usuario_id=token_data["user_id"],
+        tipo_evento="CREACION_PERMISO",
+        resultado="EXITOSO",
+        detalle=f"Creacion de permiso ID {permiso_id} con nombre '{permission.name}'",
+        datos_nuevos=datos_nuevos
+    )
 
-        stmt = (
-            insert(Permiso)
-            .values(nombre = permission.name, menu_path = permission.menu_path)
-            .returning(Permiso.id)
-        )
-        permiso_id = await db.scalar(stmt)
-
-        # Preparar datos para auditoría
-        datos_nuevos = {
-            "id": permiso_id,
-            "nombre": permission.name,
-            "menu_path": permission.menu_path,
-        }
-
-        # Guardar auditoría
-        audit_result = await insert_auditoria(
-            db=db,
-            usuario_id=user_id,
-            tabla_afectada="permiso",
-            tipo_operacion="INSERT",
-            descripcion=f"Creacion de permioso ID {permiso_id} con nombre '{permission.name}'",
-            id_registro=str(permiso_id),
-            datos_nuevos=datos_nuevos
-        )
-        
-        if not audit_result["ok"]:
-            await db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Error al guardar registro de auditoría"
-            )
-
-        # Commit de todo
-        await db.commit()
-        return JSONResponse(content={"ok": True, "permiso_id": permiso_id}, status_code=201)
-
-    except Exception as e:
+    if not audit_result["ok"]:
         await db.rollback()
-        logger.error(f"Error en el servidor durante create permission: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Error al guardar registro de auditoría"
+        )
+
+    await db.commit()
+    return JSONResponse(content={"ok": True, "permiso_id": permiso_id}, status_code=201)
 
 @router.put("/permission/update/{permiso_id}")
 async def actualizar_permiso(
     request: Request,
     permiso_id: int,
     permission: PerCreate,
-    db: AsyncSession = Depends(get_db)
-):
-    try:
-        user_id = verify_gateway_token(request)
+    db: AsyncSession = Depends(get_db_managed)
+    ):
+    token_data = verify_gateway_token(request)
+    user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
 
-        # Verificar permisos del usuario
-        stmt = (
-            select(1)
-            .select_from(RolPermiso)
-            .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-            .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-            .where(
-                Usuario.numero_documento == user_id,
-                Permiso.nombre == PERMISO_ROL
-            )
-            .limit(1)
-        )
-        tiene_permiso = await db.scalar(stmt)
-
-        if not tiene_permiso:
-            raise HTTPException(status_code=401, detail="No cuenta con permisos")
-
-        # Verificar que el permiso existe
-        stmt = select(Permiso).where(Permiso.id == permiso_id)
-        permiso_existente = await db.scalar(stmt)
-
-        if not permiso_existente:
-            raise HTTPException(status_code=404, detail="Permiso no encontrado")
-
-        # Guardar datos antiguos para auditoría
-        datos_antiguos = {
-            "id": permiso_existente.id,
-            "nombre": permiso_existente.nombre,
-            "menu_path": permiso_existente.menu_path,
-        }
-
-        # Verificar que el nuevo nombre no esté en uso (excepto por el mismo permiso)
-        stmt = select(Permiso.id).where(
-            Permiso.nombre == permission.name,
-            Permiso.id != permiso_id
-        )
-        nombre_en_uso = await db.scalar(stmt)
-
-        if nombre_en_uso:
-            raise HTTPException(status_code=400, detail="El nombre de permiso ya está en uso")
-
-        # Verificar que el nuevo menu_path no esté en uso (excepto por el mismo permiso)
-        stmt = select(Permiso.id).where(
-            Permiso.menu_path == permission.menu_path,
-            Permiso.id != permiso_id
-        )
-        path_en_uso = await db.scalar(stmt)
-
-        if path_en_uso:
-            raise HTTPException(status_code=400, detail="El menu_path de permiso ya está en uso")
-
-        # Actualizar el permiso
-        stmt = (
-            update(Permiso)
-            .where(Permiso.id == permiso_id)
-            .values(
-                nombre=permission.name,
-                menu_path=permission.menu_path
-            )
-        )
-        await db.execute(stmt)
-
-        # Preparar datos nuevos para auditoría
-        datos_nuevos = {
-            "id": permiso_id,
-            "nombre": permission.name,
-            "menu_path": permission.menu_path,
-        }
-
-        # Guardar auditoría
-        audit_result = await insert_auditoria(
-            db=db,
-            usuario_id=user_id,
-            tabla_afectada="permiso",
-            tipo_operacion="UPDATE",
-            descripcion=f"Actualización de permiso ID {permiso_id} con nombre '{permission.name}'",
-            id_registro=str(permiso_id),
-            datos_anteriores=datos_antiguos,
-            datos_nuevos=datos_nuevos
+    if PERMISO_ROL not in user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permiso para actualizar permisos"
         )
 
-        if not audit_result["ok"]:
-            await db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Error al guardar registro de auditoría"
-            )
+    stmt = select(Permiso).where(Permiso.id == permiso_id)
+    permiso_existente = await db.scalar(stmt)
 
-        # Commit de todo
-        await db.commit()
-        return JSONResponse(content={"ok": True, "message": "Permiso actualizado correctamente"}, status_code=200)
+    if not permiso_existente:
+        raise HTTPException(status_code=404, detail="Permiso no encontrado")
 
-    except HTTPException:
-        raise
-    except Exception as e:
+    if permiso_existente.nombre not in user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail="No puede actualizar un permiso que no posee"
+        )
+
+    stmt = select(Permiso.id).where(
+        Permiso.nombre == permission.name,
+        Permiso.id != permiso_id
+    )
+    nombre_en_uso = await db.scalar(stmt)
+
+    if nombre_en_uso:
+        raise HTTPException(status_code=400, detail="El nombre de permiso ya está en uso")
+
+    stmt = (
+        update(Permiso)
+        .where(Permiso.id == permiso_id)
+        .values(
+            nombre=permission.name,
+            menu_path=permission.menu_path
+        )
+    )
+    await db.execute(stmt)
+
+    datos_antiguos = {
+        "id": permiso_existente.id,
+        "nombre": permiso_existente.nombre,
+        "menu_path": permiso_existente.menu_path,
+    }
+
+    datos_nuevos = {
+        "id": permiso_id,
+        "nombre": permission.name,
+        "menu_path": permission.menu_path,
+    }
+
+    audit_result = await insert_auditoria(
+        db=db,
+        usuario_id=token_data["user_id"],
+        tipo_evento="ACTUALIZACION_PERMISO",
+        resultado="EXITOSO",
+        detalle=f"Actualización de permiso ID {permiso_id} con nombre '{permission.name}'",
+        datos_anteriores=datos_antiguos,
+        datos_nuevos=datos_nuevos
+    )
+
+    if not audit_result["ok"]:
         await db.rollback()
-        logger.error(f"Error en el servidor durante update permission: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail="Error al guardar registro de auditoría"
+        )
+
+    await db.commit()
+    return JSONResponse(content={"ok": True, "message": "Permiso actualizado correctamente"}, status_code=200)
 
 @router.delete("/permission/delete/{permiso_id}")
 async def eliminar_permiso(
     request: Request,
     permiso_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    try:
-        user_id = verify_gateway_token(request)
+    db: AsyncSession = Depends(get_db_managed)
+    ):
+    token_data = verify_gateway_token(request)
+    user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
 
-        # Verificar permisos del usuario
-        stmt = (
-            select(1)
-            .select_from(RolPermiso)
-            .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-            .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-            .where(
-                Usuario.numero_documento == user_id,
-                Permiso.nombre == PERMISO_ROL
-            )
-            .limit(1)
-        )
-        tiene_permiso = await db.scalar(stmt)
-
-        if not tiene_permiso:
-            raise HTTPException(status_code=401, detail="No cuenta con permisos")
-
-        # Verificar que el permiso existe
-        stmt = select(Permiso).where(Permiso.id == permiso_id)
-        permiso_existente = await db.scalar(stmt)
-
-        if not permiso_existente:
-            raise HTTPException(status_code=404, detail="Permiso no encontrado")
-
-        # Verificar si el permiso está siendo usado por algún rol
-        stmt = select(RolPermiso.rol_id).where(RolPermiso.permiso_id == permiso_id).limit(1)
-        permiso_en_uso = await db.scalar(stmt)
-
-        if permiso_en_uso:
-            raise HTTPException(
-                status_code=400, 
-                detail="No se puede eliminar el permiso porque está asignado a uno o más roles"
-            )
-
-        # Guardar datos antiguos para auditoría
-        datos_antiguos = {
-            "id": permiso_existente.id,
-            "nombre": permiso_existente.nombre,
-            "menu_path": permiso_existente.menu_path,
-        }
-
-        # Eliminar el permiso
-        stmt = delete(Permiso).where(Permiso.id == permiso_id)
-        await db.execute(stmt)
-
-        # Guardar auditoría
-        audit_result = await insert_auditoria(
-            db=db,
-            usuario_id=user_id,
-            tabla_afectada="permiso",
-            tipo_operacion="DELETE",
-            descripcion=f"Eliminación de permiso ID {permiso_id} con nombre '{permiso_existente.nombre}'",
-            id_registro=str(permiso_id),
-            datos_antiguos=datos_antiguos
+    if PERMISO_ROL not in user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permiso para eliminar permisos"
         )
 
-        if not audit_result["ok"]:
-            await db.rollback()
-            raise HTTPException(
-                status_code=500,
-                detail="Error al guardar registro de auditoría"
-            )
+    stmt = select(Permiso).where(Permiso.id == permiso_id)
+    permiso_existente = await db.scalar(stmt)
 
-        # Commit de todo
-        await db.commit()
-        return JSONResponse(content={"ok": True, "message": "Permiso eliminado correctamente"}, status_code=200)
+    if not permiso_existente:
+        raise HTTPException(status_code=404, detail="Permiso no encontrado")
 
-    except HTTPException:
-        raise
-    except Exception as e:
+    if permiso_existente.nombre not in user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail="No puede eliminar un permiso que no posee."
+        )
+
+    stmt_roles = select(RolPermiso.rol_id).where(RolPermiso.permiso_id == permiso_id)
+    result_roles = await db.execute(stmt_roles)
+    roles_afectados = result_roles.scalars().all()
+    cantidad_roles = len(roles_afectados)
+
+    await db.execute(delete(RolPermiso).where(RolPermiso.permiso_id == permiso_id))
+
+    datos_antiguos = {
+        "id": permiso_existente.id,
+        "nombre": permiso_existente.nombre,
+        "menu_path": permiso_existente.menu_path,
+        "roles_afectados": cantidad_roles,
+    }
+
+    stmt = delete(Permiso).where(Permiso.id == permiso_id)
+    await db.execute(stmt)
+
+    audit_result = await insert_auditoria(
+        db=db,
+        usuario_id=token_data["user_id"],
+        tipo_evento="ELIMINACION_PERMISO",
+        resultado="EXITOSO",
+        detalle=f"Eliminación de permiso ID {permiso_id} con nombre '{permiso_existente.nombre}'. Removido de {cantidad_roles} rol(es).",
+        datos_anteriores=datos_antiguos
+    )
+
+    if not audit_result["ok"]:
         await db.rollback()
-        logger.error(f"Error en el servidor durante delete permission: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    
-@router.get("/permission/verify")
+        raise HTTPException(
+            status_code=500,
+            detail="Error al guardar registro de auditoría"
+        )
+
+    await db.commit()
+
+    msg = f"Permiso eliminado correctamente"
+    if cantidad_roles > 0:
+        msg += f" (removido de {cantidad_roles} rol(es))"
+
+    return JSONResponse(content={"ok": True, "message": msg}, status_code=200)
+
+@router.post("/verify")
 async def verificar_permiso(
-    name: str,
-    user_id: int,
-    db: AsyncSession = Depends(get_db)
-):
-    try:
-        stmt = (
-            select(1)
-            .select_from(RolPermiso)
-            .join(Permiso, Permiso.id == RolPermiso.permiso_id)
-            .join(Usuario, Usuario.rol_id == RolPermiso.rol_id)
-            .where(
-                Usuario.numero_documento == user_id,
-                Permiso.nombre == name
-            )
-            .limit(1)
-        )
+    request: Request,
+    permission: Permission,
+    db: AsyncSession = Depends(get_db_managed)
+    ):
+    verify_service_token(request)
 
-        tiene_permiso = await db.scalar(stmt)
+    stmt = (
+        select(Permiso.nombre)
+        .join(RolPermiso, RolPermiso.permiso_id == Permiso.id)
+        .join(Rol, Rol.id == RolPermiso.rol_id)
+        .join(Usuario, Usuario.rol_id == Rol.id)
+        .where(Usuario.id == permission.user_id)
+    )
+    permissions_name = await db.scalars(stmt)
+    permissions_name = permissions_name.all()
 
-        if tiene_permiso is None:
-            return JSONResponse(
-                status_code=403,
-                content={"ok": False, "message": "No cuenta con permisos"}
-            )
+    tiene_permiso = permission.permission_name in permissions_name
 
-        return JSONResponse(
-            status_code=200,
-            content={"ok": True, "message": "Permiso válido"}
-        )
-
-    except Exception as e:
-        logger.error(f"Error en permission.verify: {e}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
-
-    
+    return JSONResponse(content={"ok": True, "tiene_permiso": tiene_permiso}, status_code=200)

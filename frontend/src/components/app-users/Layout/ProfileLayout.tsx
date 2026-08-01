@@ -1,26 +1,25 @@
 import React, { useEffect, useState } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import { useNavigate } from "react-router-dom";
-import TitleForm from "../../Label/TitleForm";
-import Input from "../../Input/Input";
-import MailInput from "../../Input/MailInput";
-import PasswordInput from "../../Input/PasswordInput";
+import TitleForm from "../../Common/Label/TitleForm";
+import Input from "../../Common/Input/Input";
+import MailInput from "../../Common/Input/MailInput";
+import PasswordInput from "../../Common/Input/PasswordInput";
 
 type Props = {
   setToast: (toast: {
-    id: number; 
-    message: string; 
+    id: number;
+    message: string;
     type: "success" | "error";
-    }) => void;
+  }) => void;
 };
 
-export default function ProfileLayout({setToast}: Props) {
+export default function ProfileLayout({ setToast }: Props) {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingData, setIsSavingData] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
 
-  // Datos del usuario
   const [firstName, setFirstName] = useState("");
   const [middleName, setMiddleName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -34,13 +33,11 @@ export default function ProfileLayout({setToast}: Props) {
   const [secondLastNameOriginal, setSecondLastNameOriginal] = useState("");
   const [emailOriginal, setEmailOriginal] = useState("");
 
-  // Contraseñas
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
-
-  // Cargar datos del usuario al montar el componente
   useEffect(() => {
     const fetchUserData = async () => {
       try {
@@ -67,11 +64,18 @@ export default function ProfileLayout({setToast}: Props) {
           setSecondLastNameOriginal(segundoApellido);
           setEmailOriginal(correo);
         } else {
-          setToast({id: Date.now(), message:"Error al cargar los datos del usuario",type: "error"});
+          setToast({
+            id: Date.now(),
+            message: "Error al cargar los datos del usuario",
+            type: "error",
+          });
         }
       } catch (error) {
-        /* console.error("Error al cargar datos:", error); */
-        setToast({id: Date.now(), message: "Error al cargar los datos del usuario",type: "error"});
+        setToast({
+          id: Date.now(),
+          message: "Error al cargar los datos del usuario",
+          type: "error",
+        });
       } finally {
         setIsLoading(false);
       }
@@ -92,27 +96,32 @@ export default function ProfileLayout({setToast}: Props) {
         method: "POST",
       });
     } catch (error) {
-      /* console.error("Error al cerrar sesión:", error); */
     } finally {
       // Redirigir al login independientemente del resultado
       navigate("/login");
     }
   };
 
-  // Actualizar datos básicos
   const handleUpdateData = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (isSavingData) return;
 
-    // Validaciones
     if (!firstName.trim()) {
-      setToast({id: Date.now(), message: "El primer nombre es obligatorio",type: "error"});
+      setToast({
+        id: Date.now(),
+        message: "El primer nombre es obligatorio",
+        type: "error",
+      });
       return;
     }
 
     if (!lastName.trim()) {
-      setToast({id: Date.now(), message:"El primer apellido es obligatorio",type: "error"});
+      setToast({
+        id: Date.now(),
+        message: "El primer apellido es obligatorio",
+        type: "error",
+      });
       return;
     }
 
@@ -133,24 +142,34 @@ export default function ProfileLayout({setToast}: Props) {
       });
 
       if (res.ok) {
-        setToast({id: Date.now(), message: "Datos actualizados. Cerrando sesión...", type: "success"});
+        setToast({
+          id: Date.now(),
+          message: "Datos actualizados. Cerrando sesión...",
+          type: "success",
+        });
 
         // Esperar 2 segundos para que se vea el mensaje y luego hacer logout
         setTimeout(() => {
           handleLogout();
         }, 2000);
       } else {
-        setToast({id: Date.now(),message: res.detail || "Error al actualizar datos",type: "error"});
+        setToast({
+          id: Date.now(),
+          message: res.detail || "Error al actualizar datos",
+          type: "error",
+        });
         setIsSavingData(false);
       }
     } catch (error) {
-      /* console.error("Error al actualizar datos:", error); */
-      setToast({id: Date.now(),message: "Error de conexión al actualizar datos",type: "error"});
+      setToast({
+        id: Date.now(),
+        message: "Error de conexión al actualizar datos",
+        type: "error",
+      });
       setIsSavingData(false);
     }
   };
 
-  // Cambiar contraseña
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -158,9 +177,8 @@ export default function ProfileLayout({setToast}: Props) {
 
     setPasswordError("");
 
-    // Validaciones
-    if (!newPassword || !confirmPassword) {
-      setPasswordError("Ambos campos son obligatorios");
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordError("Todos los campos son obligatorios");
       return;
     }
 
@@ -177,28 +195,39 @@ export default function ProfileLayout({setToast}: Props) {
     setIsSavingPassword(true);
 
     try {
-      const res = await apiCall(API_CONFIG.ENDPOINTS.PASSWORD_RESET, {
+      const res = await apiCall(API_CONFIG.ENDPOINTS.PASSWORD_CHANGE, {
         method: "POST",
         body: JSON.stringify({
-          email: email,
+          current_password: currentPassword,
           new_password: newPassword,
         }),
       });
 
       if (res.ok) {
-        setToast({id: Date.now(), message: "Contraseña actualizada. Cerrando sesión...",type: "success"});
+        setToast({
+          id: Date.now(),
+          message: "Contraseña actualizada. Cerrando sesión...",
+          type: "success",
+        });
 
         // Esperar 2 segundos para que se vea el mensaje y luego hacer logout
         setTimeout(() => {
           handleLogout();
         }, 2000);
       } else {
-        setToast({id: Date.now(),message:res.detail || "Error al cambiar contraseña",type: "error"});
+        setToast({
+          id: Date.now(),
+          message: res.detail || "Error al cambiar contraseña",
+          type: "error",
+        });
         setIsSavingPassword(false);
       }
     } catch (error) {
-      /* console.error("Error al cambiar contraseña:", error); */
-      setToast({id: Date.now(),message:"Error de conexión al cambiar contraseña",type: "error"});
+      setToast({
+        id: Date.now(),
+        message: "Error de conexión al cambiar contraseña",
+        type: "error",
+      });
       setIsSavingPassword(false);
     }
   };
@@ -410,6 +439,13 @@ export default function ProfileLayout({setToast}: Props) {
                   >
                     <div className="flex-1 space-y-4">
                       <PasswordInput
+                        title="Contraseña actual"
+                        placeHolder="Ingresa tu contraseña actual"
+                        value={currentPassword}
+                        onChange={setCurrentPassword}
+                      />
+
+                      <PasswordInput
                         title="Nueva contraseña"
                         placeHolder="Mínimo 8 caracteres"
                         value={newPassword}
@@ -479,6 +515,7 @@ export default function ProfileLayout({setToast}: Props) {
                         type="button"
                         className="btn btn-ghost w-full gap-2"
                         onClick={() => {
+                          setCurrentPassword("");
                           setNewPassword("");
                           setConfirmPassword("");
                           setPasswordError("");

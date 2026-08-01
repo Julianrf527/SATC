@@ -1,38 +1,35 @@
-
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import insert, select
-from datetime import datetime
-import os
+from sqlalchemy import insert
+from zoneinfo import ZoneInfo
 
-
-# -------- MODELS ------------
 from db.models.auditoria import Auditoria
 
 
-# --------- FUNTIONS --------
-
 async def insert_auditoria(
     db: AsyncSession,
-    usuario_id: int,
-    descripcion: str,
-    tabla_afectada: str | None = None,
-    tipo_operacion: str | None = None,
-    id_registro: str | None = None,
+    usuario_id: int | None,
+    tipo_evento: str,
+    resultado: str = "EXITOSO",
+    detalle: str | None = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
     datos_anteriores: dict | None = None,
     datos_nuevos: dict | None = None,
 ):
     try:
         stmt = insert(Auditoria).values(
             usuario_id=usuario_id,
-            tabla_afectada=tabla_afectada,
-            tipo_operacion=tipo_operacion,
-            descripcion=descripcion,
-            id_registro=id_registro,
+            tipo_evento=tipo_evento,
+            resultado=resultado,
+            detalle=detalle,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            fecha=datetime.now(ZoneInfo("America/Bogota")),
             datos_anteriores=datos_anteriores,
             datos_nuevos=datos_nuevos,
         ).returning(Auditoria.id)
-        
+
         result = await db.execute(stmt)
         inserted_id = result.scalar()
         return {"ok": True, "id": inserted_id}

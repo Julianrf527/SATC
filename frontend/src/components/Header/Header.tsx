@@ -5,7 +5,6 @@ import ImgProfile from "../Image/ImgProfile";
 import Notifications from "./Notifications";
 
 type Props = {
-  userId: number;
   setTheme: (theme: "emerald" | "dark") => void;
   permission: { name: string; path: string }[];
 };
@@ -17,7 +16,7 @@ type FormattedPermission = {
   path: string;
 };
 
-export default function Header({ userId, setTheme, permission }: Props) {
+export default function Header({ setTheme, permission = [] }: Props) {
   const [notification, setNotification] = useState<any[] | null>(null);
   const [isDark, setIsDark] = useState(() => {
     return localStorage.getItem("theme") === "dark";
@@ -91,7 +90,7 @@ export default function Header({ userId, setTheme, permission }: Props) {
       return;
     }
 
-    const formatted = formatPermissions(permission);
+    const formatted = formatPermissions(permission || []);
     const searchLower = searchValue.toLowerCase();
 
     const filtered = formatted.filter(
@@ -120,55 +119,67 @@ export default function Header({ userId, setTheme, permission }: Props) {
   }, []);
 
   useEffect(() => {
-    async function GetNotifications(userId: number) {
-      try {
-        const res = await apiCall(API_CONFIG.ENDPOINTS.NOTIFICATION(userId), {
-          method: "GET",
-        });
-        if (res.ok) {
-          setNotification(res.data);
+    const endpoint = API_CONFIG.ENDPOINTS.NOTIFICATION_STREAM;
+    let baseUrl =
+      window.ENV?.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "";
+    if (baseUrl.endsWith("/")) baseUrl = baseUrl.slice(0, -1);
+    const streamUrl = `${baseUrl}${endpoint}`;
+
+    let eventSource: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const connect = () => {
+      eventSource = new window.EventSource(streamUrl, {
+        withCredentials: true,
+      });
+
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.notifications) {
+            setNotification(data.notifications);
+          }
+        } catch (e) {
+          // Puede ser heartbeat u otro mensaje
         }
-      } catch (error) {
-        /* console.log(error); */
-      }
-    }
+      };
 
-    // Cargar notificaciones iniciales
-    GetNotifications(userId);
+      eventSource.onerror = () => {
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
 
-    // Polling cada 60 segundos (optimizado para reducir carga)
-    const interval = setInterval(() => {
-      // Solo hacer polling si la pestaña está visible
-      if (!document.hidden) {
-        GetNotifications(userId);
-      }
-    }, 30000); // 30 segundos
-
-    // Listener para cargar notificaciones cuando el usuario vuelve a la pestaña
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        GetNotifications(userId);
-      }
+        // Reintento simple para mantener el stream activo
+        if (!reconnectTimer) {
+          reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            connect();
+          }, 2000);
+        }
+      };
     };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    connect();
 
     return () => {
-      clearInterval(interval);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+      if (eventSource) {
+        eventSource.close();
+      }
     };
-  }, [userId]);
+  }, []);
 
   const logout = async () => {
     try {
-      const res = await apiCall(API_CONFIG.ENDPOINTS.AUTH_LOGOUT, {
+      await apiCall(API_CONFIG.ENDPOINTS.AUTH_LOGOUT, {
         method: "POST",
       });
-      if (res.ok) {
-        window.location.href = "/login";
-      }
     } catch (error) {
-      /* console.log(error); */
+    } finally {
+      window.location.href = "/login";
     }
   };
 
@@ -177,7 +188,6 @@ export default function Header({ userId, setTheme, permission }: Props) {
     setTheme(newTheme);
     setIsDark(!isDark);
     localStorage.setItem("theme", newTheme);
-    // Disparar evento para que los modales detecten el cambio
     window.dispatchEvent(
       new CustomEvent("themeChange", { detail: { theme: newTheme } }),
     );
@@ -490,9 +500,8 @@ export default function Header({ userId, setTheme, permission }: Props) {
           {/* Notifications - siempre mostrar, incluso sin notificaciones */}
           {notification !== null && (
             <Notifications
-              userId={userId}
-              notification={notification}
-              key={notification.length}
+              notifications={notification}
+              onUpdate={setNotification}
             />
           )}
 

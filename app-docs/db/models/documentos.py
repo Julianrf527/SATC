@@ -11,12 +11,16 @@ class Documento(Base):
     nombre = Column(String(255))
     descripcion = Column(Text)
     tipo_archivo = Column(String(10))
-    usuario_creador_id = Column(Integer)
+    # Se filtra por creador en /list y /stats
+    usuario_creador_id = Column(Integer, index=True)
+    # Se ordena por fecha en /list
     fecha_creacion = Column(
         TIMESTAMP(timezone=True),
-        default=lambda: datetime.now(ZoneInfo("America/Bogota"))
+        default=lambda: datetime.now(ZoneInfo("America/Bogota")),
+        index=True
     )
-    estado = Column(String(20))
+    # Se filtra por estado en /list y /stats
+    estado = Column(String(20), index=True)
     version_actual = Column(Integer)
     numero_devoluciones = Column(Integer, default=0)
     fecha_ultima_actualizacion = Column(
@@ -24,7 +28,6 @@ class Documento(Base):
         default=lambda: datetime.now(ZoneInfo("America/Bogota"))
     )
 
-    # Relaciones para optimización con selectinload
     versiones = relationship("VersionDocumento", back_populates="documento", lazy="select")
     revisiones = relationship("Revision", back_populates="documento", lazy="select")
     asignaciones_revisores = relationship("AsignacionRevisor", back_populates="documento", lazy="select")

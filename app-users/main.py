@@ -2,35 +2,35 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+from routes import auth, notification, role, email
+from routes import user_crud, user_profile, user_auditoria, user_internal
+from utils.redis_session import init_redis, close_redis, redis_health_check
+from db.database import init_db
+
 import os
-from routes import auth, notification, role, user, email
-from utils.session_cleanup import start_cleanup_task
-from utils.redis_session import get_redis, close_redis, redis_health_check
+
 
 app = FastAPI()
 
-# Startup event - iniciar tarea de limpieza de sesiones y conectar Redis
 @app.on_event("startup")
 async def startup_event():
-    # Iniciar cleanup de sesiones PostgreSQL (fallback)
-    start_cleanup_task()
-    
-    # Conectar Redis
     try:
-        redis_client = await get_redis()
-        if redis_client:
-            print("Redis conectado exitosamente para sesiones")
-        else:
-            print("Redis deshabilitado - usando PostgreSQL para sesiones")
+        await init_db()
+        print("Tablas de user_db inicializadas correctamente")
+        from db.seeds import seed_initial_data
+        await seed_initial_data()
     except Exception as e:
-        print(f"Error conectando Redis: {e}")
+        import traceback
+        print(f"Error inicializando BD: {e}")
+        print(f"Stacktrace completo: {traceback.format_exc()}")
 
-# Shutdown event - cerrar Redis
+    await init_redis()
+
 @app.on_event("shutdown")
 async def shutdown_event():
     await close_redis()
 
-# Middleware para forzar charset UTF-8 en todas las respuestas
+# Fuerza charset UTF-8: sin esto los acentos llegan mal a algunos clientes.
 class CharsetMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -40,7 +40,6 @@ class CharsetMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(CharsetMiddleware)
 
-# CORS configurable desde variables de entorno
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:8000").split(",")
 app.add_middleware(
     CORSMiddleware,
@@ -50,18 +49,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Rutas
-
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
-app.include_router(user.router, prefix="/user", tags=["Users"])
+app.include_router(user_crud.router, prefix="/user", tags=["Users - Gestión"])
+app.include_router(user_profile.router, prefix="/user", tags=["Users - Autoservicio"])
+app.include_router(user_auditoria.router, prefix="/user", tags=["Users - Auditoría"])
+app.include_router(user_internal.router, prefix="/user", tags=["Users - Interno"])
 app.include_router(notification.router, prefix="/notification", tags=["Notifications"])
 app.include_router(role.router, prefix="/role", tags=["Roles"])
 app.include_router(email.router, prefix="/email", tags=["Email"])
 
-# Health check endpoint (Caso 3: Alta Disponibilidad)
 @app.get("/health")
 async def health_check():
-    # Obtener info de Redis
     redis_info = await redis_health_check()
     
     return {
