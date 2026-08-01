@@ -26,13 +26,12 @@ export default function ExpedienteList({
   recursoAfectadoList,
   setToast,
   setExpedienteSeleccionado,
-  expedienteList,
+  expedienteList = [],
   setExpedienteList,
   isEditable = true,
 }: Props) {
   const { user } = useAuth();
 
-  // Filtros locales (búsqueda rápida)
   const [radicadoFiltro, setRadicadoFiltro] = useState("");
   const [expedienteFiltro, setExpedienteFiltro] = useState("");
   const [fromDateFiltro, setFromDateFiltro] = useState("");
@@ -42,7 +41,6 @@ export default function ExpedienteList({
   const [archivadoFiltro, setArchivadoFiltro] = useState("all");
   const [showQuickFilters, setShowQuickFilters] = useState(false);
 
-  // Estados para filtros avanzados
   const [showAdvancedModal, setShowAdvancedModal] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<FilterData | null>(
     null,
@@ -71,7 +69,6 @@ export default function ExpedienteList({
     setNoFiles(false);
   };
 
-  // Municipios únicos en expedientes cargados
   const municipioValido = useMemo(() => {
     const municipios = new Set<string>();
     const currentList = advancedFilters
@@ -85,7 +82,6 @@ export default function ExpedienteList({
     return Array.from(municipios);
   }, [expedienteList, avanzadaExpedienteList, advancedFilters]);
 
-  // Etapas únicas en expedientes cargados
   const availableStages = useMemo(() => {
     const etapas = new Set<string>();
     const currentList = advancedFilters
@@ -102,8 +98,6 @@ export default function ExpedienteList({
   // Aplicar filtros avanzados (llamada al backend)
   const applyAdvancedFilters = async (filters: FilterData) => {
     setIsLoadingAdvanced(true);
-    /* console.log("[FileList] Enviando filtros avanzados:", filters);
-    console.log("[FileList] Filtros en JSON:", JSON.stringify(filters, null, 2)); */
     try {
       const response = await apiCall(API_CONFIG.ENDPOINTS.FILE_FILTER, {
         method: "POST",
@@ -122,7 +116,6 @@ export default function ExpedienteList({
         });
       }
     } catch (error) {
-      /* console.error("Error al aplicar filtros avanzados:", error); */
       setToast({
         id: Date.now(),
         message: "Error al aplicar filtros avanzados",
@@ -133,7 +126,6 @@ export default function ExpedienteList({
     }
   };
 
-  // Limpiar filtros avanzados
   const clearAdvancedFilters = () => {
     setAdvancedFilters(null);
     setAvanzadaExpedienteList([]);

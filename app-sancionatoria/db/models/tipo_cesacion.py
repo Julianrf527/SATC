@@ -1,5 +1,4 @@
 from sqlalchemy import Column, Integer, Text
-from sqlalchemy.orm import relationship
 from .base import Base
 
 class TipoCesacion(Base):
@@ -7,5 +6,3 @@ class TipoCesacion(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     nombre = Column(Text)
-
-    cesaciones = relationship("Cesacion", back_populates="tipo_cesacion")

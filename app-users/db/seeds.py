@@ -1,147 +1,140 @@
-from sqlalchemy import select
+import logging
+import traceback
+
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from dotenv import load_dotenv
+
 from db.database import SessionLocal
 from db.models.permiso import Permiso
 from db.models.rol import Rol
 from db.models.rol_permiso import RolPermiso
 from db.models.usuario import Usuario
-from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
 
-# Datos iniciales de permisos (mejorados pero mantienen compatibilidad con slider)
 PERMISOS = [
-    # === ADMINISTRACIÓN (prefix: admin_) ===
     {"nombre": "admin_roles", "menu_path": "/user/role"},
     {"nombre": "admin_crear_usuarios", "menu_path": "/user/add"},
     {"nombre": "admin_gestionar_usuarios", "menu_path": "/user/manage"},
-
-    # === EXPEDIENTES (prefix: expediente_) ===
-    {"nombre": "expediente_gestionar", "menu_path": "/file/manage"},
-    {"nombre": "expediente_consultar", "menu_path": "/file/consult"},
-    {"nombre": "expediente_alertas", "menu_path": "/file/alerts"},
-    {"nombre": "expediente_asignar", "menu_path": "/file/assign_manage"},
-
-    # === INVOLUCRADOS (prefix: involucrado_) ===
+    {"nombre": "sancionatorio_gestionar", "menu_path": "/file/manage"},
+    {"nombre": "sancionatorio_consultar", "menu_path": "/file/consult"},
+    {"nombre": "sancionatorio_alertas", "menu_path": "/file/alerts"},
+    {"nombre": "sancionatorio_asignar", "menu_path": "/file/assign_manage"},
     {"nombre": "involucrado_gestionar", "menu_path": "/involved/manage"},
-
-    # === DOCUMENTOS (prefix: documento_) ===
     {"nombre": "documento_gestionar", "menu_path": "/document/manage"},
     {"nombre": "documento_crear", "menu_path": ""},
     {"nombre": "documento_revisar", "menu_path": ""},
-
-    # === AUDITORÍA (prefix: auditoria_) ===
     {"nombre": "auditoria_usuarios", "menu_path": "/audit/users"},
     {"nombre": "auditoria_expedientes", "menu_path": "/audit/files"},
     {"nombre": "auditoria_involucrados", "menu_path": "/audit/involved"},
     {"nombre": "auditoria_infracciones", "menu_path": "/audit/infractions"},
-    # === INFRACCIONES (prefix: infraccion_) ===
-    {"nombre": "infracciones_gestionar", "menu_path": "/infraction/manage"},
-    {"nombre": "infracciones_consultar", "menu_path": "/infraction/consult"},
-    {"nombre": "infracciones_alertas", "menu_path": "/infraction/alerts"},
-    {"nombre": "infracciones_asignar", "menu_path": "/infraction/assign_manage"},
+    {"nombre": "infraccion_gestionar", "menu_path": "/infraction/manage"},
+    {"nombre": "infraccion_consultar", "menu_path": "/infraction/consult"},
+    {"nombre": "infraccion_alertas", "menu_path": "/infraction/alerts"},
+    {"nombre": "infraccion_asignar", "menu_path": "/infraction/assign_manage"},
+    {"nombre": "infraccion_asignar_informes", "menu_path": "/infraction/reports"},
+    {"nombre": "subir_informes", "menu_path": ""},
 ]
 
-# Rol admin con todos los permisos (1-20)
-PERMISOS_ROL_ADMIN = list(range(1, 21))
+
+async def _acquire_seed_lock(session: AsyncSession) -> bool:
+    """Intenta adquirir lock de base de datos para evitar concurrencia."""
+    try:
+        await session.execute(text("""
+            CREATE TABLE IF NOT EXISTS seed_lock (
+                id INTEGER PRIMARY KEY DEFAULT 1,
+                locked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                CHECK (id = 1)
+            )
+        """))
+        await session.commit()
+
+        result = await session.execute(text("""
+            INSERT INTO seed_lock (id) VALUES (1)
+            ON CONFLICT (id) DO NOTHING
+            RETURNING id
+        """))
+        return result.fetchone() is not None
+    except Exception as e:
+        logger.warning("Lock fallback: %s", e)
+        return True
 
 
-async def seed_initial_data():
+async def _seed_permissions(session: AsyncSession) -> list:
+    """Inserta permisos iniciales."""
+    permisos = []
+    for perm_data in PERMISOS:
+        permiso = Permiso(**perm_data)
+        session.add(permiso)
+        permisos.append(permiso)
+    await session.flush()
+    logger.info("Inserted %d permissions", len(PERMISOS))
+    return permisos
+
+
+async def _seed_admin_role(session: AsyncSession, permisos: list) -> None:
+    """Crea rol admin y vincula permisos."""
+    rol_admin = Rol(id=1, nombre="admin")
+    session.add(rol_admin)
+    await session.flush()
+    logger.info("Admin role created")
+
+    for permiso in permisos:
+        session.add(RolPermiso(rol_id=1, permiso_id=permiso.id))
+    await session.flush()
+    logger.info("Linked %d permissions to admin role", len(permisos))
+
+
+async def _seed_admin_user(session: AsyncSession) -> None:
+    """Crea usuario administrador inicial."""
+    admin_data = {
+        "numero_documento": 1233506795,
+        "primer_nombre": "Julian",
+        "segundo_nombre": None,
+        "primer_apellido": "Rodriguez",
+        "segundo_apellido": None,
+        "correo": "julianrf527@gmail.com",
+        "hash_contrasena": "$2b$12$zRj0wuQfYsr7VWDjT6A34.qPh6PtrhlQv9zH1dReZRamRwmGXKXGW",
+        "activo": True,
+        "rol_id": 1,
+    }
+    usuario = Usuario(**admin_data)
+    session.add(usuario)
+    await session.flush()
+    logger.info("Admin user created: %s %s", admin_data["primer_nombre"], admin_data["primer_apellido"])
+
+
+async def seed_initial_data() -> None:
     """
-    Ejecuta el seedeo de datos iniciales.
-    - Siempre crea: permisos y rol admin
-    - Crear usuario admin Julian Rodriguez (indispensable)
-    - Usa un lock para evitar concurrencia entre workers
-
+    Seeds initial database data: permissions, admin role, and admin user.
+    Uses database lock to prevent concurrent execution across workers.
     """
     async with SessionLocal() as session:
         try:
-            # Lock basado en BD para evitar concurrencia entre workers
-            # Intentar crear una tabla temporal como semáforo
-            await session.execute("""
-                CREATE TABLE IF NOT EXISTS seed_lock (
-                    id INTEGER PRIMARY KEY DEFAULT 1,
-                    locked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    CHECK (id = 1)
-                )
-            """)
-            await session.commit()
-
-            # Intentar tomar el lock
-            result = await session.execute("""
-                INSERT INTO seed_lock (id) VALUES (1)
-                ON CONFLICT (id) DO NOTHING
-                RETURNING id
-            """)
-            lock_acquired = result.fetchone() is not None
-
+            lock_acquired = await _acquire_seed_lock(session)
             if not lock_acquired:
-                print("Otro worker ya está ejecutando el seedeo, skipping...")
+                logger.info("Another worker is seeding, skipping")
                 return
 
-            print("Lock adquirido - ejecutando seedeo...")
+            result = await session.execute(select(Permiso).limit(1))
+            if result.scalars().first():
+                logger.info("Initial data already exists, skipping")
+                return
 
-        except Exception as lock_error:
-            # Si hay error en el lock, continúa con verificación normal
-            print(f"Warning: Error en lock, usando verificación normal: {lock_error}")
+            logger.info("Starting seed operation")
 
-        # Verificar si ya existen permisos
-        result = await session.execute(select(Permiso).limit(1))
-        if result.scalars().first():
-            print("Datos iniciales ya existen en user_db, skipping seedeo")
-            return
+            permisos = await _seed_permissions(session)
+            await _seed_admin_role(session, permisos)
+            await _seed_admin_user(session)
 
-        print("Iniciando seedeo de user_db...")
-
-        try:
-            # 1. Insertar permisos
-            for perm_data in PERMISOS:
-                permiso = Permiso(**perm_data)
-                session.add(permiso)
-            await session.flush()
-            print(f"✓ Insertados {len(PERMISOS)} permisos")
-
-            # 2. Crear rol admin
-            rol_admin = Rol(id=1, nombre="admin")
-            session.add(rol_admin)
-            await session.flush()
-            print("✓ Creado rol 'admin'")
-
-            # 3. Vincular permisos al rol admin
-            for permiso_id in PERMISOS_ROL_ADMIN:
-                rol_permiso = RolPermiso(rol_id=1, permiso_id=permiso_id)
-                session.add(rol_permiso)
-            await session.flush()
-            print(f"✓ Vinculados {len(PERMISOS_ROL_ADMIN)} permisos al rol admin")
-
-            # 4. Crear usuario admin (Julian Rodriguez - indispensable)
-            admin_data = {
-                "numero_documento": 1233506795,
-                "primer_nombre": "Julian",
-                "segundo_nombre": None,
-                "primer_apellido": "Rodriguez",
-                "segundo_apellido": None,
-                "correo": "julianrf527@gmail.com",
-                "hash_contrasena": "$2b$12$zRj0wuQfYsr7VWDjT6A34.qPh6PtrhlQv9zH1dReZRamRwmGXKXGW",
-                "activo": True,
-                "rol_id": 1,
-            }
-
-            usuario = Usuario(**admin_data)
-            session.add(usuario)
-            await session.flush()
-            print(f"✓ Creado usuario admin: {admin_data['primer_nombre']} {admin_data['primer_apellido']}")
-
-            # Commit
             await session.commit()
-            print("✓ Seedeo completado exitosamente\n")
+            logger.info("Seed operation completed successfully")
 
         except Exception as e:
-            import traceback
             await session.rollback()
-            print(f"✗ Error durante seedeo: {e}")
-            print(f"✗ Stacktrace completo: {traceback.format_exc()}")
+            logger.exception("Seed operation failed: %s", e)
             raise
 

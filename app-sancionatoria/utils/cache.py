@@ -1,6 +1,3 @@
-"""
-Sistema de caché simple para reducir llamadas HTTP repetitivas
-"""
 from datetime import datetime, timedelta
 from typing import Any, Optional
 import asyncio
@@ -10,8 +7,7 @@ logger = logging.getLogger(__name__)
 
 class SimpleCache:
     """
-    Caché en memoria con expiración por tiempo (TTL).
-    Thread-safe usando asyncio.Lock
+    Caché en memoria con expiración por tiempo (TTL), serializado con asyncio.Lock.
     """
     def __init__(self, ttl_seconds: int = 300):
         self.cache = {}
@@ -27,7 +23,6 @@ class SimpleCache:
                     logger.debug(f"Cache HIT: {key}")
                     return value
                 else:
-                    # Expirado, eliminar
                     del self.cache[key]
                     logger.debug(f"Cache EXPIRED: {key}")
             else:
@@ -64,9 +59,6 @@ class SimpleCache:
             if expired_keys:
                 logger.debug(f"Cache cleanup: removed {len(expired_keys)} expired entries")
 
-# Instancias globales de caché
-# TTL más corto para permisos (5 min) ya que pueden cambiar
+# TTL corto en permisos: cambian con más frecuencia que los datos de usuario.
 permission_cache = SimpleCache(ttl_seconds=300)
-
-# TTL más largo para usuarios (10 min) ya que cambian menos frecuentemente
 users_cache = SimpleCache(ttl_seconds=600)

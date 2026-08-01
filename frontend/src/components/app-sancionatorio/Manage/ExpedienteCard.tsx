@@ -14,7 +14,6 @@ export default function FileCard({
   fecha_creacion,
   onClick,
 }: CardProps) {
-  // Formatear fecha para mejor legibilidad
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString("es-ES", {

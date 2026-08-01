@@ -7,7 +7,7 @@ class ExpedienteRecurso(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     expediente_id = Column(Integer, ForeignKey('expediente.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    recurso_id = Column(Integer, ForeignKey('recurso_afectado.id', ondelete="RESTRICT", onupdate="CASCADE"), nullable=False)
+    recurso_id = Column(Integer, ForeignKey('recurso_afectado.id', ondelete="RESTRICT", onupdate="CASCADE"), nullable=False, index=True)
 
     expediente = relationship("Expediente", back_populates="recursos")
     recurso = relationship("RecursoAfectado", back_populates="expediente_recursos")

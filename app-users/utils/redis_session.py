@@ -18,9 +18,7 @@ REDIS_ENABLED = os.getenv("REDIS_SESSIONS_ENABLED")
 redis_client: Optional[redis.Redis] = None
 
 
-# ==========================================
 # INICIALIZACIÓN
-# ==========================================
 async def init_redis() -> None:
     """Llamar en el startup de FastAPI."""
     global redis_client
@@ -48,7 +46,6 @@ async def init_redis() -> None:
         logger.warning(f"Redis no disponible: {e}. Fallback a PostgreSQL activo.")
         redis_client = None
 
-
 async def close_redis() -> None:
     """Llamar en el shutdown de FastAPI."""
     global redis_client
@@ -57,147 +54,11 @@ async def close_redis() -> None:
         redis_client = None
         logger.info("Redis desconectado")
 
-
 def get_redis_client() -> Optional[redis.Redis]:
     """Retorna el cliente global. None si Redis no está disponible."""
     return redis_client
 
-
-# ==========================================
-# OPERACIONES DE SESIÓN
-# ==========================================
-async def save_session_redis(
-    token_jti: str,
-    user_id: int,
-    ip_address: str,
-    user_agent: str,
-    permisos: list,
-    nombre: str,
-    documento: str,
-    ttl_days: int = 1
-) -> bool:
-    """
-    Guarda sesión + permisos en Redis en un solo pipeline.
-    Retorna True si se guardó, False si hubo error o Redis no disponible.
-    """
-    r = get_redis_client()
-    if r is None:
-        return False
-
-    ttl_seconds = int(timedelta(days=ttl_days).total_seconds())
-    session_data = {
-        "user_id": str(user_id),
-        "ip_address": ip_address,
-        "user_agent": user_agent,
-        "created_at": datetime.now(ZoneInfo("America/Bogota")).isoformat()
-    }
-
-    try:
-        async with r.pipeline() as pipe:
-            pipe.setex(f"session:{token_jti}", ttl_seconds, json.dumps(session_data))
-            pipe.setex(f"session_permisos:{token_jti}", ttl_seconds, json.dumps(permisos))
-            pipe.setex(f"session_nombre:{token_jti}", ttl_seconds, nombre)
-            pipe.setex(f"session_documento:{token_jti}", ttl_seconds, documento)
-            await pipe.execute()
-
-        logger.info(f"Sesión guardada en Redis: {token_jti[:8]}... (user_id={user_id}, TTL={ttl_days}d)")
-        return True
-
-    except Exception as e:
-        logger.error(f"Error guardando sesión en Redis: {e}")
-        return False
-
-
-async def verify_session_and_permisos(
-    token_jti: str,
-    path_solicitado: str
-) -> Dict[str, Any]:
-    """
-    Verifica sesión activa y permiso en un solo pipeline.
-    Úsalo en el gateway para cada request autenticado.
-
-    Retorna:
-        { "valid": True, "user_id": "..." }
-        { "valid": False, "reason": "sesion_invalida" | "sin_permiso" }
-    """
-    r = get_redis_client()
-    if r is None:
-        # Redis caído → fallback: validar contra PostgreSQL en el gateway
-        return {"valid": False, "reason": "redis_no_disponible"}
-
-    try:
-        async with r.pipeline() as pipe:
-            pipe.get(f"session:{token_jti}")
-            pipe.get(f"session_permisos:{token_jti}")
-            sesion_raw, permisos_raw = await pipe.execute()
-
-        if not sesion_raw:
-            return {"valid": False, "reason": "sesion_invalida"}
-
-        permisos: list = json.loads(permisos_raw) if permisos_raw else []
-        if path_solicitado not in permisos:
-            return {"valid": False, "reason": "sin_permiso"}
-
-        sesion = json.loads(sesion_raw)
-        return {"valid": True, "user_id": sesion["user_id"]}
-
-    except Exception as e:
-        logger.error(f"Error verificando sesión en Redis: {e}")
-        return {"valid": False, "reason": "error_interno"}
-
-
-async def delete_session_redis(token_jti: str) -> bool:
-    """Elimina sesión y permisos al hacer logout."""
-    r = get_redis_client()
-    if r is None:
-        return False
-
-    try:
-        async with r.pipeline() as pipe:
-            pipe.delete(f"session:{token_jti}")
-            pipe.delete(f"session_permisos:{token_jti}")
-            pipe.delete(f"session_nombre:{token_jti}")
-            pipe.delete(f"session_documento:{token_jti}")
-            await pipe.execute()
-
-        logger.info(f"Sesión eliminada de Redis: {token_jti[:8]}...")
-        return True
-
-    except Exception as e:
-        logger.error(f"Error eliminando sesión: {e}")
-        return False
-
-
-async def refresh_session_ttl(token_jti: str, ttl_days: int = 1) -> bool:
-    """Renueva TTL de sesión y permisos juntos."""
-    r = get_redis_client()
-    if r is None:
-        return False
-
-    ttl_seconds = int(timedelta(days=ttl_days).total_seconds())
-
-    try:
-        async with r.pipeline() as pipe:
-            pipe.expire(f"session:{token_jti}", ttl_seconds)
-            pipe.expire(f"session_permisos:{token_jti}", ttl_seconds)
-            pipe.expire(f"session_nombre:{token_jti}", ttl_seconds)
-            pipe.expire(f"session_documento:{token_jti}", ttl_seconds)
-            results = await pipe.execute()
-
-        if not any(results):
-            logger.warning(f"Sesión no existe en Redis: {token_jti[:8]}...")
-            return False
-
-        return True
-
-    except Exception as e:
-        logger.error(f"Error renovando TTL: {e}")
-        return False
-
-
-# ==========================================
 # HEALTH CHECK
-# ==========================================
 async def redis_health_check() -> Dict[str, Any]:
     r = get_redis_client()
     if r is None:

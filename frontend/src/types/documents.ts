@@ -1,4 +1,3 @@
-// --------- Documents Module Types ---------
 export type EstadoDocumento =
   | "en_revision"
   | "aprobado"

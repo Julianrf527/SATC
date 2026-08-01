@@ -9,7 +9,7 @@ class Notificacion(Base):
     id             = Column(Integer, primary_key=True, autoincrement=True)
     mensaje        = Column(Text, nullable=False)
     id_vinculada   = Column(String(20))
-    usuario_id     = Column(Integer, ForeignKey("usuario.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
+    usuario_id     = Column(Integer, ForeignKey("usuario.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False, index=True)
     fecha_creacion = Column(TIMESTAMP(timezone=True), default=lambda: datetime.now(ZoneInfo("America/Bogota")))
     tipo           = Column(String(15))
     leida          = Column(Boolean, default=False)

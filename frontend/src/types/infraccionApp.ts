@@ -1,6 +1,20 @@
 import type { ModeloGenerico } from "./common";
 import type { Involucrado } from "./involucradoApp";
 
+export type TipoAfectacion = {
+  id: number;
+  nombre: string;
+  recurso_id: number;
+};
+
+export type Quejoso = {
+  id: number;
+  nombre: string | null;
+  telefono: string | null;
+  correo: string | null;
+  anonimo: boolean;
+};
+
 export type Expediente = {
   id: number;
   radicado: string;
@@ -16,16 +30,10 @@ export type ExpedienteDetalle = Expediente & {
   direccion: string;
   descripcion: string;
   vereda: ModeloGenerico;
-  quejosos: ModeloGenerico[];
-  causa: ModeloGenerico;
+  quejosos: Quejoso[];
+  tipos_afectacion: TipoAfectacion[];
   recurso_afectado: ModeloGenerico[];
-};
-
-export type Quejoso = {
-  id: number;
-  nombre: string;
-  telefonmo: number;
-  correo: string;
+  radicados_asociados?: string[];
 };
 
 export type Notificacion = {
@@ -85,4 +93,35 @@ export type ActoAdministrativo = {
     documento_comunicacion_id: number;
   } | null;
   notificacion?: NotificacionData | null;
+};
+
+export type RespuestaData = {
+  id: number;
+  expediente_id: number;
+  radicado: string;
+  fecha_radicado: string;
+  documento_radicado_id: number;
+  requiere_medida_preventiva: boolean;
+};
+
+export type InformeTecnico = {
+  id: number;
+  expediente_id: number;
+  expediente_radicado?: string | null;
+  profesional_asignado_id: number | null;
+  profesional_nombre: string | null;
+  fecha_programacion_visita: string | null;
+  fecha_recibido_informe: string | null;
+  fecha_aceptacion_informe: string | null;
+  documento_informe_id: number | null;
+  tipo_informe: string;
+  fecha_creacion: string;
+  docs_documento_id: number | null;
+  proceso_activo: boolean;
+  aceptado: boolean;
+};
+
+export type ProfesionalDisponible = {
+  id: number;
+  nombre: string;
 };

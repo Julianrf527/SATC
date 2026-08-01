@@ -6,7 +6,6 @@ from .rol_permiso import RolPermiso
 from .codigo_recuperacion import CodigoRecuperacion
 from .notificacion import Notificacion
 from .auditoria import Auditoria
-from .sesion_activa import SesionActiva
 
 __all__ = [
     "Base",
@@ -17,5 +16,4 @@ __all__ = [
     "CodigoRecuperacion",
     "Notificacion",
     "Auditoria",
-    "SesionActiva",
 ]

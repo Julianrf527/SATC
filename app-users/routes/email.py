@@ -4,7 +4,7 @@ from typing import Optional, List
 import logging
 import asyncio
 
-router = APIRouter(prefix="/email", tags=["email"])
+router = APIRouter(tags=["email"])
 logger = logging.getLogger(__name__)
 
 from utils.emailUtil import send_single_email, generar_html_reporte_alertas
@@ -32,7 +32,7 @@ async def enviar_email(
 ):
     """
     Endpoint para enviar un email individual.
-    Requiere autenticación con X-API-Key en el header.
+    Solo servicio-a-servicio: requiere X-Service-Token válido.
     """
     verify_service_token(request)
     
@@ -64,7 +64,7 @@ async def enviar_emails_masivo(
 ):
     """
     Endpoint para enviar emails masivos.
-    Requiere autenticación con X-API-Key en el header.
+    Solo servicio-a-servicio: requiere X-Service-Token válido.
     """
     verify_service_token(request)
     

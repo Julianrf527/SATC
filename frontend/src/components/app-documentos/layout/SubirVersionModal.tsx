@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { API_CONFIG, apiCall } from "../../../utils/api";
+import { API_CONFIG, apiCall, formatApiErrorDetail } from "../../../utils/api";
 import { X, Upload } from "lucide-react";
 
 type Props = {
@@ -8,6 +8,7 @@ type Props = {
   onClose: () => void;
   documentoId: number;
   onSuccess: () => void;
+  setToast?: (toast: { id: number; message: string; type: "success" | "error" }) => void;
 };
 
 export default function SubirVersionModal({
@@ -15,6 +16,7 @@ export default function SubirVersionModal({
   onClose,
   documentoId,
   onSuccess,
+  setToast,
 }: Props) {
   const [comentario, setComentario] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -26,7 +28,6 @@ export default function SubirVersionModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Detectar tema
   useEffect(() => {
     const updateTheme = () => {
       const currentTheme =
@@ -50,7 +51,6 @@ export default function SubirVersionModal({
     return () => observer.disconnect();
   }, []);
 
-  // Reset form
   useEffect(() => {
     if (isOpen) {
       setComentario("");
@@ -69,14 +69,20 @@ export default function SubirVersionModal({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validar tipos permitidos
+      // file.type es poco confiable para .doc (llega vacío en Windows/Chrome),
+      // por eso la extensión sirve de respaldo.
       const validTypes = [
         "application/pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "application/msword",
       ];
+      const fileName = file.name.toLowerCase();
+      const validExtension =
+        fileName.endsWith(".pdf") ||
+        fileName.endsWith(".docx") ||
+        fileName.endsWith(".doc");
 
-      if (!validTypes.includes(file.type)) {
+      if (!validTypes.includes(file.type) && !validExtension) {
         setErrors((prev) => ({
           ...prev,
           file: "Solo se permiten archivos PDF, DOCX o DOC",
@@ -149,23 +155,20 @@ export default function SubirVersionModal({
         onSuccess();
         handleClose();
       } else {
-        let errorMessage = "Error al subir la nueva versión";
+        const errorMessage = formatApiErrorDetail(
+          res.detail,
+          "Error al subir la nueva versión",
+        );
 
-        if (res.detail) {
-          if (typeof res.detail === "string") {
-            errorMessage = res.detail;
-          } else if (Array.isArray(res.detail)) {
-            errorMessage = res.detail.map((err: any) => err.msg).join(", ");
-          }
+        // Mensaje especial para archivo duplicado en el mismo proceso
+        if (res.status === 409) {
+          errorMessage = "Este archivo ya fue subido anteriormente en este proceso. Suba una versión diferente.";
         }
 
-        setErrors((prev) => ({
-          ...prev,
-          general: errorMessage,
-        }));
+        setErrors((prev) => ({ ...prev, general: errorMessage }));
+        setToast?.({ id: Date.now(), message: errorMessage, type: "error" });
       }
     } catch (error) {
-      /* console.error("Error al subir versión:", error); */
       setErrors((prev) => ({
         ...prev,
         general: "Error de conexión al subir la versión",

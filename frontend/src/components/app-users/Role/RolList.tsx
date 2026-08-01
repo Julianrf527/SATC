@@ -3,7 +3,7 @@ import { apiCall, API_CONFIG } from "../../../utils/api";
 
 type Rol = {
   id: number;
-  name: string;
+  nombre: string;
 };
 
 type Props = {
@@ -90,7 +90,7 @@ export default function RolList({ rolRef }: Props) {
         ) : (
           rolList.map((rol) => (
             <option key={rol.id} value={rol.id}>
-              {capitalize(rol.name)}
+              {capitalize(rol.nombre)}
             </option>
           ))
         )}

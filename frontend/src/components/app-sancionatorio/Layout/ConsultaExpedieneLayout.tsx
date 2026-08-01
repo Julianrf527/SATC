@@ -29,7 +29,6 @@ export default function FileViewLayout({ setToast }: Props) {
   const [municipioList, setMunicipioList] = useState<Municipio[]>([]);
   const [expedienteList, setExpedienteList] = useState<Expediente[]>([]);
 
-  // Detectar el tema actual del documento
   useEffect(() => {
     const updateTheme = () => {
       const currentTheme =
@@ -53,7 +52,6 @@ export default function FileViewLayout({ setToast }: Props) {
     return () => observer.disconnect();
   }, []);
 
-  // Seleccionar archivo desde navegación
   useEffect(() => {
     if (location.state?.radicadoToSelect && expedienteList.length > 0) {
       const expedienteToSelect = expedienteList.find(
@@ -70,7 +68,6 @@ export default function FileViewLayout({ setToast }: Props) {
     }
   }, [location.state?.radicadoToSelect, expedienteList]);
 
-  // Cargar recursos y municipios
   useEffect(() => {
     const getResourcesAndTowns = async () => {
       try {
@@ -103,7 +100,6 @@ export default function FileViewLayout({ setToast }: Props) {
           });
         }
       } catch (e) {
-        /* console.error("Error en el fetch:", e); */
         setToast({
           id: Date.now(),
           message: "Error en el fetch",
@@ -135,7 +131,6 @@ export default function FileViewLayout({ setToast }: Props) {
           });
         }
       } catch (e) {
-        /* console.log(e); */
         setToast({
           id: Date.now(),
           message: "Error al cargar los expedientes",

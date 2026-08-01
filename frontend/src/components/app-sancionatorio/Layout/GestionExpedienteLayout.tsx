@@ -32,7 +32,6 @@ export default function GestionExpedienteLayout({ setToast }: Props) {
   const [municipioList, setMunicipioList] = useState<Municipio[]>([]);
   const [expedienteList, setExpedienteList] = useState<Expediente[]>([]);
 
-  // Detectar el tema actual del documento
   useEffect(() => {
     const updateTheme = () => {
       const currentTheme =
@@ -108,7 +107,6 @@ export default function GestionExpedienteLayout({ setToast }: Props) {
           });
         }
       } catch (e) {
-        /* console.error("Error en el fetch:", e); */
         setToast({
           id: Date.now(),
           message: "Error en el fetch",
@@ -140,7 +138,6 @@ export default function GestionExpedienteLayout({ setToast }: Props) {
           }
         }
       } catch (e) {
-        /* console.log(e); */
         setToast({
           id: Date.now(),
           message: "Error al cargar los expedientes",
@@ -171,12 +168,10 @@ export default function GestionExpedienteLayout({ setToast }: Props) {
   const handleArchiveSuccess = () => {
     if (!expedienteSeleccionado) return;
 
-    // Eliminar el expediente de la lista
     setExpedienteList((prevList) =>
       prevList.filter((f) => f.radicado !== expedienteSeleccionado.radicado),
     );
 
-    // Deseleccionar el expediente
     setExpedienteSeleccionado(null);
   };
 

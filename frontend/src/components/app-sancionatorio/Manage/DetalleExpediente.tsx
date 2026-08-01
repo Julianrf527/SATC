@@ -4,30 +4,33 @@ import type {
 } from "../../../types/sancionatorioApp";
 import type { Municipio, ModeloGenerico } from "../../../types/common";
 import { useState, useEffect, lazy, Suspense } from "react";
-import { API_CONFIG, apiCall, BASE_URL } from "../../../utils/api";
+import { API_CONFIG, apiCall } from "../../../utils/api";
+import { downloadBlobFile } from "../../../utils/DownloadFile";
 import "boxicons/css/boxicons.min.css";
 
 const InformacionExpediente = lazy(
-  () => import("../Stages/InformacionExpediente"),
+  () => import("../Etapas/InformacionExpediente"),
 );
-const PreliminaryInvestigation = lazy(
-  () => import("../Stages/PreliminaryInvestigation"),
+const InvestigacionPreliminar = lazy(
+  () => import("../Etapas/InvestigacionPreliminar"),
 );
-const PreventiveMeasure = lazy(() => import("../Stages/PreventiveMeasure"));
-const StartSanctioningProcess = lazy(
-  () => import("../Stages/StartSanctioningProcess"),
+const MedidaPreventiva = lazy(
+  () => import("../Etapas/DetalleMedidaPreventiva"),
 );
-const CessationStage = lazy(() => import("../Stages/CessationStage"));
-const FormulationCharges = lazy(() => import("../Stages/FormulationCharges"));
-const OpeningProbationaryPeriod = lazy(
-  () => import("../Stages/OpeningProbationaryPeriod"),
+const InicioProcesoSancionatorio = lazy(
+  () => import("../Etapas/InicioProcesoSancionatorio"),
 );
-const ClosingProbationaryPeriod = lazy(
-  () => import("../Stages/ClosingProbationaryPeriod"),
+const Cesacion = lazy(() => import("../Etapas/Cesacion"));
+const FormulacionCargos = lazy(() => import("../Etapas/FormulacionCargos"));
+const AperturaEtapaProbatoria = lazy(
+  () => import("../Etapas/AperturaEtapaProbatoria"),
 );
-const SubstantiveDecision = lazy(() => import("../Stages/SubstantiveDecision"));
-const Resource = lazy(() => import("../Stages/Resource"));
-const ExecutionOfSanction = lazy(() => import("../Stages/ExecutionSanction"));
+const CierreEtapaProbatoria = lazy(
+  () => import("../Etapas/CierreEtapaProbatoria"),
+);
+const DecisionFondo = lazy(() => import("../Etapas/DecisionFondo"));
+const Recurso = lazy(() => import("../Etapas/Recurso"));
+const EjecucionSancion = lazy(() => import("../Etapas/EjecucionSancion"));
 
 type Tab = {
   id: string;
@@ -70,15 +73,17 @@ export default function DetalleExpediente({
     useState<ModeloGenerico | null>(null);
   const [isTabsCollapsed, setIsTabsCollapsed] = useState(false);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
-  const [etapasExistentes, setEtapasExistentes] = useState<number[]>([]);
+  const [etapasExistentes, setEtapasExistentes] = useState<number[] | null>(null);
 
-  // Sincronizar cuando cambia el file desde el padre
   useEffect(() => {
     setExpedienteActual(expedienteSeleccionado);
+    if (!isEditable) setActiveTab("info");
   }, [expedienteSeleccionado]);
 
   // Cargar datos adicionales y combinar con BasicFile para crear File completo
   useEffect(() => {
+    let cancelado = false;
+
     const fetchAndCombineFileData = async () => {
       if (!expedienteActual) {
         setExpedienteDetalle(null);
@@ -86,10 +91,13 @@ export default function DetalleExpediente({
       }
 
       setLoading(true);
+      setEtapasExistentes(null);
       try {
         const response = await apiCall(
           API_CONFIG.ENDPOINTS.FILE_FUll(expedienteActual.id),
         );
+
+        if (cancelado) return;
 
         if (!response.ok) {
           throw new Error("Error al cargar datos del expediente");
@@ -97,8 +105,13 @@ export default function DetalleExpediente({
 
         if (response.ok && response.data) {
           setTipoNotificacion(response.tipo_notificacion);
-          setEtapasExistentes(response.etapas_existentes || []);
+          setEtapasExistentes(response.etapas_existentes ?? []);
           const information = response.data;
+          const recursoIds = Array.isArray(information.recurso_afectado)
+            ? information.recurso_afectado.map((item: any) =>
+                typeof item === "number" ? item : item?.id,
+              )
+            : [];
 
           const expedienteCompleto: ExpedienteDetalle = {
             // Datos básicos del BasicFile
@@ -117,7 +130,9 @@ export default function DetalleExpediente({
             direccion: information.direccion || expedienteActual.direccion,
             vereda: information.vereda || { id: 0, name: "Sin vereda" },
             ultima_etapa: information.ultima_etapa || null,
-            recurso_afectado: information.recurso_afectado || [],
+            recurso_afectado: recursoIds.filter(
+              (id: number) => typeof id === "number",
+            ),
             motivo_afectacion: information.motivo_afectacion || "",
           };
 
@@ -130,18 +145,23 @@ export default function DetalleExpediente({
           });
         }
       } catch (error) {
-        /* console.error("Error al cargar expediente completo:", error); */
+        if (cancelado) return;
+        setEtapasExistentes([]);
         setToast({
           id: Date.now(),
           message: "Error al cargar información completa del expediente",
           type: "error",
         });
       } finally {
-        setLoading(false);
+        if (!cancelado) setLoading(false);
       }
     };
 
     fetchAndCombineFileData();
+
+    return () => {
+      cancelado = true;
+    };
   }, [expedienteActual, setToast]);
 
   // Mapping de tab.id a tipo_etapa_id
@@ -170,75 +190,69 @@ export default function DetalleExpediente({
       id: "indagacion",
       label: "Indagación Preliminar",
       icon: "bx-search-alt",
-      component: PreliminaryInvestigation,
+      component: InvestigacionPreliminar,
     },
     {
       id: "detalle",
       label: "Medida Preventiva",
       icon: "bx-error-alt",
-      component: PreventiveMeasure,
+      component: MedidaPreventiva,
     },
     {
       id: "inicio",
       label: "Inicio Proceso Sancionatorio",
       icon: "bx-book-bookmark",
-      component: StartSanctioningProcess,
+      component: InicioProcesoSancionatorio,
     },
     {
       id: "cesacion",
       label: "Cesacion",
       icon: "bx-error-alt",
-      component: CessationStage,
+      component: Cesacion,
     },
     {
       id: "cargos",
       label: "Formulación de Cargos",
       icon: "bx-file",
-      component: FormulationCharges,
+      component: FormulacionCargos,
     },
     {
       id: "apertura_ep",
       label: "Apertura Etapa Probatoria",
       icon: "bx-cabinet",
-      component: OpeningProbationaryPeriod,
+      component: AperturaEtapaProbatoria,
     },
     {
       id: "cierre_ep",
       label: "Cierre Etapa Probatoria",
       icon: "bx-cabinet",
-      component: ClosingProbationaryPeriod,
+      component: CierreEtapaProbatoria,
     },
     {
       id: "decision",
       label: "Decisión de Fondo",
       icon: "bx-check-circle",
-      component: SubstantiveDecision,
+      component: DecisionFondo,
     },
     {
       id: "recurso",
       label: "Probatoria del Recurso",
       icon: "bx-calendar-check",
-      component: Resource,
+      component: Recurso,
     },
     {
       id: "ejecucion",
       label: "Ejecución Sanción",
       icon: "bx-calendar-check",
-      component: ExecutionOfSanction,
+      component: EjecucionSancion,
     },
   ];
 
-  // Verificar si una etapa existe en el expediente
   const isEtapaDisponible = (tabId: string): boolean => {
     const etapaId = tabToEtapaMap[tabId];
     if (etapaId === null) return true; // Info siempre disponible
     if (!isEditable) {
-      // En modo consulta, verificar disponibilidad solo si hay datos de etapas
-      if (etapasExistentes.length === 0) {
-        // Si no hay datos de etapas existentes, permitir acceso a todas (carga inicial)
-        return true;
-      }
-      // Si hay datos, solo permitir acceso a las etapas que existen
+      if (etapasExistentes === null) return false; // Cargando: deshabilitar hasta saber
       return etapasExistentes.includes(etapaId);
     }
     return true; // En modo editable, todas disponibles
@@ -246,14 +260,12 @@ export default function DetalleExpediente({
 
   const handleTabClick = (tabId: string) => {
     if (!expedienteDetalle) return;
-    // Verificar disponibilidad antes de cambiar
     if (!isEtapaDisponible(tabId)) {
       return;
     }
     setActiveTab(tabId);
   };
 
-  // Función para actualizar el File
   const handleExpedienteDetalleUpdate = (updated: ExpedienteDetalle) => {
     setExpedienteDetalle(updated);
 
@@ -286,22 +298,37 @@ export default function DetalleExpediente({
 
     setIsDownloadingAll(true);
 
-    const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.FILE_DOWNLOAD_ALL(
-      expedienteActual.id,
-    )}`;
+    try {
+      const endpoint = API_CONFIG.ENDPOINTS.FILE_DOWNLOAD_ALL(expedienteActual.id);
+      const filename = `expediente-${expedienteActual.radicado || expedienteActual.id}.pdf`;
 
-    // Usar window.open igual que otras descargas - envía cookies automáticamente
-    window.open(url, "_blank");
+      const result = await downloadBlobFile(endpoint, filename);
 
-    // Simular progreso y mostrar mensaje después de un momento
-    setTimeout(() => {
-      setIsDownloadingAll(false);
+      if (!result.ok) {
+        if (result.message) {
+          setToast({
+            id: Date.now(),
+            message: result.message,
+            type: "error",
+          });
+        }
+        return;
+      }
+
       setToast({
         id: Date.now(),
         message: "Descarga iniciada exitosamente",
         type: "success",
       });
-    }, 1500);
+    } catch {
+      setToast({
+        id: Date.now(),
+        message: "Error al descargar el expediente",
+        type: "error",
+      });
+    } finally {
+      setIsDownloadingAll(false);
+    }
   };
 
   const renderTabContent = () => {
@@ -372,7 +399,6 @@ export default function DetalleExpediente({
     );
   };
 
-  // Obtener el tab activo actual
   const currentActiveTab = tabs.find((tab) => tab.id === activeTab);
 
   return (
@@ -398,6 +424,10 @@ export default function DetalleExpediente({
             </div>
             {!isEditable && expedienteActual && (
               <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-success/10 border border-success/30 rounded-lg">
+                  <i className="bx bx-show text-success text-base"></i>
+                  <span className="text-xs font-semibold text-success uppercase tracking-wide">Modo Consulta</span>
+                </div>
                 <button
                   onClick={handleDownloadAll}
                   disabled={isDownloadingAll}
@@ -415,12 +445,6 @@ export default function DetalleExpediente({
                       Descargar Expediente
                     </>
                   )}
-                </button>
-                <button
-                  className="btn btn-success text-white shadow-lg hover:scale-105 transition-transform"
-                  title="Solo lectura"
-                >
-                  <i className="bx bx-show text-xl"></i>
                 </button>
               </div>
             )}

@@ -9,28 +9,25 @@ import os
 import logging
 
 
-# --------- DB MODELS ---------
 from db.models.expediente import Expediente
 from services.users import get_users_by_permission
 from services.alertas import calcular_alertas_expediente
 from core.permission import Permission
 
-logger = logging.getLogger(__name__)
-
-# -------- ENV ------------
 load_dotenv()
-API_GATEWAY_URL = os.getenv("API_GATEWAY_URL")
+USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://app-users:8001")
 SERVICE_SECRET_KEY = os.getenv("SERVICE_SECRET_KEY")
-
 FILE_MANAGE = Permission.FILE_MANAGE
 scheduler = AsyncIOScheduler()
 
-#  ----------  UTILS  ------------
+logger = logging.getLogger(__name__)
+
 from utils.generate_service_jwt import generate_service_jwt
 
 async def obtener_alertas_usuario(user_id: int, db: AsyncSession) -> dict:
     """
-    Obtiene las alertas para un usuario específico usando tu lógica existente
+    Alertas de todos los expedientes a cargo del usuario, o None si no tiene
+    ninguna: el scheduler usa ese None para no mandar un email vacío.
     """
     try:
         stmt = select(Expediente.radicado).where(Expediente.encargado_id == user_id)
@@ -51,7 +48,6 @@ async def obtener_alertas_usuario(user_id: int, db: AsyncSession) -> dict:
         if not alertas_totales:
             return None  # Sin alertas = no enviar email
 
-        # Calcular estadísticas (igual que tu endpoint)
         estadisticas = {
             "verde": 0,
             "amarillo": 0,
@@ -75,35 +71,32 @@ async def obtener_alertas_usuario(user_id: int, db: AsyncSession) -> dict:
         logger.error(f"Error obteniendo alertas para usuario {user_id}: {e}")
         return None
 
-
 async def enviar_reporte_alertas(email: str, alertas_data: dict) -> bool:
-    """Envía el reporte de alertas usando la API de users"""
+    """Envía el reporte de alertas llamando directo a app-users (east-west, sin pasar por el gateway)"""
     try:
-        service_token = generate_service_jwt("expedientes-service", SERVICE_SECRET_KEY)
-        
+        service_token = generate_service_jwt("sanctioning-service", SERVICE_SECRET_KEY)
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                f"{API_GATEWAY_URL}/users/email/send-alert-report",
+                f"{USER_SERVICE_URL}/email/send-alert-report",
+                params={"title": "Reporte Semanal de Alertas - Sistema Sancionatorio"},
                 headers={"X-Service-Token": service_token},
                 json={
-                    "title": "Reporte Semanal de Alertas - Sistema Sancionatorio",
                     "emails": [email],
                     "alertas_data": alertas_data
                 }
             )
-            
+
             return response.status_code == 200
-                
+
     except Exception as e:
         logger.error(f"Error enviando email a {email}: {e}")
         return False
-
 
 async def tarea_envio_alertas_semanal(db: AsyncSession):
 
     
     try:
-        # Obtener todos los usuarios con permiso de expedientes
         usuarios = await get_users_by_permission(FILE_MANAGE)
         
         if not usuarios:
@@ -127,11 +120,9 @@ async def tarea_envio_alertas_semanal(db: AsyncSession):
             try:
                 logger.info(f"  Procesando: {nombre} ({email})")
                 
-                # Obtener alertas del usuario
                 alertas_data = await obtener_alertas_usuario(user_id, db)
                 
                 if alertas_data:
-                    # Hay alertas, enviar email
                     resultado = await enviar_reporte_alertas(email, alertas_data)
                     if resultado:
                         expedientes_con_alertas = alertas_data.get("expedientes_con_alertas", 0)
@@ -148,7 +139,6 @@ async def tarea_envio_alertas_semanal(db: AsyncSession):
                 logger.error(f"    Error procesando usuario {user_id}: {e}")
                 errores += 1
         
-        # Resumen
         logger.info("=" * 60)
         logger.info("RESUMEN DEL ENVIO")
         logger.info(f"  Emails enviados: {enviados}")
@@ -160,21 +150,14 @@ async def tarea_envio_alertas_semanal(db: AsyncSession):
     except Exception as e:
         logger.error(f"Error en tarea de envio: {e}", exc_info=True)
 
-
 async def ejecutar_tarea_con_db(get_db):
-    """Helper para ejecutar la tarea con DB"""
     async for db in get_db():
         await tarea_envio_alertas_semanal(db)
         break
 
-
 def configurar_scheduler_alertas(app, get_db):
-    """
-    Configura el scheduler en FastAPI
-    """
     @app.on_event("startup")
     async def start_scheduler():
-        # Ejecutar cada lunes a las 8:00 AM
         scheduler.add_job(
             func=lambda: ejecutar_tarea_con_db(get_db),
             trigger=CronTrigger(

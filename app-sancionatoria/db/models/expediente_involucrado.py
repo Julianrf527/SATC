@@ -7,7 +7,7 @@ class ExpedienteInvolucrado(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     expediente_id = Column(Integer, ForeignKey('expediente.id', ondelete="CASCADE", onupdate="CASCADE"), nullable=False)
-    involucrado_id = Column(Integer, nullable=False)
+    involucrado_id = Column(Integer, nullable=False, index=True)
 
     expediente = relationship("Expediente", back_populates="involucrados")
 

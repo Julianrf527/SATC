@@ -5,6 +5,7 @@ type LogAuditoria = {
   id: number;
   usuario_id: number;
   usuario_nombre: string;
+  usuario_documento?: string | null;
   usuario_correo: string;
   tabla_afectada: string;
   tipo_operacion: string;
@@ -12,8 +13,8 @@ type LogAuditoria = {
   expediente_radicado: string | null;
   id_registro: string | null;
   fecha: string;
-  datos_anteriores: any;
-  datos_nuevos: any;
+  datos_anteriores: Record<string, unknown>;
+  datos_nuevos: Record<string, unknown>;
 };
 
 type Props = {
@@ -21,7 +22,6 @@ type Props = {
   data: LogAuditoria[];
   uniqueTables: string[];
 
-  // Filtros
   usuarioFilter: string;
   tablaFilter: string;
   operacionFilter: string;
@@ -33,6 +33,7 @@ type Props = {
   onOperacionFilterChange: (v: string) => void;
   onRadicadoFilterChange: (v: string) => void;
   onFechaFilterChange: (v: string) => void;
+  auditScope: "sanctioning" | "infraction" | "involved";
   currentPage?: number;
   totalRecords?: number;
   recordsPerPage?: number;
@@ -54,12 +55,14 @@ export default function TableFileLog({
   onOperacionFilterChange,
   onRadicadoFilterChange,
   onFechaFilterChange,
+  auditScope,
   currentPage = 1,
   totalRecords = 0,
   recordsPerPage = 10,
   onPageChange,
   isServerPagination = false,
 }: Props) {
+  const showRadicado = auditScope !== "involved";
   const [modalData, setModalData] = useState<any | null>(null);
   const [page, setPage] = useState(1);
   const rowsPerPage = recordsPerPage;
@@ -67,8 +70,10 @@ export default function TableFileLog({
   // Paginación: usar servidor o cliente según isServerPagination
   const startIndex = isServerPagination ? 0 : (page - 1) * rowsPerPage;
   const endIndex = isServerPagination ? data.length : startIndex + rowsPerPage;
-  const paginatedData = isServerPagination ? data : data.slice(startIndex, endIndex);
-  const totalPages = isServerPagination 
+  const paginatedData = isServerPagination
+    ? data
+    : data.slice(startIndex, endIndex);
+  const totalPages = isServerPagination
     ? Math.max(1, Math.ceil(totalRecords / rowsPerPage))
     : Math.max(1, Math.ceil(data.length / rowsPerPage));
   const displayedPage = isServerPagination ? currentPage : page;
@@ -96,7 +101,6 @@ export default function TableFileLog({
     setModalData(null);
   };
 
-  // Formatear fecha
   const formatDate = (dateString: string) => {
     if (!dateString) return "-";
     const date = new Date(dateString);
@@ -109,7 +113,6 @@ export default function TableFileLog({
     });
   };
 
-  // Obtener badge según tipo de operación
   const getOperationBadge = (operation: string) => {
     const badges = {
       INSERT: "badge-success",
@@ -163,9 +166,6 @@ export default function TableFileLog({
               {/* Fila de filtros */}
               <tr className="bg-base-100">
                 <th>
-                  <div className="text-xs text-base-content/60">-</div>
-                </th>
-                <th>
                   <input
                     className="input input-bordered input-sm w-full"
                     placeholder="Filtrar usuario..."
@@ -202,14 +202,16 @@ export default function TableFileLog({
                 <th>
                   <div className="text-xs text-base-content/60">-</div>
                 </th>
-                <th>
-                  <input
-                    className="input input-bordered input-sm w-full"
-                    placeholder="Filtrar radicado..."
-                    value={radicadoFilter}
-                    onChange={(e) => onRadicadoFilterChange(e.target.value)}
-                  />
-                </th>
+                {showRadicado && (
+                  <th>
+                    <input
+                      className="input input-bordered input-sm w-full"
+                      placeholder="Filtrar radicado..."
+                      value={radicadoFilter}
+                      onChange={(e) => onRadicadoFilterChange(e.target.value)}
+                    />
+                  </th>
+                )}
                 <th>
                   <input
                     type="date"
@@ -253,90 +255,95 @@ export default function TableFileLog({
               ) : (
                 paginatedData.map((log) => {
                   // Determinar si el nombre es un placeholder (Usuario {ID})
-                  const isPlaceholder = log.usuario_nombre.startsWith("Usuario ") && 
-                                       !isNaN(Number(log.usuario_nombre.split(" ")[1]));
-                  
+                  const usuarioNombre = log.usuario_nombre || "";
+                  const isPlaceholder =
+                    usuarioNombre.startsWith("Usuario ") &&
+                    !isNaN(Number(usuarioNombre.split(" ")[1]));
+
                   return (
-                  <tr key={log.id} className="hover">
-                    <td className="font-mono text-sm">{log.id}</td>
-                    <td>
-                      <div className="flex flex-col">
-                        {isPlaceholder ? (
-                          <>
-                            <span className="font-medium text-warning">
-                              ID: {log.usuario_id}
-                            </span>
-                            <span className="text-xs text-warning/70">
-                              ⚠ Nombre no disponible
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="font-medium">
-                              {log.usuario_nombre}
-                            </span>
-                            <span className="text-xs text-base-content/60">
-                              ID: {log.usuario_id}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="badge badge-outline">
-                        {log.tabla_afectada}
-                      </span>
-                    </td>
-                    <td>
-                      <span
-                        className={`badge ${getOperationBadge(
-                          log.tipo_operacion
-                        )} text-white`}
-                      >
-                        {translateOperation(log.tipo_operacion)}
-                      </span>
-                    </td>
-                    <td className="max-w-xs truncate" title={log.descripcion}>
-                      {log.descripcion}
-                    </td>
-                    <td>
-                      {log.expediente_radicado ? (
-                        <span className="font-mono text-sm">
-                          {log.expediente_radicado}
+                    <tr key={log.id} className="hover">
+                      <td>
+                        <div className="flex flex-col">
+                          {isPlaceholder ? (
+                            <>
+                              <span className="font-medium text-warning">
+                                {log.usuario_documento || "Usuario desconocido"}
+                              </span>
+                              <span className="text-xs text-warning/70">
+                                ⚠ Nombre no disponible
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-medium">
+                                {log.usuario_nombre}
+                              </span>
+                              {log.usuario_documento && (
+                                <span className="text-xs text-base-content/60">
+                                  {log.usuario_documento}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="badge badge-outline">
+                          {log.tabla_afectada}
                         </span>
-                      ) : (
-                        <span className="text-base-content/40">-</span>
-                      )}
-                    </td>
-                    <td className="text-sm">{formatDate(log.fecha)}</td>
-                    <td>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => openModal(log)}
-                        title="Ver detalles"
-                      >
-                        <svg
-                          className="w-5 h-5"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
+                      </td>
+                      <td>
+                        <span
+                          className={`badge ${getOperationBadge(
+                            log.tipo_operacion,
+                          )} text-white`}
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                          />
-                        </svg>
-                      </button>
-                    </td>
-                  </tr>
+                          {translateOperation(log.tipo_operacion)}
+                        </span>
+                      </td>
+                      <td className="max-w-xs truncate" title={log.descripcion}>
+                        {log.descripcion}
+                      </td>
+                      {showRadicado && (
+                        <td>
+                          {log.expediente_radicado ? (
+                            <span className="font-mono text-sm">
+                              {log.expediente_radicado}
+                            </span>
+                          ) : (
+                            <span className="text-base-content/40">-</span>
+                          )}
+                        </td>
+                      )}
+                      <td className="text-sm">{formatDate(log.fecha)}</td>
+                      <td>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => openModal(log)}
+                          title="Ver detalles"
+                        >
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                            />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
                   );
                 })
               )}
@@ -349,9 +356,14 @@ export default function TableFileLog({
       <div className="flex justify-between items-center pt-4 border-t border-base-300 mt-4">
         <div className="text-sm text-base-content/60">
           {isServerPagination ? (
-            <>Mostrando {paginatedData.length} de {totalRecords} registros</>
+            <>
+              Mostrando {paginatedData.length} de {totalRecords} registros
+            </>
           ) : (
-            <>Mostrando {paginatedData.length} de {data.length} registro{data.length !== 1 ? "s" : ""}</>
+            <>
+              Mostrando {paginatedData.length} de {data.length} registro
+              {data.length !== 1 ? "s" : ""}
+            </>
           )}
         </div>
         <div className="join">
@@ -409,6 +421,7 @@ export default function TableFileLog({
           tablaAfectada={modalData.tablaAfectada}
           datosAnteriores={modalData.datos_anteriores}
           datosNuevos={modalData.datos_nuevos}
+          auditScope={auditScope}
         />
       )}
     </div>

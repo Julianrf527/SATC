@@ -14,18 +14,19 @@ class Expediente(Base):
     fecha_creacion = Column(TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(ZoneInfo("America/Bogota")))
     abogado_responsable_id = Column(Integer)
     direccion = Column(String(100))
-    descripcion = Column(String(300))
-    causa_id = Column(Integer, ForeignKey('causa.id', onupdate="CASCADE", ondelete="RESTRICT"))
+    descripcion = Column(String(400))
     archivado = Column(Boolean, default=False)
 
     vereda = relationship("Vereda", back_populates="expedientes")
-    causa = relationship("Causa", back_populates="expedientes")
+    tipos_afectacion = relationship("TipoAfectacion", secondary="expediente_tipo_afectacion")
     quejosos = relationship("Quejoso", secondary="quejoso_expediente", back_populates="expedientes")
-    recursos = relationship("RecursoAfectado", secondary="recurso_expediente", back_populates="expedientes")
+    involucrados = relationship("ExpedienteInvolucrado", back_populates="expediente", cascade="all, delete-orphan")
+    recursos = relationship("RecursoAfectado", secondary="expediente_recurso", back_populates="expedientes")
     radicados_asociados = relationship("RadicadoAsociado", back_populates="expediente", cascade="all, delete-orphan")
     etapa_respuesta = relationship("EtapaRespuesta", back_populates="expediente", cascade="all, delete-orphan")
+    etapa_cierre = relationship("EtapaCierre", back_populates="expediente", cascade="all, delete-orphan")
     informes_tecnicos = relationship("InformeTecnico", back_populates="expediente", cascade="all, delete-orphan")
-    etapa_concepto = relationship("EtapaConcepto", back_populates="expediente", uselist=False, cascade="all, delete-orphan")
+    etapa_acoger_concepto = relationship("EtapaAcogerConcepto", back_populates="expediente", uselist=False, cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('ix_expediente_fecha_creacion', 'fecha_creacion'),

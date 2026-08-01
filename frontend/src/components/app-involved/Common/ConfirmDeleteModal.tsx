@@ -17,7 +17,6 @@ export default function ConfirmDeleteInvolvedModal({
   if (!isOpen) return null;
   const [theme, setTheme] = useState<string>("emerald");
 
-  // Detectar el tema actual del documento
     useEffect(() => {
       const updateTheme = () => {
         const currentTheme =
@@ -26,10 +25,8 @@ export default function ConfirmDeleteInvolvedModal({
         setTheme(currentTheme);
       };
   
-      // Actualizar tema al montar
       updateTheme();
   
-      // Observar cambios en el atributo data-theme
       const observer = new MutationObserver(updateTheme);
       const targetNode = document.querySelector("[data-theme]");
   

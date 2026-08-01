@@ -15,6 +15,8 @@ export default function EncargadoExpedienteLayout({ setToast }: Props) {
         lista: API_CONFIG.ENDPOINTS.FILES,
         bulkUpdate: API_CONFIG.ENDPOINTS.FILE_BULK_UPDATE_ENCARGADO,
       }}
+      title="Asignar Encargados"
+      modulo="Módulo Sancionatorio"
       setToast={setToast}
     />
   );

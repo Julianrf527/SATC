@@ -32,7 +32,6 @@ export default function ConfirmationModal({
     );
   });
 
-  // Detectar tema - se actualiza cuando se abre el modal y cuando cambia el tema
   useEffect(() => {
     if (!isOpen) return;
 
@@ -43,10 +42,8 @@ export default function ConfirmationModal({
       setTheme(currentTheme);
     };
 
-    // Actualizar tema inmediatamente al abrir
     updateTheme();
 
-    // Escuchar evento custom de cambio de tema
     const handleThemeChange = (e: Event) => {
       const customEvent = e as CustomEvent<{ theme: string }>;
       setTheme(customEvent.detail.theme);

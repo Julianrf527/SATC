@@ -3,15 +3,12 @@ from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import os
 
-# URL de conexión a la base de datos (ejemplo con PostgreSQL)
-# Puedes cambiarla por la que uses: MySQL, SQLite, etc.
 load_dotenv()
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL"
 )
 
-# Crear el motor asíncrono con configuración UTF-8 para PostgreSQL
 engine = create_async_engine(
     DATABASE_URL,
     connect_args={
@@ -20,23 +17,20 @@ engine = create_async_engine(
     pool_pre_ping=True
 )
 
-# Crear la sesión local
 SessionLocal = sessionmaker(
     bind=engine,
     class_=AsyncSession,
     expire_on_commit=False
 )
 
-# Crear tablas y vista al iniciar
 async def init_db():
     from . import models
     from sqlalchemy import text
 
     async with engine.begin() as conn:
-        # 1. Crear tablas desde los modelos ORM
         await conn.run_sync(models.Base.metadata.create_all)
 
-        # 2. Crear la vista vista_documentos_detalle (las vistas no las crea create_all)
+        # create_all no crea vistas, hay que emitir el DDL a mano.
         await conn.execute(text("""
             CREATE OR REPLACE VIEW vista_documentos_detalle AS
             SELECT

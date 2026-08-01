@@ -1,17 +1,13 @@
 import { apiCall, API_CONFIG } from "./api";
 
-/**
- * Upload a single file to the app-docs service
- * @param file - The file to upload
- * @param fileName - The name to give the file
- * @returns Promise<number> - The file ID from app-docs
- */
+/** Sube un archivo a app-docs y devuelve su file_id. */
 export async function uploadFileToDocuments(
   file: File,
   fileName: string,
 ): Promise<number> {
   const formData = new FormData();
-  formData.append("file", file, fileName);
+  // app-docs espera el archivo en el campo multipart "archivo"
+  formData.append("archivo", file, fileName);
 
   const uploadRes = await apiCall(API_CONFIG.ENDPOINTS.FILE_UPLOAD, {
     method: "POST",
@@ -22,18 +18,17 @@ export async function uploadFileToDocuments(
     throw new Error(uploadRes.detail || "Error al subir el archivo");
   }
 
-  if (!uploadRes.data?.file_id) {
+  // El backend puede retornar file_id en raíz o dentro de data según endpoint/proxy.
+  const fileId = uploadRes.file_id ?? uploadRes.data?.file_id;
+
+  if (!fileId) {
     throw new Error("No se recibió el ID del archivo subido");
   }
 
-  return uploadRes.data.file_id;
+  return fileId;
 }
 
-/**
- * Upload multiple files in parallel to the app-docs service
- * @param files - Array of files with their desired names
- * @returns Promise<number[]> - Array of file IDs in same order as input
- */
+/** Sube archivos en paralelo; los IDs vuelven en el mismo orden de entrada. */
 export async function uploadMultipleFiles(
   files: { file: File; fileName: string }[],
 ): Promise<number[]> {
@@ -44,14 +39,7 @@ export async function uploadMultipleFiles(
   return Promise.all(uploadPromises);
 }
 
-/**
- * Generate a standardized document filename
- * @param prefix - Document type prefix (e.g., 'NOTIF', 'CITAC', 'AUTO', 'RES')
- * @param numerado - Document number
- * @param fecha - Date in YYYY-MM-DD format
- * @param extension - File extension (default: 'pdf')
- * @returns Formatted filename
- */
+/** Nombre estandarizado `PREFIJO_numerado_YYYYMMDD.ext` (prefijo: NOTIF, CITAC, AUTO, RES…). */
 export function generateDocumentFileName(
   prefix: string,
   numerado: string,
@@ -62,13 +50,6 @@ export function generateDocumentFileName(
   return `${prefix}_${numerado}_${cleanDate}.${extension}`;
 }
 
-/**
- * Validate a file before upload
- * @param file - The file to validate
- * @param allowedTypes - Array of allowed MIME types (default: ['application/pdf'])
- * @param maxSizeBytes - Maximum file size in bytes (default: 10MB)
- * @returns Validation result with error message if invalid
- */
 export function validateFile(
   file: File,
   allowedTypes: string[] = ["application/pdf"],
@@ -92,16 +73,10 @@ export function validateFile(
   return { isValid: true };
 }
 
-/**
- * File upload error types for better error handling
- */
 export class FileUploadError extends Error {
   public cause?: Error;
 
-  constructor(
-    message: string,
-    cause?: Error,
-  ) {
+  constructor(message: string, cause?: Error) {
     super(message);
     this.name = "FileUploadError";
     this.cause = cause;

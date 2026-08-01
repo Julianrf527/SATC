@@ -22,7 +22,6 @@ export default function CardNotification({
   const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
 
-  // Obtener configuración del tipo o usar valores por defecto
   const typeConfig = NOTIFICATION_TYPES[
     tipo as keyof typeof NOTIFICATION_TYPES
   ] || {
@@ -60,11 +59,9 @@ export default function CardNotification({
       if (res.ok) {
         onRemove();
       } else {
-        /* console.log(res.detail || "Error desconocido"); */
         setIsDeleting(false);
       }
     } catch (error) {
-      /* console.log(error); */
       setIsDeleting(false);
     }
   };
@@ -73,11 +70,9 @@ export default function CardNotification({
     if (typeConfig.hasRoute && typeConfig.route) {
       const route = typeConfig.route(idVinculada);
 
-      // Si route es un objeto con pathname y state, usar navigate con opciones
       if (typeof route === "object" && "pathname" in route) {
         navigate(route.pathname, { state: route.state });
       } else {
-        // Si es un string simple, navegar directamente
         navigate(route);
       }
     }
@@ -201,7 +196,6 @@ export default function CardNotification({
   );
 }
 
-// Configuración de tipos de notificación
 const NOTIFICATION_TYPES = {
   documento: {
     icon: (
@@ -250,7 +244,7 @@ const NOTIFICATION_TYPES = {
       state: { radicadoToSelect: id, timestamp: Date.now() },
     }),
     label: "Expediente",
-  }, //Ej otro tipo
+  },
   licencia: {
     icon: (
       <svg
@@ -271,5 +265,26 @@ const NOTIFICATION_TYPES = {
     hasRoute: true,
     route: (id: string) => `/licencias/${id}`,
     label: "Licencia",
+  },
+  informe_tecnico: {
+    icon: (
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+        />
+      </svg>
+    ),
+    color: "warning",
+    hasRoute: false,
+    route: null,
+    label: "Informe Técnico",
   },
 };

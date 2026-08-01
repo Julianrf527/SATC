@@ -1,570 +1,476 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
-from pydantic import BaseModel, EmailStr
+"""Rutas de gestión de involucrados (personas naturales/jurídicas del sistema SATC)."""
+
 import logging
+from datetime import datetime
 from typing import Optional
 
-#----- DB -----
+from fastapi import APIRouter, Depends, HTTPException, Request, Query, Path, Body
+from sqlalchemy import select, and_, func
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.deps import get_db
-from db.models.involucrado import Involucrado
-from db.models.auditoria import Auditoria
 from core.permission import Permisos
+from db.deps import get_db_managed
+from db.models.auditoria import Auditoria
+from db.models.involucrado import Involucrado
+from services.auditoria import insert_auditoria
+from services.users import get_user_info, verify_permission
+from utils.functions import (
+    format_involucrado_response,
+    format_auditoria_response,
+    resolver_identidad_usuario,
+    verificar_involucrado_existe,
+)
+from utils.verify_token import verify_gateway_token, verify_service_token
+
+from .models.involved_models import (
+    InvolucradoCreate,
+    InvolucradoUpdate,
+    BulkInvolucradoRequest,
+)
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
 INVOLVED_MANAGE = Permisos.INVOLVED_MANAGE
 INVOLVED_LOG = Permisos.INVOLVED_LOG
 
-# ---------- LOGGER ------------
+# Techo duro para el filtrado en memoria del log de auditoría (ver obtener_auditoria).
+MAX_FILAS_POST_FILTRO = 5000
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
+
+async def _exigir_permiso(request: Request, permiso: str, mensaje: str) -> dict:
+    """Valida gateway + permiso y devuelve la identidad del usuario.
+
+    Un permiso faltante siempre es 403 y se resuelve ANTES de tocar la BD, para
+    que la respuesta no dependa nunca de si el recurso pedido existe o no.
+    """
+    token_data = verify_gateway_token(request)
+    if not await verify_permission(token_data["user_id"], permiso):
+        raise HTTPException(status_code=403, detail=mensaje)
+    return token_data
+
+
+async def _registrar_auditoria_o_fallar(db: AsyncSession, **kwargs) -> None:
+    """Inserta el registro de auditoría dentro de la transacción en curso.
+
+    Si la auditoría no se puede escribir se aborta la operación completa: un
+    cambio sobre datos personales sin traza es peor que no hacer el cambio.
+    """
+    resultado = await insert_auditoria(db=db, **kwargs)
+    if not resultado.get("ok"):
+        logger.error(f"Error al guardar auditoría: {resultado.get('error')}")
+        raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
+
+
+def _contexto_peticion(request: Request) -> dict:
+    return {
+        "ip_address": request.client.host if request.client else None,
+        "user_agent": request.headers.get("user-agent"),
+    }
+
+
+@router.get(
+    "/search/{tipo_documento}/{numero_documento}",
+    summary="Buscar involucrado por documento",
+    description="Busca un involucrado por tipo y número de documento. Para NITs el dígito de verificación es opcional.",
+    tags=["Involucrados - Consulta"],
+    responses={
+        200: {"description": "Resultado de la búsqueda (ok=false si no existe)"},
+        400: {"description": "Número de documento inválido"},
+        403: {"description": "No tiene permisos para consultar involucrados"},
+    },
 )
-logger = logging.getLogger(__name__)
-
-# Modelos Pydantic
-class InvolucradoCreate(BaseModel):
-    numero_documento: str
-    digito_verificacion: str | None = None
-    tipo_documento: str
-    nombre: str
-    celular: str
-    correo: EmailStr
-
-class InvolucradoUpdate(BaseModel):
-    nombre: str
-    celular: str
-    correo: EmailStr
-    digito_verificacion: str | None = None
-
-class BulkInvolucradoRequest(BaseModel):
-    ids: list[int]
-    tipo_documento: str | None = None
-
-class AuditoriaQueryParams(BaseModel):
-    page: int = 1
-    limit: int = 10
-    usuario_id: Optional[int] = None
-    documento_usuario: Optional[str] = None
-    nombre_usuario: Optional[str] = None
-    tipo_evento: Optional[str] = None
-    resultado: Optional[str] = None
-    fecha_desde: Optional[str] = None  # YYYY-MM-DD
-    fecha_hasta: Optional[str] = None  # YYYY-MM-DD
-
-#----------- FUNCIONES ------------
-
-from services.crud_file_operations import insert_auditoria
-from utils.verify_token import verify_gateway_token
-from utils.verify_permission import verify_permission
-
-# -------- ENDPOINTS -------
-
-@router.get("/search/{tipo_documento}/{numero_documento}")
 async def buscar_involucrado(
     request: Request,
-    tipo_documento: str,
-    numero_documento: str,
-    dv: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    tipo_documento: str = Path(..., description="Tipo de documento (CC, NIT, CE, etc.)"),
+    numero_documento: str = Path(..., description="Número de documento a buscar"),
+    dv: Optional[str] = Query(None, description="Dígito de verificación (solo para NIT)", max_length=2),
+    db: AsyncSession = Depends(get_db_managed),
 ):
-    """
-    Buscar involucrado por tipo y número de documento.
-    Para NITs, el dígito de verificación (dv) es opcional como query parameter.
-    """
+    await _exigir_permiso(request, INVOLVED_MANAGE, "No tiene permisos para consultar involucrados")
+
     try:
-        verify_gateway_token(request)
+        numero_int = int(numero_documento)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Número de documento inválido. Debe ser numérico.")
 
-        try:
-            numero_int = int(numero_documento)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Número de documento inválido")
+    involucrado = await verificar_involucrado_existe(
+        db=db,
+        numero_documento=numero_int,
+        tipo_documento=tipo_documento,
+        digito_verificacion=dv,
+    )
 
-        conditions = [
-            Involucrado.numero_documento == numero_int,
-            Involucrado.tipo_documento == tipo_documento
-        ]
+    if not involucrado:
+        return {"ok": False, "data": None, "detail": "Involucrado no encontrado"}
 
-        if tipo_documento == "NIT" and dv:
-            conditions.append(Involucrado.digito_verificacion == dv)
+    return {"ok": True, "data": format_involucrado_response(involucrado)}
 
-        stmt = select(Involucrado).where(and_(*conditions))
-        result = await db.execute(stmt)
-        involucrado = result.scalar_one_or_none()
 
-        if not involucrado:
-            raise HTTPException(status_code=404, detail="Involucrado no encontrado")
-
-        return {
-            "ok": True,
-            "data": {
-                "id": involucrado.id,
-                "numero_documento": involucrado.numero_documento,
-                "digito_verificacion": involucrado.digito_verificacion,
-                "tipo_documento": involucrado.tipo_documento,
-                "nombre": involucrado.nombre,
-                "celular": involucrado.celular,
-                "correo": involucrado.correo
-            }
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error buscando involucrado: {e}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
-
-@router.get("/{involucrado_id}")
-async def obtener_involucrado_por_id(
-    request: Request,
-    involucrado_id: int,
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        verify_gateway_token(request)
-
-        stmt = select(Involucrado).where(Involucrado.id == involucrado_id)
-        result = await db.execute(stmt)
-        involucrado = result.scalar_one_or_none()
-
-        if not involucrado:
-            raise HTTPException(status_code=404, detail="Involucrado no encontrado")
-
-        return {
-            "ok": True,
-            "data": {
-                "id": involucrado.id,
-                "numero_documento": involucrado.numero_documento,
-                "digito_verificacion": involucrado.digito_verificacion,
-                "tipo_documento": involucrado.tipo_documento,
-                "nombre": involucrado.nombre,
-                "celular": involucrado.celular,
-                "correo": involucrado.correo
-            }
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error buscando involucrado: {e}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
-
-@router.post("/new")
-async def crear_involucrado(
-    request: Request,
-    involucrado: InvolucradoCreate,
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        token_data = verify_gateway_token(request)["user_id"]
-
-        try:
-            numero_documento_int = int(involucrado.numero_documento)
-            celular_int = int(involucrado.celular)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Número de documento o celular inválido")
-        
-        # Validar dígito de verificación si está presente
-        if involucrado.digito_verificacion and len(involucrado.digito_verificacion) > 2:
-            raise HTTPException(status_code=400, detail="Dígito de verificación debe tener máximo 2 caracteres")
-        
-        # Construir condiciones de unicidad
-        conditions = [
-            Involucrado.numero_documento == numero_documento_int,
-            Involucrado.tipo_documento == involucrado.tipo_documento
-        ]
-        
-        # Si es NIT, incluir el DV en la verificación de unicidad
-        if involucrado.tipo_documento == "NIT" and involucrado.digito_verificacion:
-            conditions.append(Involucrado.digito_verificacion == involucrado.digito_verificacion)
-            
-        stmt = select(Involucrado).where(and_(*conditions))
-        result = await db.execute(stmt)
-        existing = result.scalar_one_or_none()
-        
-        if existing:
-            raise HTTPException(
-                status_code=400, 
-                detail="Ya existe un involucrado con ese documento y tipo"
-            )
-        
-        # Crear nuevo involucrado
-        new_involucrado = Involucrado(
-            numero_documento=numero_documento_int,
-            digito_verificacion=involucrado.digito_verificacion if involucrado.digito_verificacion else None,
-            tipo_documento=involucrado.tipo_documento,
-            nombre=involucrado.nombre,
-            celular=celular_int,
-            correo=involucrado.correo.lower()
-        )
-        
-        db.add(new_involucrado)
-        await db.commit()
-        await db.refresh(new_involucrado)
-
-        # Log de auditoría
-        await insert_auditoria(
-            db=db,
-            usuario_id=token_data["user_id"],
-            tipo_evento="CREAR_INVOLUCRADO",
-            resultado="EXITOSO",
-            ip_address=request.client.host if request.client else None,
-            user_agent=request.headers.get("user-agent"),
-            detalle=f"Creación de involucrado documento={numero_documento_int} ({involucrado.tipo_documento}), nombre='{involucrado.nombre}', correo={involucrado.correo.lower()}",
-            documento_usuario=token_data.get("documento"),
-            nombre_usuario=token_data.get("nombre"),
-            datos_nuevos={
-                "id": new_involucrado.id,
-                "numero_documento": numero_documento_int,
-                "digito_verificacion": involucrado.digito_verificacion,
-                "tipo_documento": involucrado.tipo_documento,
-                "nombre": involucrado.nombre,
-                "celular": celular_int,
-                "correo": involucrado.correo.lower()
-            }
-        )
-        
-        return {
-            "ok": True,
-            "data": {
-                "id": new_involucrado.id,
-                "numero_documento": new_involucrado.numero_documento,
-                "digito_verificacion": new_involucrado.digito_verificacion,
-                "tipo_documento": new_involucrado.tipo_documento,
-                "nombre": new_involucrado.nombre,
-                "celular": new_involucrado.celular,
-                "correo": new_involucrado.correo
-            }
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error creando involucrado: {e}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
-
-@router.put("/{involucrado_id}")
-async def actualizar_involucrado(
-    request: Request,
-    involucrado_id: int,
-    involucrado_update: InvolucradoUpdate,
-    db: AsyncSession = Depends(get_db),
-):
-    try:
-        token_data = verify_gateway_token(request)
-        verify_permission(token_data, INVOLVED_MANAGE)
-
-        # Buscar involucrado existente
-        stmt = select(Involucrado).where(Involucrado.id == involucrado_id)
-        result = await db.execute(stmt)
-        involucrado = result.scalar_one_or_none()
-        
-        if not involucrado:
-            raise HTTPException(status_code=404, detail="Involucrado no encontrado")
-        
-        # Guardar estado anterior para auditoría
-        datos_anteriores = {
-            "id": involucrado.id,
-            "numero_documento": involucrado.numero_documento,
-            "tipo_documento": involucrado.tipo_documento,
-            "nombre": involucrado.nombre,
-            "celular": involucrado.celular,
-            "correo": involucrado.correo,
-            "digito_verificacion": involucrado.digito_verificacion
-        }
-        
-        # Actualizar campos
-        involucrado.nombre = involucrado_update.nombre
-        involucrado.celular = involucrado_update.celular
-        involucrado.correo = involucrado_update.correo.lower()
-        involucrado.digito_verificacion = involucrado_update.digito_verificacion if involucrado_update.digito_verificacion else None
-        
-        await db.commit()
-        await db.refresh(involucrado)
-
-        # Log de auditoría
-        await insert_auditoria(
-            db=db,
-            usuario_id=int(token_data["user_id"]),
-            tipo_evento="ACTUALIZAR_INVOLUCRADO",
-            resultado="EXITOSO",
-            ip_address=request.client.host if request.client else None,
-            user_agent=request.headers.get("user-agent"),
-            detalle=f"Actualización de involucrado id={involucrado.id}, documento={involucrado.numero_documento} ({involucrado.tipo_documento}), nombre='{involucrado.nombre}'",
-            documento_usuario=token_data.get("documento"),
-            nombre_usuario=token_data.get("nombre"),
-            datos_anteriores=datos_anteriores,
-            datos_nuevos={
-                "id": involucrado.id,
-                "numero_documento": involucrado.numero_documento,
-                "tipo_documento": involucrado.tipo_documento,
-                "nombre": involucrado.nombre,
-                "celular": involucrado.celular,
-                "correo": involucrado.correo,
-                "digito_verificacion": involucrado.digito_verificacion
-            }
-        )
-        
-        return {
-            "ok": True,
-            "data": {
-                "id": involucrado.id,
-                "numero_documento": involucrado.numero_documento,
-                "digito_verificacion": involucrado.digito_verificacion,
-                "tipo_documento": involucrado.tipo_documento,
-                "nombre": involucrado.nombre,
-                "celular": involucrado.celular,
-                "correo": involucrado.correo
-            }
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error actualizando involucrado: {e}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
-
-@router.get("/manage")
+@router.get(
+    "/manage",
+    summary="Listar involucrados con paginación",
+    description="Lista involucrados con paginación y filtros opcionales. Requiere permiso de gestión.",
+    tags=["Involucrados - Gestión"],
+    responses={
+        200: {"description": "Lista paginada de involucrados"},
+        403: {"description": "No tiene permisos para gestionar involucrados"},
+    },
+)
 async def listar_involucrados_paginado(
     request: Request,
-    page: int = 1,
-    limit: int = 10,
-    numero_documento: Optional[str] = None,
-    tipo_documento: Optional[str] = None,
-    nombre: Optional[str] = None,
-    correo: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    page: int = Query(1, ge=1, description="Número de página"),
+    limit: int = Query(10, ge=1, le=100, description="Registros por página"),
+    numero_documento: Optional[str] = Query(None, description="Filtrar por número de documento"),
+    tipo_documento: Optional[str] = Query(None, description="Filtrar por tipo de documento"),
+    nombre: Optional[str] = Query(None, description="Filtrar por nombre (búsqueda parcial)"),
+    correo: Optional[str] = Query(None, description="Filtrar por correo (búsqueda parcial)"),
+    db: AsyncSession = Depends(get_db_managed),
 ):
-    """
-    Lista involucrados con paginación y filtros.
-    Requiere permiso: involucrado_gestionar
-    """
-    try:
-        token_data = verify_gateway_token(request)
-        verify_permission(token_data, INVOLVED_MANAGE)
-        
-        # Query base
-        query = select(Involucrado)
-        count_query = select(func.count()).select_from(Involucrado)
-        
-        # Aplicar filtros
-        conditions = []
-        
-        if numero_documento:
-            try:
-                num_doc = int(numero_documento)
-                conditions.append(Involucrado.numero_documento == num_doc)
-            except ValueError:
-                pass  # Ignorar si no es número válido
-        
-        if tipo_documento:
-            conditions.append(Involucrado.tipo_documento == tipo_documento)
-        
-        if nombre:
-            conditions.append(Involucrado.nombre.ilike(f"%{nombre}%"))
-        
-        if correo:
-            conditions.append(Involucrado.correo.ilike(f"%{correo}%"))
-        
-        if conditions:
-            query = query.where(and_(*conditions))
-            count_query = count_query.where(and_(*conditions))
-        
-        # Contar total
-        total_count = await db.scalar(count_query) or 0
-        
-        # Paginación
-        offset = (page - 1) * limit
-        query = query.offset(offset).limit(limit).order_by(Involucrado.id.desc())
-        
-        # Ejecutar
-        result = await db.execute(query)
-        involucrados = result.scalars().all()
-        
-        # Formatear respuesta
-        data = [
-            {
-                "id": inv.id,
-                "numero_documento": inv.numero_documento,
-                "digito_verificacion": inv.digito_verificacion,
-                "tipo_documento": inv.tipo_documento,
-                "nombre": inv.nombre,
-                "celular": inv.celular,
-                "correo": inv.correo
-            }
-            for inv in involucrados
-        ]
+    await _exigir_permiso(request, INVOLVED_MANAGE, "No tiene permisos para gestionar involucrados")
 
-        return {
-            "ok": True,
-            "data": data,
-            "page": page,
-            "limit": limit,
-            "totalCount": total_count
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error listando involucrados: {e}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
+    conditions = []
 
-@router.get("/log")
+    if numero_documento:
+        try:
+            conditions.append(Involucrado.numero_documento == int(numero_documento))
+        except ValueError:
+            # Un filtro no numérico no puede casar con ninguna fila: lista vacía,
+            # no un 400 que rompería el tipeo incremental del buscador.
+            return {"ok": True, "data": [], "page": page, "limit": limit, "totalCount": 0}
+
+    if tipo_documento:
+        conditions.append(Involucrado.tipo_documento == tipo_documento)
+    if nombre:
+        conditions.append(Involucrado.nombre.ilike(f"%{nombre}%"))
+    if correo:
+        conditions.append(Involucrado.correo.ilike(f"%{correo}%"))
+
+    query = select(Involucrado)
+    count_query = select(func.count()).select_from(Involucrado)
+    if conditions:
+        query = query.where(and_(*conditions))
+        count_query = count_query.where(and_(*conditions))
+
+    total_count = await db.scalar(count_query) or 0
+
+    query = query.order_by(Involucrado.id.desc()).offset((page - 1) * limit).limit(limit)
+    involucrados = (await db.execute(query)).scalars().all()
+
+    return {
+        "ok": True,
+        "data": [format_involucrado_response(inv) for inv in involucrados],
+        "page": page,
+        "limit": limit,
+        "totalCount": total_count,
+    }
+
+
+@router.get(
+    "/log",
+    summary="Consultar log de auditoría",
+    description="Log de auditoría de involucrados con filtros y paginación. Requiere permiso de auditoría.",
+    tags=["Involucrados - Auditoría"],
+    responses={
+        200: {"description": "Log de auditoría obtenido"},
+        400: {"description": "Formato de fecha inválido"},
+        403: {"description": "No tiene permisos para consultar logs"},
+    },
+)
 async def obtener_auditoria(
     request: Request,
-    page: int = 1,
-    limit: int = 10,
-    usuario_id: Optional[int] = None,
-    documento_usuario: Optional[str] = None,
-    nombre_usuario: Optional[str] = None,
-    tipo_evento: Optional[str] = None,
-    resultado: Optional[str] = None,
-    fecha_desde: Optional[str] = None,  # YYYY-MM-DD
-    fecha_hasta: Optional[str] = None,  # YYYY-MM-DD
-    db: AsyncSession = Depends(get_db)
+    page: int = Query(1, ge=1, description="Número de página"),
+    limit: int = Query(10, ge=1, le=500, description="Registros por página"),
+    offset: Optional[int] = Query(None, ge=0, description="Offset (alternativa a page)"),
+    usuario_id: Optional[int] = Query(None, description="Filtrar por ID de usuario"),
+    documento_usuario: Optional[str] = Query(None, description="Filtrar por documento de usuario"),
+    nombre_usuario: Optional[str] = Query(None, description="Filtrar por nombre de usuario"),
+    tipo_evento: Optional[str] = Query(None, description="Filtrar por tipo de evento"),
+    resultado: Optional[str] = Query(None, description="Filtrar por resultado (EXITOSO/ERROR)"),
+    fecha_inicio: Optional[str] = Query(None, description="Fecha inicio (YYYY-MM-DD)"),
+    fecha_fin: Optional[str] = Query(None, description="Fecha fin (YYYY-MM-DD)"),
+    db: AsyncSession = Depends(get_db_managed),
 ):
-    """
-    Consulta la auditoría de operaciones sobre involucrados.
-    Filtros disponibles:
-    - usuario_id: ID interno del usuario
-    - documento_usuario: Número de documento del usuario (filtro parcial)
-    - nombre_usuario: Nombre del usuario (filtro parcial)
-    - tipo_evento: Tipo de operación realizada
-    - resultado: Resultado de la operación (EXITOSO/ERROR)
-    - fecha_desde/fecha_hasta: Rango de fechas (formato YYYY-MM-DD)
-    Requiere permisos de administrador.
-    """
-    try:
-        token_data = verify_gateway_token(request)
-        verify_permission(token_data, INVOLVED_LOG)
+    await _exigir_permiso(request, INVOLVED_LOG, "No tiene permisos para consultar logs de auditoría")
 
-        # Query base
-        query = select(Auditoria)
-        count_query = select(func.count()).select_from(Auditoria)
+    conditions = []
+    if usuario_id:
+        conditions.append(Auditoria.usuario_id == usuario_id)
+    if tipo_evento:
+        conditions.append(Auditoria.tipo_evento == tipo_evento)
+    if resultado:
+        conditions.append(Auditoria.resultado == resultado)
 
-        # Aplicar filtros
-        conditions = []
+    if fecha_inicio:
+        try:
+            conditions.append(Auditoria.fecha >= datetime.fromisoformat(fecha_inicio))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de fecha_inicio inválido. Use YYYY-MM-DD")
 
-        if usuario_id:
-            conditions.append(Auditoria.usuario_id == usuario_id)
+    if fecha_fin:
+        try:
+            # Se extiende al final del día para que el rango sea inclusivo.
+            fin = datetime.fromisoformat(fecha_fin).replace(hour=23, minute=59, second=59)
+            conditions.append(Auditoria.fecha <= fin)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de fecha_fin inválido. Use YYYY-MM-DD")
 
-        if documento_usuario:
-            conditions.append(Auditoria.documento_usuario.ilike(f"%{documento_usuario}%"))
+    query = select(Auditoria)
+    count_query = select(func.count()).select_from(Auditoria)
+    if conditions:
+        query = query.where(and_(*conditions))
+        count_query = count_query.where(and_(*conditions))
 
-        if nombre_usuario:
-            conditions.append(Auditoria.nombre_usuario.ilike(f"%{nombre_usuario}%"))
+    total_count = await db.scalar(count_query) or 0
+    effective_offset = offset if offset is not None else (page - 1) * limit
 
-        if tipo_evento:
-            conditions.append(Auditoria.tipo_evento == tipo_evento)
+    # nombre_usuario/documento_usuario viven en app-users, no en esta BD, así que
+    # solo se pueden aplicar después de resolver los usuarios. Eso obliga a traer
+    # más filas de las que se devuelven; MAX_FILAS_POST_FILTRO acota el costo para
+    # que el endpoint no cargue la tabla de auditoría entera en memoria.
+    filtra_en_memoria = bool(documento_usuario or nombre_usuario)
+    query = query.order_by(Auditoria.fecha.desc())
+    if filtra_en_memoria:
+        query = query.limit(MAX_FILAS_POST_FILTRO)
+    else:
+        query = query.offset(effective_offset).limit(limit)
 
-        if resultado:
-            conditions.append(Auditoria.resultado == resultado)
+    auditorias = (await db.execute(query)).scalars().all()
 
-        if fecha_desde:
-            try:
-                from datetime import datetime
-                fecha_inicio = datetime.strptime(fecha_desde, "%Y-%m-%d")
-                conditions.append(Auditoria.fecha >= fecha_inicio)
-            except ValueError:
-                raise HTTPException(status_code=400, detail="Fecha desde inválida. Use formato YYYY-MM-DD")
+    user_ids = list({aud.usuario_id for aud in auditorias if aud.usuario_id})
+    users_info = await get_user_info(user_ids) if user_ids else {}
 
-        if fecha_hasta:
-            try:
-                from datetime import datetime, timedelta
-                fecha_fin = datetime.strptime(fecha_hasta, "%Y-%m-%d") + timedelta(days=1)
-                conditions.append(Auditoria.fecha < fecha_fin)
-            except ValueError:
-                raise HTTPException(status_code=400, detail="Fecha hasta inválida. Use formato YYYY-MM-DD")
+    data = []
+    for aud in auditorias:
+        user_info = users_info.get(aud.usuario_id, {})
+        usuario_nombre, usuario_documento = resolver_identidad_usuario(aud.usuario_id, user_info)
 
-        if conditions:
-            query = query.where(and_(*conditions))
-            count_query = count_query.where(and_(*conditions))
+        if nombre_usuario and nombre_usuario.lower() not in usuario_nombre.lower():
+            continue
+        if documento_usuario and documento_usuario.strip() not in usuario_documento:
+            continue
 
-        # Contar total
-        total_count = await db.scalar(count_query) or 0
+        data.append(format_auditoria_response(aud, user_info))
 
-        # Paginación
-        offset = (page - 1) * limit
-        query = query.offset(offset).limit(limit).order_by(Auditoria.fecha.desc(), Auditoria.id.desc())
+    if filtra_en_memoria:
+        total_count = len(data)
+        data = data[effective_offset:effective_offset + limit]
 
-        # Ejecutar
-        result = await db.execute(query)
-        auditorias = result.scalars().all()
-
-        # Formatear respuesta
-        data = [
-            {
-                "id": aud.id,
-                "usuario_id": aud.usuario_id,
-                "documento_usuario": aud.documento_usuario,
-                "nombre_usuario": aud.nombre_usuario,
-                "tipo_evento": aud.tipo_evento,
-                "resultado": aud.resultado,
-                "ip_address": aud.ip_address,
-                "user_agent": aud.user_agent,
-                "fecha": str(aud.fecha),
-                "detalle": aud.detalle,
-                "datos_anteriores": aud.datos_anteriores,
-                "datos_nuevos": aud.datos_nuevos
-            }
-            for aud in auditorias
-        ]
-
-        return {
-            "ok": True,
-            "data": data,
+    return {
+        "ok": True,
+        "data": data,
+        "msg": f"Se encontraron {total_count} registros",
+        "pagination": {
             "page": page,
             "limit": limit,
-            "totalCount": total_count
-        }
+            "total": total_count,
+            "pages": (total_count + limit - 1) // limit if total_count > 0 else 0,
+        },
+    }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error consultando auditoría: {e}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
 
-# Endpoint interno
-@router.post("/bulk")
-async def obtener_involucrados_por_ids(
+@router.post(
+    "/bulk",
+    summary="Consulta masiva de involucrados",
+    description="Obtiene múltiples involucrados por sus IDs. Endpoint service-to-service.",
+    tags=["Involucrados - Interno"],
+    responses={
+        200: {"description": "Lista de involucrados obtenida"},
+        403: {"description": "Service token ausente o inválido"},
+    },
+)
+async def obtener_involucrados_bulk(
     request: Request,
-    body: BulkInvolucradoRequest,
-    db: AsyncSession = Depends(get_db),
+    bulk_request: BulkInvolucradoRequest = Body(...),
+    db: AsyncSession = Depends(get_db_managed),
 ):
-    """
-    Obtiene múltiples involucrados por una lista de IDs.
-    Opcionalmente filtra por tipo_documento.
-    """
+    # Solo service-to-service: nunca se entra por gateway/frontend
+    # (ver verify_service_token para por qué el X-Gateway-Token no basta).
+    verify_service_token(request)
+
+    conditions = [Involucrado.id.in_(bulk_request.ids)]
+    if bulk_request.tipo_documento:
+        conditions.append(Involucrado.tipo_documento == bulk_request.tipo_documento)
+
+    involucrados = (await db.execute(select(Involucrado).where(and_(*conditions)))).scalars().all()
+    data = [format_involucrado_response(inv) for inv in involucrados]
+
+    return {"ok": True, "data": data, "total": len(data)}
+
+
+@router.post(
+    "/new",
+    summary="Crear nuevo involucrado",
+    description="Crea un nuevo involucrado. Requiere permiso de gestión.",
+    tags=["Involucrados - Gestión"],
+    status_code=201,
+    responses={
+        201: {"description": "Involucrado creado"},
+        400: {"description": "El involucrado ya existe"},
+        403: {"description": "No tiene permisos para gestionar involucrados"},
+    },
+)
+async def crear_involucrado(
+    request: Request,
+    involucrado: InvolucradoCreate = Body(...),
+    db: AsyncSession = Depends(get_db_managed),
+):
+    token_data = await _exigir_permiso(request, INVOLVED_MANAGE, "No tiene permisos para gestionar involucrados")
+
+    existing = await verificar_involucrado_existe(
+        db=db,
+        numero_documento=involucrado.numero_documento,
+        tipo_documento=involucrado.tipo_documento,
+        digito_verificacion=involucrado.digito_verificacion,
+    )
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ya existe un involucrado con documento {involucrado.numero_documento} ({involucrado.tipo_documento})",
+        )
+
+    nuevo = Involucrado(
+        numero_documento=involucrado.numero_documento,
+        digito_verificacion=involucrado.digito_verificacion,
+        tipo_documento=involucrado.tipo_documento,
+        nombre=involucrado.nombre,
+        celular=involucrado.celular,
+        correo=involucrado.correo.lower() if involucrado.correo else None,
+        direccion=involucrado.direccion,
+    )
+    db.add(nuevo)
     try:
-        verify_gateway_token(request)
+        await db.flush()
+    except IntegrityError:
+        # El check previo no cierra la ventana de carrera entre dos altas
+        # concurrentes: la constraint UNIQUE es la fuente de verdad, y la
+        # segunda request cae acá como 409 en vez de un 500 crudo de asyncpg.
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"Ya existe un involucrado con documento {involucrado.numero_documento} ({involucrado.tipo_documento})",
+        )
 
-        if not body.ids:
-            return {"ok": True, "data": []}
+    datos_involucrado = format_involucrado_response(nuevo)
 
-        conditions = [Involucrado.id.in_(body.ids)]
-        if body.tipo_documento:
-            conditions.append(Involucrado.tipo_documento == body.tipo_documento)
+    await _registrar_auditoria_o_fallar(
+        db,
+        usuario_id=token_data["user_id"],
+        tipo_evento="CREAR_INVOLUCRADO",
+        resultado="EXITOSO",
+        detalle=f"Se registró el involucrado {involucrado.tipo_documento} {involucrado.numero_documento}: {involucrado.nombre}",
+        datos_nuevos=datos_involucrado,
+        **_contexto_peticion(request),
+    )
 
-        stmt = select(Involucrado).where(and_(*conditions))
-        result = await db.execute(stmt)
-        involucrados = result.scalars().all()
+    await db.commit()
+    logger.info(f"Involucrado creado: {involucrado.tipo_documento}-{involucrado.numero_documento} (ID: {nuevo.id})")
 
-        data = [
-            {
-                "id": inv.id,
-                "numero_documento": inv.numero_documento,
-                "digito_verificacion": inv.digito_verificacion,
-                "tipo_documento": inv.tipo_documento,
-                "nombre": inv.nombre,
-                "celular": inv.celular,
-                "correo": inv.correo,
-            }
-            for inv in involucrados
-        ]
+    return {"ok": True, "data": datos_involucrado, "msg": "Involucrado creado exitosamente"}
 
-        return {"ok": True, "data": data}
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error en bulk de involucrados: {e}")
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
+@router.get(
+    "/{involucrado_id}",
+    summary="Obtener involucrado por ID",
+    description="Obtiene los datos de un involucrado por su ID. Requiere permiso de gestión.",
+    tags=["Involucrados - Consulta"],
+    responses={
+        200: {"description": "Involucrado encontrado"},
+        403: {"description": "No tiene permisos para consultar involucrados"},
+        404: {"description": "Involucrado no encontrado"},
+    },
+)
+async def obtener_involucrado_por_id(
+    request: Request,
+    involucrado_id: int = Path(..., description="ID del involucrado", gt=0),
+    db: AsyncSession = Depends(get_db_managed),
+):
+    await _exigir_permiso(request, INVOLVED_MANAGE, "No tiene permisos para consultar involucrados")
 
+    involucrado = (
+        await db.execute(select(Involucrado).where(Involucrado.id == involucrado_id))
+    ).scalar_one_or_none()
+
+    if not involucrado:
+        raise HTTPException(status_code=404, detail="Involucrado no encontrado")
+
+    return {"ok": True, "data": format_involucrado_response(involucrado)}
+
+
+@router.put(
+    "/{involucrado_id}",
+    summary="Actualizar involucrado",
+    description="Actualiza los datos de un involucrado. Requiere permiso de gestión.",
+    tags=["Involucrados - Gestión"],
+    responses={
+        200: {"description": "Involucrado actualizado"},
+        400: {"description": "El documento nuevo ya pertenece a otro involucrado"},
+        403: {"description": "No tiene permisos para gestionar involucrados"},
+        404: {"description": "Involucrado no encontrado"},
+    },
+)
+async def actualizar_involucrado(
+    request: Request,
+    involucrado_id: int = Path(..., description="ID del involucrado a actualizar", gt=0),
+    involucrado_update: InvolucradoUpdate = Body(...),
+    db: AsyncSession = Depends(get_db_managed),
+):
+    token_data = await _exigir_permiso(request, INVOLVED_MANAGE, "No tiene permisos para gestionar involucrados")
+
+    involucrado = (
+        await db.execute(select(Involucrado).where(Involucrado.id == involucrado_id))
+    ).scalar_one_or_none()
+
+    if not involucrado:
+        raise HTTPException(status_code=404, detail="Involucrado no encontrado")
+
+    datos_anteriores = format_involucrado_response(involucrado)
+
+    # El modal del frontend no siempre manda todos los campos: sin exclude_unset
+    # los ausentes se guardarían como None y borrarían celular/correo/dirección.
+    cambios = involucrado_update.model_dump(exclude_unset=True)
+
+    nuevo_num_doc = cambios.get("numero_documento")
+    nuevo_tipo_doc = cambios.get("tipo_documento")
+    doc_cambio = (
+        (nuevo_num_doc is not None and nuevo_num_doc != involucrado.numero_documento)
+        or (nuevo_tipo_doc is not None and nuevo_tipo_doc != involucrado.tipo_documento)
+    )
+    if doc_cambio:
+        existing = await verificar_involucrado_existe(
+            db=db,
+            numero_documento=nuevo_num_doc if nuevo_num_doc is not None else involucrado.numero_documento,
+            tipo_documento=nuevo_tipo_doc if nuevo_tipo_doc is not None else involucrado.tipo_documento,
+            digito_verificacion=cambios.get("digito_verificacion", involucrado.digito_verificacion),
+        )
+        if existing and existing.id != involucrado_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Ya existe otro involucrado con ese documento",
+            )
+
+    if "correo" in cambios and cambios["correo"]:
+        cambios["correo"] = cambios["correo"].lower()
+
+    for campo, valor in cambios.items():
+        setattr(involucrado, campo, valor)
+
+    await db.flush()
+    datos_nuevos = format_involucrado_response(involucrado)
+
+    await _registrar_auditoria_o_fallar(
+        db,
+        usuario_id=token_data["user_id"],
+        tipo_evento="ACTUALIZAR_INVOLUCRADO",
+        resultado="EXITOSO",
+        detalle=f"Se actualizaron los datos de {involucrado.tipo_documento} {involucrado.numero_documento}: {involucrado.nombre}",
+        datos_anteriores=datos_anteriores,
+        datos_nuevos=datos_nuevos,
+        **_contexto_peticion(request),
+    )
+
+    await db.commit()
+    logger.info(f"Involucrado actualizado ID={involucrado_id}")
+
+    return {"ok": True, "data": datos_nuevos, "msg": "Involucrado actualizado exitosamente"}

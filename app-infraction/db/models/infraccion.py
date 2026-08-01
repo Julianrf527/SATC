@@ -26,7 +26,7 @@ class Expediente(Base):
     radicados_asociados = relationship("RadicadoAsociado", back_populates="expediente", cascade="all, delete-orphan")
     etapa_respuesta = relationship("EtapaRespuesta", back_populates="expediente", cascade="all, delete-orphan")
     informes_tecnicos = relationship("InformeTecnico", back_populates="expediente", cascade="all, delete-orphan")
-    etapa_concepto = relationship("EtapaConcepto", back_populates="expediente", uselist=False, cascade="all, delete-orphan")
+    etapa_concepto = relationship("EtapaAcogerConcepto", back_populates="expediente", uselist=False, cascade="all, delete-orphan")
 
 
 class Quejoso(Base):
@@ -130,8 +130,8 @@ class InformeTecnico(Base):
     expediente = relationship("Expediente", back_populates="informes_tecnicos")
 
 
-class EtapaConcepto(Base):
-    __tablename__ = 'etapa_concepto'
+class EtapaAcogerConcepto(Base):
+    __tablename__ = 'etapa_acoger_concepto'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     expediente_id = Column(Integer, ForeignKey('expediente.id', onupdate="CASCADE", ondelete="CASCADE"))
@@ -155,7 +155,7 @@ class ActoAdministrativo(Base):
     documento_acto_administrativo_id = Column(Integer)
     fecha_creacion = Column(TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(ZoneInfo("America/Bogota")))
 
-    etapa_concepto = relationship("EtapaConcepto", back_populates="acto_administrativo")
+    etapa_concepto = relationship("EtapaAcogerConcepto", back_populates="acto_administrativo")
     notificaciones = relationship("Notificacion", back_populates="acto_administrativo", cascade="all, delete-orphan")
 
 

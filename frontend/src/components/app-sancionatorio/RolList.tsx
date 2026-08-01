@@ -3,7 +3,7 @@ import { apiCall, API_CONFIG } from '../../utils/api';
 
 type Rol = {
   id: number;
-  name: string;
+  nombre: string;
 };
 
 type Props = {
@@ -14,7 +14,6 @@ type Props = {
 export default function RolList({ rolRef, setErrorMsg }: Props) {
   const [rolList, setRolList] = useState<Rol[]>([]);
 
-  /* Cargar Roles*/
   useEffect(() => {
     async function loadRol() {
       try {
@@ -28,7 +27,6 @@ export default function RolList({ rolRef, setErrorMsg }: Props) {
           setErrorMsg(res.detail || "Error Inesperado");
         }
       } catch (error) {
-        /* console.log(error); */
       }
     }
     loadRol();
@@ -41,7 +39,7 @@ export default function RolList({ rolRef, setErrorMsg }: Props) {
       <select className="select w-full" ref={rolRef}>
         {rolList.map((rol) => (
           <option key={rol.id} value={rol.id}>
-            {capitalize(rol.name)}
+            {capitalize(rol.nombre)}
           </option>
         ))}
       </select>

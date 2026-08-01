@@ -6,14 +6,15 @@ type Props = {
 
 const menuBase = [
   { iconName: "contact-book", title: "Administracion", prefix: "admin_" },
-  { iconName: "user-circle", title: "Involucrados", prefix: "involucrado_" },
-  { iconName: "file-detail", title: "Expedientes", prefix: "expediente_" },
+  { iconName: "file-detail", title: "Sancionatorio", prefix: "sancionatorio_" },
+  { iconName: "gavel", title: "Infracciones", prefix: "infraccion_" },
   { iconName: "book-alt", title: "Documentos", prefix: "documento_" },
+  { iconName: "user-circle", title: "Involucrados", prefix: "involucrado_" },
   { iconName: "calendar-alt", title: "Auditoría", prefix: "auditoria_" },
 ];
 
-// Orden específico para el submenú de Expedientes
-const ordenExpedientes = [
+// Orden específico para el submenú de Sancionatorio
+const ordenSancionatorio = [
   "gestionar",
   "consultar",
   "alertas",
@@ -21,7 +22,16 @@ const ordenExpedientes = [
   "involucrados",
 ];
 
-export default function Slider({ permission }: Props) {
+const ordenInfracciones = [
+  "gestionar",
+  "consultar",
+  "alertas",
+  "asignar",
+  "asignar informes",
+  "involucrados",
+];
+
+export default function Slider({ permission = [] }: Props) {
   const menuFiltrado = menuBase
     .map((cat) => {
       const subMenuPermitido = permission
@@ -33,23 +43,34 @@ export default function Slider({ permission }: Props) {
           originalName: p.name,
         }));
 
-      // Aplicar orden específico para Expedientes
-      if (cat.prefix === "expediente_") {
+      if (cat.prefix === "sancionatorio_") {
         subMenuPermitido.sort((a, b) => {
           const nombreA = a.name.toLowerCase();
           const nombreB = b.name.toLowerCase();
-          const indexA = ordenExpedientes.indexOf(nombreA);
-          const indexB = ordenExpedientes.indexOf(nombreB);
+          const indexA = ordenSancionatorio.indexOf(nombreA);
+          const indexB = ordenSancionatorio.indexOf(nombreB);
 
-          // Si ambos están en el orden definido, comparar por índice
           if (indexA !== -1 && indexB !== -1) {
             return indexA - indexB;
           }
-          // Si solo A está en el orden, A va primero
           if (indexA !== -1) return -1;
-          // Si solo B está en el orden, B va primero
           if (indexB !== -1) return 1;
-          // Si ninguno está en el orden, mantener orden original
+          return 0;
+        });
+      }
+
+      if (cat.prefix === "infraccion_") {
+        subMenuPermitido.sort((a, b) => {
+          const nombreA = a.name.toLowerCase();
+          const nombreB = b.name.toLowerCase();
+          const indexA = ordenInfracciones.indexOf(nombreA);
+          const indexB = ordenInfracciones.indexOf(nombreB);
+
+          if (indexA !== -1 && indexB !== -1) {
+            return indexA - indexB;
+          }
+          if (indexA !== -1) return -1;
+          if (indexB !== -1) return 1;
           return 0;
         });
       }
@@ -61,16 +82,12 @@ export default function Slider({ permission }: Props) {
   return (
     <>
       {/* CSS optimizado para animaciones ultrarrápidas */}
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-          .slider-content {
-            scroll-behavior: smooth;
-            -webkit-overflow-scrolling: touch;
-          }
-        `,
-        }}
-      />
+      <style>{`
+        .slider-content {
+          scroll-behavior: smooth;
+          -webkit-overflow-scrolling: touch;
+        }
+      `}</style>
 
       <div className="drawer-side transition-all duration-100 ease-out z-[9999]">
         <label htmlFor="my-drawer" className="drawer-overlay"></label>

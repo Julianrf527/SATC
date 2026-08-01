@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { UserPlus, KeyRound } from "lucide-react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import Input from "../../Common/Input/Input";
 import RolList from "../Role/RolList";
@@ -109,67 +110,38 @@ export default function SignUpLayout({ setToast }: Props) {
   };
 
   return (
-    <div className="w-full min-h-[calc(100vh-4rem)] bg-gradient-to-br from-base-200 to-base-300 p-4">
-      <div className="max-w-4xl mx-auto space-y-4">
-        {/* ── Header fuera del card ── */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-base-content flex items-center gap-3">
-              <div className="w-12 h-12 bg-success/10 rounded-xl flex items-center justify-center">
-                <svg
-                  className="w-7 h-7 text-success"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                  />
-                </svg>
+    <>
+      <div className="bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center">
+                <UserPlus className="text-success" size={20} />
               </div>
-              Registrar Usuario
-            </h1>
-            <p className="text-base-content/60 mt-1">
-              Complete la información del nuevo usuario del sistema
-            </p>
-          </div>
-
-          {/* Aviso contraseña temporal — a la derecha del título */}
-          <div className="sm:max-w-xs flex-shrink-0">
-            <div className="bg-warning/10 border border-warning/30 rounded-xl p-4 flex gap-3">
-              <svg
-                className="w-5 h-5 text-warning flex-shrink-0 mt-0.5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-                />
-              </svg>
               <div>
-                <p className="text-sm font-semibold text-warning">
-                  Contraseña temporal
+                <p className="text-[10px] font-semibold text-base-content/50 uppercase tracking-wider">
+                  Módulo de Usuarios
                 </p>
-                <p className="text-xs text-base-content/70 mt-1">
-                  El usuario registrado recibirá una contraseña temporal al
-                  correo registrado. Deberá cambiarla en su primer inicio de
-                  sesión.
-                </p>
+                <h1 className="text-lg font-bold text-base-content">
+                  Registrar Usuario
+                </h1>
               </div>
+            </div>
+            <div className="hidden sm:flex items-center gap-2">
+              <KeyRound className="text-info/70 flex-shrink-0" size={14} />
+              <p className="text-xs text-info/70 font-medium leading-tight max-w-[220px]">
+                Se enviará contraseña temporal al correo. El usuario deberá
+                cambiarla en su primer inicio de sesión.
+              </p>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* ── Card principal ── */}
-        <div className="card bg-base-100 shadow-xl border border-base-300">
-          <div className="card-body p-6">
+      <div className="w-full min-h-[calc(100vh-4rem)] bg-gradient-to-br from-base-200 to-base-300 p-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="card bg-base-100 shadow border border-base-300">
+          <div className="card-body px-6 py-6">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Datos personales */}
               <div>
@@ -352,8 +324,9 @@ export default function SignUpLayout({ setToast }: Props) {
               </div>
             </form>
           </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

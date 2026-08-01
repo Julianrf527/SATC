@@ -9,6 +9,8 @@ import {
   Plus,
   Search,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { API_CONFIG, apiCall } from "../../../utils/api";
 import DocumentoCard from "./DocumentoCard";
@@ -62,6 +64,8 @@ type Props = {
   }) => void;
 };
 
+const PAGE_SIZE = 20;
+
 export default function DocumentosPage({ setToast }: Props) {
   const location = useLocation();
   const [documentos, setDocumentos] = useState<DocumentoResumen[]>([]);
@@ -74,19 +78,16 @@ export default function DocumentosPage({ setToast }: Props) {
   const [showDetalleModal, setShowDetalleModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Paginación
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const pageSize = 20; // Documentos por página
+  const [totalDocs, setTotalDocs] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
-  // Filtros
   const [filtroEstado, setFiltroEstado] = useState<string>("");
   const [filtroFechaDesde, setFiltroFechaDesde] = useState("");
   const [filtroFechaHasta, setFiltroFechaHasta] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Detectar si viene desde notificación para abrir modal automáticamente
+  // Abrir modal desde notificación
   useEffect(() => {
     const state = location.state as {
       documentoIdToSelect?: string;
@@ -97,22 +98,17 @@ export default function DocumentosPage({ setToast }: Props) {
       if (!isNaN(docId)) {
         setSelectedDocId(docId);
         setShowDetalleModal(true);
-        // Limpiar el state para que no se abra de nuevo al volver
         window.history.replaceState({}, document.title);
       }
     }
   }, [location]);
 
-  // Cargar revisores solo una vez al montar
   useEffect(() => {
     cargarRevisores();
   }, []);
 
-  // Cargar documentos cuando cambien los filtros (reset paginación)
   useEffect(() => {
     setPage(1);
-    setDocumentos([]);
-    setHasMore(true);
     cargarDatos(1);
   }, [filtroEstado, filtroFechaDesde, filtroFechaHasta]);
 
@@ -122,82 +118,55 @@ export default function DocumentosPage({ setToast }: Props) {
       const res = await apiCall(API_CONFIG.ENDPOINTS.DOCS_REVIEWERS, {
         method: "GET",
       });
-
       if (res.ok && Array.isArray(res.usuarios)) {
         setRevisores(res.usuarios);
       } else {
         setRevisores([]);
       }
-    } catch (error) {
-      /* console.error("Error cargando revisores:", error); */
+    } catch {
       setRevisores([]);
     } finally {
       setLoadingRevisores(false);
     }
   };
 
-  const cargarDatos = async (pageNum: number = 1, append: boolean = false) => {
-    if (append) {
-      setLoadingMore(true);
-    } else {
-      setLoading(true);
-    }
-
+  const cargarDatos = async (pageNum: number = 1) => {
+    setLoading(true);
     try {
       const params = new URLSearchParams();
       if (filtroEstado) params.append("estado", filtroEstado);
       if (filtroFechaDesde) params.append("fecha_desde", filtroFechaDesde);
       if (filtroFechaHasta) params.append("fecha_hasta", filtroFechaHasta);
-
-      // Agregar paginación
       params.append("page", pageNum.toString());
-      params.append("page_size", pageSize.toString());
+      params.append("page_size", PAGE_SIZE.toString());
 
-      const queryString = params.toString();
-      const endpoint = `${API_CONFIG.ENDPOINTS.DOCS_LIST}?${queryString}`;
+      const endpoint = `${API_CONFIG.ENDPOINTS.DOCS_LIST}?${params.toString()}`;
 
-      const promises: Promise<any>[] = [apiCall(endpoint, { method: "GET" })];
+      const [resDocumentos, resStats] = await Promise.all([
+        apiCall(endpoint, { method: "GET" }),
+        pageNum === 1
+          ? apiCall(API_CONFIG.ENDPOINTS.DOCS_STATS, { method: "GET" })
+          : Promise.resolve(null),
+      ]);
 
-      // Solo cargar stats en la primera página
-      if (!append) {
-        promises.push(
-          apiCall(API_CONFIG.ENDPOINTS.DOCS_STATS, { method: "GET" })
-        );
-      }
-
-      const results = await Promise.all(promises);
-      const resDocumentos = results[0];
-      const resStats = results[1];
-
-      // Procesar documentos
-      let docs: DocumentoResumen[] = [];
-      if (resDocumentos.ok) {
-        // Extraer todos los valores que no sean 'ok' o 'status'
-        docs = Object.keys(resDocumentos)
-          .filter((key) => key !== "ok" && key !== "status")
-          .map((key) => resDocumentos[key]);
+      if (resDocumentos.ok && Array.isArray(resDocumentos.documentos)) {
+        setDocumentos(resDocumentos.documentos);
+        setTotalDocs(resDocumentos.total ?? resDocumentos.documentos.length);
+        setTotalPages(resDocumentos.total_pages ?? 1);
       } else if (Array.isArray(resDocumentos)) {
-        docs = resDocumentos;
-      }
-
-      // Determinar si hay más páginas
-      if (docs.length < pageSize) {
-        setHasMore(false);
-      }
-
-      // Actualizar documentos (append o replace)
-      if (append) {
-        setDocumentos((prev) => [...prev, ...docs]);
+        setDocumentos(resDocumentos);
+        setTotalDocs(resDocumentos.length);
+        setTotalPages(1);
       } else {
-        setDocumentos(docs);
+        setDocumentos([]);
+        setTotalDocs(0);
+        setTotalPages(1);
       }
 
-      // Actualizar stats si están disponibles
       if (resStats?.ok && resStats?.stats) {
         setStats(resStats.stats);
       }
-    } catch (error) {
-      /* console.error("Error cargando datos:", error); */
+    } catch {
       setToast({
         id: Date.now(),
         message: "Error al cargar documentos",
@@ -205,16 +174,14 @@ export default function DocumentosPage({ setToast }: Props) {
       });
     } finally {
       setLoading(false);
-      setLoadingMore(false);
     }
   };
 
-  const cargarMasDatos = () => {
-    if (!loadingMore && hasMore) {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      cargarDatos(nextPage, true);
-    }
+  const cambiarPagina = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages || newPage === page) return;
+    setPage(newPage);
+    cargarDatos(newPage);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const limpiarFiltros = () => {
@@ -222,8 +189,6 @@ export default function DocumentosPage({ setToast }: Props) {
     setFiltroFechaDesde("");
     setFiltroFechaHasta("");
     setSearchTerm("");
-    setPage(1);
-    setHasMore(true);
   };
 
   const abrirDetalle = (docId: number) => {
@@ -238,16 +203,11 @@ export default function DocumentosPage({ setToast }: Props) {
 
   const handleDocumentoCreado = () => {
     setPage(1);
-    setDocumentos([]);
-    setHasMore(true);
     cargarDatos(1);
   };
 
   const handleDocumentoActualizado = () => {
-    setPage(1);
-    setDocumentos([]);
-    setHasMore(true);
-    cargarDatos(1);
+    cargarDatos(page);
   };
 
   const documentosFiltrados = documentos.filter((doc) => {
@@ -262,6 +222,29 @@ export default function DocumentosPage({ setToast }: Props) {
 
   const tienenFiltrosActivos =
     filtroEstado || filtroFechaDesde || filtroFechaHasta || searchTerm;
+
+  const renderPaginationButtons = () => {
+    const buttons: (number | "...")[] = [];
+    const delta = 2;
+    let prev = 0;
+
+    for (let i = 1; i <= totalPages; i++) {
+      if (
+        i === 1 ||
+        i === totalPages ||
+        (i >= page - delta && i <= page + delta)
+      ) {
+        if (prev && i - prev > 1) buttons.push("...");
+        buttons.push(i);
+        prev = i;
+      }
+    }
+
+    return buttons;
+  };
+
+  const primerDoc = totalDocs === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const ultimoDoc = Math.min(page * PAGE_SIZE, totalDocs);
 
   return (
     <div className="min-h-screen bg-base-200">
@@ -294,15 +277,13 @@ export default function DocumentosPage({ setToast }: Props) {
         </div>
       </div>
 
-      {/* Layout principal con sidebar A LA DERECHA */}
       <div className="container mx-auto px-6 py-6 max-w-7xl">
         <div className="flex gap-6">
-          {/* Contenido principal PRIMERO */}
+          {/* Contenido principal */}
           <div className="flex-1 min-w-0">
             {/* Barra de búsqueda y filtros */}
             <div className="bg-base-100 rounded-lg p-4 shadow-sm border border-base-300 mb-6">
               <div className="flex flex-col md:flex-row gap-4">
-                {/* Búsqueda */}
                 <div className="flex-1">
                   <div className="relative">
                     <Search
@@ -319,7 +300,6 @@ export default function DocumentosPage({ setToast }: Props) {
                   </div>
                 </div>
 
-                {/* Botones */}
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowFilters(!showFilters)}
@@ -334,12 +314,7 @@ export default function DocumentosPage({ setToast }: Props) {
                     )}
                   </button>
                   <button
-                    onClick={() => {
-                      setPage(1);
-                      setDocumentos([]);
-                      setHasMore(true);
-                      cargarDatos(1);
-                    }}
+                    onClick={() => cargarDatos(page)}
                     className="btn btn-ghost gap-2"
                     disabled={loading}
                   >
@@ -352,7 +327,6 @@ export default function DocumentosPage({ setToast }: Props) {
                 </div>
               </div>
 
-              {/* Panel de filtros expandible */}
               {showFilters && (
                 <div className="mt-4 pt-4 border-t border-base-300">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -446,6 +420,14 @@ export default function DocumentosPage({ setToast }: Props) {
               </div>
             ) : (
               <>
+                {/* Info de resultados */}
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <p className="text-sm text-base-content/60">
+                    Mostrando {primerDoc}–{ultimoDoc} de {totalDocs} documento
+                    {totalDocs !== 1 ? "s" : ""}
+                  </p>
+                </div>
+
                 <div className="grid grid-cols-1 gap-4">
                   {documentosFiltrados.map((doc, idx) => (
                     <DocumentoCard
@@ -456,35 +438,49 @@ export default function DocumentosPage({ setToast }: Props) {
                   ))}
                 </div>
 
-                {/* Botón "Cargar Más" */}
-                {hasMore && documentosFiltrados.length > 0 && (
-                  <div className="flex justify-center mt-6">
-                    <button
-                      onClick={cargarMasDatos}
-                      disabled={loadingMore}
-                      className="btn btn-outline btn-success gap-2"
-                    >
-                      {loadingMore ? (
-                        <>
-                          <span className="loading loading-spinner loading-sm"></span>
-                          Cargando más documentos...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw size={18} />
-                          Cargar Más Documentos
-                        </>
-                      )}
-                    </button>
-                  </div>
-                )}
+                {/* Paginación */}
+                {totalPages > 1 && (
+                  <div className="flex flex-col items-center gap-2 mt-8">
+                    <div className="join">
+                      <button
+                        className="join-item btn btn-sm"
+                        onClick={() => cambiarPagina(page - 1)}
+                        disabled={page === 1}
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
 
-                {/* Mensaje de fin de resultados */}
-                {!hasMore && documentosFiltrados.length > 0 && (
-                  <div className="text-center py-6">
-                    <p className="text-base-content/50 text-sm">
-                      ✓ Has visto todos los documentos (
-                      {documentosFiltrados.length})
+                      {renderPaginationButtons().map((p, idx) =>
+                        p === "..." ? (
+                          <button
+                            key={`ellipsis-${idx}`}
+                            className="join-item btn btn-sm btn-disabled"
+                          >
+                            …
+                          </button>
+                        ) : (
+                          <button
+                            key={p}
+                            className={`join-item btn btn-sm ${
+                              p === page ? "btn-success text-white" : ""
+                            }`}
+                            onClick={() => cambiarPagina(p)}
+                          >
+                            {p}
+                          </button>
+                        )
+                      )}
+
+                      <button
+                        className="join-item btn btn-sm"
+                        onClick={() => cambiarPagina(page + 1)}
+                        disabled={page === totalPages}
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                    <p className="text-xs text-base-content/50">
+                      Página {page} de {totalPages}
                     </p>
                   </div>
                 )}
@@ -492,11 +488,10 @@ export default function DocumentosPage({ setToast }: Props) {
             )}
           </div>
 
-          {/* Sidebar de Estadísticas A LA DERECHA Y MÁS DELGADO */}
+          {/* Sidebar de Estadísticas */}
           <div className="w-64 flex-shrink-0">
             {stats && (
               <div className="space-y-4 sticky top-24">
-                {/* Estadísticas de Revisor */}
                 {stats.revisor && (
                   <div className="bg-base-100 rounded-lg p-4 shadow-lg border border-base-300">
                     <div className="flex items-center gap-2 mb-4">
@@ -544,7 +539,6 @@ export default function DocumentosPage({ setToast }: Props) {
                   </div>
                 )}
 
-                {/* Estadísticas de Creador */}
                 {stats.creador && (
                   <div className="bg-base-100 rounded-lg p-4 shadow-lg border border-base-300">
                     <div className="flex items-center gap-2 mb-4">
@@ -597,7 +591,6 @@ export default function DocumentosPage({ setToast }: Props) {
         </div>
       </div>
 
-      {/* Modales */}
       {showCreateModal && (
         <CrearDocumentoModal
           isOpen={showCreateModal}

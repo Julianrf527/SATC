@@ -10,10 +10,11 @@ class EtapaRespuesta(Base):
     radicado = Column(String(15), unique=True)
     fecha_radicado = Column(Date)
     documento_radicado_id = Column(Integer)
-    require_medida_preventiva = Column(Boolean)
+    requiere_medida_preventiva = Column(Boolean)
     fecha_creacion = Column(Date)
 
     expediente = relationship("Expediente", back_populates="etapa_respuesta")
+    medida_preventiva = relationship("MedidaPreventiva", back_populates="etapa_respuesta", uselist=False, cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('ix_etapa_respuesta_expediente', 'expediente_id'),

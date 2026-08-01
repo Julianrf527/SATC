@@ -61,12 +61,10 @@ export default function MainLayout({ setTheme, setToast }: Props) {
     );
   }
 
-  // Si no hay usuario (null o undefined), no renderiza nada
   if (!user) {
     return null;
   }
 
-  // En este punto TypeScript sabe que user es de tipo User
   return (
     <AuthContext.Provider value={{ user, setUser }}>
       <div className="drawer">

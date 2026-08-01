@@ -68,7 +68,6 @@ export default function NewPermission({
         });
       }
     } catch (e) {
-      /* console.error("Error al hacer fetch:", e); */
       setToast({
         id: Date.now(),
         message: "Error al crear el permiso",

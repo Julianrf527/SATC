@@ -1,3 +1,4 @@
+import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +21,14 @@ async def tarea_limpieza_temporales(db: AsyncSession):
     logger.info("Iniciando tarea de limpieza de archivos sin uso...")
 
     try:
-        stmt = select(FileHash).where(FileHash.numero_usos == 0)
+        # with_for_update bloquea las filas para que un increment_file_usage concurrente
+        # (otro upload reutilizando el mismo hash) no quede huérfano si lo borramos aquí.
+        # skip_locked evita esperar archivos que ya están siendo usados en este instante.
+        stmt = (
+            select(FileHash)
+            .where(FileHash.numero_usos == 0)
+            .with_for_update(skip_locked=True)
+        )
         result = await db.execute(stmt)
         sin_uso = result.scalars().all()
 
@@ -35,14 +43,14 @@ async def tarea_limpieza_temporales(db: AsyncSession):
             # Eliminar el objeto de MinIO
             # file.file_url viene con el prefijo "bucket/object_name",
             # delete_file_from_minio se encarga de limpiarlo internamente.
-            minio_resultado = delete_file_from_minio(file.file_url)
+            minio_resultado = await asyncio.to_thread(delete_file_from_minio, file.file_url)
             
             if minio_resultado.get("ok", False):
                  eliminados_minio += 1
             else:
                  logger.warning(f"Atencion con MinIO ({file.file_url}): {minio_resultado.get('message')}")
             
-            # Independientemente si en MinIO fall� (ej. no exist�a), lo eliminamos de la DB
+            # Independientemente si en MinIO falló (ej. no existía), lo eliminamos de la DB
             await db.delete(file)
             eliminados_db += 1
             
@@ -66,7 +74,7 @@ def configurar_scheduler_limpieza(app, get_db):
     """
     @app.on_event("startup")
     async def start_scheduler():
-        # Ejecutar todos los d�as a las 23:59 (11:59 pm)
+        # Ejecutar todos los días a las 23:59 (11:59 pm)
         scheduler.add_job(
             func=lambda: ejecutar_tarea_con_db(get_db),
             trigger=CronTrigger(

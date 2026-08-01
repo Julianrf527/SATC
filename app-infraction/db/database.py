@@ -1,5 +1,6 @@
 # database.py
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy import text
 from sqlalchemy.orm import sessionmaker
 from dotenv import load_dotenv
 import os
@@ -35,4 +36,8 @@ SessionLocal = sessionmaker(
 async def init_db():
     from . import models
     async with engine.begin() as conn:
-        await conn.run_sync(models.Base.metadata.create_all)
+        await conn.execute(text("SELECT pg_advisory_lock(815123001)"))
+        try:
+            await conn.run_sync(models.Base.metadata.create_all, checkfirst=True)
+        finally:
+            await conn.execute(text("SELECT pg_advisory_unlock(815123001)"))

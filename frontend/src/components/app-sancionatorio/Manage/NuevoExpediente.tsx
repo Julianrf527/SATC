@@ -56,7 +56,11 @@ export default function NuevoExpediente({
       });
 
       if (res.ok) {
-        let expediente_id = res.data.expediente_id;
+        const expediente_id = res.expediente_id ?? res.data?.expediente_id;
+        if (!expediente_id) {
+          setErrorMsg("Error al registrar el expediente");
+          return;
+        }
         setToast({
           id: Date.now(),
           message: "Expediente registrado",
@@ -96,11 +100,9 @@ export default function NuevoExpediente({
         setRecursoAfectadoSeleccionado([]);
         onCancel();
       } else {
-        /* console.log("Error en respuesta:", res); */
         setErrorMsg(res.detail || "Error al registrar el expediente");
       }
     } catch (e) {
-      /* console.error("Error en onSubmit:", e); */
       setErrorMsg("Error de conexión con el servidor");
     } finally {
       setIsSubmitting(false);
@@ -195,8 +197,8 @@ export default function NuevoExpediente({
               className="input input-bordered w-full"
               required
               disabled={isSubmitting}
-              pattern="^\d{4}(IE|EE|ER)\d{4}$"
-              title="Debe tener el formato: 4 números + IE o EE o ER + 4 números (ej: 2015IE5678)"
+              pattern="^\d{4}(IE|EE|ER)\d{4,5}$"
+              title="Debe tener el formato: 4 números + IE o EE o ER + 4 o 5 números (ej: 2015IE5678)"
             />
           </div>
 
