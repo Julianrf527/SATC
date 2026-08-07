@@ -27,7 +27,10 @@ type Props = {
     type: "success" | "error";
   }) => void;
   isEditable?: boolean;
-  inicio_proceso: Record<string, unknown> | null;
+  // any: el backend no tiene un contrato de forma estable para el estado de
+  // la etapa anterior (varía de campos según cuál etapa sea); modelarlo
+  // requeriría un discriminated union por etapa que no existe hoy.
+  inicio_proceso: any;
   tiposNotificacion: TipoNotificacion[];
   involucrados: Involucrado[];
 };
