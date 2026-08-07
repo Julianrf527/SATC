@@ -20,7 +20,8 @@ type Props = {
     type: "success" | "error";
   }) => void;
   isEditable?: boolean;
-  indagacion: Record<string, unknown> | null;
+  // any: ver nota en DecisionFondo.tsx — sin contrato de forma estable por etapa.
+  indagacion: any;
 };
 
 const STAGE_NAME = "INDAGACION PRELIMINAR";

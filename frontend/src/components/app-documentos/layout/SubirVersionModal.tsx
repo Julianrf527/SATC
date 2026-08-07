@@ -155,7 +155,7 @@ export default function SubirVersionModal({
         onSuccess();
         handleClose();
       } else {
-        const errorMessage = formatApiErrorDetail(
+        let errorMessage = formatApiErrorDetail(
           res.detail,
           "Error al subir la nueva versión",
         );

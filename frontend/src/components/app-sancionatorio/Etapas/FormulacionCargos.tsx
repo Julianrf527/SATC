@@ -29,7 +29,8 @@ type Props = {
     type: "success" | "error";
   }) => void;
   isEditable?: boolean;
-  inicio_proceso: Record<string, unknown> | null;
+  // any: ver nota en DecisionFondo.tsx — sin contrato de forma estable por etapa.
+  inicio_proceso: any;
   tiposNotificacion: TipoNotificacion[];
   involucrados: Involucrado[];
 };
