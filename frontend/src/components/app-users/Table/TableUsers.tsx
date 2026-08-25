@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import CustomSelect from "../../Common/Form/CustomSelect";
 
 type Rol = { id: number; nombre: string };
 
@@ -62,23 +63,27 @@ export default function TableUsers({ titles, data, rolList, onToggleState, onTog
                   <td className="select-text w-[25%]">{user.name}</td>
                   <td className="select-text w-[25%]">{user.email}</td>
                   <td className="w-[18%]">
-                    <select
-                      className="select select-bordered select-sm w-full"
+                    <CustomSelect
+                      className="select-sm"
+                      hidePlaceholderOption
                       value={user.rol_id}
-                      onChange={(e) => onToggleRol(user.id, Number(e.target.value))}
-                    >
-                      {rolList.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
-                    </select>
+                      onChange={(v) => onToggleRol(user.id, v)}
+                      options={rolList.map((r) => ({ value: r.id, label: r.nombre }))}
+                    />
                   </td>
                   <td className="w-[20%]">
-                    <select
-                      className="select select-bordered select-sm w-full"
+                    <CustomSelect
+                      className="select-sm"
+                      hidePlaceholderOption
                       value={user.state ? "activo" : "inactivo"}
-                      onChange={() => onToggleState(user.id)}
-                    >
-                      <option value="activo">Activo</option>
-                      <option value="inactivo">Inactivo</option>
-                    </select>
+                      onChange={(v) => {
+                        if ((v === "activo") !== user.state) onToggleState(user.id);
+                      }}
+                      options={[
+                        { value: "activo", label: "Activo" },
+                        { value: "inactivo", label: "Inactivo" },
+                      ]}
+                    />
                   </td>
                 </tr>
               ))

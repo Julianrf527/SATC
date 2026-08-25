@@ -7,6 +7,8 @@ import type { Municipio, ModeloGenerico } from "../../../types/common";
 import { useState, useRef } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import QuejosoSelectorModal from "../Common/QuejosoSelectorModal";
+import CustomSelect from "../../Common/Form/CustomSelect";
+import CustomDateInput from "../../Common/Form/CustomDateInput";
 
 type NewFileProps = {
   userId: number;
@@ -36,6 +38,9 @@ export default function NewFile({
   agregarExpediente,
 }: NewFileProps) {
   const [sidewalkList, setSidewalkList] = useState<ModeloGenerico[]>([]);
+  const [municipioId, setMunicipioId] = useState(0);
+  const [veredaId, setVeredaId] = useState(0);
+  const [fechaRadicado, setFechaRadicado] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [recursosSeleccionados, setRecursosSeleccionados] = useState<number[]>(
     [],
@@ -48,17 +53,11 @@ export default function NewFile({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
 
-  const toggleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const municipioId = Number(e.target.value);
-    const municipio = municipioList.find((m) => m.id === municipioId);
+  const handleMunicipioChange = (id: number) => {
+    setMunicipioId(id);
+    setVeredaId(0);
+    const municipio = municipioList.find((m) => m.id === id);
     setSidewalkList(municipio?.veredas ?? []);
-
-    if (formRef.current) {
-      const veredaEl = formRef.current.elements.namedItem(
-        "vereda",
-      ) as HTMLSelectElement | null;
-      if (veredaEl) veredaEl.value = "";
-    }
   };
 
   const onSubmit = async (payload: any, municipioId: number) => {
@@ -96,6 +95,9 @@ export default function NewFile({
         formRef.current?.reset();
         setErrorMsg("");
         setSidewalkList([]);
+        setMunicipioId(0);
+        setVeredaId(0);
+        setFechaRadicado("");
         setRecursosSeleccionados([]);
         setTiposSeleccionados([]);
         setExpandedRecursos([]);
@@ -178,6 +180,21 @@ export default function NewFile({
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
 
+    if (!fechaRadicado) {
+      setErrorMsg("Seleccione la fecha de radicado");
+      return;
+    }
+
+    if (!municipioId) {
+      setErrorMsg("Seleccione un municipio");
+      return;
+    }
+
+    if (!veredaId) {
+      setErrorMsg("Seleccione una vereda");
+      return;
+    }
+
     if (recursosSeleccionados.length === 0) {
       setErrorMsg("Seleccione al menos un recurso afectado");
       return;
@@ -196,14 +213,12 @@ export default function NewFile({
     setErrorMsg("");
 
     const descripcion = formData.get("descripcion");
-    const municipioId = Number(formData.get("municipio"));
-    const veredaId = Number(formData.get("vereda"));
     const radicadosAsociadosLimpios = radicadosAsociados
       .map((r) => r.trim())
       .filter((r) => r.length > 0);
     const payload = {
       radicado: formData.get("radicado"),
-      fecha_radicado: formData.get("fecha_radicado"),
+      fecha_radicado: fechaRadicado,
       direccion: formData.get("direccion"),
       descripcion,
       vereda_id: veredaId,
@@ -236,6 +251,9 @@ export default function NewFile({
   const handleCancelClick = () => {
     formRef.current?.reset();
     setSidewalkList([]);
+    setMunicipioId(0);
+    setVeredaId(0);
+    setFechaRadicado("");
     setRecursosSeleccionados([]);
     setTiposSeleccionados([]);
     setExpandedRecursos([]);
@@ -309,12 +327,10 @@ export default function NewFile({
                 Fecha de Radicado *
               </span>
             </label>
-            <input
-              type="date"
-              name="fecha_radicado"
-              className="input input-bordered w-full"
+            <CustomDateInput
+              value={fechaRadicado}
+              onChange={setFechaRadicado}
               max={new Date().toISOString().split("T")[0]}
-              required
               disabled={isSubmitting}
             />
           </div>
@@ -367,23 +383,13 @@ export default function NewFile({
             <label className="label">
               <span className="label-text font-medium">Municipio *</span>
             </label>
-            <select
-              name="municipio"
-              defaultValue=""
-              onChange={toggleChange}
-              className="select select-bordered w-full"
-              required
+            <CustomSelect
+              value={municipioId}
+              onChange={handleMunicipioChange}
+              placeholder="Seleccione un municipio"
               disabled={isSubmitting}
-            >
-              <option value="" disabled>
-                Seleccione un municipio
-              </option>
-              {municipioList.map((town) => (
-                <option value={town.id} key={town.id}>
-                  {town.nombre}
-                </option>
-              ))}
-            </select>
+              options={municipioList.map((town) => ({ value: town.id, label: town.nombre }))}
+            />
           </div>
 
           {/* Vereda */}
@@ -391,24 +397,17 @@ export default function NewFile({
             <label className="label">
               <span className="label-text font-medium">Vereda *</span>
             </label>
-            <select
-              name="vereda"
-              defaultValue=""
-              className="select select-bordered w-full"
-              required
-              disabled={isSubmitting || sidewalkList.length === 0}
-            >
-              <option value="" disabled>
-                {sidewalkList.length === 0
+            <CustomSelect
+              value={veredaId}
+              onChange={setVeredaId}
+              placeholder={
+                sidewalkList.length === 0
                   ? "Seleccione primero un municipio"
-                  : "Seleccione una vereda"}
-              </option>
-              {sidewalkList.map((sw) => (
-                <option value={sw.id} key={sw.id}>
-                  {sw.nombre}
-                </option>
-              ))}
-            </select>
+                  : "Seleccione una vereda"
+              }
+              disabled={isSubmitting || sidewalkList.length === 0}
+              options={sidewalkList.map((sw) => ({ value: sw.id, label: sw.nombre }))}
+            />
           </div>
 
           {/* Dirección */}

@@ -6,6 +6,8 @@ import AdvancedFiltersModal, { type FilterData } from "./AvancedFilterModal";
 import type { Expediente } from "../../../types/sancionatorioApp";
 import type { Municipio, ModeloGenerico } from "../../../types/common";
 import { API_CONFIG, apiCall } from "../../../utils/api";
+import CustomSelect from "../../Common/Form/CustomSelect";
+import CustomDateInput from "../../Common/Form/CustomDateInput";
 
 type Props = {
   municipioList: Municipio[];
@@ -338,57 +340,53 @@ export default function ExpedienteList({
               />
 
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="date"
-                  className="input input-bordered input-sm"
+                <CustomDateInput
+                  className="input-sm"
+                  placeholder="Fecha desde"
                   value={fromDateFiltro}
-                  onChange={(e) => setFromDateFiltro(e.target.value)}
-                  title="Fecha desde"
+                  onChange={setFromDateFiltro}
                 />
-                <input
-                  type="date"
-                  className="input input-bordered input-sm"
+                <CustomDateInput
+                  className="input-sm"
+                  placeholder="Fecha hasta"
                   value={untilDateFiltro}
-                  onChange={(e) => setUntilDateFiltro(e.target.value)}
-                  title="Fecha hasta"
+                  onChange={setUntilDateFiltro}
                 />
               </div>
 
-              <select
-                className="select select-bordered select-sm w-full"
+              <CustomSelect
+                className="select-sm"
+                hidePlaceholderOption
                 value={municipioFiltro}
-                onChange={(e) => setMunicipioFiltro(e.target.value)}
-              >
-                <option value="all">Todos los municipios</option>
-                {municipioValido.map((mun) => (
-                  <option value={mun} key={mun}>
-                    {mun}
-                  </option>
-                ))}
-              </select>
+                onChange={setMunicipioFiltro}
+                options={[
+                  { value: "all", label: "Todos los municipios" },
+                  ...municipioValido.map((mun) => ({ value: mun, label: mun })),
+                ]}
+              />
 
-              <select
-                className="select select-bordered select-sm w-full"
+              <CustomSelect
+                className="select-sm"
+                hidePlaceholderOption
                 value={etapaFiltro}
-                onChange={(e) => setEtapaFiltro(e.target.value)}
-              >
-                <option value="all">Todas las etapas</option>
-                {availableStages.map((etapa) => (
-                  <option value={etapa} key={etapa}>
-                    {etapa}
-                  </option>
-                ))}
-              </select>
+                onChange={setEtapaFiltro}
+                options={[
+                  { value: "all", label: "Todas las etapas" },
+                  ...availableStages.map((etapa) => ({ value: etapa, label: etapa })),
+                ]}
+              />
 
-              <select
-                className="select select-bordered select-sm w-full"
+              <CustomSelect
+                className="select-sm"
+                hidePlaceholderOption
                 value={archivadoFiltro}
-                onChange={(e) => setArchivadoFiltro(e.target.value)}
-              >
-                <option value="all">Todos los estados</option>
-                <option value="archived">Solo archivados</option>
-                <option value="active">Solo activos</option>
-              </select>
+                onChange={setArchivadoFiltro}
+                options={[
+                  { value: "all", label: "Todos los estados" },
+                  { value: "archived", label: "Solo archivados" },
+                  { value: "active", label: "Solo activos" },
+                ]}
+              />
             </div>
 
             {/* Botón limpiar filtros */}

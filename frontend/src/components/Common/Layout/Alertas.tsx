@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiCall } from "../../../utils/api";
+import CustomSelect from "../Form/CustomSelect";
 
 type EstadoSemaforo = "verde" | "amarillo" | "rojo" | "vencido";
 
@@ -174,18 +175,21 @@ export default function Alertas({ expedienteId, alertEndpoint, setToast }: Props
                   {alertasFiltradas.length} alerta{alertasFiltradas.length !== 1 ? "s" : ""}
                   {estadoFilter !== "all" && " filtradas"}
                 </span>
-                <select
-                  className="select select-bordered select-xs w-36"
+                <CustomSelect
+                  className="select-xs w-36"
+                  hidePlaceholderOption
                   value={estadoFilter}
-                  onChange={(e) => setEstadoFilter(e.target.value)}
-                >
-                  <option value="all">Todos ({alertasFlat.length})</option>
-                  {(["verde", "amarillo", "rojo", "vencido"] as EstadoSemaforo[]).map((e) => (
-                    <option key={e} value={e} disabled={estadisticas[e] === 0}>
-                      {SEMAFORO_CFG[e].emoji} {SEMAFORO_CFG[e].label} ({estadisticas[e]})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setEstadoFilter}
+                  options={[
+                    { value: "all", label: `Todos (${alertasFlat.length})` },
+                    ...(["verde", "amarillo", "rojo", "vencido"] as EstadoSemaforo[])
+                      .filter((e) => estadisticas[e] > 0)
+                      .map((e) => ({
+                        value: e,
+                        label: `${SEMAFORO_CFG[e].emoji} ${SEMAFORO_CFG[e].label} (${estadisticas[e]})`,
+                      })),
+                  ]}
+                />
               </div>
 
               <div className="space-y-2">

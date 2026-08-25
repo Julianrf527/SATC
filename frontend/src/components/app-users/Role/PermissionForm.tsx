@@ -2,6 +2,7 @@ import { useState } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import ConfirmationModal from "./ConfirmationModal";
 import type { Permiso } from "../../../types/userApp";
+import CustomSelect from "../../Common/Form/CustomSelect";
 
 type Props = {
   permisoList: Permiso[];
@@ -361,18 +362,17 @@ export default function PermissionForm({
                     Seleccionar Permiso
                   </span>
                 </label>
-                <select
-                  className="select select-bordered w-full focus:border-blue-600"
+                <CustomSelect
+                  className="focus:border-blue-600"
                   value={selectedPermissionId}
-                  onChange={(e) => handlePermissionSelect(e.target.value)}
-                >
-                  <option value="">-- Seleccione un permiso --</option>
-                  {permisoList.map((permission) => (
-                    <option key={permission.id} value={permission.id}>
-                      {permission.nombre}
-                    </option>
-                  ))}
-                </select>
+                  onChange={handlePermissionSelect}
+                  emptyValue=""
+                  placeholder="-- Seleccione un permiso --"
+                  options={permisoList.map((permission) => ({
+                    value: String(permission.id),
+                    label: permission.nombre,
+                  }))}
+                />
               </div>
             )}
 

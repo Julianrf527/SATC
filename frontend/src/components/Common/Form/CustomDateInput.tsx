@@ -5,6 +5,7 @@ type Props = {
   value: string; // yyyy-mm-dd
   onChange: (value: string) => void;
   max?: string; // yyyy-mm-dd
+  placeholder?: string;
   disabled?: boolean;
   error?: boolean;
   className?: string;
@@ -45,6 +46,7 @@ export default function CustomDateInput({
   value,
   onChange,
   max,
+  placeholder = "Seleccionar fecha",
   disabled,
   error,
   className = "",
@@ -53,16 +55,28 @@ export default function CustomDateInput({
   const maxDate = max ? parseYMD(max) : null;
   const [viewDate, setViewDate] = useState(() => selected || maxDate || new Date());
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+  const [pos, setPos] = useState<{ left: number; width: number; top?: number; bottom?: number }>({
+    left: 0,
+    width: 0,
+  });
   const [theme, setTheme] = useState("emerald");
   const triggerRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+
+  const MAX_POPUP_HEIGHT = 300; // calendario completo (encabezado + 6 filas)
 
   const openPopup = () => {
     if (disabled) return;
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect) {
-      setPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const openUpward = spaceBelow < MAX_POPUP_HEIGHT && spaceAbove > spaceBelow;
+      setPos(
+        openUpward
+          ? { bottom: window.innerHeight - rect.top + 4, left: rect.left, width: rect.width }
+          : { top: rect.bottom + 4, left: rect.left, width: rect.width },
+      );
     }
     // El popup se porta fuera del modal, así que ya no hereda su data-theme.
     setTheme(
@@ -122,7 +136,7 @@ export default function CustomDateInput({
 
   const displayLabel = selected
     ? `${String(selected.getDate()).padStart(2, "0")}/${String(selected.getMonth() + 1).padStart(2, "0")}/${selected.getFullYear()}`
-    : "Seleccionar fecha";
+    : placeholder;
 
   const pick = (day: number) => {
     onChange(toYMD(new Date(year, month, day)));
@@ -157,7 +171,7 @@ export default function CustomDateInput({
           <div
             ref={popupRef}
             data-theme={theme}
-            style={{ top: pos.top, left: pos.left, minWidth: pos.width }}
+            style={{ top: pos.top, bottom: pos.bottom, left: pos.left, minWidth: pos.width }}
             className="fixed z-[9999999] w-56 bg-base-100 rounded-box p-2 shadow-lg border border-base-300"
           >
             <div className="flex items-center justify-between mb-1">

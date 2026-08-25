@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { apiCall, API_CONFIG } from "../../../../utils/api";
 import type { ExpedienteDetalle } from "../../../../types/sancionatorioApp";
 import type { Municipio, ModeloGenerico } from "../../../../types/common";
+import CustomSelect from "../../../Common/Form/CustomSelect";
 
 const ETAPA_LABELS: Record<string, string> = {
   "INDAGACION PRELIMINAR": "Indagación Preliminar",
@@ -46,6 +47,8 @@ export default function InformacionExpedienteData({
     expediente.recurso_afectado || [],
   );
   const [veredaList, setVeredaList] = useState<ModeloGenerico[]>([]);
+  const [municipioId, setMunicipioId] = useState(expediente.municipio?.id || 0);
+  const [veredaId, setVeredaId] = useState(expediente.vereda?.id || 0);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
@@ -61,13 +64,22 @@ export default function InformacionExpedienteData({
     );
   };
 
-  const toggleChangeTown = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const townId = Number(e.target.value);
+  const toggleChangeTown = (townId: number) => {
+    setMunicipioId(townId);
+    setVeredaId(0);
     const town = municipioList.find((t) => t.id === townId);
     setVeredaList(town?.veredas || []);
   };
 
   const validateForm = () => {
+    if (!municipioId) {
+      setToast({ id: Date.now(), message: "Debe seleccionar un municipio", type: "error" });
+      return false;
+    }
+    if (!veredaId) {
+      setToast({ id: Date.now(), message: "Debe seleccionar una vereda", type: "error" });
+      return false;
+    }
     if (recursosSeleccionados.length === 0) {
       setToast({
         id: Date.now(),
@@ -84,8 +96,6 @@ export default function InformacionExpedienteData({
     const newNombre = formData.get("nombre") as string;
     const newMotivo = formData.get("motivo") as string;
     const newDireccion = formData.get("direccion") as string;
-    const newVeredaId = Number(formData.get("vereda"));
-    const newMunicipioId = Number(formData.get("municipio"));
 
     const resourcesChanged =
       JSON.stringify([...recursosSeleccionados].sort()) !==
@@ -96,8 +106,8 @@ export default function InformacionExpedienteData({
       newNombre !== expediente.expediente ||
       newMotivo !== (expediente.motivo_afectacion || "") ||
       newDireccion !== expediente.direccion ||
-      newVeredaId !== (expediente.vereda?.id || 0) ||
-      newMunicipioId !== expediente.municipio.id ||
+      veredaId !== (expediente.vereda?.id || 0) ||
+      municipioId !== expediente.municipio.id ||
       resourcesChanged
     );
   };
@@ -164,12 +174,8 @@ export default function InformacionExpedienteData({
         return;
       }
 
-      const selectedMunicipio = municipioList.find(
-        (t) => t.id === Number(formData.get("municipio")),
-      );
-      const selectedVereda = veredaList.find(
-        (s) => s.id === Number(formData.get("vereda")),
-      );
+      const selectedMunicipio = municipioList.find((t) => t.id === municipioId);
+      const selectedVereda = veredaList.find((s) => s.id === veredaId);
 
       const updatedExpediente: ExpedienteDetalle = {
         ...expediente,
@@ -179,11 +185,11 @@ export default function InformacionExpedienteData({
         motivo_afectacion: (formData.get("motivo") as string).trim(),
         direccion: (formData.get("direccion") as string).trim(),
         vereda: {
-          id: Number(formData.get("vereda")),
+          id: veredaId,
           nombre: selectedVereda?.nombre || "",
         },
         municipio: {
-          id: Number(formData.get("municipio")),
+          id: municipioId,
           nombre: selectedMunicipio?.nombre || expediente.municipio.nombre,
         },
       };
@@ -230,6 +236,8 @@ export default function InformacionExpedienteData({
 
   const handleCancel = () => {
     setRecursosSeleccionados(expediente.recurso_afectado || []);
+    setMunicipioId(expediente.municipio?.id || 0);
+    setVeredaId(expediente.vereda?.id || 0);
     setShowForm(false);
   };
 
@@ -262,7 +270,11 @@ export default function InformacionExpedienteData({
           {!showForm && isEditable && (
             <button
               className="btn btn-ghost btn-sm gap-2 text-success hover:bg-success/10"
-              onClick={() => setShowForm(true)}
+              onClick={() => {
+                setMunicipioId(expediente.municipio?.id || 0);
+                setVeredaId(expediente.vereda?.id || 0);
+                setShowForm(true);
+              }}
               disabled={isLoading}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -554,45 +566,26 @@ export default function InformacionExpedienteData({
                 <label className="label">
                   <span className="label-text font-medium">Municipio</span>
                 </label>
-                <select
-                  name="municipio"
-                  defaultValue={expediente.municipio?.id || ""}
+                <CustomSelect
+                  value={municipioId}
                   onChange={toggleChangeTown}
-                  className="select select-bordered w-full"
-                  required
+                  placeholder="Seleccione un municipio"
                   disabled={isLoading}
-                >
-                  <option value="" disabled>
-                    Seleccione un municipio
-                  </option>
-                  {municipioList.map((m) => (
-                    <option value={m.id} key={m.id}>
-                      {m.nombre}
-                    </option>
-                  ))}
-                </select>
+                  options={municipioList.map((m) => ({ value: m.id, label: m.nombre }))}
+                />
               </div>
 
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-medium">Vereda</span>
                 </label>
-                <select
-                  name="vereda"
-                  defaultValue={expediente.vereda?.id || ""}
-                  className="select select-bordered w-full"
-                  required
+                <CustomSelect
+                  value={veredaId}
+                  onChange={setVeredaId}
+                  placeholder="Seleccione una vereda"
                   disabled={isLoading}
-                >
-                  <option value="" disabled>
-                    Seleccione una vereda
-                  </option>
-                  {veredaList.map((v) => (
-                    <option value={v.id} key={v.id}>
-                      {v.nombre}
-                    </option>
-                  ))}
-                </select>
+                  options={veredaList.map((v) => ({ value: v.id, label: v.nombre }))}
+                />
               </div>
             </div>
 

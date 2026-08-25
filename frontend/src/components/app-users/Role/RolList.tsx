@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
+import CustomSelect from "../../Common/Form/CustomSelect";
 
 type Rol = {
   id: number;
@@ -7,14 +8,15 @@ type Rol = {
 };
 
 type Props = {
-  rolRef: React.RefObject<HTMLSelectElement | null>;
+  value: number;
+  onChange: (value: number) => void;
 };
 
 function capitalize(word: string) {
   return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
 }
 
-export default function RolList({ rolRef }: Props) {
+export default function RolList({ value, onChange }: Props) {
   const [rolList, setRolList] = useState<Rol[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -77,24 +79,13 @@ export default function RolList({ rolRef }: Props) {
 
   return (
     <div className="form-control">
-      <select
-        className="select select-bordered w-full focus:border-green-600"
-        ref={rolRef}
-        defaultValue="0"
-      >
-        <option value="0" disabled>
-          -- Seleccione un rol --
-        </option>
-        {rolList.length === 0 ? (
-          <option disabled>No hay roles disponibles</option>
-        ) : (
-          rolList.map((rol) => (
-            <option key={rol.id} value={rol.id}>
-              {capitalize(rol.nombre)}
-            </option>
-          ))
-        )}
-      </select>
+      <CustomSelect
+        className="focus:border-green-600"
+        value={value}
+        onChange={onChange}
+        placeholder="-- Seleccione un rol --"
+        options={rolList.map((rol) => ({ value: rol.id, label: capitalize(rol.nombre) }))}
+      />
       {rolList.length > 0 && (
         <label className="label">
           <span className="label-text-alt text-base-content/50">

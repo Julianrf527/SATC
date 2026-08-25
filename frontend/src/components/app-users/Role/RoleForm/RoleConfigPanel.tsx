@@ -1,4 +1,5 @@
 import type { Rol } from "../../../../types/userApp";
+import CustomSelect from "../../../Common/Form/CustomSelect";
 
 type Props = {
   mode: "create" | "edit";
@@ -100,18 +101,17 @@ export default function RoleConfigPanel({
                   Seleccionar Rol
                 </span>
               </label>
-              <select
-                className="select select-bordered w-full focus:border-green-600"
+              <CustomSelect
+                className="focus:border-green-600"
                 value={selectedRoleId}
-                onChange={(e) => onRoleSelect(e.target.value)}
-              >
-                <option value="">-- Seleccione un rol --</option>
-                {rolList.map((rol) => (
-                  <option key={rol.id} value={rol.id}>
-                    {rol.nombre} ({rol.permisos?.length || 0} permisos)
-                  </option>
-                ))}
-              </select>
+                onChange={onRoleSelect}
+                emptyValue=""
+                placeholder="-- Seleccione un rol --"
+                options={rolList.map((rol) => ({
+                  value: String(rol.id),
+                  label: `${rol.nombre} (${rol.permisos?.length || 0} permisos)`,
+                }))}
+              />
             </div>
           )}
 

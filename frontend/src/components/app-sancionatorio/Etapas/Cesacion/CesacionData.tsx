@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiCall, API_CONFIG } from "../../../../utils/api";
+import CustomSelect from "../../../Common/Form/CustomSelect";
 
 type Cesacion = {
   id: number;
@@ -36,6 +37,7 @@ export default function CesacionData({
   );
   const [showForm, setShowForm] = useState(!hasCesacion && isEditable);
   const [isLoading, setIsLoading] = useState(false);
+  const [tipoCesacionId, setTipoCesacionId] = useState(localData?.tipo_cesacion_id || 0);
 
   const getTipoNombre = (idTipo: number) => {
     return tipoMedida.find((t) => t.id === idTipo)?.nombre || "No definido";
@@ -43,12 +45,13 @@ export default function CesacionData({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!tipoCesacionId) {
+      setToast({ id: Date.now(), message: "Seleccione un tipo de cesación", type: "error" });
+      return;
+    }
     setIsLoading(true);
 
     try {
-      const formData = new FormData(e.target as HTMLFormElement);
-      const tipoCesacionId = Number(formData.get("tipo_cesacion_id"));
-
       const cesacionData = {
         tipo_cesacion_id: tipoCesacionId,
         etapa_id: etapaId,
@@ -153,7 +156,10 @@ export default function CesacionData({
           {!showForm && localData && isEditable && (
             <button
               className="btn btn-ghost btn-sm gap-2 text-info hover:bg-info/10"
-              onClick={() => setShowForm(true)}
+              onClick={() => {
+                setTipoCesacionId(localData?.tipo_cesacion_id || 0);
+                setShowForm(true);
+              }}
               disabled={isLoading}
             >
               <svg
@@ -238,22 +244,13 @@ export default function CesacionData({
                   Tipo de Cesación <span className="text-error">*</span>
                 </span>
               </label>
-              <select
-                name="tipo_cesacion_id"
-                defaultValue={localData?.tipo_cesacion_id || ""}
-                className="select select-bordered w-full"
-                required
+              <CustomSelect
+                value={tipoCesacionId}
+                onChange={setTipoCesacionId}
+                placeholder="Seleccione un tipo"
                 disabled={isLoading}
-              >
-                <option value="" disabled>
-                  Seleccione un tipo
-                </option>
-                {tipoMedida.map((tipo) => (
-                  <option key={tipo.id} value={tipo.id}>
-                    {tipo.nombre}
-                  </option>
-                ))}
-              </select>
+                options={tipoMedida.map((tipo) => ({ value: tipo.id, label: tipo.nombre }))}
+              />
             </div>
 
             <div className="flex gap-3 justify-end pt-4 border-t border-base-300">

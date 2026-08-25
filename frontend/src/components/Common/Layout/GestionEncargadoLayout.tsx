@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { Users } from "lucide-react";
 import { apiCall } from "../../../utils/api";
 import TableFiles from "../../app-infraccion/Table/TableFiles";
+import CustomSelect from "../Form/CustomSelect";
 
 type Expediente = {
   id: number;
@@ -343,31 +344,32 @@ export default function GestorEncargados({ endpoints, title, modulo, showExpedie
                 <label className="label">
                   <span className="label-text text-xs">Estado</span>
                 </label>
-                <select
-                  className="select select-sm select-bordered"
+                <CustomSelect
+                  className="select-sm"
+                  hidePlaceholderOption
                   value={estadoFilter}
-                  onChange={(e) => setEstadoFilter(e.target.value)}
-                >
-                  <option value="all">Todos</option>
-                  <option value="asignado">Asignados</option>
-                  <option value="sin_asignar">Sin asignar</option>
-                </select>
+                  onChange={setEstadoFilter}
+                  options={[
+                    { value: "all", label: "Todos" },
+                    { value: "asignado", label: "Asignados" },
+                    { value: "sin_asignar", label: "Sin asignar" },
+                  ]}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-5 gap-3 rounded-lg mb-2 items-center">
-              <select
-                className="select select-sm select-bordered w-full h-9"
+              <CustomSelect
+                className="select-sm h-9"
                 value={selectedEncargadoId}
-                onChange={(e) => setSelectedEncargadoId(e.target.value)}
-              >
-                <option value="">Seleccionar encargado...</option>
-                {usuariosDisponibles.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nombre} (CC: {u.numero_documento ?? u.id})
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedEncargadoId}
+                emptyValue=""
+                placeholder="Seleccionar encargado..."
+                options={usuariosDisponibles.map((u) => ({
+                  value: String(u.id),
+                  label: `${u.nombre} (CC: ${u.numero_documento ?? u.id})`,
+                }))}
+              />
 
               <span className="text-sm font-medium text-base-content/80 whitespace-nowrap">
                 {selectedIds.size} seleccionados

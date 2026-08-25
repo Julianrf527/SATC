@@ -224,6 +224,33 @@ export function useInformacionInfraccionForm({
       return false;
     }
 
+    if (!fechaRadicado) {
+      setToast({
+        id: Date.now(),
+        message: "Debe seleccionar la fecha de radicado",
+        type: "error",
+      });
+      return false;
+    }
+
+    if (!municipioId) {
+      setToast({
+        id: Date.now(),
+        message: "Debe seleccionar un municipio",
+        type: "error",
+      });
+      return false;
+    }
+
+    if (!veredaId) {
+      setToast({
+        id: Date.now(),
+        message: "Debe seleccionar una vereda",
+        type: "error",
+      });
+      return false;
+    }
+
     if (quejososIds.length === 0) {
       setToast({
         id: Date.now(),

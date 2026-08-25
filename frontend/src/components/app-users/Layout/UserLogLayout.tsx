@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import TableAudit from "../../app-users/Table/TableUserLog";
+import CustomDateInput from "../../Common/Form/CustomDateInput";
 
 type Auditoria = {
   id: number;
@@ -181,13 +182,13 @@ export default function AuditLayout({ setToast }: Props) {
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-base-content/60">Fecha desde</span>
-                  <input type="date" className="input input-sm input-bordered w-full"
-                    value={searchFechaInicio} onChange={(e) => setSearchFechaInicio(e.target.value)} disabled={loading} />
+                  <CustomDateInput className="input-sm"
+                    value={searchFechaInicio} onChange={setSearchFechaInicio} disabled={loading} />
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-base-content/60">Fecha hasta</span>
-                  <input type="date" className="input input-sm input-bordered w-full"
-                    value={searchFechaFin} onChange={(e) => setSearchFechaFin(e.target.value)} disabled={loading} />
+                  <CustomDateInput className="input-sm"
+                    value={searchFechaFin} onChange={setSearchFechaFin} disabled={loading} />
                 </div>
                 <div className="flex items-end">
                   <button className="btn btn-sm btn-success text-white gap-2 w-full"

@@ -1,6 +1,8 @@
 import type { Quejoso, TipoAfectacion } from "../../../../types/infraccionApp";
 import type { Municipio, ModeloGenerico } from "../../../../types/common";
 import type { InformacionInfraccionFormState } from "./useInformacionInfraccionForm";
+import CustomSelect from "../../../Common/Form/CustomSelect";
+import CustomDateInput from "../../../Common/Form/CustomDateInput";
 
 interface Props {
   form: InformacionInfraccionFormState;
@@ -72,13 +74,10 @@ export default function InformacionInfraccionForm({
           <label className="label">
             <span className="label-text font-medium">Fecha radicado *</span>
           </label>
-          <input
-            type="date"
-            className="input input-bordered w-full"
+          <CustomDateInput
             value={fechaRadicado}
-            onChange={(e) => setFechaRadicado(e.target.value)}
+            onChange={setFechaRadicado}
             max={new Date().toISOString().split('T')[0]}
-            required
             disabled={isLoading}
           />
         </div>
@@ -87,41 +86,29 @@ export default function InformacionInfraccionForm({
           <label className="label">
             <span className="label-text font-medium">Municipio *</span>
           </label>
-          <select
-            className="select select-bordered w-full"
-            value={municipioId || ""}
-            onChange={(e) => {
-              setMunicipioId(Number(e.target.value));
+          <CustomSelect
+            value={municipioId || 0}
+            onChange={(v) => {
+              setMunicipioId(v);
               setVeredaId(0);
             }}
-            required
+            placeholder="Seleccione un municipio"
             disabled={isLoading}
-          >
-            <option value="" disabled>Seleccione un municipio</option>
-            {municipioList.map((m) => (
-              <option key={m.id} value={m.id}>{m.nombre}</option>
-            ))}
-          </select>
+            options={municipioList.map((m) => ({ value: m.id, label: m.nombre }))}
+          />
         </div>
 
         <div className="form-control">
           <label className="label">
             <span className="label-text font-medium">Vereda *</span>
           </label>
-          <select
-            className="select select-bordered w-full"
-            value={veredaId || ""}
-            onChange={(e) => setVeredaId(Number(e.target.value))}
-            required
+          <CustomSelect
+            value={veredaId || 0}
+            onChange={setVeredaId}
+            placeholder={veredaList.length === 0 ? "Seleccione primero un municipio" : "Seleccione una vereda"}
             disabled={isLoading || veredaList.length === 0}
-          >
-            <option value="" disabled>
-              {veredaList.length === 0 ? "Seleccione primero un municipio" : "Seleccione una vereda"}
-            </option>
-            {veredaList.map((v) => (
-              <option key={v.id} value={v.id}>{v.nombre}</option>
-            ))}
-          </select>
+            options={veredaList.map((v) => ({ value: v.id, label: v.nombre }))}
+          />
         </div>
 
         <div className="form-control">

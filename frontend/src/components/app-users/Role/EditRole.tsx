@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import ConfirmationModal from "./ConfirmationModal";
 import type { Rol } from "../../../types/userApp";
+import CustomSelect from "../../Common/Form/CustomSelect";
 
 type Props = {
   permission: { id: number; name: string; menu_path: string }[];
@@ -24,10 +25,10 @@ export default function EditRol({ permission = [], setToast }: Props) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 8;
 
-  const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const rolTemp = rolList.find((r) => r.id === Number(e.target.value));
+  const handleRoleChange = (value: string) => {
+    const rolTemp = rolList.find((r) => r.id === Number(value));
     setPermissionList(rolTemp ? rolTemp.permisos : []);
-    setSelectedRoleId(e.target.value);
+    setSelectedRoleId(value);
     roleNameRef.current!.value = rolTemp ? rolTemp.nombre : "";
   };
 
@@ -248,18 +249,13 @@ export default function EditRol({ permission = [], setToast }: Props) {
         {/* Selector y Input - Altura fija */}
         <div className="mb-4 flex-shrink-0">
           <div className="form-control mb-4">
-            <select
-              className="select select-bordered w-full"
+            <CustomSelect
               onChange={handleRoleChange}
               value={selectedRoleId}
-            >
-              <option value="0">Seleccione un rol</option>
-              {rolList.map((rol) => (
-                <option key={rol.id} value={rol.id}>
-                  {rol.nombre}
-                </option>
-              ))}
-            </select>
+              emptyValue="0"
+              placeholder="Seleccione un rol"
+              options={rolList.map((rol) => ({ value: String(rol.id), label: rol.nombre }))}
+            />
           </div>
 
           {selectedRoleId !== "0" && (
