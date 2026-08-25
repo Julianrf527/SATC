@@ -32,9 +32,8 @@ export default function RoleConfigPanel({
   onClear,
 }: Props) {
   return (
-    <div className="xl:col-span-1">
-      <div className="card bg-base-100 shadow-xl border border-base-300 sticky top-4">
-        <div className="card-body">
+    <div className="xl:w-1/3 flex-none overflow-y-auto h-full">
+      <div className="p-6 h-full flex flex-col">
           {/* Selector de modo */}
           <div className="flex gap-2 mb-4">
             <button
@@ -142,8 +141,8 @@ export default function RoleConfigPanel({
             </div>
           </div>
 
-          {/* Botones de acción */}
-          <div className="flex flex-col gap-2">
+          {/* Botones de acción: siempre al fondo del panel */}
+          <div className="flex flex-col gap-2 mt-auto pt-4">
             <button
               className={`btn ${
                 mode === "create"
@@ -214,7 +213,6 @@ export default function RoleConfigPanel({
               Limpiar
             </button>
           </div>
-        </div>
       </div>
     </div>
   );

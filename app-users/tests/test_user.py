@@ -2,7 +2,7 @@
 import pytest
 from conftest import gateway_headers, service_headers, TEST_PASSWORD
 
-PERMISO_USER = "admin_crear_usuarios"
+PERMISO_USER = "admin_registrar_usuarios"
 GESTION_USER = "admin_gestionar_usuarios"
 USER_LOG = "auditoria_usuarios"
 

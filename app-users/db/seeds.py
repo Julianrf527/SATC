@@ -16,8 +16,8 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 PERMISOS = [
-    {"nombre": "admin_roles", "menu_path": "/user/role"},
-    {"nombre": "admin_crear_usuarios", "menu_path": "/user/add"},
+    {"nombre": "admin_roles_y_permisos", "menu_path": "/user/role"},
+    {"nombre": "admin_registrar_usuarios", "menu_path": "/user/add"},
     {"nombre": "admin_gestionar_usuarios", "menu_path": "/user/manage"},
     {"nombre": "sancionatorio_gestionar", "menu_path": "/file/manage"},
     {"nombre": "sancionatorio_consultar", "menu_path": "/file/consult"},

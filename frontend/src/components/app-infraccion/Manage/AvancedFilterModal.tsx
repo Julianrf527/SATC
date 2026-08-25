@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { API_CONFIG, apiCall } from "../../../utils/api";
 import type { ModeloGenerico, Municipio } from "../../../types/common";
 import type { TipoAfectacion } from "../../../types/infraccionApp";
+import CustomSelect from "../../Common/Form/CustomSelect";
 
 type Props = {
   isOpen: boolean;
@@ -175,23 +176,19 @@ export default function AdvancedFiltersModal({
                 <label className="label py-1">
                   <span className="label-text text-sm">Municipio</span>
                 </label>
-                <select
-                  className="select select-sm select-bordered"
-                  value={filters.municipio_id || ""}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    if (val) {
-                      setFilters((p) => ({ ...p, municipio_id: Number(val), vereda_ids: [] }));
+                <CustomSelect
+                  className="select-sm"
+                  value={filters.municipio_id || 0}
+                  onChange={(v) => {
+                    if (v) {
+                      setFilters((p) => ({ ...p, municipio_id: v, vereda_ids: [] }));
                     } else {
                       setFilters((p) => { const n = { ...p }; delete n.municipio_id; delete n.vereda_ids; return n; });
                     }
                   }}
-                >
-                  <option value="">Todos los municipios</option>
-                  {municipioList.map((m) => (
-                    <option key={m.id} value={m.id}>{m.nombre}</option>
-                  ))}
-                </select>
+                  placeholder="Todos los municipios"
+                  options={municipioList.map((m) => ({ value: m.id, label: m.nombre }))}
+                />
               </div>
 
               {filters.municipio_id && (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { apiCall, API_CONFIG } from "../../../utils/api";
+import CustomSelect from "../../Common/Form/CustomSelect";
 
 type Involved = {
   id: number;
@@ -196,14 +197,18 @@ export default function EditInvolvedModal({ involved, onClose, onSave }: Props) 
                 {/* Tipo */}
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-base-content/60">Tipo *</span>
-                  <select
-                    value={tipoDoc}
-                    onChange={(e) => { setTipoDoc(e.target.value); if (e.target.value !== "NIT") setDv(""); }}
-                    className="select select-bordered select-sm w-full"
+                  <CustomSelect
+                    value={DOC_TYPES.indexOf(tipoDoc)}
+                    onChange={(i) => {
+                      const t = DOC_TYPES[i];
+                      setTipoDoc(t);
+                      if (t !== "NIT") setDv("");
+                    }}
+                    hidePlaceholderOption
+                    className="select-sm"
                     disabled={busy}
-                  >
-                    {DOC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
+                    options={DOC_TYPES.map((t, i) => ({ value: i, label: t }))}
+                  />
                 </div>
 
                 {/* Número (ocupa 2 cols) */}

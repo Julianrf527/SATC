@@ -158,7 +158,7 @@ export default function GestionLogsManager({ title, body: _body, endpoint, modul
   return (
     <>
       {/* Header estilo SignUpLayout */}
-      <div className="bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm sticky top-0 z-10">
+      <div className="bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">

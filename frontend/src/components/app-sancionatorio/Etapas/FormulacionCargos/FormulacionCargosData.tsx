@@ -12,7 +12,7 @@ import { apiCall, API_CONFIG } from "../../../../utils/api";
 type FormulationCharges = {
   id: number;
   descargos: boolean | null;
-  documento_descargos_id?: number | null;
+  documento_id?: number | null;
 };
 
 type Props = {
@@ -58,10 +58,10 @@ export default function FormulacionCargosData({
 
   const handleViewDocument = () => {
     if (
-      data?.documento_descargos_id &&
-      isValidDocumentId(data.documento_descargos_id)
+      data?.documento_id &&
+      isValidDocumentId(data.documento_id)
     ) {
-      openDocumentById(data.documento_descargos_id);
+      openDocumentById(data.documento_id);
     }
   };
 
@@ -121,7 +121,7 @@ export default function FormulacionCargosData({
       if (
         descargosBoolean === true &&
         !selectedFile &&
-        !data?.documento_descargos_id
+        !data?.documento_id
       ) {
         setToast({
           id: Date.now(),
@@ -133,40 +133,22 @@ export default function FormulacionCargosData({
         return;
       }
 
-      let documento_descargos_id: number | undefined;
+      // Documento vigente: el ya guardado, salvo que se suba uno nuevo.
+      let documentoId: number | null | undefined = data?.documento_id ?? null;
 
-      // Paso 1: Subir archivo a app-docs si hay uno seleccionado
       if (selectedFile) {
         const fileName = generateDocumentFileName(
           "DESCARGOS",
           `F-${etapaId}`,
           new Date().toISOString().split("T")[0],
         );
-        documento_descargos_id = await uploadFileToDocuments(
-          selectedFile,
-          fileName,
-        );
+        documentoId = await uploadFileToDocuments(selectedFile, fileName);
       }
 
-      // Paso 2: Enviar datos de formulación con ID del documento
-      const requestBody: any = {
-        descargos:
-          descargosBoolean !== null ? descargosBoolean.toString() : "null",
-        etapa_id: etapaId.toString(),
+      const requestBody = {
+        descargos: descargosBoolean,
+        documento_id: documentoId,
       };
-
-      // Solo incluir documento_descargos_id si se subió un archivo nuevo
-      if (documento_descargos_id !== undefined) {
-        requestBody.documento_descargos_id = documento_descargos_id.toString();
-      } else if (!data?.id && descargosBoolean === true) {
-        setToast({
-          id: Date.now(),
-          message: "Error: No se pudo procesar el archivo",
-          type: "error",
-        });
-        setIsLoading(false);
-        return;
-      }
 
       let res;
       if (data?.id) {
@@ -243,7 +225,7 @@ export default function FormulacionCargosData({
 
   const showDocumentField = descargosValue === "true";
   const documentRequired =
-    descargosValue === "true" && !data?.documento_descargos_id;
+    descargosValue === "true" && !data?.documento_id;
 
   return (
     <div className="card bg-base-100 shadow-md border border-base-300">
@@ -304,7 +286,7 @@ export default function FormulacionCargosData({
           <div className="space-y-4">
             <div
               className={`grid grid-cols-1 ${
-                data.descargos === true && data.documento_descargos_id
+                data.descargos === true && data.documento_id
                   ? "md:grid-cols-2"
                   : ""
               } gap-4`}
@@ -342,39 +324,24 @@ export default function FormulacionCargosData({
 
               {/* Documento - Solo si descargos es "Sí" */}
               {data.descargos === true && (
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-base-200 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <svg
-                      className="w-4 h-4 text-base-content/70"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
+                <div className="flex items-start">
                   <div className="flex-1">
-                    <p className="text-xs font-medium text-base-content/60 uppercase tracking-wide mb-1">
-                      Documento de Descargos
-                    </p>
-                    {data.documento_descargos_id ? (
+                    {data.documento_id ? (
                       <button
                         onClick={handleViewDocument}
-                        className="btn btn-ghost btn-sm gap-2 p-0 h-auto min-h-0 text-info hover:text-info-focus"
+                        className="btn btn-success btn-sm gap-1 px-2 tooltip"
+                        data-tip="Ver documento de descargos"
                       >
                         <svg
-                          className="w-5 h-5 text-error"
+                          className="w-4 h-4 text-white"
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
                           <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" />
                         </svg>
-                        Ver documento
+                        <span className="text-xs font-medium text-white">
+                          Documento Descargos
+                        </span>
                       </button>
                     ) : (
                       <p className="text-sm text-base-content/60">
@@ -452,7 +419,7 @@ export default function FormulacionCargosData({
                     {documentRequired ? (
                       <span className="text-error">*</span>
                     ) : (
-                      data?.documento_descargos_id && (
+                      data?.documento_id && (
                         <span className="text-xs text-base-content/50 ml-2">
                           (Opcional - Solo si desea reemplazar)
                         </span>
@@ -495,7 +462,7 @@ export default function FormulacionCargosData({
                     </span>
                   </div>
                 )}
-                {data?.documento_descargos_id && !selectedFile && (
+                {data?.documento_id && !selectedFile && (
                   <p className="mt-2 text-xs text-base-content/60">
                     Archivo actual: Documento registrado
                   </p>

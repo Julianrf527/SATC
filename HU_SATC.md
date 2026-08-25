@@ -29,7 +29,7 @@
 ## 2. Módulo: Administración (usuarios y roles)
 
 ### HU-ADM-01 — Gestión de roles y permisos
-**Permiso:** `admin_roles`
+**Permiso:** `admin_roles_y_permisos`
 **Como** administrador del sistema, **quiero** crear, editar y eliminar roles y asignarles permisos específicos, **para** controlar de forma centralizada qué puede hacer cada perfil de usuario en la plataforma.
 
 **Criterios de aceptación:**
@@ -40,7 +40,7 @@
 - Los cambios de permisos en un rol se reflejan de inmediato en todos los usuarios que lo tienen asignado (sin necesidad de cerrar sesión).
 
 ### HU-ADM-02 — Creación de usuarios
-**Permiso:** `admin_crear_usuarios`
+**Permiso:** `admin_registrar_usuarios`
 **Como** administrador, **quiero** registrar nuevos usuarios en el sistema con su rol asignado, **para** darles acceso a la plataforma según su función institucional.
 
 **Criterios de aceptación:**

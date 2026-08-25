@@ -162,7 +162,7 @@ export default function DetalleExpediente({
     return () => {
       cancelado = true;
     };
-  }, [expedienteActual, setToast]);
+  }, [expedienteActual?.id, setToast]);
 
   // Mapping de tab.id a tipo_etapa_id
   const tabToEtapaMap: { [key: string]: number | null } = {
@@ -404,7 +404,7 @@ export default function DetalleExpediente({
   return (
     <div className="flex-1 flex flex-col h-full bg-base-200">
       {/* HEADER MEJORADO */}
-      <div className="flex-shrink-0 bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm sticky top-0 z-10">
+      <div className="flex-shrink-0 bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

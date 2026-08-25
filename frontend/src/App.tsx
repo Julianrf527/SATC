@@ -37,8 +37,8 @@ const inferPermissionFromPath = (path: string): string => {
   // Las claves deben coincidir con los permisos sembrados en seeds.py del backend.
   const pathToPermissionMap: Record<string, string> = {
     // === ADMINISTRACIÓN ===
-    "/user/role": "admin_roles",
-    "/user/add": "admin_crear_usuarios",
+    "/user/role": "admin_roles_y_permisos",
+    "/user/add": "admin_registrar_usuarios",
     "/user/manage": "admin_gestionar_usuarios",
 
     // === SANCIONATORIO ===

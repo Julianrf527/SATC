@@ -36,36 +36,38 @@ export default function RoleForm({ permisoList = [], setToast }: Props) {
   } = useRoleForm(permisoList, setToast);
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-      {/* Panel de configuración */}
-      <RoleConfigPanel
-        mode={mode}
-        onModeChange={setMode}
-        rolList={rolList}
-        selectedRoleId={selectedRoleId}
-        onRoleSelect={handleRoleSelect}
-        roleName={roleName}
-        onRoleNameChange={setRoleName}
-        selectedCount={selectedPermissions.length}
-        totalPermissions={permisoList.length}
-        isSubmitting={isSubmitting}
-        onSubmit={handleSubmit}
-        onDelete={handleDelete}
-        onClear={handleClear}
-      />
+    <>
+      <div className="flex-1 min-h-0 flex flex-col xl:flex-row divide-y xl:divide-y-0 xl:divide-x divide-base-300">
+        {/* Panel de configuración */}
+        <RoleConfigPanel
+          mode={mode}
+          onModeChange={setMode}
+          rolList={rolList}
+          selectedRoleId={selectedRoleId}
+          onRoleSelect={handleRoleSelect}
+          roleName={roleName}
+          onRoleNameChange={setRoleName}
+          selectedCount={selectedPermissions.length}
+          totalPermissions={permisoList.length}
+          isSubmitting={isSubmitting}
+          onSubmit={handleSubmit}
+          onDelete={handleDelete}
+          onClear={handleClear}
+        />
 
-      {/* Panel de permisos */}
-      <PermissionSelector
-        categories={categories}
-        searchTerm={searchTerm}
-        onSearchTermChange={setSearchTerm}
-        expandedCategories={expandedCategories}
-        selectedPermissions={selectedPermissions}
-        getFilteredPermissions={getFilteredPermissions}
-        onToggleCategory={toggleCategory}
-        onToggleCategoryPermissions={toggleCategoryPermissions}
-        onTogglePermission={togglePermission}
-      />
+        {/* Panel de permisos */}
+        <PermissionSelector
+          categories={categories}
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+          expandedCategories={expandedCategories}
+          selectedPermissions={selectedPermissions}
+          getFilteredPermissions={getFilteredPermissions}
+          onToggleCategory={toggleCategory}
+          onToggleCategoryPermissions={toggleCategoryPermissions}
+          onTogglePermission={togglePermission}
+        />
+      </div>
 
       {/* Modal de confirmación dinámico */}
       <ConfirmationModal
@@ -77,6 +79,6 @@ export default function RoleForm({ permisoList = [], setToast }: Props) {
         itemIdentifier={confirmationModal.itemIdentifier}
         isSubmitting={isSubmitting}
       />
-    </div>
+    </>
   );
 }

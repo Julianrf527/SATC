@@ -290,11 +290,11 @@ export default function PermissionForm({
   const groupedPermissions = groupPermissionsByCategory();
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <>
+    <div className="flex-1 min-h-0 flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-base-300">
       {/* Panel de formulario */}
-      <div className="lg:col-span-1">
-        <div className="card bg-base-100 shadow-xl border border-base-300 sticky top-4">
-          <div className="card-body">
+      <div className="lg:w-1/3 flex-none overflow-y-auto h-full">
+        <div className="p-6 h-full flex flex-col">
             {/* Selector de modo */}
             <div className="flex gap-2 mb-4">
               <button
@@ -386,7 +386,7 @@ export default function PermissionForm({
               </label>
               <input
                 type="text"
-                placeholder="Ej: admin_crear_usuarios"
+                placeholder="Ej: admin_registrar_usuarios"
                 className="input input-bordered w-full focus:border-blue-600"
                 value={permissionName}
                 onChange={(e) => setPermissionName(e.target.value)}
@@ -421,8 +421,8 @@ export default function PermissionForm({
 
             <div className="divider my-2"></div>
 
-            {/* Botones de acción */}
-            <div className="flex flex-col gap-2">
+            {/* Botones de acción: siempre al fondo del panel */}
+            <div className="flex flex-col gap-2 mt-auto pt-4">
               <button
                 className={`btn ${
                   mode === "create"
@@ -493,14 +493,12 @@ export default function PermissionForm({
                 Limpiar
               </button>
             </div>
-          </div>
         </div>
       </div>
 
       {/* Panel de lista de permisos */}
-      <div className="lg:col-span-2">
-        <div className="card bg-base-100 shadow-xl border border-base-300">
-          <div className="card-body">
+      <div className="lg:w-2/3 flex-1 min-h-0 flex flex-col">
+        <div className="p-6 flex flex-col flex-1 min-h-0">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <svg
@@ -551,7 +549,7 @@ export default function PermissionForm({
             <div className="divider my-2"></div>
 
             {/* Lista de permisos agrupados */}
-            <div className="space-y-4 max-h-[600px] overflow-y-auto">
+            <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
               {Object.entries(groupedPermissions).map(([key, perms]) => {
                 if (perms.length === 0) return null;
 
@@ -609,11 +607,10 @@ export default function PermissionForm({
                 );
               })}
             </div>
-          </div>
         </div>
       </div>
+    </div>
 
-      {/* Modal de confirmación de eliminación */}
       {/* Modal de confirmación dinámico */}
       <ConfirmationModal
         isOpen={confirmationModal.isOpen}
@@ -624,6 +621,6 @@ export default function PermissionForm({
         onConfirm={confirmationModal.onConfirm}
         onClose={hideConfirmationModal}
       />
-    </div>
+    </>
   );
 }

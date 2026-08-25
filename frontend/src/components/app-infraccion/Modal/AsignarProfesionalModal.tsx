@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { X, UserCheck, Calendar } from "lucide-react";
 import type { ProfesionalDisponible } from "../../../types/infraccionApp";
 import { getErrorMessage } from "../../../utils/api";
+import CustomSelect from "../../Common/Form/CustomSelect";
+import CustomDateInput from "../../Common/Form/CustomDateInput";
 
 type Props = {
   isOpen: boolean;
@@ -120,19 +122,13 @@ export default function AsignarProfesionalModal({
             <label className="label py-1">
               <span className="label-text font-medium">Profesional <span className="text-error">*</span></span>
             </label>
-            <select
-              className="select select-bordered w-full"
-              value={profesionalId}
-              onChange={(e) => setProfesionalId(e.target.value === "" ? "" : Number(e.target.value))}
+            <CustomSelect
+              value={profesionalId === "" ? 0 : profesionalId}
+              onChange={(v) => setProfesionalId(v === 0 ? "" : v)}
+              placeholder="Seleccionar profesional..."
               disabled={submitting}
-            >
-              <option value="">Seleccionar profesional...</option>
-              {profesionales.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
-                </option>
-              ))}
-            </select>
+              options={profesionales.map((p) => ({ value: p.id, label: p.nombre }))}
+            />
           </div>
 
           {/* Fecha de programación */}
@@ -144,11 +140,9 @@ export default function AsignarProfesionalModal({
                 <span className="text-base-content/40 text-xs font-normal">(Opcional)</span>
               </span>
             </label>
-            <input
-              type="date"
-              className="input input-bordered w-full"
+            <CustomDateInput
               value={fechaProgramacion}
-              onChange={(e) => setFechaProgramacion(e.target.value)}
+              onChange={setFechaProgramacion}
               max={new Date().toISOString().split('T')[0]}
               disabled={submitting}
             />
