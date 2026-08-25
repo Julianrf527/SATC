@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import TableInvolved from "../Table/TableInvolved";
 import EditInvolvedModal from "../Modal/EditInvolvedModal";
+import CustomSelect from "../../Common/Form/CustomSelect";
 
 type Involved = {
   id: number;
@@ -201,16 +202,20 @@ export default function ManageInvolvedLayout({ setToast }: Props) {
               </div>
               <div className="form-control">
                 <label className="label py-1"><span className="label-text text-xs">Tipo Documento</span></label>
-                <select className="select select-sm select-bordered"
+                <CustomSelect
+                  className="select-sm"
                   value={tipoDocumentoFilter}
-                  onChange={(e) => { setTipoDocumentoFilter(e.target.value); setPage(1); }}>
-                  <option value="">Todos</option>
-                  <option value="CC">CC</option>
-                  <option value="CE">CE</option>
-                  <option value="NIT">NIT</option>
-                  <option value="TI">TI</option>
-                  <option value="PAS">PAS</option>
-                </select>
+                  onChange={(v) => { setTipoDocumentoFilter(v); setPage(1); }}
+                  emptyValue=""
+                  placeholder="Todos"
+                  options={[
+                    { value: "CC", label: "CC" },
+                    { value: "CE", label: "CE" },
+                    { value: "NIT", label: "NIT" },
+                    { value: "TI", label: "TI" },
+                    { value: "PAS", label: "PAS" },
+                  ]}
+                />
               </div>
               <div className="form-control">
                 <label className="label py-1"><span className="label-text text-xs">Nombre</span></label>

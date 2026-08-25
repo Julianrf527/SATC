@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiCall, API_CONFIG } from "../../../../utils/api";
+import CustomSelect from "../../../Common/Form/CustomSelect";
 
 type Decision = {
   id: number;
@@ -32,6 +33,7 @@ export default function DecisionFondoData({
 }: Props) {
   const [showForm, setShowForm] = useState(!data && isEditable);
   const [isLoading, setIsLoading] = useState(false);
+  const [tipoSancionId, setTipoSancionId] = useState(data?.tipo_sancion_id || 0);
 
   const getTipoNombre = (idTipo: number) => {
     return tipoSancion.find((t) => t.id === idTipo)?.nombre || "No definido";
@@ -39,13 +41,17 @@ export default function DecisionFondoData({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!tipoSancionId) {
+      setToast({ id: Date.now(), message: "Seleccione un tipo de sanción", type: "error" });
+      return;
+    }
     setIsLoading(true);
 
     try {
       const formData = new FormData(e.target as HTMLFormElement);
 
       const decisionData = {
-        tipo_sancion_id: Number(formData.get("tipo_sancion_id")),
+        tipo_sancion_id: tipoSancionId,
         detalle: (formData.get("detalle") as string).trim(),
         etapa_id: etapaId,
       };
@@ -135,7 +141,10 @@ export default function DecisionFondoData({
           {!showForm && data && isEditable && (
             <button
               className="btn btn-ghost btn-sm gap-2 text-error hover:bg-error/10"
-              onClick={() => setShowForm(true)}
+              onClick={() => {
+                setTipoSancionId(data?.tipo_sancion_id || 0);
+                setShowForm(true);
+              }}
               disabled={isLoading}
             >
               <svg
@@ -249,22 +258,13 @@ export default function DecisionFondoData({
                     Tipo de Sanción
                   </span>
                 </label>
-                <select
-                  name="tipo_sancion_id"
-                  defaultValue={data?.tipo_sancion_id || ""}
-                  className="select select-bordered w-full"
-                  required
+                <CustomSelect
+                  value={tipoSancionId}
+                  onChange={setTipoSancionId}
+                  placeholder="Seleccione un tipo"
                   disabled={isLoading}
-                >
-                  <option value="" disabled>
-                    Seleccione un tipo
-                  </option>
-                  {tipoSancion.map((tipo) => (
-                    <option key={tipo.id} value={tipo.id}>
-                      {tipo.nombre}
-                    </option>
-                  ))}
-                </select>
+                  options={tipoSancion.map((tipo) => ({ value: tipo.id, label: tipo.nombre }))}
+                />
               </div>
 
               <div className="form-control">

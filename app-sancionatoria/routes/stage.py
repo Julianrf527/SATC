@@ -446,6 +446,13 @@ async def crear_inicio_proceso(request: Request, expediente_id: int, db: AsyncSe
 class CesacionBody(BaseModel):
     tipo_cesacion_id: int
 
+@router.get("/cessation-type", status_code=200)
+async def listar_tipos_cesacion(request: Request, db: AsyncSession = Depends(get_db_managed)):
+    verify_gateway_token(request)
+    tipos = (await db.execute(select(TipoCesacion).order_by(TipoCesacion.id))).scalars().all()
+    return JSONResponse(content={"ok": True, "data": [{"id": t.id, "nombre": t.nombre} for t in tipos]})
+
+
 @router.get("/cessation/{expediente_id}")
 async def obtener_cesacion(request: Request, expediente_id: int, db: AsyncSession = Depends(get_db_managed)):
     user_id = verify_gateway_token(request)["user_id"]

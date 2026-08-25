@@ -3,6 +3,8 @@ import {
   TIPO_INFORME_OPTIONS,
   type InformesTecnicosState,
 } from "./useInformesTecnicos";
+import CustomSelect from "../../../Common/Form/CustomSelect";
+import CustomDateInput from "../../../Common/Form/CustomDateInput";
 
 interface Props {
   state: InformesTecnicosState;
@@ -65,46 +67,43 @@ export default function InformesFiltros({ state }: Props) {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-base-content/60">Fecha desde</span>
-            <input
-              type="date"
-              className="input input-sm input-bordered w-full"
+            <CustomDateInput
+              className="input-sm"
               value={fechaDesde}
-              onChange={(e) => { setFechaDesde(e.target.value); setPage(1); }}
+              onChange={(v) => { setFechaDesde(v); setPage(1); }}
             />
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-base-content/60">Fecha hasta</span>
-            <input
-              type="date"
-              className="input input-sm input-bordered w-full"
+            <CustomDateInput
+              className="input-sm"
               value={fechaHasta}
-              onChange={(e) => { setFechaHasta(e.target.value); setPage(1); }}
+              onChange={(v) => { setFechaHasta(v); setPage(1); }}
             />
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-base-content/60">Estado</span>
-            <select
-              className="select select-sm select-bordered w-full"
+            <CustomSelect
+              className="select-sm"
               value={aceptado}
-              onChange={(e) => { setAceptado(e.target.value as "" | "true" | "false"); setPage(1); }}
-            >
-              <option value="">Todos</option>
-              <option value="true">Aceptados</option>
-              <option value="false">Pendientes</option>
-            </select>
+              onChange={(v) => { setAceptado(v as "" | "true" | "false"); setPage(1); }}
+              emptyValue=""
+              placeholder="Todos"
+              options={[
+                { value: "true", label: "Aceptados" },
+                { value: "false", label: "Pendientes" },
+              ]}
+            />
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-base-content/60">Profesional</span>
-            <select
-              className="select select-sm select-bordered w-full"
-              value={profesionalFilter}
-              onChange={(e) => { setProfesionalFilter(e.target.value === "" ? "" : Number(e.target.value)); setPage(1); }}
-            >
-              <option value="">Todos</option>
-              {profesionales.map((p) => (
-                <option key={p.id} value={p.id}>{p.nombre}</option>
-              ))}
-            </select>
+            <CustomSelect
+              className="select-sm"
+              value={profesionalFilter || 0}
+              onChange={(v) => { setProfesionalFilter(v === 0 ? "" : v); setPage(1); }}
+              placeholder="Todos"
+              options={profesionales.map((p) => ({ value: p.id, label: p.nombre }))}
+            />
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-base-content/60">Radicado</span>
@@ -118,16 +117,14 @@ export default function InformesFiltros({ state }: Props) {
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium text-base-content/60">Tipo informe</span>
-            <select
-              className="select select-sm select-bordered w-full"
+            <CustomSelect
+              className="select-sm"
               value={tipoInformeFilter}
-              onChange={(e) => { setTipoInformeFilter(e.target.value); setPage(1); }}
-            >
-              <option value="">Todos</option>
-              {TIPO_INFORME_OPTIONS.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
+              onChange={(v) => { setTipoInformeFilter(v); setPage(1); }}
+              emptyValue=""
+              placeholder="Todos"
+              options={TIPO_INFORME_OPTIONS.map((t) => ({ value: t, label: t }))}
+            />
           </div>
         </div>
       </div>

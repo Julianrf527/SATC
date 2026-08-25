@@ -16,6 +16,8 @@ import { API_CONFIG, apiCall } from "../../../utils/api";
 import DocumentoCard from "./DocumentoCard";
 import DocumentoDetalleModal from "./DocumentoDetalleModal";
 import CrearDocumentoModal from "./CrearDocumentoModal";
+import CustomSelect from "../../Common/Form/CustomSelect";
+import CustomDateInput from "../../Common/Form/CustomDateInput";
 
 type EstadoDocumento = "en_revision" | "aprobado" | "rechazado" | "finalizado";
 
@@ -334,28 +336,27 @@ export default function DocumentosPage({ setToast }: Props) {
                       <label className="block text-sm font-medium text-base-content/70 mb-1">
                         Estado
                       </label>
-                      <select
+                      <CustomSelect
                         value={filtroEstado}
-                        onChange={(e) => setFiltroEstado(e.target.value)}
-                        className="select select-bordered w-full"
-                      >
-                        <option value="">Todos los estados</option>
-                        <option value="en_revision">En Revisión</option>
-                        <option value="aprobado">Aprobado</option>
-                        <option value="rechazado">Rechazado</option>
-                        <option value="finalizado">Finalizado</option>
-                      </select>
+                        onChange={setFiltroEstado}
+                        emptyValue=""
+                        placeholder="Todos los estados"
+                        options={[
+                          { value: "en_revision", label: "En Revisión" },
+                          { value: "aprobado", label: "Aprobado" },
+                          { value: "rechazado", label: "Rechazado" },
+                          { value: "finalizado", label: "Finalizado" },
+                        ]}
+                      />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-base-content/70 mb-1">
                         Fecha Desde
                       </label>
-                      <input
-                        type="date"
+                      <CustomDateInput
                         value={filtroFechaDesde}
-                        onChange={(e) => setFiltroFechaDesde(e.target.value)}
-                        className="input input-bordered w-full"
+                        onChange={setFiltroFechaDesde}
                       />
                     </div>
 
@@ -363,11 +364,9 @@ export default function DocumentosPage({ setToast }: Props) {
                       <label className="block text-sm font-medium text-base-content/70 mb-1">
                         Fecha Hasta
                       </label>
-                      <input
-                        type="date"
+                      <CustomDateInput
                         value={filtroFechaHasta}
-                        onChange={(e) => setFiltroFechaHasta(e.target.value)}
-                        className="input input-bordered w-full"
+                        onChange={setFiltroFechaHasta}
                       />
                     </div>
                   </div>

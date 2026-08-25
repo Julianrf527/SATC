@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiCall } from "../../../utils/api";
 import { useNavigate } from "react-router-dom";
+import CustomSelect from "../Form/CustomSelect";
 
 type EstadoSemaforo = "verde" | "amarillo" | "rojo" | "vencido";
 
@@ -206,24 +207,32 @@ export default function AlertasExpediente({
                     </div>
                     <div className="flex flex-col gap-1">
                       <span className="text-xs font-medium text-base-content/60">Estado</span>
-                      <select className="select select-sm select-bordered w-full"
-                        value={estadoFilter} onChange={(e) => setEstadoFilter(e.target.value)}>
-                        <option value="all">Todos los estados</option>
-                        <option value="verde">🟢 Verde</option>
-                        <option value="amarillo">🟡 Amarillo</option>
-                        <option value="rojo">🔴 Rojo</option>
-                        <option value="vencido">⚫ Vencido</option>
-                      </select>
+                      <CustomSelect
+                        className="select-sm"
+                        hidePlaceholderOption
+                        value={estadoFilter}
+                        onChange={setEstadoFilter}
+                        options={[
+                          { value: "all", label: "Todos los estados" },
+                          { value: "verde", label: "🟢 Verde" },
+                          { value: "amarillo", label: "🟡 Amarillo" },
+                          { value: "rojo", label: "🔴 Rojo" },
+                          { value: "vencido", label: "⚫ Vencido" },
+                        ]}
+                      />
                     </div>
                     <div className="flex flex-col gap-1">
                       <span className="text-xs font-medium text-base-content/60">Tipo de alerta</span>
-                      <select className="select select-sm select-bordered w-full"
-                        value={tipoFilter} onChange={(e) => setTipoFilter(e.target.value)}>
-                        <option value="all">Todos los tipos</option>
-                        {tiposUnicos.map((t) => (
-                          <option key={t} value={t}>{TIPO_LABELS[t] ?? t}</option>
-                        ))}
-                      </select>
+                      <CustomSelect
+                        className="select-sm"
+                        hidePlaceholderOption
+                        value={tipoFilter}
+                        onChange={setTipoFilter}
+                        options={[
+                          { value: "all", label: "Todos los tipos" },
+                          ...tiposUnicos.map((t) => ({ value: t, label: TIPO_LABELS[t] ?? t })),
+                        ]}
+                      />
                     </div>
                   </div>
 

@@ -93,6 +93,7 @@ export const API_CONFIG = {
       `/sanctioning/stage/investigation/${expediente_id}`,
 
     FILE_TIPO_MEDIDA: "/sanctioning/stage/measure-type",
+    FILE_TIPO_CESACION: "/sanctioning/stage/cessation-type",
     FILE_MEASURE: (expediente_id: number) =>
       `/sanctioning/stage/measure/${expediente_id}`,
     FILE_MEASURE_CREATE: (expediente_id: number) =>

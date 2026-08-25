@@ -1,3 +1,6 @@
+import CustomSelect from "../../../Common/Form/CustomSelect";
+import CustomDateInput from "../../../Common/Form/CustomDateInput";
+
 type Execution = {
   id?: number;
   cobro_coactivo: boolean;
@@ -25,8 +28,10 @@ type Props = {
   ) => void;
   autoTipo: string;
   autoNumero: string;
+  fechaAuto: string;
   onAutoTipoChange: (value: string) => void;
   onAutoNumeroChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onFechaAutoChange: (value: string) => void;
   cobroCoactivoInputRef: React.RefObject<HTMLInputElement | null>;
   ruiaInputRef: React.RefObject<HTMLInputElement | null>;
   memorandoInputRef: React.RefObject<HTMLInputElement | null>;
@@ -46,8 +51,10 @@ export default function EjecucionForm({
   onFileChange,
   autoTipo,
   autoNumero,
+  fechaAuto,
   onAutoTipoChange,
   onAutoNumeroChange,
+  onFechaAutoChange,
   cobroCoactivoInputRef,
   ruiaInputRef,
   memorandoInputRef,
@@ -330,16 +337,16 @@ export default function EjecucionForm({
                 Tipo de Acto <span className="text-error">*</span>
               </span>
             </label>
-            <select
+            <CustomSelect
+              hidePlaceholderOption
               value={autoTipo}
-              onChange={(e) => onAutoTipoChange(e.target.value)}
-              className="select select-bordered w-full"
+              onChange={onAutoTipoChange}
               disabled={isLoading}
-              required
-            >
-              <option value="AUTO">AUTO</option>
-              <option value="RES">RES</option>
-            </select>
+              options={[
+                { value: "AUTO", label: "AUTO" },
+                { value: "RES", label: "RES" },
+              ]}
+            />
           </div>
 
           <div className="form-control">
@@ -366,13 +373,10 @@ export default function EjecucionForm({
                 Fecha del Auto <span className="text-error">*</span>
               </span>
             </label>
-            <input
-              type="date"
-              name="fecha_auto"
-              defaultValue={data?.fecha_auto || ""}
-              className="input input-bordered w-full"
+            <CustomDateInput
+              value={fechaAuto}
+              onChange={onFechaAutoChange}
               max={new Date().toISOString().split('T')[0]}
-              required
               disabled={isLoading}
             />
           </div>

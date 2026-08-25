@@ -8,6 +8,7 @@ import {
   isValidDocumentId,
 } from "../../../../utils/documentViewer";
 import { apiCall, API_CONFIG } from "../../../../utils/api";
+import CustomSelect from "../../../Common/Form/CustomSelect";
 
 type FormulationCharges = {
   id: number;
@@ -96,8 +97,7 @@ export default function FormulacionCargosData({
     }
   };
 
-  const handleDescargosChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value;
+  const handleDescargosChange = (value: string) => {
     setDescargosValue(value);
 
     if (value !== "true") {
@@ -389,18 +389,17 @@ export default function FormulacionCargosData({
                   Estado de Descargos <span className="text-error">*</span>
                 </span>
               </label>
-              <select
-                name="descargos"
+              <CustomSelect
+                hidePlaceholderOption
                 value={descargosValue}
                 onChange={handleDescargosChange}
-                className="select select-bordered w-full"
-                required
                 disabled={isLoading}
-              >
-                <option value="true">Sí</option>
-                <option value="false">No</option>
-                <option value="null">No Aplica</option>
-              </select>
+                options={[
+                  { value: "true", label: "Sí" },
+                  { value: "false", label: "No" },
+                  { value: "null", label: "No Aplica" },
+                ]}
+              />
               <label className="label">
                 <span className="label-text-alt text-base-content/60">
                   {descargosValue === "true"

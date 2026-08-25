@@ -501,10 +501,10 @@ RECUROS = [
 RECURSOS = RECUROS
 
 TIPO_CESACION = [
-    (1, "Muerte de investigado"),
-    (2, "No es constitutivo de infracción ambiental"),
-    (3, "Conducta investigada no es imputable al presunto infractor"),
-    (4, "La actividad está legalmente amparada/autorizada"),
+    (1, "Muerte del investigado cuando es una persona natural o liquidación definitiva de la persona jurídica, en el segundo caso procederá lo contenido en el artículo 9A de la presente Ley."),
+    (2, "Que el hecho investigado no sea constitutivo de infracción ambiental."),
+    (3, "Que la conducta investigada no sea imputable al presunto infractor."),
+    (4, "Que la actividad esté legalmente amparada y/o autorizada."),
 ]
 
 

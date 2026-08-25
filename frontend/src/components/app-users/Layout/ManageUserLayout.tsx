@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Users } from "lucide-react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import TableUsers from "../../app-users/Table/TableUsers";
+import CustomSelect from "../../Common/Form/CustomSelect";
 
 type User = {
   id: number;
@@ -331,32 +332,32 @@ export default function ManageUserLayout({ setToast }: Props) {
                     <label className="label py-1">
                       <span className="label-text text-xs">Rol</span>
                     </label>
-                    <select
-                      className="select select-sm select-bordered"
+                    <CustomSelect
+                      className="select-sm"
+                      hidePlaceholderOption
                       value={roleFilter}
-                      onChange={(e) => setRoleFilter(e.target.value)}
-                    >
-                      <option value="all">Todos</option>
-                      {rolList.map((r) => (
-                        <option key={r.id} value={r.id}>
-                          {r.nombre}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={setRoleFilter}
+                      options={[
+                        { value: "all", label: "Todos" },
+                        ...rolList.map((r) => ({ value: String(r.id), label: r.nombre })),
+                      ]}
+                    />
                   </div>
                   <div className="form-control">
                     <label className="label py-1">
                       <span className="label-text text-xs">Estado</span>
                     </label>
-                    <select
-                      className="select select-sm select-bordered"
+                    <CustomSelect
+                      className="select-sm"
+                      hidePlaceholderOption
                       value={stateFilter}
-                      onChange={(e) => setStateFilter(e.target.value)}
-                    >
-                      <option value="all">Todos</option>
-                      <option value="active">Activos</option>
-                      <option value="inactive">Inactivos</option>
-                    </select>
+                      onChange={setStateFilter}
+                      options={[
+                        { value: "all", label: "Todos" },
+                        { value: "active", label: "Activos" },
+                        { value: "inactive", label: "Inactivos" },
+                      ]}
+                    />
                   </div>
                 </div>
               </div>
