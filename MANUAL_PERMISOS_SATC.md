@@ -28,8 +28,8 @@ El sistema tiene **21 permisos** organizados en 6 categorías. Los permisos marc
 
 | #   | Nombre del permiso            | Categoría      | Ruta de menú                |
 | --- | ----------------------------- | -------------- | --------------------------- |
-| 1   | `admin_roles`                 | Administración | `/user/role`                |
-| 2   | `admin_crear_usuarios`        | Administración | `/user/add`                 |
+| 1   | `admin_roles_y_permisos`                 | Administración | `/user/role`                |
+| 2   | `admin_registrar_usuarios`        | Administración | `/user/add`                 |
 | 3   | `admin_gestionar_usuarios`    | Administración | `/user/manage`              |
 | 4   | `expediente_gestionar`        | Expedientes    | `/file/manage`              |
 | 5   | `expediente_consultar`        | Expedientes    | `/file/consult`             |
@@ -60,7 +60,7 @@ El menú lateral del sistema es completamente dinámico. Se construye en tiempo 
 
 | Categoría          | Ícono                | Se muestra cuando...                                                                                                                                        |
 | ------------------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Administración** | Libreta de contactos | El usuario tiene al menos uno de: `admin_roles`, `admin_crear_usuarios`, `admin_gestionar_usuarios`                                                         |
+| **Administración** | Libreta de contactos | El usuario tiene al menos uno de: `admin_roles_y_permisos`, `admin_registrar_usuarios`, `admin_gestionar_usuarios`                                                         |
 | **Expedientes**    | Archivo              | El usuario tiene al menos uno de: `expediente_gestionar`, `expediente_consultar`, `expediente_alertas`, `expediente_asignar`                                |
 | **Infracciones**   | Martillo             | El usuario tiene al menos uno de: `infraccion_gestionar`, `infraccion_consultar`, `infraccion_alertas`, `infraccion_asignar`, `infraccion_asignar_informes` |
 | **Documentos**     | Libro                | El usuario tiene `documento_gestionar`                                                                                                                      |
@@ -82,7 +82,7 @@ El menú lateral del sistema es completamente dinámico. Se construye en tiempo 
 
 ---
 
-#### `admin_roles` — Administración de roles y permisos
+#### `admin_roles_y_permisos` — Administración de roles y permisos
 
 **Ruta:** `/user/role`  
 **Microservicio:** `app-users`
@@ -104,7 +104,7 @@ El menú lateral del sistema es completamente dinámico. Se construye en tiempo 
 
 ---
 
-#### `admin_crear_usuarios` — Creación de usuarios
+#### `admin_registrar_usuarios` — Creación de usuarios
 
 **Ruta:** `/user/add`  
 **Microservicio:** `app-users`
@@ -140,7 +140,7 @@ El menú lateral del sistema es completamente dinámico. Se construye en tiempo 
 **Restricciones:**
 
 - No puede eliminar usuarios de forma permanente (solo desactivar)
-- No puede crear usuarios nuevos (eso requiere `admin_crear_usuarios`)
+- No puede crear usuarios nuevos (eso requiere `admin_registrar_usuarios`)
 
 ---
 

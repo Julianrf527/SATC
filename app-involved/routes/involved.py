@@ -35,6 +35,17 @@ logger = logging.getLogger(__name__)
 INVOLVED_MANAGE = Permisos.INVOLVED_MANAGE
 INVOLVED_LOG = Permisos.INVOLVED_LOG
 
+# Búsqueda/creación de involucrados también se dispara desde el formulario de
+# vinculación dentro de un expediente sancionatorio o de infracción, con el
+# token propio del abogado — quien tiene permiso para gestionar su expediente
+# debe poder buscar y crear el involucrado que va a vincular, aunque su rol
+# no incluya el permiso de gestión del módulo de involucrados.
+BUSCAR_O_CREAR_INVOLUCRADO = [
+    Permisos.INVOLVED_MANAGE,
+    Permisos.SANCIONATORIO_MANAGE,
+    Permisos.INFRACCION_MANAGE,
+]
+
 # Techo duro para el filtrado en memoria del log de auditoría (ver obtener_auditoria).
 MAX_FILAS_POST_FILTRO = 5000
 
@@ -45,10 +56,18 @@ async def _exigir_permiso(request: Request, permiso: str, mensaje: str) -> dict:
     Un permiso faltante siempre es 403 y se resuelve ANTES de tocar la BD, para
     que la respuesta no dependa nunca de si el recurso pedido existe o no.
     """
+    return await _exigir_alguno(request, [permiso], mensaje)
+
+
+async def _exigir_alguno(request: Request, permisos: list[str], mensaje: str) -> dict:
+    """Como `_exigir_permiso`, pero concede acceso si el usuario tiene
+    cualquiera de los permisos listados (OR), no todos.
+    """
     token_data = verify_gateway_token(request)
-    if not await verify_permission(token_data["user_id"], permiso):
-        raise HTTPException(status_code=403, detail=mensaje)
-    return token_data
+    for permiso in permisos:
+        if await verify_permission(token_data["user_id"], permiso):
+            return token_data
+    raise HTTPException(status_code=403, detail=mensaje)
 
 
 async def _registrar_auditoria_o_fallar(db: AsyncSession, **kwargs) -> None:
@@ -88,7 +107,7 @@ async def buscar_involucrado(
     dv: Optional[str] = Query(None, description="Dígito de verificación (solo para NIT)", max_length=2),
     db: AsyncSession = Depends(get_db_managed),
 ):
-    await _exigir_permiso(request, INVOLVED_MANAGE, "No tiene permisos para consultar involucrados")
+    await _exigir_alguno(request, BUSCAR_O_CREAR_INVOLUCRADO, "No tiene permisos para consultar involucrados")
 
     try:
         numero_int = int(numero_documento)
@@ -316,7 +335,7 @@ async def crear_involucrado(
     involucrado: InvolucradoCreate = Body(...),
     db: AsyncSession = Depends(get_db_managed),
 ):
-    token_data = await _exigir_permiso(request, INVOLVED_MANAGE, "No tiene permisos para gestionar involucrados")
+    token_data = await _exigir_alguno(request, BUSCAR_O_CREAR_INVOLUCRADO, "No tiene permisos para gestionar involucrados")
 
     existing = await verificar_involucrado_existe(
         db=db,

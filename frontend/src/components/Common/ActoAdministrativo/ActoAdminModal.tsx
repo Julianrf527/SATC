@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { ActoAdministrativo } from "../../../types/sancionatorioApp";
+import CustomSelect from "../Form/CustomSelect";
+import CustomDateInput from "../Form/CustomDateInput";
 import {
   uploadFileToDocuments,
   generateDocumentFileName,
@@ -197,16 +199,16 @@ export default function ActoAdminModal({
               <label className="block text-sm font-medium text-base-content/70 mb-1">
                 Tipo de Acto <span className="text-error">*</span>
               </label>
-              <select
-                className="select select-bordered w-full"
-                required
-                value={tipoActo}
-                onChange={(e) => setTipoActo(e.target.value as "AUTO" | "RES")}
+              <CustomSelect
+                hidePlaceholderOption
+                value={tipoActo === "AUTO" ? 0 : 1}
+                onChange={(i) => setTipoActo(i === 0 ? "AUTO" : "RES")}
                 disabled={isSubmitting || isUploadingFile}
-              >
-                <option value="AUTO">AUTO</option>
-                <option value="RES">RES</option>
-              </select>
+                options={[
+                  { value: 0, label: "AUTO" },
+                  { value: 1, label: "RES" },
+                ]}
+              />
             </div>
             <div className="w-2/3">
               <label className="block text-sm font-medium text-base-content/70 mb-1">
@@ -233,13 +235,10 @@ export default function ActoAdminModal({
             <label className="block text-sm font-medium text-base-content/70 mb-1">
               Fecha de Numerado <span className="text-error">*</span>
             </label>
-            <input
-              type="date"
-              className="input input-bordered w-full"
+            <CustomDateInput
               value={fechaNumerado}
-              onChange={(e) => setFechaNumerado(e.target.value)}
+              onChange={setFechaNumerado}
               max={new Date().toISOString().split('T')[0]}
-              required
               disabled={isSubmitting || isUploadingFile}
             />
           </div>

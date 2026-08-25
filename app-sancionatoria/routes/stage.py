@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Form, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -150,7 +150,7 @@ async def _get_anexos(db: AsyncSession, etapa_tipo: str, etapa_ref_id: int) -> l
 # mutar → auditar → responder): indagación, medida preventiva, inicio del
 # proceso, cesación, apertura probatoria, cierre probatoria y decisión de
 # fondo. Las otras 3 quedan como rutas propias por razones concretas:
-# formulación usa Form() en vez de JSON, recurso tiene creable con lógica
+# formulación tiene el paso adicional de descargos/documento, recurso tiene creable con lógica
 # ramificada, y ejecución maneja 4 documentos independientes.
 
 from dataclasses import dataclass
@@ -490,10 +490,15 @@ async def obtener_formulacion(request: Request, expediente_id: int, db: AsyncSes
     }})
 
 
+class FormulacionInfoBody(BaseModel):
+    descargos: Optional[bool] = None
+    documento_id: Optional[int] = None
+
+
 @router.post("/formulation/{expediente_id}", status_code=201)
 async def crear_formulacion(
-    request: Request, expediente_id: int, db: AsyncSession = Depends(get_db_managed),
-    descargos: Optional[str] = Form(None), documento_id: Optional[int] = Form(None),
+    request: Request, expediente_id: int, body: Optional[FormulacionInfoBody] = None,
+    db: AsyncSession = Depends(get_db_managed),
 ):
     user_id = verify_gateway_token(request)["user_id"]
     row = await _get_expediente_con_permiso(db, expediente_id, user_id)
@@ -502,7 +507,8 @@ async def crear_formulacion(
     inicio = await db.scalar(select(EtapaInicioSancionatorio).where(EtapaInicioSancionatorio.expediente_id == expediente_id))
     if not inicio or not await _acto_con_notif_exitosa(db, inicio.acto_administrativo_id):
         raise HTTPException(status_code=400, detail="El inicio del proceso debe tener acto administrativo con notificación exitosa")
-    descargos_bool = True if descargos == "true" else (False if descargos == "false" else None)
+    descargos_bool = body.descargos if body else None
+    documento_id = body.documento_id if body else None
     nueva = EtapaFormulacionCargos(expediente_id=expediente_id, descargos=descargos_bool, documento_id=documento_id)
     db.add(nueva)
     await db.flush()
@@ -518,15 +524,16 @@ async def crear_formulacion(
 
 @router.put("/formulation/{expediente_id}")
 async def actualizar_formulacion(
-    request: Request, expediente_id: int, db: AsyncSession = Depends(get_db_managed),
-    descargos: Optional[str] = Form(None), documento_id: Optional[int] = Form(None),
+    request: Request, expediente_id: int, body: FormulacionInfoBody,
+    db: AsyncSession = Depends(get_db_managed),
 ):
     user_id = verify_gateway_token(request)["user_id"]
     row = await _get_expediente_con_permiso(db, expediente_id, user_id)
     etapa = await db.scalar(select(EtapaFormulacionCargos).where(EtapaFormulacionCargos.expediente_id == expediente_id))
     if not etapa:
         raise HTTPException(status_code=404, detail="Formulación de cargos no encontrada")
-    descargos_bool = True if descargos == "true" else (False if descargos == "false" else None)
+    descargos_bool = body.descargos
+    documento_id = body.documento_id
     datos_ant = {"descargos": etapa.descargos}
     if documento_id != etapa.documento_id:
         if etapa.documento_id: await decrement_file_usage([etapa.documento_id])

@@ -5,6 +5,7 @@ import {
   uploadFileToDocuments,
   generateDocumentFileName,
 } from "../../../utils/fileUpload";
+import CustomDateInput from "../Form/CustomDateInput";
 
 type ComunicacionData = {
   id: number;
@@ -153,17 +154,15 @@ export default function ComunicacionModal({
     }
   };
 
-  const handleFechaNumeradoChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    setFechaNumerado(e.target.value);
+  const handleFechaNumeradoChange = (value: string) => {
+    setFechaNumerado(value);
     if (errors.fecha_numerado) {
       setErrors((prev) => ({ ...prev, fecha_numerado: "" }));
     }
   };
 
-  const handleFechaEnvioChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFechaEnvio(e.target.value);
+  const handleFechaEnvioChange = (value: string) => {
+    setFechaEnvio(value);
     if (errors.fecha_envio) {
       setErrors((prev) => ({ ...prev, fecha_envio: "" }));
     }
@@ -364,44 +363,39 @@ export default function ComunicacionModal({
             )}
           </div>
 
-          {/* Fecha de Numeración */}
-          <div>
-            <label className="block text-sm font-medium text-base-content/70 mb-1">
-              Fecha de Numeración <span className="text-error">*</span>
-            </label>
-            <input
-              type="date"
-              className={`input input-bordered w-full ${
-                errors.fecha_numerado ? "input-error" : ""
-              }`}
-              value={fechaNumerado}
-              onChange={handleFechaNumeradoChange}
-              max={new Date().toISOString().split('T')[0]}
-              disabled={isSubmitting || isUploadingFile}
-            />
-            {errors.fecha_numerado && (
-              <p className="text-error text-xs mt-1">{errors.fecha_numerado}</p>
-            )}
-          </div>
+          {/* Fecha de Numeración y Fecha de Envío */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-base-content/70 mb-1">
+                Fecha de Numeración <span className="text-error">*</span>
+              </label>
+              <CustomDateInput
+                error={!!errors.fecha_numerado}
+                value={fechaNumerado}
+                onChange={handleFechaNumeradoChange}
+                max={new Date().toISOString().split('T')[0]}
+                disabled={isSubmitting || isUploadingFile}
+              />
+              {errors.fecha_numerado && (
+                <p className="text-error text-xs mt-1">{errors.fecha_numerado}</p>
+              )}
+            </div>
 
-          {/* Fecha de Envío */}
-          <div>
-            <label className="block text-sm font-medium text-base-content/70 mb-1">
-              Fecha de Envío <span className="text-error">*</span>
-            </label>
-            <input
-              type="date"
-              className={`input input-bordered w-full ${
-                errors.fecha_envio ? "input-error" : ""
-              }`}
-              value={fechaEnvio}
-              onChange={handleFechaEnvioChange}
-              max={new Date().toISOString().split('T')[0]}
-              disabled={isSubmitting || isUploadingFile}
-            />
-            {errors.fecha_envio && (
-              <p className="text-error text-xs mt-1">{errors.fecha_envio}</p>
-            )}
+            <div>
+              <label className="block text-sm font-medium text-base-content/70 mb-1">
+                Fecha de Envío <span className="text-error">*</span>
+              </label>
+              <CustomDateInput
+                error={!!errors.fecha_envio}
+                value={fechaEnvio}
+                onChange={handleFechaEnvioChange}
+                max={new Date().toISOString().split('T')[0]}
+                disabled={isSubmitting || isUploadingFile}
+              />
+              {errors.fecha_envio && (
+                <p className="text-error text-xs mt-1">{errors.fecha_envio}</p>
+              )}
+            </div>
           </div>
 
           {/* Archivo */}

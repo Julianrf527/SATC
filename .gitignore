@@ -157,6 +157,9 @@ minio-server/minio.exe
 minio-server/data/*
 !minio-server/data/.gitkeep
 
+# Clasificador Expedientes
+clasificador-expedientes/
+
 # Backups de runtime (generados por backup-service, no son código fuente)
 backups/
 

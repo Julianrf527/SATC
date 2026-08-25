@@ -3,6 +3,7 @@ import type {
   TipoNotificacion,
 } from "../../../types/sancionatorioApp";
 import type { NotificacionFormApi } from "./useNotificacionForm";
+import CustomSelect from "../Form/CustomSelect";
 
 type Props = {
   form: NotificacionFormApi;
@@ -97,52 +98,43 @@ export default function NotificacionEntregaFields({
               )}
             </span>
           </label>
-          <div className="relative">
-            <select
-              value={notificacionForm.tipo_notificacion_id}
-              onChange={(e) => {
-                setNotificacionForm({
-                  ...notificacionForm,
-                  tipo_notificacion_id: Number(e.target.value),
-                });
-                if (errors.tipo_notificacion_id) {
-                  setErrors((prev) => ({
-                    ...prev,
-                    tipo_notificacion_id: "",
-                  }));
-                }
-              }}
-              className={`select select-bordered w-full h-12 ${
-                errors.tipo_notificacion_id
-                  ? "select-error border-2"
-                  : notificacionForm.tipo_notificacion_id !== 0
-                    ? "border-2 border-success"
-                    : "focus:select-success"
-              } ${
-                !hasDocumentoCitacion || !notificacionForm.notificacion_exitosa
-                  ? "opacity-50 cursor-not-allowed"
-                  : ""
-              }`}
-              disabled={
-                !hasDocumentoCitacion ||
-                !notificacionForm.notificacion_exitosa ||
-                isSubmitting
+          <CustomSelect
+            value={notificacionForm.tipo_notificacion_id}
+            onChange={(v) => {
+              setNotificacionForm({
+                ...notificacionForm,
+                tipo_notificacion_id: v,
+              });
+              if (errors.tipo_notificacion_id) {
+                setErrors((prev) => ({
+                  ...prev,
+                  tipo_notificacion_id: "",
+                }));
               }
-            >
-              <option value={0}>
-                {!hasDocumentoCitacion
-                  ? "Requiere documento de citación"
-                  : !notificacionForm.notificacion_exitosa
-                    ? "Marque citación exitosa primero"
-                    : "Seleccione un tipo"}
-              </option>
-              {tiposNotificacion.map((tipo) => (
-                <option key={tipo.id} value={tipo.id}>
-                  {tipo.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
+            }}
+            placeholder={
+              !hasDocumentoCitacion
+                ? "Requiere documento de citación"
+                : !notificacionForm.notificacion_exitosa
+                  ? "Marque citación exitosa primero"
+                  : "Seleccione un tipo"
+            }
+            error={!!errors.tipo_notificacion_id}
+            disabled={
+              !hasDocumentoCitacion ||
+              !notificacionForm.notificacion_exitosa ||
+              isSubmitting
+            }
+            className={
+              !errors.tipo_notificacion_id && notificacionForm.tipo_notificacion_id !== 0
+                ? "border-2 border-success"
+                : ""
+            }
+            options={tiposNotificacion.map((tipo) => ({
+              value: tipo.id,
+              label: tipo.nombre,
+            }))}
+          />
           {errors.tipo_notificacion_id && (
             <label className="label">
               <span className="label-text-alt text-error">

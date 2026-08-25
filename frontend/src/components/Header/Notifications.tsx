@@ -174,7 +174,7 @@ export default function Notifications({ notifications, onUpdate }: Props) {
             />
           </svg>
           {count > 0 && (
-            <span className="badge badge-xs badge-error text-white indicator-item animate-pulse">
+            <span className="badge badge-xs badge-error text-white indicator-item">
               {count > 9 ? "9+" : count}
             </span>
           )}

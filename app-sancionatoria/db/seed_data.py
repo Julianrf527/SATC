@@ -493,6 +493,8 @@ RECUROS = [
     (4, "Fauna"),
     (5, "Flora"),
     (6, "Suelo"),
+    (7, "Ruido"),
+    (8, "Social"),
 ]
 
 # Alias del typo RECUROS, que es el nombre que usa el código de seedeo.

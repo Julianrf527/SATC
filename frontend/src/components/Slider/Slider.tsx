@@ -93,7 +93,7 @@ export default function Slider({ permission = [] }: Props) {
         <label htmlFor="my-drawer" className="drawer-overlay"></label>
         <div className="bg-base-100 text-base-content h-full w-72 shadow-xl border-r border-base-300 transform transition-transform duration-100 ease-out">
           {/* Header del menú */}
-          <div className="sticky top-0 bg-base-100/95 backdrop-blur-sm border-b border-base-300 px-6 py-5 z-10">
+          <div className="sticky top-0 bg-base-100 border-b border-base-300 px-6 py-5 z-10">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center">
                 <svg
