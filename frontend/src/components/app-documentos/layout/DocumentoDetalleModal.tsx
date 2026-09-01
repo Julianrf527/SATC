@@ -74,7 +74,7 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   documentoId: number;
-  onUpdate: () => void;
+  onUpdate: (accion?: "upload" | "revision") => void;
   setToast?: (toast: { id: number; message: string; type: "success" | "error" }) => void;
 };
 
@@ -178,12 +178,12 @@ export default function DocumentoDetalleModal({
 
   const handleVersionSubida = () => {
     cargarDocumento();
-    onUpdate();
+    onUpdate("upload");
   };
 
   const handleRevisionRealizada = () => {
     cargarDocumento();
-    onUpdate();
+    onUpdate("revision");
   };
 
   const getEstadoBadge = (estado: EstadoDocumento) => {
@@ -491,7 +491,7 @@ export default function DocumentoDetalleModal({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-semibold text-base-content">
-                              v{version.numero_version}
+                              Versión {version.numero_version}
                             </span>
                             {version.numero_version ===
                               documento.version_actual && (
@@ -583,7 +583,7 @@ export default function DocumentoDetalleModal({
                                   {revision.estado}
                                 </span>
                                 <span className="text-xs text-base-content/50">
-                                  • v{revision.version_revisada}
+                                  • Versión {revision.version_revisada}
                                 </span>
                               </div>
                               <span className="text-xs text-base-content/60 font-medium">

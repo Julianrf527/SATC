@@ -80,11 +80,21 @@ export default function AutoRequerimiento({
 
   const notifs: any[] = actoAdmin?.notificacion?.involucrados ?? [];
 
+  // Cada involucrado actualmente vinculado debe tener al menos una
+  // notificación exitosa. Comparar solo cantidades (notifs.length ===
+  // involucrados.length) es frágil: se rompe con notificaciones duplicadas,
+  // o si se vincula/desvincula un involucrado después de notificar.
   const todasNotificadas =
     actoAdmin !== null &&
-    notifs.length > 0 &&
-    notifs.length === involucrados.length &&
-    notifs.every((n: any) => n.notificacion_exitosa === true);
+    involucrados.length > 0 &&
+    involucrados.every((inv) =>
+      notifs.some((n: any) => n.involucrado_id === inv.id && n.notificacion_exitosa === true),
+    );
+
+  const pendientesNotificar = involucrados.filter(
+    (inv) =>
+      !notifs.some((n: any) => n.involucrado_id === inv.id && n.notificacion_exitosa === true),
+  );
 
   // Regla 15 días: alguna notif tiene fecha_constancia + no notificada + >= 15 días
   const puedeChangiarAComunicacion =
@@ -174,6 +184,28 @@ export default function AutoRequerimiento({
         stageBinding={{ type: "etapa_concepto", id: etapaConceptoId }}
         embedded
       />
+
+      {/* Aviso: por qué no se puede definir días de término todavía */}
+      {actoAdmin !== null && !puedeSeleccionarDias && (
+        <div className="alert bg-info/10 border border-info/30">
+          <svg className="w-5 h-5 text-info shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div>
+            <p className="text-sm font-medium text-base-content">
+              {tipoActo === "notificacion"
+                ? "No se pueden definir los días de término todavía: aún no se notifican todos los involucrados."
+                : "No se pueden definir los días de término todavía: falta adjuntar el documento de comunicación."}
+            </p>
+            {tipoActo === "notificacion" && pendientesNotificar.length > 0 && (
+              <p className="text-xs text-base-content/60 mt-1">
+                Pendientes: {pendientesNotificar.map((inv) => inv.nombre).join(", ")}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Días de Término */}
       {puedeSeleccionarDias && (

@@ -110,6 +110,7 @@ export default function DetalleInfraccion({
             fecha_creacion: expedienteActual.fecha_creacion,
             archivado: expedienteActual.archivado,
             etapa_actual: expedienteActual.etapa_actual || null,
+            estado: information.estado ?? expedienteActual.estado ?? null,
 
             // Datos adicionales del endpoint /file/full
             direccion: information.direccion || "",

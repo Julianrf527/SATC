@@ -21,8 +21,15 @@ export default function AsignarInformes({ setToast }: Props) {
   const navigate = useNavigate();
 
   const state = useInformesTecnicos(setToast);
-  const { loading, totalCount, page, totalPages, profesionales, loadInformes } =
-    state;
+  const {
+    loading,
+    totalCount,
+    page,
+    totalPages,
+    profesionales,
+    revisores,
+    loadInformes,
+  } = state;
 
   // ── Modales ──────────────────────────────────────────────────────────────
   const [asignarModal, setAsignarModal] = useState<{
@@ -40,6 +47,7 @@ export default function AsignarInformes({ setToast }: Props) {
   // ── Asignar / Reasignar profesional ──────────────────────────────────────
   const handleAsignarSubmit = async (
     profesionalId: number,
+    revisorId: number,
     fechaProgramacion: string,
   ) => {
     if (!asignarModal.informe) return;
@@ -54,6 +62,7 @@ export default function AsignarInformes({ setToast }: Props) {
         method,
         body: JSON.stringify({
           profesional_id: profesionalId,
+          revisor_id: revisorId,
           ...(fechaProgramacion
             ? { fecha_programacion_visita: fechaProgramacion }
             : {}),
@@ -163,13 +172,23 @@ export default function AsignarInformes({ setToast }: Props) {
                 informeId: inf.id,
               })
             }
-            onAsignar={(inf) =>
+            onAsignar={(inf) => {
+              if (inf.modo === "MANUAL") {
+                setToast({
+                  id: Date.now(),
+                  message:
+                    "Este informe está en modo de cargue manual, la asignación no está disponible.",
+                  type: "error",
+                });
+                loadInformes(page);
+                return;
+              }
               setAsignarModal({
                 open: true,
                 informe: inf,
                 isReassign: inf.proceso_activo || !!inf.profesional_asignado_id,
-              })
-            }
+              });
+            }}
           />
         </div>
       </div>
@@ -182,7 +201,9 @@ export default function AsignarInformes({ setToast }: Props) {
         }
         onSubmit={handleAsignarSubmit}
         profesionales={profesionales}
+        revisores={revisores}
         profesionalActualId={asignarModal.informe?.profesional_asignado_id}
+        revisorActualId={asignarModal.informe?.revisor_asignado_id}
         fechaProgramacionActual={
           asignarModal.informe?.fecha_programacion_visita
         }
@@ -202,17 +223,15 @@ export default function AsignarInformes({ setToast }: Props) {
           }
           documentoId={docsModal.docsDocumentoId}
           setToast={setToast}
-          onUpdate={() => {
-            // Cuando hay una actualización (aprobación/devolución), sincronizar con app-infraction
-            if (docsModal.informeId) {
+          onUpdate={(accion) => {
+            // Solo una revisión (aprobar/devolver) sincroniza con app-infraction
+            // y cierra el modal. Un simple cargue de archivo no es una revisión
+            // todavía: cerrarlo y mostrar "aún no aprobado" ahí confundía al
+            // profesional que recién estaba subiendo su documento.
+            if (accion === "revision" && docsModal.informeId) {
               handleDocAprobado(docsModal.informeId);
             } else {
               loadInformes(page);
-              setDocsModal({
-                open: false,
-                docsDocumentoId: null,
-                informeId: null,
-              });
             }
           }}
         />

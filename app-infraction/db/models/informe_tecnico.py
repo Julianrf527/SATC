@@ -11,6 +11,8 @@ class InformeTecnico(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     expediente_id = Column(Integer, ForeignKey('expediente.id', onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
     profesional_asignado_id = Column(Integer)
+    revisor_asignado_id = Column(Integer)
+    modo = Column(String(10), nullable=False, default='FLUJO', server_default='FLUJO')
     fecha_programacion_visita = Column(Date)
     fecha_recibido_informe = Column(Date)
     fecha_aceptacion_informe = Column(Date)

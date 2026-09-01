@@ -76,7 +76,7 @@ async def notify_assignment(
         logger.info(f"=== INICIANDO notify_assignment ===")
         logger.info(f"documento_id={documento_id}, revisor_id={revisor_id}")
         
-        mensaje = f"Te han asignado como revisor del documento '{documento_nombre}' (versión {version_actual})"
+        mensaje = f"Documento asignado para revisión — {documento_nombre} (v{version_actual})"
         resultado = await create_notification(
             mensaje=mensaje,
             id_vinculada=str(documento_id),
@@ -98,7 +98,7 @@ async def notify_new_version(
 ) -> list[dict]:
     """Notifica a todos los revisores que se subió una nueva versión."""
     resultados = []
-    mensaje = f"Se ha subido una nueva versión ({version_numero}) del documento '{documento_nombre}'"
+    mensaje = f"Nueva versión (v{version_numero}) — {documento_nombre}"
     
     for revisor_id in revisores_ids:
         resultado = await create_notification(
@@ -118,7 +118,7 @@ async def notify_document_rejected(
     numero_devoluciones: int
 ) -> dict:
     """Notifica al creador que su documento fue rechazado."""
-    mensaje = f"Tu documento '{documento_nombre}' ha sido devuelto. Devolución {numero_devoluciones}/3"
+    mensaje = f"Documento devuelto ({numero_devoluciones}/3) — {documento_nombre}"
     return await create_notification(
         mensaje=mensaje,
         id_vinculada=str(documento_id),
@@ -132,7 +132,7 @@ async def notify_document_approved(
     creador_id: int
 ) -> dict:
     """Notifica al creador que su documento fue aprobado."""
-    mensaje = f"¡Felicidades! Tu documento '{documento_nombre}' ha sido aprobado"
+    mensaje = f"Documento aprobado — {documento_nombre}"
     return await create_notification(
         mensaje=mensaje,
         id_vinculada=str(documento_id),
@@ -146,7 +146,7 @@ async def notify_document_finalized(
     creador_id: int
 ) -> dict:
     """Notifica al creador que su documento fue finalizado tras 3 rechazos."""
-    mensaje = f"Tu documento '{documento_nombre}' ha sido finalizado tras alcanzar 3 devoluciones"
+    mensaje = f"Documento finalizado tras 3 devoluciones — {documento_nombre}"
     return await create_notification(
         mensaje=mensaje,
         id_vinculada=str(documento_id),

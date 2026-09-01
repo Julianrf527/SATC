@@ -304,8 +304,15 @@ export const API_CONFIG = {
       `/infraction/informes/${informe_id}/assign`,
     INFRACTION_REPORTS_SYNC: (informe_id: number) =>
       `/infraction/informes/${informe_id}/sync`,
+    INFRACTION_REPORTS_SYNC_BY_DOC: (docs_documento_id: number) =>
+      `/infraction/informes/sync-by-doc/${docs_documento_id}`,
     INFRACTION_REPORTS_DOC_PROCESS: (informe_id: number) =>
       `/infraction/informes/${informe_id}/doc-process`,
+    INFRACTION_REPORTS_SWITCH_MODE: (informe_id: number) =>
+      `/infraction/informes/${informe_id}/switch-mode`,
+    INFRACTION_REPORTS_MANUAL_UPLOAD: (informe_id: number) =>
+      `/infraction/informes/${informe_id}/manual-upload`,
+    INFRACTION_REPORTS_DISPONIBLES: "/infraction/informes/disponibles",
   },
 };
 

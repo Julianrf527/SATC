@@ -208,7 +208,16 @@ export default function DocumentosPage({ setToast }: Props) {
     cargarDatos(1);
   };
 
-  const handleDocumentoActualizado = () => {
+  const handleDocumentoActualizado = (accion?: "upload" | "revision") => {
+    // Best-effort: si el documento revisado es en realidad un informe técnico
+    // de app-infraction (asignado a un revisor distinto de quien lo asignó),
+    // esto sincroniza su estado allá. Si no lo es, el endpoint responde
+    // ok=false sin error y no pasa nada.
+    if (accion === "revision" && selectedDocId) {
+      apiCall(API_CONFIG.ENDPOINTS.INFRACTION_REPORTS_SYNC_BY_DOC(selectedDocId), {
+        method: "PUT",
+      }).catch(() => {});
+    }
     cargarDatos(page);
   };
 

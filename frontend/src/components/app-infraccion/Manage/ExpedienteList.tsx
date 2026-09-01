@@ -47,6 +47,7 @@ export default function ExpedienteList({
   const [townFilter, setTownFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
   const [archivedFilter, setArchivedFilter] = useState("all");
+  const [estadoFilter, setEstadoFilter] = useState("all");
   const [showQuickFilters, setShowQuickFilters] = useState(false);
 
   const [showAdvancedModal, setShowAdvancedModal] = useState(false);
@@ -99,6 +100,18 @@ export default function ExpedienteList({
       }
     });
     return Array.from(etapas).sort();
+  }, [expedienteList, avanzadaExpedienteList, advancedFilters]);
+
+  const availableEstados = useMemo(() => {
+    const estados = new Set<string>();
+    const currentList =
+      (advancedFilters ? avanzadaExpedienteList : expedienteList) || [];
+    currentList.forEach((f) => {
+      if (f.estado) {
+        estados.add(f.estado);
+      }
+    });
+    return Array.from(estados).sort();
   }, [expedienteList, avanzadaExpedienteList, advancedFilters]);
 
   // Aplicar filtros avanzados (llamada al backend)
@@ -178,6 +191,9 @@ export default function ExpedienteList({
             ? f.archivado === true
             : f.archivado === false;
 
+      const matchesEstado =
+        estadoFilter === "all" ? true : f.estado === estadoFilter;
+
       return (
         matchesRadicado &&
         matchesName &&
@@ -185,7 +201,8 @@ export default function ExpedienteList({
         matchesUntilDate &&
         matchesTown &&
         matchesStage &&
-        matchesArchived
+        matchesArchived &&
+        matchesEstado
       );
     });
   }, [
@@ -199,6 +216,7 @@ export default function ExpedienteList({
     townFilter,
     stageFilter,
     archivedFilter,
+    estadoFilter,
   ]);
 
   const clearAllFilters = () => {
@@ -209,6 +227,7 @@ export default function ExpedienteList({
     setTownFilter("all");
     setStageFilter("all");
     setArchivedFilter("all");
+    setEstadoFilter("all");
     clearAdvancedFilters();
   };
 
@@ -219,6 +238,7 @@ export default function ExpedienteList({
     untilDateFilter ||
     townFilter !== "all" ||
     stageFilter !== "all" ||
+    estadoFilter !== "all" ||
     archivedFilter !== "all" ||
     advancedFilters !== null;
 
@@ -382,9 +402,20 @@ export default function ExpedienteList({
                 value={archivedFilter}
                 onChange={setArchivedFilter}
                 options={[
-                  { value: "all", label: "Todos los estados" },
+                  { value: "all", label: "Todos" },
                   { value: "archived", label: "Solo archivados" },
                   { value: "active", label: "Solo activos" },
+                ]}
+              />
+
+              <CustomSelect
+                className="select-sm"
+                hidePlaceholderOption
+                value={estadoFilter}
+                onChange={setEstadoFilter}
+                options={[
+                  { value: "all", label: "Todos los estados" },
+                  ...availableEstados.map((estado) => ({ value: estado, label: estado })),
                 ]}
               />
             </div>

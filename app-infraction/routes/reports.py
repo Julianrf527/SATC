@@ -20,6 +20,8 @@ from db.models.expediente import Expediente
 from core.permission import Permission
 ASSIGN_REPORTS = Permission.ASSIGN_REPORTS
 UPLOAD_REPORTS = Permission.UPLOAD_REPORTS
+REVIEW_REPORTS = Permission.REVIEW_REPORTS
+MANUAL_UPLOAD = Permission.MANUAL_UPLOAD
 
 # UTILIDADES
 router = APIRouter()
@@ -34,17 +36,32 @@ from utils.log import insert_log
 from services.notification import create_notification
 from services.users import get_users_by_permission, get_user_info, verify_permission
 from services.docs_service import create_doc_for_professional, finalize_doc_as_rejected, get_doc_detail
+from services.docs import increment_file_usage, decrement_file_usage
 
 
 # ─── SCHEMAS ────────────────────────────────────────────────────────────────
 
 class AsignarProfesionalRequest(BaseModel):
     profesional_id: int
+    revisor_id: int
     fecha_programacion_visita: Optional[str] = None  # ISO date string
 
 
 class SyncDocRequest(BaseModel):
     pass  # vacío — el sync lo hace el backend consultando app-docs
+
+
+class SwitchModeRequest(BaseModel):
+    modo: str  # 'FLUJO' | 'MANUAL'
+
+
+class ManualUploadRequest(BaseModel):
+    file_id: int
+    fecha_recibido: str  # ISO date string
+    fecha_aceptacion: str  # ISO date string
+    fecha_programacion_visita: Optional[str] = None  # ISO date string
+    profesional_id: Optional[int] = None
+    revisor_id: Optional[int] = None
 
 
 # ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -67,6 +84,34 @@ async def _get_active_informe_documento(db: AsyncSession, informe_id: int) -> Op
 
 # ─── GET /reports ─────────────────────────────────────────────────────────────
 
+@router.get("/disponibles", status_code=200)
+async def obtener_profesionales_revisores_disponibles(
+    request: Request,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    """
+    Lista de usuarios con permiso de subir/revisar informes, para el
+    selector opcional de profesional/revisor en el cargue manual.
+    """
+    user_id = verify_gateway_token(request)["user_id"]
+    permisos = await verify_permission(user_id, MANUAL_UPLOAD)
+    if not permisos:
+        raise HTTPException(status_code=403, detail="No tienes permiso para cargar informes manualmente")
+
+    profesionales = await get_users_by_permission(UPLOAD_REPORTS)
+    revisores = await get_users_by_permission(REVIEW_REPORTS)
+
+    return JSONResponse(content={
+        "ok": True,
+        "profesionales_disponibles": [
+            {"id": uid, "nombre": info["nombre"]} for uid, info in profesionales.items()
+        ],
+        "revisores_disponibles": [
+            {"id": uid, "nombre": info["nombre"]} for uid, info in revisores.items()
+        ],
+    })
+
+
 @router.get("", status_code=200)
 async def obtener_informes_tecnicos(
     request: Request,
@@ -87,10 +132,13 @@ async def obtener_informes_tecnicos(
     if not permisos:
         raise HTTPException(status_code=403, detail="No tienes permiso para gestionar informes técnicos")
 
-    # Cargar usuarios con UPLOAD_REPORTS para enriquecer respuesta
+    # Cargar usuarios con UPLOAD_REPORTS/REVIEW_REPORTS para enriquecer respuesta
     users = await get_users_by_permission(UPLOAD_REPORTS)
+    revisores = await get_users_by_permission(REVIEW_REPORTS)
 
-    stmt = select(InformeTecnico)
+    # Los informes en modo MANUAL no pasan por asignación/revisión — no
+    # pertenecen a esta tabla, se gestionan desde la etapa del expediente.
+    stmt = select(InformeTecnico).where(InformeTecnico.modo == "FLUJO")
 
     # Filtros
     if fecha_desde:
@@ -139,6 +187,7 @@ async def obtener_informes_tecnicos(
     data = []
     for inf in informes:
         profesional_info = users.get(inf.profesional_asignado_id) if inf.profesional_asignado_id else None
+        revisor_info = revisores.get(inf.revisor_asignado_id) if inf.revisor_asignado_id else None
 
         # Proceso activo en app-docs
         informe_doc = await _get_active_informe_documento(db, inf.id)
@@ -149,6 +198,9 @@ async def obtener_informes_tecnicos(
             "expediente_radicado": radicados_map.get(inf.expediente_id),
             "profesional_asignado_id": inf.profesional_asignado_id,
             "profesional_nombre": profesional_info["nombre"] if profesional_info else None,
+            "revisor_asignado_id": inf.revisor_asignado_id,
+            "revisor_nombre": revisor_info["nombre"] if revisor_info else None,
+            "modo": inf.modo,
             "fecha_programacion_visita": _format_date(inf.fecha_programacion_visita),
             "fecha_recibido_informe": _format_date(inf.fecha_recibido_informe),
             "fecha_aceptacion_informe": _format_date(inf.fecha_aceptacion_informe),
@@ -170,6 +222,10 @@ async def obtener_informes_tecnicos(
         "profesionales_disponibles": [
             {"id": uid, "nombre": info["nombre"]}
             for uid, info in users.items()
+        ],
+        "revisores_disponibles": [
+            {"id": uid, "nombre": info["nombre"]}
+            for uid, info in revisores.items()
         ],
     })
 
@@ -198,6 +254,9 @@ async def asignar_profesional(
     if not informe:
         raise HTTPException(status_code=404, detail="Informe técnico no encontrado")
 
+    if informe.modo != "FLUJO":
+        raise HTTPException(status_code=400, detail="El informe está en modo de cargue manual, cambia el modo primero")
+
     # No permitir si ya fue aceptado
     if informe.fecha_aceptacion_informe is not None:
         raise HTTPException(status_code=400, detail="El informe ya fue aceptado, no se puede reasignar")
@@ -210,7 +269,15 @@ async def asignar_profesional(
     # Verificar que el profesional tiene el permiso correcto
     perm_profesional = await verify_permission(body.profesional_id, UPLOAD_REPORTS)
     if not perm_profesional:
-        raise HTTPException(status_code=400, detail="El usuario no tiene permiso de subir_informes")
+        raise HTTPException(status_code=400, detail="El usuario no tiene permiso de informes_subir")
+
+    # Verificar que el revisor tiene el permiso correcto
+    perm_revisor = await verify_permission(body.revisor_id, REVIEW_REPORTS)
+    if not perm_revisor:
+        raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de informes_revisar")
+
+    if body.revisor_id == body.profesional_id:
+        raise HTTPException(status_code=400, detail="El profesional y el revisor deben ser personas distintas")
 
     # Obtener nombre del expediente para el nombre del documento
     result_exp = await db.execute(select(Expediente).where(Expediente.id == informe.expediente_id))
@@ -222,7 +289,7 @@ async def asignar_profesional(
         nombre=nombre_doc,
         descripcion=f"Informe técnico de {informe.tipo_informe or 'VISITA'} para el expediente. Profesional responsable del cargue.",
         creador_id=body.profesional_id,
-        revisor_id=user_id,  # la ingeniera líder que asigna es la revisora
+        revisor_id=body.revisor_id,
     )
 
     if not create_result["ok"]:
@@ -232,6 +299,7 @@ async def asignar_profesional(
 
     # Actualizar informe
     informe.profesional_asignado_id = body.profesional_id
+    informe.revisor_asignado_id = body.revisor_id
     if body.fecha_programacion_visita:
         try:
             informe.fecha_programacion_visita = date.fromisoformat(body.fecha_programacion_visita)
@@ -250,7 +318,7 @@ async def asignar_profesional(
     # Notificar al profesional — tipo "documento" para que el botón navegue directo al doc
     try:
         await create_notification(
-            mensaje=f"Se te ha asignado el informe técnico de {informe.tipo_informe or 'VISITA'} para el expediente {expediente.radicado if expediente else informe.expediente_id}. Debes subir el documento en el módulo de documentos.",
+            mensaje=f"Informe técnico de {informe.tipo_informe or 'VISITA'} asignado — expediente {expediente.radicado if expediente else informe.expediente_id}",
             id_vinculada=str(docs_documento_id),
             tipo="documento",
             usuario_id=body.profesional_id,
@@ -289,13 +357,24 @@ async def reasignar_profesional(
     if not informe:
         raise HTTPException(status_code=404, detail="Informe técnico no encontrado")
 
+    if informe.modo != "FLUJO":
+        raise HTTPException(status_code=400, detail="El informe está en modo de cargue manual, cambia el modo primero")
+
     if informe.fecha_aceptacion_informe is not None:
         raise HTTPException(status_code=400, detail="El informe ya fue aceptado, no se puede reasignar")
 
     # Verificar permiso del nuevo profesional
     perm_profesional = await verify_permission(body.profesional_id, UPLOAD_REPORTS)
     if not perm_profesional:
-        raise HTTPException(status_code=400, detail="El usuario no tiene permiso de subir_informes")
+        raise HTTPException(status_code=400, detail="El usuario no tiene permiso de informes_subir")
+
+    # Verificar permiso del nuevo revisor
+    perm_revisor = await verify_permission(body.revisor_id, REVIEW_REPORTS)
+    if not perm_revisor:
+        raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de informes_revisar")
+
+    if body.revisor_id == body.profesional_id:
+        raise HTTPException(status_code=400, detail="El profesional y el revisor deben ser personas distintas")
 
     # Finalizar proceso activo anterior
     informe_doc_activo = await _get_active_informe_documento(db, informe_id)
@@ -311,7 +390,7 @@ async def reasignar_profesional(
                 result_exp = await db.execute(select(Expediente).where(Expediente.id == informe.expediente_id))
                 expediente_prev = result_exp.scalar_one_or_none()
                 await create_notification(
-                    mensaje=f"Se ha reasignado el informe técnico del expediente {expediente_prev.radicado if expediente_prev else informe.expediente_id}. Ya no eres el profesional responsable.",
+                    mensaje=f"Informe técnico reasignado — ya no eres responsable del expediente {expediente_prev.radicado if expediente_prev else informe.expediente_id}",
                     id_vinculada=str(informe_id),
                     tipo="informe_tecnico",
                     usuario_id=informe.profesional_asignado_id,
@@ -329,7 +408,7 @@ async def reasignar_profesional(
         nombre=nombre_doc,
         descripcion=f"Informe técnico de {informe.tipo_informe or 'VISITA'} (reasignación). Profesional responsable del cargue.",
         creador_id=body.profesional_id,
-        revisor_id=user_id,
+        revisor_id=body.revisor_id,
     )
 
     if not create_result["ok"]:
@@ -340,6 +419,7 @@ async def reasignar_profesional(
 
     # Actualizar informe
     informe.profesional_asignado_id = body.profesional_id
+    informe.revisor_asignado_id = body.revisor_id
     if body.fecha_programacion_visita:
         try:
             informe.fecha_programacion_visita = date.fromisoformat(body.fecha_programacion_visita)
@@ -358,7 +438,7 @@ async def reasignar_profesional(
     # Notificar al nuevo profesional — tipo "documento" para navegar directo al doc
     try:
         await create_notification(
-            mensaje=f"Se te ha asignado el informe técnico de {informe.tipo_informe or 'VISITA'} para el expediente {expediente.radicado if expediente else informe.expediente_id}. Debes subir el documento en el módulo de documentos.",
+            mensaje=f"Informe técnico de {informe.tipo_informe or 'VISITA'} asignado — expediente {expediente.radicado if expediente else informe.expediente_id}",
             id_vinculada=str(docs_documento_id),
             tipo="documento",
             usuario_id=body.profesional_id,
@@ -375,6 +455,122 @@ async def reasignar_profesional(
     })
 
 
+# ─── SYNC (compartido) ────────────────────────────────────────────────────────
+
+def _parse_date_bogota(iso_str: str) -> date | None:
+    try:
+        dt = datetime.fromisoformat(iso_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(_BOGOTA).date()
+    except (ValueError, TypeError):
+        return None
+
+
+async def _sincronizar_informe(
+    db: AsyncSession,
+    informe: InformeTecnico,
+    informe_doc: InformeDocumento,
+) -> dict:
+    """
+    Consulta el estado del documento en app-docs y actualiza el InformeTecnico
+    si ya fue aprobado o rechazado. Devuelve el payload de respuesta.
+    Nota: el estado de "devuelto" en app-docs se llama 'rechazado' (ver
+    app-docs/routes/revision.py) — antes se comparaba mal contra 'devuelto'
+    y esta rama nunca se ejecutaba.
+    """
+    doc_detail = await get_doc_detail(informe_doc.docs_documento_id)
+    if not doc_detail.get("ok"):
+        return {"ok": False, "message": f"Error consultando app-docs: {doc_detail.get('message')}", "estado": None}
+
+    estado_doc = doc_detail.get("estado")
+
+    result_exp = await db.execute(select(Expediente).where(Expediente.id == informe.expediente_id))
+    expediente = result_exp.scalar_one_or_none()
+    radicado = expediente.radicado if expediente else str(informe.expediente_id)
+
+    if estado_doc == "rechazado":
+        try:
+            await create_notification(
+                mensaje=f"Informe técnico devuelto — expediente {radicado}, revisa observaciones",
+                id_vinculada=str(informe.id),
+                tipo="informe_tecnico",
+                usuario_id=informe.profesional_asignado_id,
+            )
+        except Exception as e:
+            logger.warning(f"Error notificando devolución al profesional: {e}")
+        return {
+            "ok": False,
+            "message": "El documento fue devuelto. Se notificó al profesional.",
+            "estado": estado_doc,
+        }
+
+    if estado_doc == "finalizado":
+        # 3 devoluciones seguidas: app-docs cierra el proceso solo. Se marca
+        # inactivo en app-infraction para que se pueda reasignar de cero.
+        informe_doc.activo = False
+        await db.commit()
+        try:
+            await create_notification(
+                mensaje=f"Informe técnico rechazado 3 veces — expediente {radicado}, reasignar",
+                id_vinculada=str(informe.id),
+                tipo="informe_tecnico",
+                usuario_id=informe.revisor_asignado_id or informe.profesional_asignado_id,
+            )
+        except Exception as e:
+            logger.warning(f"Error notificando finalización: {e}")
+        return {
+            "ok": False,
+            "message": "El documento fue rechazado 3 veces y el proceso se cerró. Reasigna el informe.",
+            "estado": estado_doc,
+        }
+
+    if estado_doc != "aprobado":
+        return {
+            "ok": False,
+            "message": f"El documento aún no está aprobado. Estado actual: {estado_doc}",
+            "estado": estado_doc,
+        }
+
+    ultima_version = doc_detail.get("ultima_version")
+    fecha_subida = _parse_date_bogota(ultima_version["fecha_subida"]) if ultima_version and ultima_version.get("fecha_subida") else None
+    fecha_aprobacion = _parse_date_bogota(doc_detail["fecha_ultima_actualizacion"]) if doc_detail.get("fecha_ultima_actualizacion") else None
+
+    informe.fecha_aceptacion_informe = fecha_aprobacion or date.today()
+    informe.fecha_recibido_informe = fecha_subida or fecha_aprobacion or date.today()
+    file_hash_id = ultima_version.get("file_hash_id") if ultima_version else None
+    informe.documento_informe_id = file_hash_id or informe_doc.docs_documento_id
+
+    informe_doc.activo = False
+    await db.commit()
+
+    try:
+        await create_notification(
+            mensaje=f"Informe técnico aceptado — expediente {radicado}",
+            id_vinculada=str(informe.id),
+            tipo="informe_tecnico",
+            usuario_id=informe.profesional_asignado_id,
+        )
+        if expediente and expediente.abogado_responsable_id:
+            await create_notification(
+                mensaje=f"Informe técnico aceptado — expediente {radicado}, disponible para revisión",
+                id_vinculada=str(informe.id),
+                tipo="informe_tecnico",
+                usuario_id=expediente.abogado_responsable_id,
+            )
+    except Exception as e:
+        logger.warning(f"Error notificando aprobación: {e}")
+
+    logger.info(f"Informe {informe.id} sincronizado como aprobado")
+    return {
+        "ok": True,
+        "informe_id": informe.id,
+        "fecha_aceptacion": _format_date(informe.fecha_aceptacion_informe),
+        "fecha_recibido": _format_date(informe.fecha_recibido_informe),
+        "message": "Informe técnico actualizado como aceptado",
+    }
+
+
 # ─── PUT /reports/{informe_id}/sync ──────────────────────────────────────────
 
 @router.put("/{informe_id}/sync", status_code=200)
@@ -384,9 +580,8 @@ async def sincronizar_informe_aprobado(
     db: AsyncSession = Depends(get_db_managed),
 ):
     """
-    Sincroniza el InformeTecnico con el documento aprobado en app-docs.
-    Se llama desde el frontend luego de que la líder aprueba en el modal de revisión.
-    Consulta app-docs vía service-to-service y actualiza los campos del informe.
+    Sincroniza el InformeTecnico con el documento aprobado/rechazado en app-docs.
+    Se llama desde el frontend luego de que se revisa el documento.
     """
     user_id = verify_gateway_token(request)["user_id"]
     permisos = await verify_permission(user_id, ASSIGN_REPORTS)
@@ -402,96 +597,213 @@ async def sincronizar_informe_aprobado(
     if not informe_doc:
         raise HTTPException(status_code=404, detail="No hay proceso de documento activo para este informe")
 
-    # Obtener detalle desde app-docs (service-to-service)
-    doc_detail = await get_doc_detail(informe_doc.docs_documento_id)
-    if not doc_detail.get("ok"):
-        raise HTTPException(status_code=502, detail=f"Error consultando app-docs: {doc_detail.get('message')}")
+    payload = await _sincronizar_informe(db, informe, informe_doc)
+    return JSONResponse(content=payload)
 
-    estado_doc = doc_detail.get("estado")
 
-    if estado_doc == "devuelto":
-        # Notificar al profesional que el documento fue rechazado
-        try:
-            result_exp = await db.execute(select(Expediente).where(Expediente.id == informe.expediente_id))
-            expediente_dev = result_exp.scalar_one_or_none()
-            radicado_dev = expediente_dev.radicado if expediente_dev else str(informe.expediente_id)
-            await create_notification(
-                mensaje=f"Tu informe técnico para el expediente {radicado_dev} fue devuelto. Por favor revisa las observaciones y sube una nueva versión.",
-                id_vinculada=str(informe_id),
-                tipo="informe_tecnico",
-                usuario_id=informe.profesional_asignado_id,
-            )
-        except Exception as e:
-            logger.warning(f"Error notificando devolución al profesional: {e}")
-        return JSONResponse(content={
-            "ok": False,
-            "message": "El documento fue devuelto. Se notificó al profesional.",
-            "estado": estado_doc,
-        })
+# ─── PUT /reports/sync-by-doc/{docs_documento_id} ────────────────────────────
 
-    if estado_doc != "aprobado":
-        return JSONResponse(content={
-            "ok": False,
-            "message": f"El documento aún no está aprobado. Estado actual: {estado_doc}",
-            "estado": estado_doc,
-        })
+@router.put("/sync-by-doc/{docs_documento_id}", status_code=200)
+async def sincronizar_informe_por_documento(
+    request: Request,
+    docs_documento_id: int,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    """
+    Igual que /sync pero identificando el informe por el id del documento en
+    app-docs. Pensado para llamarse best-effort desde el módulo genérico de
+    Documentos (app-documentos) justo después de revisar cualquier documento:
+    si ese documento no corresponde a un informe técnico, responde ok=False
+    sin error, ya que la mayoría de documentos no lo son.
 
-    def _parse_date_bogota(iso_str: str) -> date | None:
-        try:
-            dt = datetime.fromisoformat(iso_str)
-            if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
-            return dt.astimezone(_BOGOTA).date()
-        except (ValueError, TypeError):
-            return None
+    Necesario porque el revisor de un informe técnico ya no es siempre quien
+    lo asignó — puede revisar desde el módulo de Documentos, donde antes
+    nunca se disparaba esta sincronización.
+    """
+    user_id = verify_gateway_token(request)["user_id"]
 
-    ultima_version = doc_detail.get("ultima_version")
-    fecha_subida = _parse_date_bogota(ultima_version["fecha_subida"]) if ultima_version and ultima_version.get("fecha_subida") else None
-    fecha_aprobacion = _parse_date_bogota(doc_detail["fecha_ultima_actualizacion"]) if doc_detail.get("fecha_ultima_actualizacion") else None
+    result = await db.execute(
+        select(InformeDocumento).where(
+            and_(InformeDocumento.docs_documento_id == docs_documento_id, InformeDocumento.activo == True)
+        )
+    )
+    informe_doc = result.scalar_one_or_none()
+    if not informe_doc:
+        return JSONResponse(content={"ok": False, "message": "No es un informe técnico o ya fue sincronizado"})
 
-    # Actualizar InformeTecnico
-    informe.fecha_aceptacion_informe = fecha_aprobacion or date.today()
-    informe.fecha_recibido_informe = fecha_subida or fecha_aprobacion or date.today()
-    file_hash_id = ultima_version.get("file_hash_id") if ultima_version else None
-    informe.documento_informe_id = file_hash_id or informe_doc.docs_documento_id
+    result_inf = await db.execute(select(InformeTecnico).where(InformeTecnico.id == informe_doc.informe_id))
+    informe = result_inf.scalar_one_or_none()
+    if not informe:
+        return JSONResponse(content={"ok": False, "message": "Informe técnico no encontrado"})
 
-    # Desactivar el proceso en la tabla bridge (ya terminó)
-    informe_doc.activo = False
+    es_asignador = await verify_permission(user_id, ASSIGN_REPORTS)
+    es_revisor_asignado = informe.revisor_asignado_id is not None and int(informe.revisor_asignado_id) == int(user_id)
+    if not (es_asignador or es_revisor_asignado):
+        raise HTTPException(status_code=403, detail="No tienes permiso para sincronizar este informe")
+
+    payload = await _sincronizar_informe(db, informe, informe_doc)
+    return JSONResponse(content=payload)
+
+
+# ─── PUT /reports/{informe_id}/switch-mode ───────────────────────────────────
+
+@router.put("/{informe_id}/switch-mode", status_code=200)
+async def cambiar_modo_informe(
+    request: Request,
+    informe_id: int,
+    body: SwitchModeRequest,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    """
+    Alterna el informe entre modo FLUJO (asignar profesional/revisor + ciclo
+    de revisión en app-docs) y modo MANUAL (cargue directo de un informe ya
+    aceptado previamente, ej. expedientes históricos). Cambiar de modo borra
+    por completo la información del modo anterior (archivo, fechas,
+    profesional/revisor) — el frontend debe confirmarlo con el usuario antes
+    de llamar este endpoint.
+    """
+    user_id = verify_gateway_token(request)["user_id"]
+    permisos = await verify_permission(user_id, MANUAL_UPLOAD)
+    if not permisos:
+        raise HTTPException(status_code=403, detail="No tienes permiso para cambiar el modo de cargue")
+
+    if body.modo not in ("FLUJO", "MANUAL"):
+        raise HTTPException(status_code=400, detail="Modo inválido, debe ser FLUJO o MANUAL")
+
+    result = await db.execute(select(InformeTecnico).where(InformeTecnico.id == informe_id))
+    informe = result.scalar_one_or_none()
+    if not informe:
+        raise HTTPException(status_code=404, detail="Informe técnico no encontrado")
+
+    if informe.modo == body.modo:
+        return JSONResponse(content={"ok": True, "informe_id": informe_id, "modo": informe.modo, "message": "Ya estaba en ese modo"})
+
+    if body.modo == "MANUAL":
+        # Viene de FLUJO: cerrar cualquier proceso de app-docs y liberar el archivo si ya se había subido.
+        informe_doc = await _get_active_informe_documento(db, informe_id)
+        if informe_doc:
+            doc_detail = await get_doc_detail(informe_doc.docs_documento_id)
+            if doc_detail.get("ok"):
+                ultima_version = doc_detail.get("ultima_version")
+                file_hash_id = ultima_version.get("file_hash_id") if ultima_version else None
+                if file_hash_id:
+                    try:
+                        await decrement_file_usage([file_hash_id])
+                    except Exception as e:
+                        logger.warning(f"Error decrementando uso de archivo {file_hash_id}: {e}")
+            finalize_result = await finalize_doc_as_rejected(informe_doc.docs_documento_id)
+            if not finalize_result["ok"]:
+                logger.warning(f"No se pudo finalizar proceso {informe_doc.docs_documento_id}: {finalize_result.get('message')}")
+            informe_doc.activo = False
+
+        if informe.documento_informe_id:
+            try:
+                await decrement_file_usage([informe.documento_informe_id])
+            except Exception as e:
+                logger.warning(f"Error decrementando uso de archivo {informe.documento_informe_id}: {e}")
+
+        informe.profesional_asignado_id = None
+        informe.revisor_asignado_id = None
+        informe.documento_informe_id = None
+        informe.fecha_recibido_informe = None
+        informe.fecha_aceptacion_informe = None
+        informe.fecha_programacion_visita = None
+        informe.modo = "MANUAL"
+    else:
+        # Viene de MANUAL: liberar el archivo cargado a mano, si lo hay.
+        if informe.documento_informe_id:
+            try:
+                await decrement_file_usage([informe.documento_informe_id])
+            except Exception as e:
+                logger.warning(f"Error decrementando uso de archivo {informe.documento_informe_id}: {e}")
+
+        informe.documento_informe_id = None
+        informe.fecha_recibido_informe = None
+        informe.fecha_aceptacion_informe = None
+        informe.fecha_programacion_visita = None
+        informe.profesional_asignado_id = None
+        informe.revisor_asignado_id = None
+        informe.modo = "FLUJO"
 
     await db.commit()
 
-    # Notificar al profesional y al abogado del expediente
+    logger.info(f"Informe {informe_id} cambiado a modo {informe.modo}")
+    return JSONResponse(content={"ok": True, "informe_id": informe_id, "modo": informe.modo, "message": "Modo actualizado"})
+
+
+# ─── POST /reports/{informe_id}/manual-upload ────────────────────────────────
+
+@router.post("/{informe_id}/manual-upload", status_code=200)
+async def cargue_manual_informe(
+    request: Request,
+    informe_id: int,
+    body: ManualUploadRequest,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    """
+    Registra el cargue manual (histórico) de un informe técnico ya aceptado
+    previamente fuera del sistema. El archivo ya debe estar subido en
+    app-docs (vía /files/upload) — aquí solo se vincula su file_id.
+    """
+    user_id = verify_gateway_token(request)["user_id"]
+    permisos = await verify_permission(user_id, MANUAL_UPLOAD)
+    if not permisos:
+        raise HTTPException(status_code=403, detail="No tienes permiso para cargar informes manualmente")
+
+    result = await db.execute(select(InformeTecnico).where(InformeTecnico.id == informe_id))
+    informe = result.scalar_one_or_none()
+    if not informe:
+        raise HTTPException(status_code=404, detail="Informe técnico no encontrado")
+
+    if informe.modo != "MANUAL":
+        raise HTTPException(status_code=400, detail="El informe no está en modo de cargue manual. Cambia el modo primero.")
+
     try:
-        result_exp = await db.execute(select(Expediente).where(Expediente.id == informe.expediente_id))
-        expediente = result_exp.scalar_one_or_none()
-        radicado = expediente.radicado if expediente else str(informe.expediente_id)
+        fecha_recibido = date.fromisoformat(body.fecha_recibido)
+        fecha_aceptacion = date.fromisoformat(body.fecha_aceptacion)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido, debe ser YYYY-MM-DD")
 
-        # Notificar profesional: su informe fue aceptado
-        await create_notification(
-            mensaje=f"Tu informe técnico para el expediente {radicado} ha sido aceptado.",
-            id_vinculada=str(informe_id),
-            tipo="informe_tecnico",
-            usuario_id=informe.profesional_asignado_id,
-        )
+    fecha_programacion = None
+    if body.fecha_programacion_visita:
+        try:
+            fecha_programacion = date.fromisoformat(body.fecha_programacion_visita)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Formato de fecha de programación inválido")
 
-        # Notificar abogado responsable del expediente
-        if expediente and expediente.abogado_responsable_id:
-            await create_notification(
-                mensaje=f"El informe técnico del expediente {radicado} fue aceptado y está disponible para revisión.",
-                id_vinculada=str(informe_id),
-                tipo="informe_tecnico",
-                usuario_id=expediente.abogado_responsable_id,
-            )
-    except Exception as e:
-        logger.warning(f"Error notificando aprobación: {e}")
+    if body.profesional_id is not None:
+        if not await verify_permission(body.profesional_id, UPLOAD_REPORTS):
+            raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de informes_subir")
 
-    logger.info(f"Informe {informe_id} sincronizado como aprobado")
+    if body.revisor_id is not None:
+        if not await verify_permission(body.revisor_id, REVIEW_REPORTS):
+            raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de informes_revisar")
+
+    # Solo tocar el contador de uso si el archivo realmente cambió — reenviar
+    # el mismo file_id (ej. edición que solo cambia fechas) no debe inflar el
+    # contador ni decrementarlo de más.
+    if informe.documento_informe_id != body.file_id:
+        if informe.documento_informe_id:
+            try:
+                await decrement_file_usage([informe.documento_informe_id])
+            except Exception as e:
+                logger.warning(f"Error decrementando uso de archivo previo {informe.documento_informe_id}: {e}")
+        await increment_file_usage([body.file_id])
+
+    informe.documento_informe_id = body.file_id
+    informe.fecha_recibido_informe = fecha_recibido
+    informe.fecha_aceptacion_informe = fecha_aceptacion
+    informe.fecha_programacion_visita = fecha_programacion
+    informe.profesional_asignado_id = body.profesional_id
+    informe.revisor_asignado_id = body.revisor_id
+
+    await db.commit()
+
+    logger.info(f"Informe {informe_id} cargado manualmente por usuario {user_id}, file_id={body.file_id}")
     return JSONResponse(content={
         "ok": True,
         "informe_id": informe_id,
-        "fecha_aceptacion": _format_date(informe.fecha_aceptacion_informe),
-        "fecha_recibido": _format_date(informe.fecha_recibido_informe),
-        "message": "Informe técnico actualizado como aceptado",
+        "message": "Informe técnico cargado y aceptado correctamente",
     })
 
 

@@ -70,6 +70,7 @@ from services.notification import create_notification
 from services.users import get_users_by_permission, get_user_info, verify_permission
 from services.involved import get_involved_by_expedientes_ids
 from services.docs import download_unified_pdf
+from services.estado_expediente import calcular_estados, calcular_estado_uno
 
 
 @router.get("/get")
@@ -100,6 +101,7 @@ async def obtener_expedientes(
         Expediente.fecha_radicado,
         Expediente.abogado_responsable_id,
         Expediente.fecha_creacion,
+        Expediente.archivado,
     )
 
     if radicado:
@@ -126,6 +128,10 @@ async def obtener_expedientes(
 
     usuarios_disponibles = await get_users_by_permission(FILE_MANAGE)
 
+    estados_map = await calcular_estados(
+        db, [r[0] for r in rows], {r[0]: r[5] for r in rows}
+    )
+
     payload = [
         {
             "id": r[0],
@@ -135,6 +141,8 @@ async def obtener_expedientes(
             "encargado_nombre": usuarios_disponibles.get(r[3], {}).get("nombre") if r[3] else None,
             "encargado_documento": (usuarios_disponibles.get(r[3], {}).get("numero_documento") or usuarios_disponibles.get(r[3], {}).get("documento")) if r[3] else None,
             "fecha_creacion": r[4].isoformat() if r[4] else None,
+            "archivado": r[5],
+            "estado": estados_map.get(r[0]),
         }
         for r in rows
     ]
@@ -413,6 +421,7 @@ async def obtener_expediente_completo_por_expediente_id(
             Expediente.direccion,
             Expediente.descripcion,
             Expediente.vereda_id,
+            Expediente.archivado,
             etapa_actual.c.tipo.label("etapa_actual"),
         )
         .where(Expediente.id == expediente_id)
@@ -506,6 +515,8 @@ async def obtener_expediente_completo_por_expediente_id(
             etapas_existentes.append(legacy_id)
 
     # Armar respuesta con toda la data
+    estado = await calcular_estado_uno(db, expediente_id, expediente["archivado"])
+
     exp_dict = {
         "id": expediente["id"],
         "radicado": expediente["radicado"],
@@ -519,6 +530,8 @@ async def obtener_expediente_completo_por_expediente_id(
         "radicados_asociados": radicados_asociados,
         "ultima_etapa": expediente["etapa_actual"],
         "involucrados": involucrados,
+        "archivado": expediente["archivado"],
+        "estado": estado,
     }
 
     return JSONResponse(
@@ -623,6 +636,10 @@ async def obtener_expedientes_para_vista(
     # Obtener involucrados
     involucrados_map = await get_involved_by_expedientes_ids(db, expediente_ids)
 
+    estados_map = await calcular_estados(
+        db, expediente_ids, {exp.id: exp.archivado for exp in expedientes_raw}
+    )
+
     vereda_ids = [exp.vereda_id for exp in expedientes_raw if exp.vereda_id]
     veredas_map = {}
     municipios_map = {}
@@ -662,6 +679,7 @@ async def obtener_expedientes_para_vista(
             "municipio": municipio_obj,
             "involucrados": involucrados_map.get(exp.id, []),
             "etapa_actual": exp.etapa_actual,
+            "estado": estados_map.get(exp.id),
         })
 
     return JSONResponse(content={"ok": True, "data": data}, status_code=200)
@@ -753,6 +771,10 @@ async def obtener_expedientes_por_encargado(
     expediente_ids = [r["id"] for r in expedientes_raw]
     involucrados_map = await get_involved_by_expedientes_ids(db, expediente_ids)
 
+    estados_map = await calcular_estados(
+        db, expediente_ids, {r["id"]: r["archivado"] for r in expedientes_raw}
+    )
+
     data = [
         {
             "id": r["id"],
@@ -763,6 +785,7 @@ async def obtener_expedientes_por_encargado(
             "involucrados": involucrados_map.get(r["id"], []),
             "etapa_actual": r["etapa_actual"],
             "archivado": r["archivado"],
+            "estado": estados_map.get(r["id"]),
         }
         for r in expedientes_raw
     ]
