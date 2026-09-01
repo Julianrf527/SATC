@@ -24,6 +24,7 @@ export type Expediente = {
   involucrados: Involucrado[];
   etapa_actual?: string | null;
   archivado: true | false;
+  estado?: string | null;
 };
 
 export type ExpedienteDetalle = Expediente & {
@@ -110,6 +111,8 @@ export type InformeTecnico = {
   expediente_radicado?: string | null;
   profesional_asignado_id: number | null;
   profesional_nombre: string | null;
+  revisor_asignado_id: number | null;
+  revisor_nombre: string | null;
   fecha_programacion_visita: string | null;
   fecha_recibido_informe: string | null;
   fecha_aceptacion_informe: string | null;
@@ -119,6 +122,7 @@ export type InformeTecnico = {
   docs_documento_id: number | null;
   proceso_activo: boolean;
   aceptado: boolean;
+  modo: "FLUJO" | "MANUAL";
 };
 
 export type ProfesionalDisponible = {

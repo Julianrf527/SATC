@@ -9,10 +9,17 @@ import CustomDateInput from "../../Common/Form/CustomDateInput";
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (profesionalId: number, fechaProgramacion: string) => Promise<void>;
+  onSubmit: (
+    profesionalId: number,
+    revisorId: number,
+    fechaProgramacion: string,
+  ) => Promise<void>;
   profesionales: ProfesionalDisponible[];
+  revisores: ProfesionalDisponible[];
   /** Si es reasignación, pasar el profesional actual para mostrarlo */
   profesionalActualId?: number | null;
+  /** Si es reasignación, pasar el revisor actual para mostrarlo */
+  revisorActualId?: number | null;
   /** Fecha de programación actual */
   fechaProgramacionActual?: string | null;
   isReassign?: boolean;
@@ -23,11 +30,14 @@ export default function AsignarProfesionalModal({
   onClose,
   onSubmit,
   profesionales,
+  revisores,
   profesionalActualId,
+  revisorActualId,
   fechaProgramacionActual,
   isReassign = false,
 }: Props) {
   const [profesionalId, setProfesionalId] = useState<number | "">("");
+  const [revisorId, setRevisorId] = useState<number | "">("");
   const [fechaProgramacion, setFechaProgramacion] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -36,11 +46,12 @@ export default function AsignarProfesionalModal({
   useEffect(() => {
     if (isOpen) {
       setProfesionalId(profesionalActualId ?? "");
+      setRevisorId(revisorActualId ?? "");
       setFechaProgramacion(fechaProgramacionActual ?? "");
       setError("");
       setSubmitting(false);
     }
-  }, [isOpen, profesionalActualId, fechaProgramacionActual]);
+  }, [isOpen, profesionalActualId, revisorActualId, fechaProgramacionActual]);
 
   useEffect(() => {
     const update = () => {
@@ -59,10 +70,18 @@ export default function AsignarProfesionalModal({
       setError("Selecciona un profesional");
       return;
     }
+    if (!revisorId) {
+      setError("Selecciona un revisor");
+      return;
+    }
+    if (revisorId === profesionalId) {
+      setError("El profesional y el revisor deben ser personas distintas");
+      return;
+    }
     setError("");
     setSubmitting(true);
     try {
-      await onSubmit(Number(profesionalId), fechaProgramacion);
+      await onSubmit(Number(profesionalId), Number(revisorId), fechaProgramacion);
       onClose();
     } catch (e) {
       setError(getErrorMessage(e, "Error al asignar el profesional"));
@@ -131,6 +150,20 @@ export default function AsignarProfesionalModal({
             />
           </div>
 
+          {/* Selector de revisor */}
+          <div className="form-control">
+            <label className="label py-1">
+              <span className="label-text font-medium">Revisor <span className="text-error">*</span></span>
+            </label>
+            <CustomSelect
+              value={revisorId === "" ? 0 : revisorId}
+              onChange={(v) => setRevisorId(v === 0 ? "" : v)}
+              placeholder="Seleccionar revisor..."
+              disabled={submitting}
+              options={revisores.map((r) => ({ value: r.id, label: r.nombre }))}
+            />
+          </div>
+
           {/* Fecha de programación */}
           <div className="form-control">
             <label className="label py-1">
@@ -143,7 +176,6 @@ export default function AsignarProfesionalModal({
             <CustomDateInput
               value={fechaProgramacion}
               onChange={setFechaProgramacion}
-              max={new Date().toISOString().split('T')[0]}
               disabled={submitting}
             />
           </div>
@@ -163,7 +195,7 @@ export default function AsignarProfesionalModal({
           <button
             onClick={handleSubmit}
             className="btn btn-success text-white btn-sm gap-2"
-            disabled={submitting || !profesionalId}
+            disabled={submitting || !profesionalId || !revisorId}
           >
             {submitting ? (
               <><span className="loading loading-spinner loading-xs" />Procesando...</>

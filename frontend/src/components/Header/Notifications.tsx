@@ -105,7 +105,7 @@ function NotifRow({
             {cfg.label}
           </span>
         </div>
-        <p className="text-xs text-base-content/80 leading-relaxed line-clamp-2">
+        <p className="text-xs text-base-content/80 leading-relaxed">
           {noti.mensaje}
         </p>
       </div>

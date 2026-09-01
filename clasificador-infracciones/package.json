@@ -1,0 +1,33 @@
+{
+  "name": "clasificador-infracciones",
+  "version": "1.0.0",
+  "description": "Herramienta standalone para pre-clasificar hojas de expedientes de infracciones escaneados antes de subirlos al SATC. No forma parte del sistema SATC.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win portable"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.corpochivor.clasificador-infracciones",
+    "productName": "Clasificador de Infracciones",
+    "files": [
+      "main.js",
+      "preload.js",
+      "app/**/*"
+    ],
+    "win": {
+      "target": "portable"
+    },
+    "portable": {
+      "artifactName": "ClasificadorInfracciones.exe"
+    },
+    "directories": {
+      "output": "dist"
+    }
+  }
+}

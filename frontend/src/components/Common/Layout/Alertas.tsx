@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiCall } from "../../../utils/api";
-import CustomSelect from "../Form/CustomSelect";
 
 type EstadoSemaforo = "verde" | "amarillo" | "rojo" | "vencido";
 
@@ -65,7 +64,6 @@ const URGENCIA_CLASS: Record<string, string> = {
 export default function Alertas({ expedienteId, alertEndpoint, setToast }: Props) {
   const [alertas, setAlertas] = useState<Record<string, Alerta>>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [estadoFilter, setEstadoFilter] = useState("all");
 
   useEffect(() => {
     loadAlertas();
@@ -97,14 +95,12 @@ export default function Alertas({ expedienteId, alertEndpoint, setToast }: Props
     return s;
   }, [alertasFlat]);
 
-  const alertasFiltradas = useMemo(() =>
-    alertasFlat
-      .filter((a) => estadoFilter === "all" || a.semaforo.estado === estadoFilter)
-      .sort((a, b) => {
-        const diff = URGENCIA_ORDER[a.semaforo.urgencia] - URGENCIA_ORDER[b.semaforo.urgencia];
-        return diff !== 0 ? diff : b.semaforo.porcentaje_avance - a.semaforo.porcentaje_avance;
-      }),
-  [alertasFlat, estadoFilter]);
+  const alertasOrdenadas = useMemo(() =>
+    [...alertasFlat].sort((a, b) => {
+      const diff = URGENCIA_ORDER[a.semaforo.urgencia] - URGENCIA_ORDER[b.semaforo.urgencia];
+      return diff !== 0 ? diff : b.semaforo.porcentaje_avance - a.semaforo.porcentaje_avance;
+    }),
+  [alertasFlat]);
 
   const formatFecha = (f: string) => {
     try { return new Date(f).toLocaleDateString("es-CO", { month: "short", day: "numeric" }); }
@@ -169,31 +165,14 @@ export default function Alertas({ expedienteId, alertEndpoint, setToast }: Props
             </div>
           ) : (
             <>
-              {/* Filtro */}
-              <div className="flex items-center justify-between mb-3">
+              <div className="mb-3">
                 <span className="text-xs font-semibold text-base-content/60">
-                  {alertasFiltradas.length} alerta{alertasFiltradas.length !== 1 ? "s" : ""}
-                  {estadoFilter !== "all" && " filtradas"}
+                  {alertasOrdenadas.length} alerta{alertasOrdenadas.length !== 1 ? "s" : ""}
                 </span>
-                <CustomSelect
-                  className="select-xs w-36"
-                  hidePlaceholderOption
-                  value={estadoFilter}
-                  onChange={setEstadoFilter}
-                  options={[
-                    { value: "all", label: `Todos (${alertasFlat.length})` },
-                    ...(["verde", "amarillo", "rojo", "vencido"] as EstadoSemaforo[])
-                      .filter((e) => estadisticas[e] > 0)
-                      .map((e) => ({
-                        value: e,
-                        label: `${SEMAFORO_CFG[e].emoji} ${SEMAFORO_CFG[e].label} (${estadisticas[e]})`,
-                      })),
-                  ]}
-                />
               </div>
 
               <div className="space-y-2">
-                {alertasFiltradas.map((alerta, index) => {
+                {alertasOrdenadas.map((alerta, index) => {
                   const cfg = SEMAFORO_CFG[alerta.semaforo.estado];
                   return (
                     <div key={`${alerta.alertaKey}-${index}`}
