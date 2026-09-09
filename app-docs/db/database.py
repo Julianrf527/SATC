@@ -40,6 +40,7 @@ async def init_db():
                 d.descripcion,
                 d.tipo_archivo,
                 d.estado,
+                d.origen,
                 d.version_actual,
                 d.numero_devoluciones,
                 d.usuario_creador_id,

@@ -23,6 +23,7 @@ class VDocumentoDetalle(ViewBase):
     descripcion = Column(Text, nullable=True)
     tipo_archivo = Column(String(50), nullable=False)
     estado = Column(String(50), nullable=False)
+    origen = Column(String(30), nullable=True)
     version_actual = Column(Integer, default=1)
     numero_devoluciones = Column(Integer, default=0)
     usuario_creador_id = Column(Integer, nullable=False)

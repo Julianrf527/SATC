@@ -84,7 +84,9 @@ async def listar_documentos(
     if not tiene_permiso_creador and not tiene_permiso_revisor:
         raise HTTPException(status_code=403, detail="No tienes permisos para ver documentos")
 
-    stmt = select(VDocumentoDetalle)
+    # Los documentos del flujo de informes técnicos (app-infraction) no se
+    # listan acá — se gestionan desde "Mis Informes".
+    stmt = select(VDocumentoDetalle).where(VDocumentoDetalle.origen.is_(None))
 
     if tiene_permiso_creador and tiene_permiso_revisor:
         subquery = select(AsignacionRevisor.documento_id).where(AsignacionRevisor.revisor_id == user_id)

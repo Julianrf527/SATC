@@ -223,6 +223,7 @@ export default function AsignarInformes({ setToast }: Props) {
           }
           documentoId={docsModal.docsDocumentoId}
           setToast={setToast}
+          readOnly
           onUpdate={(accion) => {
             // Solo una revisión (aprobar/devolver) sincroniza con app-infraction
             // y cierra el modal. Un simple cargue de archivo no es una revisión

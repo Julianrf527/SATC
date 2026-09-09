@@ -29,6 +29,7 @@ class CreateServiceRequest(BaseModel):
     tipo_archivo: str = "pdf"
     creador_id: int
     revisores_ids: list[int]
+    origen: str | None = None
 
 
 @router.post("/create-service")
@@ -55,6 +56,7 @@ async def crear_documento_service(
         tipo_archivo=body.tipo_archivo,
         usuario_creador_id=body.creador_id,
         estado='en_revision',
+        origen=body.origen,
         version_actual=1
     )
     db.add(nuevo_documento)

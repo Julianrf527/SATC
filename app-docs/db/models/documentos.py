@@ -21,6 +21,11 @@ class Documento(Base):
     )
     # Se filtra por estado en /list y /stats
     estado = Column(String(20), index=True)
+    # Null = documento genérico (visible en el listado principal de Documentos).
+    # "informe_tecnico" = creado por app-infraction vía /docs/create-service
+    # para el flujo de informes técnicos — se oculta de ese listado, se
+    # gestiona desde "Mis Informes".
+    origen = Column(String(30), nullable=True, index=True)
     version_actual = Column(Integer)
     numero_devoluciones = Column(Integer, default=0)
     fecha_ultima_actualizacion = Column(

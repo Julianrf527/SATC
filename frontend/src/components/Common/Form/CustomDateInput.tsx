@@ -31,6 +31,24 @@ function toYMD(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+function maskDMY(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  const parts = [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4, 8)].filter(Boolean);
+  return parts.join("/");
+}
+
+function parseDMY(s: string): Date | null {
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const day = Number(m[1]);
+  const month = Number(m[2]);
+  const year = Number(m[3]);
+  if (month < 1 || month > 12) return null;
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  return date;
+}
+
 /**
  * Selector de fecha propio (sin <input type="date"> nativo) — el calendario
  * nativo del navegador parpadea en negro dentro de modales con fondo
@@ -134,9 +152,16 @@ export default function CustomDateInput({
     return today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
   };
 
-  const displayLabel = selected
+  const displayDMY = selected
     ? `${String(selected.getDate()).padStart(2, "0")}/${String(selected.getMonth() + 1).padStart(2, "0")}/${selected.getFullYear()}`
-    : placeholder;
+    : "";
+
+  const [textValue, setTextValue] = useState(displayDMY);
+  const [editing, setEditing] = useState(false);
+
+  useEffect(() => {
+    if (!editing) setTextValue(displayDMY);
+  }, [displayDMY, editing]);
 
   const pick = (day: number) => {
     onChange(toYMD(new Date(year, month, day)));
@@ -145,25 +170,68 @@ export default function CustomDateInput({
 
   const clear = () => {
     onChange("");
+    setTextValue("");
     setOpen(false);
+  };
+
+  const commitText = (raw: string) => {
+    const text = raw.trim();
+    if (!text) {
+      onChange("");
+      return;
+    }
+    const parsed = parseDMY(text);
+    if (!parsed || (maxDate && parsed > maxDate)) {
+      setTextValue(displayDMY);
+      return;
+    }
+    setViewDate(parsed);
+    onChange(toYMD(parsed));
   };
 
   return (
     <>
       <div
         ref={triggerRef}
-        tabIndex={disabled ? -1 : 0}
-        role="button"
-        onClick={openPopup}
         className={`input input-bordered w-full flex items-center justify-between gap-2 ${
-          error ? "input-error" : "focus:input-success"
+          error ? "input-error" : "focus-within:input-success"
         } ${disabled ? "opacity-50 cursor-not-allowed" : ""} ${className}`}
       >
-        <span className={selected ? "" : "text-base-content/50"}>{displayLabel}</span>
-        <svg className="w-4 h-4 flex-shrink-0 text-base-content/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={textValue}
+          placeholder={placeholder}
+          disabled={disabled}
+          onFocus={openPopup}
+          onChange={(e) => setTextValue(maskDMY(e.target.value))}
+          onBlur={() => {
+            setEditing(false);
+            commitText(textValue);
+          }}
+          onKeyDown={(e) => {
+            setEditing(true);
+            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Escape") {
+              setTextValue(displayDMY);
+              setOpen(false);
+              e.currentTarget.blur();
+            }
+          }}
+          className="flex-1 min-w-0 bg-transparent outline-none placeholder:text-base-content/50"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          disabled={disabled}
+          onClick={openPopup}
+          className="flex-shrink-0 text-base-content/50 disabled:cursor-not-allowed"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        </button>
       </div>
 
       {open &&

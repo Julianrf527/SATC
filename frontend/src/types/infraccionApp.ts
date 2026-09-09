@@ -123,6 +123,40 @@ export type InformeTecnico = {
   proceso_activo: boolean;
   aceptado: boolean;
   modo: "FLUJO" | "MANUAL";
+  tiene_matriz?: boolean;
+  recursos_afectados?: FilaRecursoAfectado[] | null;
+};
+
+export type MiInforme = {
+  id: number;
+  expediente_id: number;
+  expediente_radicado: string | null;
+  tipo_informe: string;
+  modo: "FLUJO" | "MANUAL";
+  soy_profesional: boolean;
+  soy_revisor: boolean;
+  fecha_programacion_visita: string | null;
+  fecha_recibido_informe: string | null;
+  fecha_aceptacion_informe: string | null;
+  documento_informe_id: number | null;
+  docs_documento_id: number | null;
+  proceso_activo: boolean;
+  aceptado: boolean;
+  puede_diligenciar_matriz: boolean;
+  tiene_matriz: boolean;
+};
+
+export const RECURSOS_MATRIZ = [
+  "AIRE", "SUELO", "AGUA", "PAISAJE", "FLORA", "FAUNA", "RUIDO", "SOCIAL", "OTRO",
+] as const;
+
+export type RecursoMatriz = (typeof RECURSOS_MATRIZ)[number];
+
+export type FilaRecursoAfectado = {
+  recurso: RecursoMatriz;
+  magnitud: "LEVE" | "MODERADO" | "GRAVE" | null;
+  reversibilidad: "REVERSIBLE" | "IRREVERSIBLE" | null;
+  no_existe: boolean;
 };
 
 export type ProfesionalDisponible = {

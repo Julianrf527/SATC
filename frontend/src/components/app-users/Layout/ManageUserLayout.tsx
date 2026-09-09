@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Users } from "lucide-react";
-import { apiCall, API_CONFIG } from "../../../utils/api";
+import { apiCall, API_CONFIG, formatApiErrorDetail } from "../../../utils/api";
 import TableUsers from "../../app-users/Table/TableUsers";
 import CustomSelect from "../../Common/Form/CustomSelect";
+import EditUserModal from "../Modal/EditUserModal";
+import ConfirmResendPasswordModal from "../Modal/ConfirmResendPasswordModal";
 
 type User = {
   id: number;
@@ -11,6 +13,21 @@ type User = {
   email: string;
   rol_id: number;
   state: boolean;
+  primer_nombre: string;
+  segundo_nombre: string | null;
+  primer_apellido: string;
+  segundo_apellido: string | null;
+};
+
+type SaveData = {
+  document: number;
+  first_name: string;
+  middle_name: string;
+  lastname: string;
+  second_lastname: string;
+  email: string;
+  rol_id: number;
+  activo: boolean;
 };
 
 type Rol = { id: number; nombre: string };
@@ -33,6 +50,9 @@ export default function ManageUserLayout({ setToast }: Props) {
   const [emailFilter, setEmailFilter] = useState("");
   const [stateFilter, setStateFilter] = useState("all");
   const [roleFilter, setRoleFilter] = useState("all");
+
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [resendTarget, setResendTarget] = useState<User | null>(null);
 
   const buildFullName = (
     a: string,
@@ -67,6 +87,10 @@ export default function ManageUserLayout({ setToast }: Props) {
               email: u.correo,
               rol_id: u.rol_id,
               state: typeof u.state !== "undefined" ? u.state : false,
+              primer_nombre: u.primer_nombre,
+              segundo_nombre: u.segundo_nombre,
+              primer_apellido: u.primer_apellido,
+              segundo_apellido: u.segundo_apellido,
             })),
           );
         }
@@ -113,62 +137,79 @@ export default function ManageUserLayout({ setToast }: Props) {
     });
   }, [users, documentFilter, nameFilter, emailFilter, stateFilter, roleFilter]);
 
-  const toggleState = async (id: number) => {
+  const handleSaveEdit = async (id: number, data: SaveData) => {
     try {
-      const res = await apiCall(API_CONFIG.ENDPOINTS.USER_TOGGLE_STATE(id), {
+      const res = await apiCall(API_CONFIG.ENDPOINTS.USER_ADMIN_UPDATE(id), {
         method: "PATCH",
+        body: JSON.stringify(data),
       });
+
       if (res.ok) {
         setUsers((prev) =>
-          prev.map((u) => (u.id === id ? { ...u, state: !u.state } : u)),
+          prev.map((u) =>
+            u.id === id
+              ? {
+                  ...u,
+                  document: data.document,
+                  name: buildFullName(
+                    data.first_name,
+                    data.middle_name || null,
+                    data.lastname,
+                    data.second_lastname || null,
+                  ),
+                  email: data.email,
+                  rol_id: data.rol_id,
+                  state: data.activo,
+                  primer_nombre: data.first_name,
+                  segundo_nombre: data.middle_name || null,
+                  primer_apellido: data.lastname,
+                  segundo_apellido: data.second_lastname || null,
+                }
+              : u,
+          ),
         );
         setToast({
           id: Date.now(),
-          message: "Estado actualizado correctamente",
+          message: "Usuario actualizado correctamente",
           type: "success",
         });
       } else {
         setToast({
           id: Date.now(),
-          message: res.detail || res.msg || "No se pudo actualizar el estado",
+          message: formatApiErrorDetail(res.detail, res.msg || "No se pudo actualizar el usuario"),
           type: "error",
         });
       }
-    } catch {
-      setToast({
-        id: Date.now(),
-        message: "No se pudo actualizar el estado",
-        type: "error",
-      });
+    } catch (e) {
+      setToast({ id: Date.now(), message: "Error al actualizar el usuario", type: "error" });
+      throw e;
     }
   };
 
-  const toggleRol = async (id: number, newRol: number) => {
+  const handleResendPassword = async (id: number) => {
     try {
-      const res = await apiCall(
-        API_CONFIG.ENDPOINTS.USER_TOGGLE_ROLE(id, newRol),
-        { method: "PATCH" },
-      );
+      const res = await apiCall(API_CONFIG.ENDPOINTS.USER_RESEND_PASSWORD(id), {
+        method: "POST",
+      });
       if (res.ok) {
-        setUsers((prev) =>
-          prev.map((u) => (u.id === id ? { ...u, rol_id: newRol } : u)),
-        );
         setToast({
           id: Date.now(),
-          message: res.msg || "Rol actualizado correctamente",
-          type: "success",
+          message: res.email_sent
+            ? "Contraseña reenviada correctamente"
+            : "Contraseña actualizada, pero el envío del correo falló. Reintente el reenvío.",
+          type: res.email_sent ? "success" : "error",
         });
       } else {
         setToast({
           id: Date.now(),
-          message: res.detail || res.msg || "No se pudo actualizar el rol",
+          message: formatApiErrorDetail(res.detail, res.msg || "No se pudo reenviar la contraseña"),
           type: "error",
         });
       }
     } catch {
       setToast({
         id: Date.now(),
-        message: "No se pudo actualizar el rol",
+        message: "No se pudo reenviar la contraseña",
         type: "error",
       });
     }
@@ -367,11 +408,11 @@ export default function ManageUserLayout({ setToast }: Props) {
             <div className="card bg-base-100 shadow border border-base-300">
               <div className="card-body p-4">
                 <TableUsers
-                  titles={["Cédula", "Nombre", "Correo", "Rol", "Estado"]}
+                  titles={["Cédula", "Nombre", "Correo", "Rol", "Estado", "Acciones"]}
                   data={filteredUsers}
                   rolList={rolList}
-                  onToggleState={toggleState}
-                  onToggleRol={toggleRol}
+                  onEdit={(u) => setSelectedUser(u)}
+                  onResendPassword={(u) => setResendTarget(u)}
                 />
               </div>
             </div>
@@ -379,6 +420,19 @@ export default function ManageUserLayout({ setToast }: Props) {
         )}
         </div>
       </div>
+
+      <EditUserModal
+        user={selectedUser}
+        rolList={rolList}
+        onClose={() => setSelectedUser(null)}
+        onSave={handleSaveEdit}
+      />
+      <ConfirmResendPasswordModal
+        userName={resendTarget?.name ?? ""}
+        isOpen={!!resendTarget}
+        onClose={() => setResendTarget(null)}
+        onConfirm={() => resendTarget && handleResendPassword(resendTarget.id)}
+      />
     </>
   );
 }

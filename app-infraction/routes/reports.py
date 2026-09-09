@@ -1,7 +1,7 @@
 from fastapi import Request, APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, and_, func
+from sqlalchemy import select, update, and_, or_, func
 from datetime import datetime, date, timezone
 from zoneinfo import ZoneInfo
 
@@ -15,6 +15,7 @@ import os
 from db.deps import get_db_managed
 from db.models.informe_tecnico import InformeTecnico
 from db.models.informe_documento import InformeDocumento
+from db.models.informe_recurso_afectado import InformeRecursoAfectado, RECURSOS_MATRIZ
 from db.models.expediente import Expediente
 
 from core.permission import Permission
@@ -269,12 +270,12 @@ async def asignar_profesional(
     # Verificar que el profesional tiene el permiso correcto
     perm_profesional = await verify_permission(body.profesional_id, UPLOAD_REPORTS)
     if not perm_profesional:
-        raise HTTPException(status_code=400, detail="El usuario no tiene permiso de informes_subir")
+        raise HTTPException(status_code=400, detail="El usuario no tiene permiso de infraccion_informes_subir")
 
     # Verificar que el revisor tiene el permiso correcto
     perm_revisor = await verify_permission(body.revisor_id, REVIEW_REPORTS)
     if not perm_revisor:
-        raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de informes_revisar")
+        raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de infraccion_informes_revisar")
 
     if body.revisor_id == body.profesional_id:
         raise HTTPException(status_code=400, detail="El profesional y el revisor deben ser personas distintas")
@@ -366,12 +367,12 @@ async def reasignar_profesional(
     # Verificar permiso del nuevo profesional
     perm_profesional = await verify_permission(body.profesional_id, UPLOAD_REPORTS)
     if not perm_profesional:
-        raise HTTPException(status_code=400, detail="El usuario no tiene permiso de informes_subir")
+        raise HTTPException(status_code=400, detail="El usuario no tiene permiso de infraccion_informes_subir")
 
     # Verificar permiso del nuevo revisor
     perm_revisor = await verify_permission(body.revisor_id, REVIEW_REPORTS)
     if not perm_revisor:
-        raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de informes_revisar")
+        raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de infraccion_informes_revisar")
 
     if body.revisor_id == body.profesional_id:
         raise HTTPException(status_code=400, detail="El profesional y el revisor deben ser personas distintas")
@@ -773,11 +774,11 @@ async def cargue_manual_informe(
 
     if body.profesional_id is not None:
         if not await verify_permission(body.profesional_id, UPLOAD_REPORTS):
-            raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de informes_subir")
+            raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de infraccion_informes_subir")
 
     if body.revisor_id is not None:
         if not await verify_permission(body.revisor_id, REVIEW_REPORTS):
-            raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de informes_revisar")
+            raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de infraccion_informes_revisar")
 
     # Solo tocar el contador de uso si el archivo realmente cambió — reenviar
     # el mismo file_id (ej. edición que solo cambia fechas) no debe inflar el
@@ -818,8 +819,14 @@ async def obtener_proceso_documento(
     El frontend usa este ID para abrir DocumentoDetalleModal.
     """
     user_id = verify_gateway_token(request)["user_id"]
-    permisos = await verify_permission(user_id, ASSIGN_REPORTS)
-    if not permisos:
+
+    informe = await db.scalar(select(InformeTecnico).where(InformeTecnico.id == informe_id))
+    if not informe:
+        raise HTTPException(status_code=404, detail="Informe técnico no encontrado")
+
+    es_asignador = await verify_permission(user_id, ASSIGN_REPORTS)
+    es_involucrado = int(user_id) in (informe.profesional_asignado_id, informe.revisor_asignado_id)
+    if not (es_asignador or es_involucrado):
         raise HTTPException(status_code=403, detail="Sin permiso")
 
     informe_doc = await _get_active_informe_documento(db, informe_id)
@@ -832,3 +839,208 @@ async def obtener_proceso_documento(
         "docs_documento_id": informe_doc.docs_documento_id,
         "informe_doc_id": informe_doc.id,
     })
+
+
+# ─── GET /reports/mios ────────────────────────────────────────────────────────
+
+@router.get("/mios", status_code=200)
+async def obtener_mis_informes(
+    request: Request,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    """
+    Informes técnicos donde el usuario actual es el profesional asignado y/o
+    el revisor asignado — para la pestaña "Mis Informes" (sin necesidad de
+    ASSIGN_REPORTS, que es del líder que asigna, no de quien sube/revisa).
+    """
+    user_id = verify_gateway_token(request)["user_id"]
+
+    puede_subir = await verify_permission(user_id, UPLOAD_REPORTS)
+    puede_revisar = await verify_permission(user_id, REVIEW_REPORTS)
+    if not (puede_subir or puede_revisar):
+        raise HTTPException(status_code=403, detail="No tienes permiso para ver esta sección")
+
+    condiciones = []
+    if puede_subir:
+        condiciones.append(InformeTecnico.profesional_asignado_id == user_id)
+    if puede_revisar:
+        condiciones.append(InformeTecnico.revisor_asignado_id == user_id)
+
+    stmt = (
+        select(InformeTecnico)
+        .where(or_(*condiciones))
+        .order_by(InformeTecnico.fecha_creacion.desc())
+    )
+    informes = (await db.execute(stmt)).scalars().all()
+
+    expediente_ids = list({inf.expediente_id for inf in informes})
+    radicados_map: dict[int, str] = {}
+    if expediente_ids:
+        exp_result = await db.execute(
+            select(Expediente.id, Expediente.radicado).where(Expediente.id.in_(expediente_ids))
+        )
+        radicados_map = {row.id: row.radicado for row in exp_result.all()}
+
+    informe_ids = [inf.id for inf in informes]
+    informes_con_matriz: set = set()
+    if informe_ids:
+        filas_result = await db.execute(
+            select(InformeRecursoAfectado.informe_id)
+            .where(InformeRecursoAfectado.informe_id.in_(informe_ids))
+            .distinct()
+        )
+        informes_con_matriz = {row[0] for row in filas_result.all()}
+
+    data = []
+    for inf in informes:
+        informe_doc = await _get_active_informe_documento(db, inf.id)
+        data.append({
+            "id": inf.id,
+            "expediente_id": inf.expediente_id,
+            "expediente_radicado": radicados_map.get(inf.expediente_id),
+            "tipo_informe": inf.tipo_informe,
+            "modo": inf.modo,
+            "soy_profesional": inf.profesional_asignado_id == user_id,
+            "soy_revisor": inf.revisor_asignado_id == user_id,
+            "fecha_programacion_visita": _format_date(inf.fecha_programacion_visita),
+            "fecha_recibido_informe": _format_date(inf.fecha_recibido_informe),
+            "fecha_aceptacion_informe": _format_date(inf.fecha_aceptacion_informe),
+            "documento_informe_id": inf.documento_informe_id,
+            "docs_documento_id": informe_doc.docs_documento_id if informe_doc else None,
+            "proceso_activo": informe_doc is not None,
+            "aceptado": inf.fecha_aceptacion_informe is not None,
+            "puede_diligenciar_matriz": (
+                inf.tipo_informe == "VISITA"
+                and inf.fecha_aceptacion_informe is not None
+                and inf.profesional_asignado_id == user_id
+            ),
+            "tiene_matriz": inf.id in informes_con_matriz,
+        })
+
+    return JSONResponse(content={"ok": True, "data": data})
+
+
+# ─── Matriz de recursos afectados ─────────────────────────────────────────────
+
+async def _validar_permiso_matriz(informe: InformeTecnico, user_id: int) -> None:
+    if informe.tipo_informe != "VISITA":
+        raise HTTPException(status_code=400, detail="La matriz de recursos afectados solo aplica a informes de VISITA")
+    if informe.fecha_aceptacion_informe is None:
+        raise HTTPException(status_code=400, detail="El informe aún no ha sido aceptado")
+
+    if informe.profesional_asignado_id == user_id:
+        return
+
+    # El rol de cargue manual (infraccion_cargue) puede diligenciar la matriz
+    # directamente desde la etapa del expediente, pero solo si el informe
+    # también se cargó en modo manual — si fue por flujo, solo el profesional
+    # asignado la diligencia (desde "Mis Informes").
+    if informe.modo == "MANUAL" and await verify_permission(user_id, MANUAL_UPLOAD):
+        return
+
+    raise HTTPException(status_code=403, detail="No tienes permiso para diligenciar esta matriz")
+
+
+@router.get("/{informe_id}/recursos", status_code=200)
+async def obtener_matriz_recursos(
+    request: Request,
+    informe_id: int,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    user_id = verify_gateway_token(request)["user_id"]
+
+    informe = await db.scalar(select(InformeTecnico).where(InformeTecnico.id == informe_id))
+    if not informe:
+        raise HTTPException(status_code=404, detail="Informe técnico no encontrado")
+
+    if informe.tipo_informe != "VISITA" or informe.fecha_aceptacion_informe is None:
+        raise HTTPException(status_code=400, detail="La matriz de recursos afectados solo aplica a informes de VISITA ya aceptados")
+
+    if informe.profesional_asignado_id != user_id and informe.revisor_asignado_id != user_id:
+        es_asignador = await verify_permission(user_id, ASSIGN_REPORTS)
+        expediente = await db.scalar(select(Expediente).where(Expediente.id == informe.expediente_id))
+        es_responsable = expediente is not None and expediente.abogado_responsable_id == user_id
+        if not (es_asignador or es_responsable):
+            raise HTTPException(status_code=403, detail="Sin permiso para consultar esta matriz")
+
+    filas = (await db.execute(
+        select(InformeRecursoAfectado).where(InformeRecursoAfectado.informe_id == informe_id)
+    )).scalars().all()
+    filas_map = {f.recurso: f for f in filas}
+
+    data = [
+        {
+            "recurso": recurso,
+            "magnitud": filas_map[recurso].magnitud if recurso in filas_map else None,
+            "reversibilidad": filas_map[recurso].reversibilidad if recurso in filas_map else None,
+            "no_existe": filas_map[recurso].no_existe if recurso in filas_map else False,
+        }
+        for recurso in RECURSOS_MATRIZ
+    ]
+
+    return JSONResponse(content={"ok": True, "data": data})
+
+
+class FilaRecursoRequest(BaseModel):
+    recurso: str
+    magnitud: Optional[str] = None
+    reversibilidad: Optional[str] = None
+    no_existe: bool = False
+
+
+class MatrizRecursosRequest(BaseModel):
+    filas: list[FilaRecursoRequest]
+
+
+@router.put("/{informe_id}/recursos", status_code=200)
+async def actualizar_matriz_recursos(
+    request: Request,
+    informe_id: int,
+    body: MatrizRecursosRequest,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    user_id = verify_gateway_token(request)["user_id"]
+
+    informe = await db.scalar(select(InformeTecnico).where(InformeTecnico.id == informe_id))
+    if not informe:
+        raise HTTPException(status_code=404, detail="Informe técnico no encontrado")
+
+    await _validar_permiso_matriz(informe, user_id)
+
+    for fila in body.filas:
+        if fila.recurso not in RECURSOS_MATRIZ:
+            raise HTTPException(status_code=400, detail=f"Recurso inválido: {fila.recurso}")
+        if fila.magnitud and fila.magnitud not in ("LEVE", "MODERADO", "GRAVE"):
+            raise HTTPException(status_code=400, detail=f"Magnitud inválida: {fila.magnitud}")
+        if fila.reversibilidad and fila.reversibilidad not in ("REVERSIBLE", "IRREVERSIBLE"):
+            raise HTTPException(status_code=400, detail=f"Reversibilidad inválida: {fila.reversibilidad}")
+        if not fila.no_existe and not (fila.magnitud and fila.reversibilidad):
+            raise HTTPException(
+                status_code=400,
+                detail=f"El recurso {fila.recurso} debe marcar 'no existe' o tener magnitud y reversibilidad",
+            )
+
+    existentes = (await db.execute(
+        select(InformeRecursoAfectado).where(InformeRecursoAfectado.informe_id == informe_id)
+    )).scalars().all()
+    existentes_map = {f.recurso: f for f in existentes}
+
+    for fila in body.filas:
+        actual = existentes_map.get(fila.recurso)
+        if actual:
+            actual.magnitud = None if fila.no_existe else fila.magnitud
+            actual.reversibilidad = None if fila.no_existe else fila.reversibilidad
+            actual.no_existe = fila.no_existe
+        else:
+            db.add(InformeRecursoAfectado(
+                informe_id=informe_id,
+                recurso=fila.recurso,
+                magnitud=None if fila.no_existe else fila.magnitud,
+                reversibilidad=None if fila.no_existe else fila.reversibilidad,
+                no_existe=fila.no_existe,
+            ))
+
+    await db.commit()
+
+    logger.info(f"Matriz de recursos afectados actualizada para informe {informe_id} por usuario {user_id}")
+    return JSONResponse(content={"ok": True, "message": "Matriz de recursos afectados guardada correctamente"})

@@ -1,24 +1,29 @@
 import { useState, useEffect, useRef } from "react";
-import CustomSelect from "../../Common/Form/CustomSelect";
 
 type Rol = { id: number; nombre: string };
 
-type Props = {
-  titles: string[];
-  data: {
-    id: number;
-    document: number;
-    name: string;
-    email: string;
-    rol_id: number;
-    state: boolean;
-  }[];
-  rolList: Rol[];
-  onToggleState: (id: number) => void;
-  onToggleRol: (id: number, rol_id: number) => void;
+type UserRow = {
+  id: number;
+  document: number;
+  name: string;
+  email: string;
+  rol_id: number;
+  state: boolean;
+  primer_nombre: string;
+  segundo_nombre: string | null;
+  primer_apellido: string;
+  segundo_apellido: string | null;
 };
 
-export default function TableUsers({ titles, data, rolList, onToggleState, onToggleRol }: Props) {
+type Props = {
+  titles: string[];
+  data: UserRow[];
+  rolList: Rol[];
+  onEdit: (user: UserRow) => void;
+  onResendPassword: (user: UserRow) => void;
+};
+
+export default function TableUsers({ titles, data, rolList, onEdit, onResendPassword }: Props) {
   const [page, setPage] = useState(1);
   const rowsPerPage = 10;
   const paginatedData = data.slice((page - 1) * rowsPerPage, page * rowsPerPage);
@@ -31,6 +36,9 @@ export default function TableUsers({ titles, data, rolList, onToggleState, onTog
       prevDataLength.current = data.length;
     }
   }, [data.length]);
+
+  const rolNombre = (rolId: number) =>
+    rolList.find((r) => r.id === rolId)?.nombre ?? "—";
 
   return (
     <div className="flex flex-col gap-3">
@@ -60,30 +68,38 @@ export default function TableUsers({ titles, data, rolList, onToggleState, onTog
               paginatedData.map((user) => (
                 <tr key={user.id} className="hover">
                   <td className="select-text font-mono text-sm w-[12%]">{user.document}</td>
-                  <td className="select-text w-[25%]">{user.name}</td>
-                  <td className="select-text w-[25%]">{user.email}</td>
-                  <td className="w-[18%]">
-                    <CustomSelect
-                      className="select-sm"
-                      hidePlaceholderOption
-                      value={user.rol_id}
-                      onChange={(v) => onToggleRol(user.id, v)}
-                      options={rolList.map((r) => ({ value: r.id, label: r.nombre }))}
-                    />
+                  <td className="select-text w-[22%]">{user.name}</td>
+                  <td className="select-text w-[22%]">{user.email}</td>
+                  <td className="w-[15%]">{rolNombre(user.rol_id)}</td>
+                  <td className="w-[13%]">
+                    <span className={`badge badge-sm ${user.state ? "badge-success" : "badge-ghost"}`}>
+                      {user.state ? "Activo" : "Inactivo"}
+                    </span>
                   </td>
                   <td className="w-[20%]">
-                    <CustomSelect
-                      className="select-sm"
-                      hidePlaceholderOption
-                      value={user.state ? "activo" : "inactivo"}
-                      onChange={(v) => {
-                        if ((v === "activo") !== user.state) onToggleState(user.id);
-                      }}
-                      options={[
-                        { value: "activo", label: "Activo" },
-                        { value: "inactivo", label: "Inactivo" },
-                      ]}
-                    />
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => onEdit(user)}
+                        className="btn btn-xs btn-success text-white gap-1"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => onResendPassword(user)}
+                        className="btn btn-xs btn-warning text-white gap-1"
+                        title="Reenviar contraseña"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Reenviar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
