@@ -1,7 +1,7 @@
 class Permission:
     ASSIGN_REPORTS = "infraccion_asignar_informes"
-    UPLOAD_REPORTS = "informes_subir"
-    REVIEW_REPORTS = "informes_revisar"
+    UPLOAD_REPORTS = "infraccion_informes_subir"
+    REVIEW_REPORTS = "infraccion_informes_revisar"
     MANUAL_UPLOAD = "infraccion_cargue"
     ASSIGN_PERMISSION = "infraccion_asignar"
     FILE_MANAGE = "infraccion_gestionar"

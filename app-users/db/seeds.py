@@ -36,9 +36,9 @@ PERMISOS = [
     {"nombre": "infraccion_alertas", "menu_path": "/infraction/alerts"},
     {"nombre": "infraccion_asignar", "menu_path": "/infraction/assign_manage"},
     {"nombre": "infraccion_asignar_informes", "menu_path": "/infraction/reports"},
-    {"nombre": "informes_revisar", "menu_path": ""},
+    {"nombre": "infraccion_informes_revisar", "menu_path": "/infraction/my-reports"},
     {"nombre": "infraccion_cargue", "menu_path": ""},
-    {"nombre": "informes_subir", "menu_path": ""},
+    {"nombre": "infraccion_informes_subir", "menu_path": "/infraction/my-reports"},
 ]
 
 

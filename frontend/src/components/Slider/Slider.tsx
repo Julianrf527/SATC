@@ -28,8 +28,13 @@ const ordenInfracciones = [
   "alertas",
   "asignar",
   "asignar informes",
+  "mis informes",
   "involucrados",
 ];
+
+// informes_subir e informes_revisar apuntan al mismo path (/infraction/my-reports)
+// — si el usuario tiene ambos, deben colapsar en una sola entrada "Mis Informes".
+const NOMBRES_MIS_INFORMES = ["informes subir", "informes revisar"];
 
 export default function Slider({ permission = [] }: Props) {
   const menuFiltrado = menuBase
@@ -60,7 +65,19 @@ export default function Slider({ permission = [] }: Props) {
       }
 
       if (cat.prefix === "infraccion_") {
-        subMenuPermitido.sort((a, b) => {
+        const renombrado = subMenuPermitido.map((item) =>
+          NOMBRES_MIS_INFORMES.includes(item.name.toLowerCase())
+            ? { ...item, name: "Mis Informes" }
+            : item,
+        );
+        const seen = new Set<string>();
+        const sinDuplicados = renombrado.filter((item) => {
+          if (item.name !== "Mis Informes") return true;
+          if (seen.has(item.url)) return false;
+          seen.add(item.url);
+          return true;
+        });
+        sinDuplicados.sort((a, b) => {
           const nombreA = a.name.toLowerCase();
           const nombreB = b.name.toLowerCase();
           const indexA = ordenInfracciones.indexOf(nombreA);
@@ -73,6 +90,7 @@ export default function Slider({ permission = [] }: Props) {
           if (indexB !== -1) return 1;
           return 0;
         });
+        return { ...cat, subMenu: sinDuplicados };
       }
 
       return { ...cat, subMenu: subMenuPermitido };

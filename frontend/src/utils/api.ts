@@ -23,10 +23,9 @@ export const API_CONFIG = {
     // user route
     USER_REGISTER: "/users/user/register",
     USERS: "/users/user/all",
-    USER_TOGGLE_STATE: (user_id: number) =>
-      `/users/user/toggleState/${user_id}`,
-    USER_TOGGLE_ROLE: (user_id: number, rol_id: number) =>
-      `/users/user/toggleRol/${user_id}/${rol_id}`,
+    USER_ADMIN_UPDATE: (user_id: number) => `/users/user/${user_id}`,
+    USER_RESEND_PASSWORD: (user_id: number) =>
+      `/users/user/resend-password/${user_id}`,
     PASSWORD_CHANGE: "/users/user/password-change",
     USER_UPDATE: "/users/user/update-user",
     USER_LOG: "/users/user/log",
@@ -313,6 +312,9 @@ export const API_CONFIG = {
     INFRACTION_REPORTS_MANUAL_UPLOAD: (informe_id: number) =>
       `/infraction/informes/${informe_id}/manual-upload`,
     INFRACTION_REPORTS_DISPONIBLES: "/infraction/informes/disponibles",
+    INFRACTION_MIS_INFORMES: "/infraction/informes/mios",
+    INFRACTION_INFORME_RECURSOS: (informe_id: number) =>
+      `/infraction/informes/${informe_id}/recursos`,
   },
 };
 

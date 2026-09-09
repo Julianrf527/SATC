@@ -431,7 +431,7 @@ async def obtener_expediente_completo_por_expediente_id(
     expediente = (await db.execute(stmt)).mappings().first()
 
     if not expediente:
-        return JSONResponse(content={"ok": True, "data": []}, status_code=200)
+        raise HTTPException(status_code=404, detail="Expediente no encontrado")
 
     # Recursos afectados
     recursos_stmt = (

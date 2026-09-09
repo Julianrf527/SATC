@@ -6,6 +6,7 @@ import type { Municipio, ModeloGenerico } from "../../../types/common";
 import { useState, useEffect, lazy, Suspense } from "react";
 import { API_CONFIG, apiCall } from "../../../utils/api";
 import { downloadBlobFile } from "../../../utils/DownloadFile";
+import ErrorBoundary from "../../Common/ErrorBoundary";
 import "boxicons/css/boxicons.min.css";
 
 const InformacionExpediente = lazy(
@@ -384,18 +385,20 @@ export default function DetalleExpediente({
     };
 
     return (
-      <Suspense
-        fallback={
-          <div className="flex justify-center items-center py-20">
-            <div className="flex flex-col items-center gap-4">
-              <span className="loading loading-spinner loading-lg text-success"></span>
-              <p className="text-base-content/70">Cargando contenido...</p>
+      <ErrorBoundary key={activeTab}>
+        <Suspense
+          fallback={
+            <div className="flex justify-center items-center py-20">
+              <div className="flex flex-col items-center gap-4">
+                <span className="loading loading-spinner loading-lg text-success"></span>
+                <p className="text-base-content/70">Cargando contenido...</p>
+              </div>
             </div>
-          </div>
-        }
-      >
-        <Component {...commonProps} />
-      </Suspense>
+          }
+        >
+          <Component {...commonProps} />
+        </Suspense>
+      </ErrorBoundary>
     );
   };
 

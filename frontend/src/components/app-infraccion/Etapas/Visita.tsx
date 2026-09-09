@@ -2,7 +2,12 @@ import { apiCall, API_CONFIG } from "../../../utils/api";
 import type { InformeTecnico } from "../../../types/infraccionApp";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { openDocumentById } from "../../../utils/documentViewer";
+import { useAuth } from "../../../context/AuthContext";
 import CargueManualInforme from "./CargueManualInforme";
+import MatrizRecursosAfectadosView from "./MatrizRecursosAfectadosView";
+import MatrizRecursosAfectadosModal from "../Modal/MatrizRecursosAfectadosModal";
+
+const PERMISO_CARGUE = "infraccion_cargue";
 
 type Props = {
   expedienteId: number;
@@ -37,6 +42,11 @@ export default function VisitStage({
   );
   const [isCreable, setIsCreable] = useState(false);
   const [creableMsg, setCreableMsg] = useState<string | null>(null);
+  const [matrizModalOpen, setMatrizModalOpen] = useState(false);
+
+  const { user } = useAuth();
+  const tieneCarguePermiso =
+    !!isEditable && (user?.permisos ?? []).some((p) => p.name === PERMISO_CARGUE);
 
   const handleCreateStage = async () => {
     try {
@@ -307,6 +317,7 @@ export default function VisitStage({
   const aceptado = !!informeTecnico?.fecha_aceptacion_informe;
 
   return (
+    <>
     <div className="card bg-base-100 shadow-md border border-base-300">
       <div className="card-body">
         {/* HEADER */}
@@ -550,7 +561,63 @@ export default function VisitStage({
             />
           </div>
         )}
+
       </div>
     </div>
+
+    {informeTecnico && (
+      <div className="mt-4">
+        {aceptado && informeTecnico.tiene_matriz && informeTecnico.recursos_afectados ? (
+          <MatrizRecursosAfectadosView
+            filas={informeTecnico.recursos_afectados}
+            action={
+              tieneCarguePermiso && informeTecnico.modo === "MANUAL" ? (
+                <button
+                  onClick={() => setMatrizModalOpen(true)}
+                  className="btn btn-outline btn-sm"
+                >
+                  Editar matriz
+                </button>
+              ) : undefined
+            }
+          />
+        ) : aceptado && tieneCarguePermiso && informeTecnico.modo === "MANUAL" ? (
+          <div className="card bg-base-100 shadow-md border border-base-300">
+            <div className="card-body flex-row items-center justify-between gap-3">
+              <p className="text-sm text-base-content/70">
+                Aún no se ha diligenciado la matriz de recursos afectados.
+              </p>
+              <button
+                onClick={() => setMatrizModalOpen(true)}
+                className="btn btn-success text-white btn-sm"
+              >
+                Agregar matriz
+              </button>
+            </div>
+          </div>
+        ) : !aceptado && tieneCarguePermiso ? (
+          <div className="card bg-base-100 shadow-md border border-base-300">
+            <div className="card-body">
+              <p className="text-sm text-base-content/60">
+                Completa el informe para poder cargar la matriz de recursos afectados.
+              </p>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    )}
+
+    {matrizModalOpen && informeTecnico && (
+      <MatrizRecursosAfectadosModal
+        isOpen={matrizModalOpen}
+        onClose={() => {
+          setMatrizModalOpen(false);
+          fetchReport();
+        }}
+        informeId={informeTecnico.id}
+        setToast={setToast}
+      />
+    )}
+    </>
   );
 }

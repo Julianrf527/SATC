@@ -76,6 +76,8 @@ type Props = {
   documentoId: number;
   onUpdate: (accion?: "upload" | "revision") => void;
   setToast?: (toast: { id: number; message: string; type: "success" | "error" }) => void;
+  /** Solo lectura: oculta las acciones de subir/revisar aunque el usuario califique — usado desde pantallas donde solo se debe poder ver el proceso, no operarlo (esas acciones viven en "Mis Informes"). */
+  readOnly?: boolean;
 };
 
 const formatDate = (dateString: string) => {
@@ -101,6 +103,7 @@ export default function DocumentoDetalleModal({
   documentoId,
   onUpdate,
   setToast,
+  readOnly = false,
 }: Props) {
   const [documento, setDocumento] = useState<DocumentoCompleto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -294,6 +297,7 @@ export default function DocumentoDetalleModal({
   const sinVersiones = (documento?.versiones?.length ?? 0) === 0;
   // Puede subir: si fue rechazado (re-entrega) O si aún no hay ninguna versión (primera carga)
   const puedeSubirVersion =
+    !readOnly &&
     esCreador &&
     (documento?.estado === "rechazado" ||
       (documento?.estado === "en_revision" && sinVersiones));
@@ -305,6 +309,7 @@ export default function DocumentoDetalleModal({
   );
 
   const puedeRevisar =
+    !readOnly &&
     esRevisor &&
     documento?.estado === "en_revision" &&
     !yaRevisoVersionActual &&

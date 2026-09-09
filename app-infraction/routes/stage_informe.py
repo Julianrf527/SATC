@@ -19,6 +19,7 @@ from db.models.etapa_respuesta import EtapaRespuesta
 from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
 from db.models.etapa_cierre import EtapaCierre
 from db.models.informe_tecnico import InformeTecnico
+from db.models.informe_recurso_afectado import InformeRecursoAfectado, RECURSOS_MATRIZ
 from db.models.medida_preventiva import MedidaPreventiva
 from db.models.tipo_medida import TipoMedida
 from db.models.acto_administrativo import ActoAdministrativo
@@ -170,6 +171,25 @@ async def obtener_informe_tecnico(
             user_data = users.get(informe_tecnico.revisor_asignado_id)
             revisor_nombre = user_data.get("nombre") if user_data else None
 
+    tiene_matriz = False
+    recursos_afectados = None
+    if tipo_informe == "VISITA" and informe_tecnico.fecha_aceptacion_informe is not None:
+        filas = (await db.execute(
+            select(InformeRecursoAfectado).where(InformeRecursoAfectado.informe_id == informe_tecnico.id)
+        )).scalars().all()
+        if filas:
+            tiene_matriz = True
+            filas_map = {f.recurso: f for f in filas}
+            recursos_afectados = [
+                {
+                    "recurso": recurso,
+                    "magnitud": filas_map[recurso].magnitud if recurso in filas_map else None,
+                    "reversibilidad": filas_map[recurso].reversibilidad if recurso in filas_map else None,
+                    "no_existe": filas_map[recurso].no_existe if recurso in filas_map else True,
+                }
+                for recurso in RECURSOS_MATRIZ
+            ]
+
     return JSONResponse(
         content={
             "ok": True,
@@ -188,6 +208,8 @@ async def obtener_informe_tecnico(
                 "fecha_creacion": informe_tecnico.fecha_creacion.isoformat(),
                 "aceptado": informe_tecnico.fecha_aceptacion_informe is not None,
                 "modo": informe_tecnico.modo,
+                "tiene_matriz": tiene_matriz,
+                "recursos_afectados": recursos_afectados,
             },
             "message": "Informe técnico obtenido correctamente",
         },

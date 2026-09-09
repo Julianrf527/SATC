@@ -22,10 +22,12 @@ import ConsultaInfraccionLayout from "./components/app-infraccion/Layout/Consult
 import EncargadoInfraccionLayout from "./components/app-infraccion/Layout/EncargadoInfraccionLayout";
 import InfraccionLogLayout from "./components/app-infraccion/Layout/InfraccionLogLayout";
 import AsignarInformes from "./components/app-infraccion/Layout/AsignarInformes";
+import MisInformes from "./components/app-infraccion/Layout/MisInformes";
 import AlertasInfraccionLayout from "./components/app-infraccion/Layout/AlertasInfraccionLayout";
 import InvolucradoLogLayout from "./components/app-involved/Layout/InvolucradoLogLayout";
 import ManageInvolvedLayout from "./components/app-involved/Layout/ManageInvolvedLayout";
 import DocumentPage from "./components/app-documentos/layout/DocumentosPage";
+import ErrorBoundary from "./components/Common/ErrorBoundary";
 
 type RouteConfig = {
   path: string;
@@ -33,9 +35,9 @@ type RouteConfig = {
   props?: Record<string, any>;
 };
 
-const inferPermissionFromPath = (path: string): string => {
+const inferPermissionFromPath = (path: string): string | string[] => {
   // Las claves deben coincidir con los permisos sembrados en seeds.py del backend.
-  const pathToPermissionMap: Record<string, string> = {
+  const pathToPermissionMap: Record<string, string | string[]> = {
     // === ADMINISTRACIÓN ===
     "/user/role": "admin_roles_y_permisos",
     "/user/add": "admin_registrar_usuarios",
@@ -64,6 +66,7 @@ const inferPermissionFromPath = (path: string): string => {
     "/infraction/alerts": "infraccion_alertas",
     "/infraction/assign_manage": "infraccion_asignar",
     "/infraction/reports": "infraccion_asignar_informes",
+    "/infraction/my-reports": ["infraccion_informes_subir", "infraccion_informes_revisar"],
   };
 
   const permission = pathToPermissionMap[path];
@@ -155,6 +158,7 @@ function App() {
     { path: "/infraction/consult", component: ConsultaInfraccionLayout },
     { path: "/infraction/assign_manage", component: EncargadoInfraccionLayout },
     { path: "/infraction/reports", component: AsignarInformes },
+    { path: "/infraction/my-reports", component: MisInformes },
     { path: "/infraction/alerts", component: AlertasInfraccionLayout },
   ];
 
@@ -168,47 +172,51 @@ function App() {
           duration={4000}
         />
       )}
-      <BrowserRouter>
-        <Routes>
-          {/* páginas públicas */}
-          <Route path="/login" element={<LoginPage theme={theme} />} />
-          <Route path="/recover" element={<RecoverPage theme={theme} />} />
+      <ErrorBoundary>
+        <BrowserRouter>
+          <Routes>
+            {/* páginas públicas */}
+            <Route path="/login" element={<LoginPage theme={theme} />} />
+            <Route path="/recover" element={<RecoverPage theme={theme} />} />
 
-          {/* páginas privadas */}
-          <Route
-            path=""
-            element={<MainLayout setTheme={setTheme} setToast={setToast} />}
-          >
-            {/* página de inicio (sin restricciones) */}
-            <Route index element={<WelcomeLayout theme={theme} />} />
-
-            {/* perfil (sin restricciones) */}
+            {/* páginas privadas */}
             <Route
-              path="/profile"
-              element={<ProfileLayout setToast={setToast} />}
-            />
+              path=""
+              element={<MainLayout setTheme={setTheme} setToast={setToast} />}
+            >
+              {/* página de inicio (sin restricciones) */}
+              <Route index element={<WelcomeLayout theme={theme} />} />
 
-            {/* rutas protegidas con inferencia automática de permisos */}
-            {protectedRoutes.map((route) => (
+              {/* perfil (sin restricciones) */}
               <Route
-                key={route.path}
-                path={route.path}
-                element={
-                  <ProtectedRoute
-                    component={route.component}
-                    path={route.path}
-                    props={route.props}
-                    setToast={setToast}
-                  />
-                }
+                path="/profile"
+                element={<ProfileLayout setToast={setToast} />}
               />
-            ))}
-          </Route>
 
-          {/* cualquier ruta desconocida fuera de "/" redirige a main */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+              {/* rutas protegidas con inferencia automática de permisos */}
+              {protectedRoutes.map((route) => (
+                <Route
+                  key={route.path}
+                  path={route.path}
+                  element={
+                    <ErrorBoundary key={route.path}>
+                      <ProtectedRoute
+                        component={route.component}
+                        path={route.path}
+                        props={route.props}
+                        setToast={setToast}
+                      />
+                    </ErrorBoundary>
+                  }
+                />
+              ))}
+            </Route>
+
+            {/* cualquier ruta desconocida fuera de "/" redirige a main */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </ErrorBoundary>
     </div>
   );
 }

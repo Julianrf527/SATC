@@ -95,31 +95,128 @@ async def test_all_con_permiso_200(client, make_permiso, make_rol, make_usuario)
 
 
 @pytest.mark.asyncio
-async def test_toggle_state_sin_gestion_403(client, make_permiso, make_rol, make_usuario):
+async def test_admin_update_sin_gestion_403(client, make_permiso, make_rol, make_usuario):
     # Solo tiene PERMISO_USER, no GESTION_USER.
     p = await make_permiso(PERMISO_USER)
     rol = await make_rol("solo_crear", [p])
     admin = await make_usuario(rol_id=rol.id)
     objetivo = await make_usuario(rol_id=rol.id, correo="obj@test.com")
-    resp = await client.patch(f"/user/toggleState/{objetivo.id}", headers=gateway_headers(admin.id, rol.id))
+    resp = await client.patch(f"/user/{objetivo.id}", headers=gateway_headers(admin.id, rol.id), json={"activo": False})
     assert resp.status_code == 403
 
 
 @pytest.mark.asyncio
-async def test_toggle_state_usuario_inexistente_404(client, make_permiso, make_rol, make_usuario):
+async def test_admin_update_usuario_inexistente_404(client, make_permiso, make_rol, make_usuario):
     rol, _ = await _rol_admin(make_permiso, make_rol)
     admin = await make_usuario(rol_id=rol.id)
-    resp = await client.patch("/user/toggleState/99999", headers=gateway_headers(admin.id, rol.id))
+    resp = await client.patch("/user/99999", headers=gateway_headers(admin.id, rol.id), json={"activo": False})
     assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_toggle_state_exitoso(client, make_permiso, make_rol, make_usuario):
+async def test_admin_update_toggle_estado_exitoso(client, make_permiso, make_rol, make_usuario):
     rol, _ = await _rol_admin(make_permiso, make_rol)
     admin = await make_usuario(rol_id=rol.id)
     objetivo = await make_usuario(rol_id=rol.id, correo="obj2@test.com", activo=True)
-    resp = await client.patch(f"/user/toggleState/{objetivo.id}", headers=gateway_headers(admin.id, rol.id))
+    resp = await client.patch(f"/user/{objetivo.id}", headers=gateway_headers(admin.id, rol.id), json={"activo": False})
     assert resp.status_code == 200
+    assert resp.json()["data"]["activo"] is False
+
+
+@pytest.mark.asyncio
+async def test_admin_update_cambio_rol_exitoso(client, make_permiso, make_rol, make_usuario):
+    rol, _ = await _rol_admin(make_permiso, make_rol)
+    otro_rol = await make_rol("otro_rol")
+    admin = await make_usuario(rol_id=rol.id)
+    objetivo = await make_usuario(rol_id=rol.id, correo="obj3@test.com")
+    resp = await client.patch(f"/user/{objetivo.id}", headers=gateway_headers(admin.id, rol.id), json={"rol_id": otro_rol.id})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["rol_id"] == otro_rol.id
+
+
+@pytest.mark.asyncio
+async def test_admin_update_cambio_rol_escalada_403(client, make_permiso, make_rol, make_usuario):
+    p_gestion = await make_permiso(GESTION_USER)
+    p_extra = await make_permiso("permiso_poderoso")
+    rol_actor = await make_rol("gestor", [p_gestion])
+    rol_poderoso = await make_rol("poderoso", [p_gestion, p_extra])
+    admin = await make_usuario(rol_id=rol_actor.id)
+    objetivo = await make_usuario(rol_id=rol_actor.id, correo="obj4@test.com")
+    resp = await client.patch(f"/user/{objetivo.id}", headers=gateway_headers(admin.id, rol_actor.id), json={"rol_id": rol_poderoso.id})
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_admin_update_datos_exitoso(client, make_permiso, make_rol, make_usuario):
+    rol, _ = await _rol_admin(make_permiso, make_rol)
+    admin = await make_usuario(rol_id=rol.id)
+    objetivo = await make_usuario(rol_id=rol.id, correo="obj5@test.com", numero_documento=444555)
+    resp = await client.patch(f"/user/{objetivo.id}", headers=gateway_headers(admin.id, rol.id), json={
+        "first_name": "Nuevo", "lastname": "Apellido", "document": 444556, "email": "nuevo5@test.com",
+    })
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["primer_nombre"] == "Nuevo"
+    assert data["numero_documento"] == 444556
+    assert data["correo"] == "nuevo5@test.com"
+
+
+@pytest.mark.asyncio
+async def test_admin_update_documento_duplicado_de_otro_409(client, make_permiso, make_rol, make_usuario):
+    rol, _ = await _rol_admin(make_permiso, make_rol)
+    admin = await make_usuario(rol_id=rol.id)
+    await make_usuario(rol_id=rol.id, correo="ocupado@test.com", numero_documento=999888)
+    objetivo = await make_usuario(rol_id=rol.id, correo="obj6@test.com")
+    resp = await client.patch(f"/user/{objetivo.id}", headers=gateway_headers(admin.id, rol.id), json={"document": 999888})
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_admin_update_mismo_documento_propio_no_409(client, make_permiso, make_rol, make_usuario):
+    # Enviar el mismo documento que ya tiene el usuario no debe disparar 409.
+    rol, _ = await _rol_admin(make_permiso, make_rol)
+    admin = await make_usuario(rol_id=rol.id)
+    objetivo = await make_usuario(rol_id=rol.id, correo="obj7@test.com", numero_documento=333222)
+    resp = await client.patch(f"/user/{objetivo.id}", headers=gateway_headers(admin.id, rol.id), json={"document": 333222})
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_admin_update_sin_cambios_200(client, make_permiso, make_rol, make_usuario):
+    rol, _ = await _rol_admin(make_permiso, make_rol)
+    admin = await make_usuario(rol_id=rol.id)
+    objetivo = await make_usuario(rol_id=rol.id, correo="obj8@test.com")
+    resp = await client.patch(f"/user/{objetivo.id}", headers=gateway_headers(admin.id, rol.id), json={})
+    assert resp.status_code == 200
+    assert resp.json()["message"] == "No se realizaron cambios"
+
+
+@pytest.mark.asyncio
+async def test_resend_password_sin_gestion_403(client, make_permiso, make_rol, make_usuario):
+    p = await make_permiso(PERMISO_USER)
+    rol = await make_rol("solo_crear2", [p])
+    admin = await make_usuario(rol_id=rol.id)
+    objetivo = await make_usuario(rol_id=rol.id, correo="rp1@test.com")
+    resp = await client.post(f"/user/resend-password/{objetivo.id}", headers=gateway_headers(admin.id, rol.id))
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_resend_password_usuario_inexistente_404(client, make_permiso, make_rol, make_usuario):
+    rol, _ = await _rol_admin(make_permiso, make_rol)
+    admin = await make_usuario(rol_id=rol.id)
+    resp = await client.post("/user/resend-password/99999", headers=gateway_headers(admin.id, rol.id))
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_resend_password_exitoso_200(client, make_permiso, make_rol, make_usuario):
+    rol, _ = await _rol_admin(make_permiso, make_rol)
+    admin = await make_usuario(rol_id=rol.id)
+    objetivo = await make_usuario(rol_id=rol.id, correo="rp2@test.com")
+    resp = await client.post(f"/user/resend-password/{objetivo.id}", headers=gateway_headers(admin.id, rol.id))
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is True
 
 
 @pytest.mark.asyncio
