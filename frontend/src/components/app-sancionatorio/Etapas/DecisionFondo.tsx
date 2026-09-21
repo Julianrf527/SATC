@@ -255,9 +255,9 @@ export default function DecisionFondo({
       // Eliminar acto de recurso primero si existe
       if (existActoAdminRecurso && decisionData?.acto_admin_recurso?.id) {
         const resRecurso = await apiCall(
-          API_CONFIG.ENDPOINTS.FILE_ACTO_ADMIN_DELETE(
+          `${API_CONFIG.ENDPOINTS.FILE_ACTO_ADMIN_DELETE(
             decisionData.acto_admin_recurso.id,
-          ),
+          )}?expediente_id=${expedienteId}`,
           { method: "DELETE" },
         );
 
@@ -276,9 +276,9 @@ export default function DecisionFondo({
       // Ahora eliminar el acto de etapa
       if (decisionData?.acto_admin?.id) {
         const resEtapa = await apiCall(
-          API_CONFIG.ENDPOINTS.FILE_ACTO_ADMIN_DELETE(
+          `${API_CONFIG.ENDPOINTS.FILE_ACTO_ADMIN_DELETE(
             decisionData.acto_admin.id,
-          ),
+          )}?expediente_id=${expedienteId}`,
           { method: "DELETE" },
         );
 

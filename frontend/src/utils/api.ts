@@ -349,6 +349,7 @@ export const apiCall = async (
   // Se intercepta antes del parseo genérico: el 401 dispara logout y redirección.
   if (response.status === 401) {
     const data = await response.json().catch(() => ({}));
+    normalizeDetail(data);
     const yaEnLogin = window.location.pathname.startsWith("/login");
 
     document.cookie =
@@ -384,6 +385,7 @@ export const apiCall = async (
   // 403 se centraliza aquí para dar el mismo feedback en toda la app.
   if (response.status === 403) {
     const data = await response.json().catch(() => ({}));
+    normalizeDetail(data);
 
     toastService.showToast({
       id: Date.now(),
@@ -421,6 +423,7 @@ export const apiCall = async (
   }
 
   const data = await response.json().catch(() => ({}));
+  normalizeDetail(data);
 
   return {
     ok: response.ok,
@@ -428,6 +431,20 @@ export const apiCall = async (
     ...data,
   };
 };
+
+/**
+ * Normaliza `data.detail` in-place a un string legible. FastAPI devuelve
+ * errores de validación (422) como array de objetos Pydantic
+ * ([{type, loc, msg, input}]) — sin esto, código que hace
+ * `message: res.detail || "..."` termina mostrando ese JSON crudo en el
+ * toast. Se aplica una sola vez acá para no depender de que cada uno de los
+ * ~70 call sites recuerde envolverlo en formatApiErrorDetail.
+ */
+function normalizeDetail(data: Record<string, unknown>): void {
+  if (data && "detail" in data && typeof data.detail !== "string") {
+    data.detail = formatApiErrorDetail(data.detail, "Ocurrió un error inesperado.");
+  }
+}
 
 /** Extrae un mensaje legible de un valor atrapado en catch (tipo unknown). */
 export function getErrorMessage(e: unknown, fallback = "Error desconocido"): string {

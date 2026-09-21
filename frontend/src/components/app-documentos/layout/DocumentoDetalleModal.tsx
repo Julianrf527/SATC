@@ -19,7 +19,7 @@ import {
 import SubirVersionModal from "./SubirVersionModal";
 import RevisarDocumentoModal from "./RevisarDocumentoModal";
 
-type EstadoDocumento = "en_revision" | "aprobado" | "rechazado" | "finalizado";
+type EstadoDocumento = "en_revision" | "aprobado" | "aprobado_firma" | "rechazado" | "finalizado";
 
 type Version = {
   version_id: number;
@@ -60,6 +60,7 @@ type DocumentoCompleto = {
   descripcion?: string;
   tipo_archivo: string;
   estado: EstadoDocumento;
+  origen: string | null;
   version_actual: number;
   numero_devoluciones: number;
   fecha_creacion: string;
@@ -201,6 +202,11 @@ export default function DocumentoDetalleModal({
         icon: CheckCircle,
         text: "Aprobado",
       },
+      aprobado_firma: {
+        color: "bg-blue-500/20 text-blue-700 border-blue-500/30",
+        icon: CheckCircle,
+        text: "Aprobado para firma",
+      },
       rechazado: {
         color: "bg-red-500/20 text-red-700 border-red-500/30",
         icon: XCircle,
@@ -238,6 +244,8 @@ export default function DocumentoDetalleModal({
         return "Devuelto";
       case "aprobar":
         return "Aprobado";
+      case "aprobar_firma":
+        return "Aprobado para firma";
       case "actualizar":
         return "Actualizado";
       case "finalizar":
@@ -259,6 +267,8 @@ export default function DocumentoDetalleModal({
         return <XCircle className="text-red-500" size={16} />;
       case "aprobar":
         return <CheckCircle className="text-green-500" size={16} />;
+      case "aprobar_firma":
+        return <CheckCircle className="text-blue-500" size={16} />;
       case "actualizar":
         return <Clock className="text-purple-500" size={16} />;
       case "finalizar":
@@ -280,6 +290,8 @@ export default function DocumentoDetalleModal({
         return "border-red-500";
       case "aprobar":
         return "border-green-500";
+      case "aprobar_firma":
+        return "border-blue-500";
       case "actualizar":
         return "border-purple-500";
       case "finalizar":
@@ -295,11 +307,14 @@ export default function DocumentoDetalleModal({
     (r) => Number(r.revisor_id) === Number(usuarioActualId),
   );
   const sinVersiones = (documento?.versiones?.length ?? 0) === 0;
-  // Puede subir: si fue rechazado (re-entrega) O si aún no hay ninguna versión (primera carga)
+  // Puede subir: si fue rechazado (re-entrega), si aún no hay ninguna versión
+  // (primera carga), o (informe técnico) si está "aprobado para firma"
+  // (la firmada se auto-aprueba sin pasar de nuevo por revisión).
   const puedeSubirVersion =
     !readOnly &&
     esCreador &&
     (documento?.estado === "rechazado" ||
+      documento?.estado === "aprobado_firma" ||
       (documento?.estado === "en_revision" && sinVersiones));
 
   const yaRevisoVersionActual = documento?.revisiones.some(
@@ -409,7 +424,11 @@ export default function DocumentoDetalleModal({
                     className="btn btn-sm btn-primary gap-2"
                   >
                     <Upload size={16} />
-                    {sinVersiones ? "Subir Documento" : "Subir Nueva Versión"}
+                    {sinVersiones
+                      ? "Subir Documento"
+                      : documento.estado === "aprobado_firma"
+                        ? "Subir Versión Firmada"
+                        : "Subir Nueva Versión"}
                   </button>
                 )}
                 {puedeRevisar && (
@@ -640,6 +659,7 @@ export default function DocumentoDetalleModal({
           onClose={() => setShowRevisarModal(false)}
           documentoId={documento.documento_id}
           nombreDocumento={documento.nombre}
+          esInformeTecnico={documento.origen === "informe_tecnico"}
           onSuccess={handleRevisionRealizada}
         />
       )}

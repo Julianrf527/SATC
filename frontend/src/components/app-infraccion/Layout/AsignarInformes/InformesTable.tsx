@@ -121,7 +121,7 @@ export default function InformesTable({
                     </td>
                     <td>
                       <span
-                        className={`badge badge-sm ${inf.tipo_informe === "VISITA" ? "badge-info" : "badge-secondary"}`}
+                        className={`badge badge-sm text-white ${inf.tipo_informe === "VISITA" ? "badge-info" : "badge-secondary"}`}
                       >
                         {inf.tipo_informe || "—"}
                       </span>

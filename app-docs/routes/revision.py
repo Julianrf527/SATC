@@ -9,6 +9,7 @@ from services.notification import (
     notify_document_rejected,
     notify_document_approved,
     notify_document_finalized,
+    notify_document_approved_firma,
 )
 from services.users import get_users_by_permission, verify_permission
 from utils.verify_token import verify_gateway_token
@@ -31,13 +32,18 @@ logger = logging.getLogger(__name__)
 async def revisar_documento(
     request: Request,
     documento_id: int,
-    estado_revision: str = Form(...),  # 'aprobado' o 'devuelto'
+    estado_revision: str = Form(...),  # 'aprobado', 'aprobado_firma' o 'devuelto'
     comentarios: str = Form(None),
     db: AsyncSession = Depends(get_db_managed)
 ):
     """
-    Permite a un revisor asignado aprobar o devolver un documento.
-    A la 3ª devolución el documento pasa a 'finalizado'. Requiere PERMISO_REVISOR.
+    Permite a un revisor asignado aprobar, devolver, o (solo documentos del
+    flujo de informe técnico) aprobar para firma un documento. A la 3ª
+    devolución el documento pasa a 'finalizado'. Requiere PERMISO_REVISOR.
+
+    'aprobado_firma' no cierra el proceso: el creador debe subir la versión
+    firmada, la cual se auto-aprueba sin pasar de nuevo por revisión (ver
+    /upload-version).
     """
     token_data = verify_gateway_token(request)
     user_id = int(token_data["user_id"])
@@ -65,7 +71,10 @@ async def revisar_documento(
     if documento.estado != 'en_revision':
         raise HTTPException(status_code=400, detail="El documento no está en revisión")
 
-    if estado_revision not in ['aprobado', 'devuelto']:
+    valid_estados = ['aprobado', 'devuelto']
+    if documento.origen == 'informe_tecnico':
+        valid_estados.append('aprobado_firma')
+    if estado_revision not in valid_estados:
         raise HTTPException(status_code=400, detail="Estado de revisión inválido")
 
     db.add(Revision(
@@ -83,7 +92,17 @@ async def revisar_documento(
         await notify_document_approved(
             documento_id=documento_id,
             documento_nombre=documento.nombre,
-            creador_id=documento.usuario_creador_id
+            creador_id=documento.usuario_creador_id,
+            origen=documento.origen,
+        )
+    elif estado_revision == 'aprobado_firma':
+        documento.estado = 'aprobado_firma'
+        accion_auditoria = 'aprobar_firma'
+        mensaje = "Documento aprobado para firma, pendiente de subir versión firmada"
+        await notify_document_approved_firma(
+            documento_id=documento_id,
+            documento_nombre=documento.nombre,
+            creador_id=documento.usuario_creador_id,
         )
     else:  # devuelto
         documento.numero_devoluciones += 1
@@ -94,7 +113,8 @@ async def revisar_documento(
             await notify_document_finalized(
                 documento_id=documento_id,
                 documento_nombre=documento.nombre,
-                creador_id=documento.usuario_creador_id
+                creador_id=documento.usuario_creador_id,
+                origen=documento.origen,
             )
         else:
             documento.estado = 'rechazado'
@@ -104,7 +124,8 @@ async def revisar_documento(
                 documento_id=documento_id,
                 documento_nombre=documento.nombre,
                 creador_id=documento.usuario_creador_id,
-                numero_devoluciones=documento.numero_devoluciones
+                numero_devoluciones=documento.numero_devoluciones,
+                origen=documento.origen,
             )
 
     documento.fecha_ultima_actualizacion = datetime.now()
@@ -152,7 +173,7 @@ async def obtener_estadisticas(
             func.sum(case((Documento.estado == 'aprobado', 1), else_=0)).label('aprobados'),
             func.sum(case((Documento.estado == 'rechazado', 1), else_=0)).label('rechazados'),
             func.sum(case((Documento.estado == 'finalizado', 1), else_=0)).label('finalizados')
-        ).where(Documento.usuario_creador_id == user_id)
+        ).where(Documento.usuario_creador_id == user_id, Documento.origen.is_(None))
         row = (await db.execute(stmt)).one()
         stats["creador"] = {
             "total_creados": row.total_creados or 0,
@@ -170,14 +191,16 @@ async def obtener_estadisticas(
         stmt_docs = select(
             func.count(Documento.id).label('total_asignados'),
             func.sum(case((Documento.estado == 'en_revision', 1), else_=0)).label('pendientes')
-        ).where(Documento.id.in_(docs_asignados))
+        ).where(Documento.id.in_(docs_asignados), Documento.origen.is_(None))
         row_docs = (await db.execute(stmt_docs)).one()
 
         stmt_rev = select(
             func.count(Revision.id).label('total_revisiones'),
             func.sum(case((Revision.estado_revision == 'aprobado', 1), else_=0)).label('aprobados'),
             func.sum(case((Revision.estado_revision == 'devuelto', 1), else_=0)).label('devueltos')
-        ).where(Revision.revisor_id == user_id)
+        ).select_from(Revision).join(Documento, Documento.id == Revision.documento_id).where(
+            Revision.revisor_id == user_id, Documento.origen.is_(None)
+        )
         row_rev = (await db.execute(stmt_rev)).one()
 
         stats["revisor"] = {

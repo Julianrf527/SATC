@@ -136,6 +136,22 @@ export default function CargueManualInforme({
       });
       return;
     }
+    if (fechaAceptacion < fechaRecibido) {
+      setToast({
+        id: Date.now(),
+        message: "La fecha de aceptación no puede ser anterior a la fecha de recibido",
+        type: "error",
+      });
+      return;
+    }
+    if (profesionalId && profesionalId === revisorId) {
+      setToast({
+        id: Date.now(),
+        message: "El profesional y el revisor deben ser personas distintas",
+        type: "error",
+      });
+      return;
+    }
 
     setUploading(true);
     try {

@@ -72,18 +72,18 @@ async def find_stage_by_id(db: AsyncSession, etapa_id: int):
     return None, None, None
 
 
-async def get_expediente_con_permiso(db: AsyncSession, expediente_id: int, user_id: int):
-    """Verifica que el expediente existe y el usuario es el encargado.
-
-    Consulta combinada (id + encargado_id en el mismo WHERE): si no hay fila,
-    se lanza el mismo 403 tanto si el expediente no existe como si existe pero
-    no es del usuario. Evita que alguien sin acceso pueda distinguir, probando
-    IDs, cuáles expedientes existen realmente (403 se mantiene, no 404, para
-    no perder el toast de "sin permisos" que ya intercepta el frontend)."""
-    row = (await db.execute(
-        select(Expediente.id, Expediente.radicado, Expediente.encargado_id)
-        .where(Expediente.id == expediente_id, Expediente.encargado_id == user_id)
-    )).fetchone()
+async def get_expediente_con_permiso(
+    db: AsyncSession, expediente_id: int, user_id: int, require_owner: bool = True,
+):
+    """Verifica que el expediente existe y, si `require_owner`, que el usuario
+    es el encargado. 403 (no 404) en ambos casos para no distinguir "no existe"
+    de "no es tuyo"."""
+    stmt = select(Expediente.id, Expediente.radicado, Expediente.encargado_id).where(
+        Expediente.id == expediente_id
+    )
+    if require_owner:
+        stmt = stmt.where(Expediente.encargado_id == user_id)
+    row = (await db.execute(stmt)).fetchone()
     if not row:
         raise HTTPException(status_code=403, detail="Sin permisos sobre este expediente")
     return row

@@ -1,6 +1,7 @@
 export type EstadoDocumento =
   | "en_revision"
   | "aprobado"
+  | "aprobado_firma"
   | "rechazado"
   | "finalizado";
 
@@ -14,7 +15,7 @@ export type AccionAuditoria =
   | "asignar_revisor"
   | "finalizar";
 
-export type EstadoRevision = "aprobado" | "devuelto";
+export type EstadoRevision = "aprobado" | "aprobado_firma" | "devuelto";
 
 export interface DocumentoResumen {
   id: number;
@@ -69,6 +70,7 @@ export interface DocumentoCompleto {
   descripcion: string | null;
   tipo_archivo: TipoArchivo;
   estado: EstadoDocumento;
+  origen: string | null;
   version_actual: number;
   numero_devoluciones: number;
   fecha_creacion: string;

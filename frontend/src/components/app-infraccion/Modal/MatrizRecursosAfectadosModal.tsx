@@ -21,6 +21,7 @@ type Props = {
   onClose: () => void;
   informeId: number;
   setToast: (toast: { id: number; message: string; type: "success" | "error" }) => void;
+  onSaved?: () => void;
 };
 
 export default function MatrizRecursosAfectadosModal({
@@ -28,6 +29,7 @@ export default function MatrizRecursosAfectadosModal({
   onClose,
   informeId,
   setToast,
+  onSaved,
 }: Props) {
   const [filas, setFilas] = useState<FilaRecursoAfectado[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,6 +112,7 @@ export default function MatrizRecursosAfectadosModal({
       });
       if (res.ok) {
         setToast({ id: Date.now(), message: "Matriz de recursos afectados guardada", type: "success" });
+        onSaved?.();
         onClose();
       } else {
         setError(res.detail || "Error al guardar la matriz");
@@ -126,7 +129,7 @@ export default function MatrizRecursosAfectadosModal({
   return createPortal(
     <div
       data-theme={theme}
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4"
       onClick={onClose}
     >
       <div
@@ -152,7 +155,7 @@ export default function MatrizRecursosAfectadosModal({
 
         <div className="p-6 overflow-y-auto flex-1 space-y-4">
           {loading ? (
-            <div className="flex justify-center py-10">
+            <div className="flex justify-center items-center min-h-[26rem]">
               <span className="loading loading-spinner loading-md text-success" />
             </div>
           ) : (

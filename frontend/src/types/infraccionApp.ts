@@ -141,6 +141,7 @@ export type MiInforme = {
   documento_informe_id: number | null;
   docs_documento_id: number | null;
   proceso_activo: boolean;
+  estado_doc: "en_revision" | "rechazado" | "aprobado" | "aprobado_firma" | "finalizado" | null;
   aceptado: boolean;
   puede_diligenciar_matriz: boolean;
   tiene_matriz: boolean;

@@ -626,7 +626,7 @@ async def actualizar_encargado_de_expediente(
     # Crear notificación si se asignó un encargado
     if encargado_id != 0:
         notif_result = await create_notification(
-            mensaje=f"Se te ha asignado el expediente de infraccion {expediente.radicado}",
+            mensaje=f"Expediente {expediente.radicado}\nTe han asignado este expediente de infracción",
             id_vinculada=str(expediente_id),
             tipo="expediente",
             usuario_id=encargado_id
@@ -718,7 +718,7 @@ async def actualizar_encargado_bulk(
     if new_value:
         for expediente_actualizado in updated:
             await create_notification(
-                mensaje=f"Se te ha asignado el expediente de infraccion {expediente_actualizado['radicado']}",
+                mensaje=f"Expediente {expediente_actualizado['radicado']}\nTe han asignado este expediente de infracción",
                 id_vinculada=str(expediente_actualizado['id']),
                 tipo="expediente",
                 usuario_id=new_value
