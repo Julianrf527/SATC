@@ -43,6 +43,7 @@ from services.involved import get_involucrados_by_ids
 from services.docs import decrement_file_usage
 from services.etapas import build_acto_for_frontend as _build_acto_for_frontend
 from services.etapas import get_expediente_con_permiso
+from routes.reports import autosincronizar_informe
 from utils.log import insert_log
 from core.permission import Permission
 
@@ -69,6 +70,9 @@ async def obtener_informe_tecnico(
             InformeTecnico.tipo_informe == tipo_informe,
         )
     )
+
+    if informe_tecnico:
+        await autosincronizar_informe(db, informe_tecnico)
 
     if not informe_tecnico:
         creable = False

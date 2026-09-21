@@ -48,7 +48,8 @@ const TYPE_CONFIG: Record<string, {
   informe_tecnico: {
     label: "Informe",
     dotClass: "bg-warning",
-    hasRoute: false,
+    hasRoute: true,
+    route: () => "/infraction/my-reports",
   },
 };
 
@@ -105,9 +106,19 @@ function NotifRow({
             {cfg.label}
           </span>
         </div>
-        <p className="text-xs text-base-content/80 leading-relaxed">
-          {noti.mensaje}
-        </p>
+        {noti.mensaje.includes("\n") ? (
+          (() => {
+            const [primera, ...resto] = noti.mensaje.split("\n");
+            return (
+              <>
+                <p className="text-xs font-semibold text-base-content/90">{primera}</p>
+                <p className="text-xs text-base-content/70 leading-relaxed">{resto.join(" ")}</p>
+              </>
+            );
+          })()
+        ) : (
+          <p className="text-xs text-base-content/80 leading-relaxed">{noti.mensaje}</p>
+        )}
       </div>
 
       {/* actions */}

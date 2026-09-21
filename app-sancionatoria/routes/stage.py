@@ -321,7 +321,7 @@ ETAPAS: dict[str, EtapaConfig] = {
 
 
 async def _get_etapa(cfg: "EtapaConfig", db: AsyncSession, expediente_id: int, user_id: int):
-    await _get_expediente_con_permiso(db, expediente_id, user_id)
+    await _get_expediente_con_permiso(db, expediente_id, user_id, require_owner=False)
     etapa = await db.scalar(select(cfg.modelo).where(cfg.modelo.expediente_id == expediente_id))
     creable = await cfg.creable(db, expediente_id) if cfg.creable else None
     if not etapa:
@@ -475,7 +475,7 @@ async def actualizar_cesacion(request: Request, expediente_id: int, body: Option
 @router.get("/formulation/{expediente_id}")
 async def obtener_formulacion(request: Request, expediente_id: int, db: AsyncSession = Depends(get_db_managed)):
     user_id = verify_gateway_token(request)["user_id"]
-    await _get_expediente_con_permiso(db, expediente_id, user_id)
+    await _get_expediente_con_permiso(db, expediente_id, user_id, require_owner=False)
     etapa = await db.scalar(select(EtapaFormulacionCargos).where(EtapaFormulacionCargos.expediente_id == expediente_id))
     creable = await _creable_requiere_notif(
         db, EtapaInicioSancionatorio, expediente_id, "Inicio Proceso Sancionatorio",
@@ -613,7 +613,7 @@ async def actualizar_decision(request: Request, expediente_id: int, body: Option
 @router.get("/resource/{expediente_id}")
 async def obtener_recurso(request: Request, expediente_id: int, db: AsyncSession = Depends(get_db_managed)):
     user_id = verify_gateway_token(request)["user_id"]
-    await _get_expediente_con_permiso(db, expediente_id, user_id)
+    await _get_expediente_con_permiso(db, expediente_id, user_id, require_owner=False)
 
     decision = await db.scalar(select(EtapaDecisionFondo).where(EtapaDecisionFondo.expediente_id == expediente_id))
     recurso = await db.scalar(select(EtapaProbatoriaRecurso).where(EtapaProbatoriaRecurso.expediente_id == expediente_id))
@@ -701,7 +701,7 @@ class EjecucionBody(BaseModel):
 @router.get("/execution/{expediente_id}")
 async def obtener_ejecucion(request: Request, expediente_id: int, db: AsyncSession = Depends(get_db_managed)):
     user_id = verify_gateway_token(request)["user_id"]
-    await _get_expediente_con_permiso(db, expediente_id, user_id)
+    await _get_expediente_con_permiso(db, expediente_id, user_id, require_owner=False)
     etapa = await db.scalar(select(EtapaEjecucionSancion).where(EtapaEjecucionSancion.expediente_id == expediente_id))
     creable = await _creable_requiere_notif(
         db, EtapaDecisionFondo, expediente_id, "Decision de Fondo",

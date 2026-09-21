@@ -1,7 +1,7 @@
 from fastapi import Request, APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, and_, or_, func
+from sqlalchemy import select, update, delete, and_, or_, func
 from datetime import datetime, date, timezone
 from zoneinfo import ZoneInfo
 
@@ -190,7 +190,7 @@ async def obtener_informes_tecnicos(
         profesional_info = users.get(inf.profesional_asignado_id) if inf.profesional_asignado_id else None
         revisor_info = revisores.get(inf.revisor_asignado_id) if inf.revisor_asignado_id else None
 
-        # Proceso activo en app-docs
+        await autosincronizar_informe(db, inf)
         informe_doc = await _get_active_informe_documento(db, inf.id)
 
         data.append({
@@ -316,12 +316,11 @@ async def asignar_profesional(
     db.add(informe_doc)
     await db.commit()
 
-    # Notificar al profesional — tipo "documento" para que el botón navegue directo al doc
     try:
         await create_notification(
-            mensaje=f"Informe técnico de {informe.tipo_informe or 'VISITA'} asignado — expediente {expediente.radicado if expediente else informe.expediente_id}",
-            id_vinculada=str(docs_documento_id),
-            tipo="documento",
+            mensaje=f"Expediente {expediente.radicado if expediente else informe.expediente_id}\nInforme técnico de {informe.tipo_informe or 'VISITA'} asignado",
+            id_vinculada=str(informe_id),
+            tipo="informe_tecnico",
             usuario_id=body.profesional_id,
         )
     except Exception as e:
@@ -361,6 +360,9 @@ async def reasignar_profesional(
     if informe.modo != "FLUJO":
         raise HTTPException(status_code=400, detail="El informe está en modo de cargue manual, cambia el modo primero")
 
+    # Si el documento ya quedó aprobado en app-docs sin que nadie sincronizara
+    # (ej. versión firmada auto-aprobada), reasignar perdería esa aprobación.
+    await autosincronizar_informe(db, informe)
     if informe.fecha_aceptacion_informe is not None:
         raise HTTPException(status_code=400, detail="El informe ya fue aceptado, no se puede reasignar")
 
@@ -391,7 +393,7 @@ async def reasignar_profesional(
                 result_exp = await db.execute(select(Expediente).where(Expediente.id == informe.expediente_id))
                 expediente_prev = result_exp.scalar_one_or_none()
                 await create_notification(
-                    mensaje=f"Informe técnico reasignado — ya no eres responsable del expediente {expediente_prev.radicado if expediente_prev else informe.expediente_id}",
+                    mensaje=f"Expediente {expediente_prev.radicado if expediente_prev else informe.expediente_id}\nInforme técnico reasignado, ya no eres responsable",
                     id_vinculada=str(informe_id),
                     tipo="informe_tecnico",
                     usuario_id=informe.profesional_asignado_id,
@@ -436,12 +438,11 @@ async def reasignar_profesional(
     db.add(nuevo_informe_doc)
     await db.commit()
 
-    # Notificar al nuevo profesional — tipo "documento" para navegar directo al doc
     try:
         await create_notification(
-            mensaje=f"Informe técnico de {informe.tipo_informe or 'VISITA'} asignado — expediente {expediente.radicado if expediente else informe.expediente_id}",
-            id_vinculada=str(docs_documento_id),
-            tipo="documento",
+            mensaje=f"Expediente {expediente.radicado if expediente else informe.expediente_id}\nInforme técnico de {informe.tipo_informe or 'VISITA'} asignado",
+            id_vinculada=str(informe_id),
+            tipo="informe_tecnico",
             usuario_id=body.profesional_id,
         )
     except Exception as e:
@@ -479,7 +480,22 @@ async def _sincronizar_informe(
     Nota: el estado de "devuelto" en app-docs se llama 'rechazado' (ver
     app-docs/routes/revision.py) — antes se comparaba mal contra 'devuelto'
     y esta rama nunca se ejecutaba.
+
+    Las notificaciones de devuelto/aprobado al profesional las envía app-docs;
+    aquí solo se notifica lo que app-docs no sabe (abogado responsable, cierre
+    por 3 devoluciones).
     """
+    # Bloquea la fila del proceso: dos sincronizaciones simultáneas (etapa y
+    # "Mis Informes" abiertas a la vez) cerrarían el informe dos veces.
+    informe_doc = await db.scalar(
+        select(InformeDocumento)
+        .where(InformeDocumento.id == informe_doc.id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if informe_doc is None or not informe_doc.activo:
+        return {"ok": False, "message": "El proceso ya fue sincronizado", "estado": None}
+
     doc_detail = await get_doc_detail(informe_doc.docs_documento_id)
     if not doc_detail.get("ok"):
         return {"ok": False, "message": f"Error consultando app-docs: {doc_detail.get('message')}", "estado": None}
@@ -491,15 +507,6 @@ async def _sincronizar_informe(
     radicado = expediente.radicado if expediente else str(informe.expediente_id)
 
     if estado_doc == "rechazado":
-        try:
-            await create_notification(
-                mensaje=f"Informe técnico devuelto — expediente {radicado}, revisa observaciones",
-                id_vinculada=str(informe.id),
-                tipo="informe_tecnico",
-                usuario_id=informe.profesional_asignado_id,
-            )
-        except Exception as e:
-            logger.warning(f"Error notificando devolución al profesional: {e}")
         return {
             "ok": False,
             "message": "El documento fue devuelto. Se notificó al profesional.",
@@ -513,7 +520,7 @@ async def _sincronizar_informe(
         await db.commit()
         try:
             await create_notification(
-                mensaje=f"Informe técnico rechazado 3 veces — expediente {radicado}, reasignar",
+                mensaje=f"Expediente {radicado}\nInforme técnico rechazado 3 veces, reasignar",
                 id_vinculada=str(informe.id),
                 tipo="informe_tecnico",
                 usuario_id=informe.revisor_asignado_id or informe.profesional_asignado_id,
@@ -540,21 +547,23 @@ async def _sincronizar_informe(
     informe.fecha_aceptacion_informe = fecha_aprobacion or date.today()
     informe.fecha_recibido_informe = fecha_subida or fecha_aprobacion or date.today()
     file_hash_id = ultima_version.get("file_hash_id") if ultima_version else None
-    informe.documento_informe_id = file_hash_id or informe_doc.docs_documento_id
+    informe.documento_informe_id = file_hash_id
 
     informe_doc.activo = False
     await db.commit()
 
+    # El informe es un uso propio del archivo, aparte de la versión en
+    # app-docs; se descuenta al cambiar de modo (ver switch-mode).
+    if file_hash_id:
+        try:
+            await increment_file_usage([file_hash_id])
+        except Exception as e:
+            logger.warning(f"Error incrementando uso de archivo {file_hash_id}: {e}")
+
     try:
-        await create_notification(
-            mensaje=f"Informe técnico aceptado — expediente {radicado}",
-            id_vinculada=str(informe.id),
-            tipo="informe_tecnico",
-            usuario_id=informe.profesional_asignado_id,
-        )
         if expediente and expediente.abogado_responsable_id:
             await create_notification(
-                mensaje=f"Informe técnico aceptado — expediente {radicado}, disponible para revisión",
+                mensaje=f"Expediente {radicado}\nInforme técnico aceptado, disponible para revisión",
                 id_vinculada=str(informe.id),
                 tipo="informe_tecnico",
                 usuario_id=expediente.abogado_responsable_id,
@@ -570,6 +579,20 @@ async def _sincronizar_informe(
         "fecha_recibido": _format_date(informe.fecha_recibido_informe),
         "message": "Informe técnico actualizado como aceptado",
     }
+
+
+async def autosincronizar_informe(db: AsyncSession, informe: InformeTecnico) -> None:
+    """Cierra el informe si su proceso en app-docs ya terminó (aprobado o
+    finalizado) sin que nadie disparara /sync, ej. la versión firmada que se
+    auto-aprueba al subirla tras "aprobado para firma"."""
+    if informe.modo != "FLUJO" or informe.fecha_aceptacion_informe is not None:
+        return
+    informe_doc = await _get_active_informe_documento(db, informe.id)
+    if not informe_doc:
+        return
+    doc_detail = await get_doc_detail(informe_doc.docs_documento_id)
+    if doc_detail.get("ok") and doc_detail.get("estado") in ("aprobado", "finalizado"):
+        await _sincronizar_informe(db, informe, informe_doc)
 
 
 # ─── PUT /reports/{informe_id}/sync ──────────────────────────────────────────
@@ -639,7 +662,8 @@ async def sincronizar_informe_por_documento(
 
     es_asignador = await verify_permission(user_id, ASSIGN_REPORTS)
     es_revisor_asignado = informe.revisor_asignado_id is not None and int(informe.revisor_asignado_id) == int(user_id)
-    if not (es_asignador or es_revisor_asignado):
+    es_profesional_asignado = informe.profesional_asignado_id is not None and int(informe.profesional_asignado_id) == int(user_id)
+    if not (es_asignador or es_revisor_asignado or es_profesional_asignado):
         raise HTTPException(status_code=403, detail="No tienes permiso para sincronizar este informe")
 
     payload = await _sincronizar_informe(db, informe, informe_doc)
@@ -680,18 +704,11 @@ async def cambiar_modo_informe(
         return JSONResponse(content={"ok": True, "informe_id": informe_id, "modo": informe.modo, "message": "Ya estaba en ese modo"})
 
     if body.modo == "MANUAL":
-        # Viene de FLUJO: cerrar cualquier proceso de app-docs y liberar el archivo si ya se había subido.
+        # Viene de FLUJO: cerrar cualquier proceso de app-docs. Los archivos de
+        # sus versiones siguen siendo de app-docs (el documento no se borra),
+        # así que aquí solo se libera el uso propio del informe más abajo.
         informe_doc = await _get_active_informe_documento(db, informe_id)
         if informe_doc:
-            doc_detail = await get_doc_detail(informe_doc.docs_documento_id)
-            if doc_detail.get("ok"):
-                ultima_version = doc_detail.get("ultima_version")
-                file_hash_id = ultima_version.get("file_hash_id") if ultima_version else None
-                if file_hash_id:
-                    try:
-                        await decrement_file_usage([file_hash_id])
-                    except Exception as e:
-                        logger.warning(f"Error decrementando uso de archivo {file_hash_id}: {e}")
             finalize_result = await finalize_doc_as_rejected(informe_doc.docs_documento_id)
             if not finalize_result["ok"]:
                 logger.warning(f"No se pudo finalizar proceso {informe_doc.docs_documento_id}: {finalize_result.get('message')}")
@@ -710,6 +727,7 @@ async def cambiar_modo_informe(
         informe.fecha_aceptacion_informe = None
         informe.fecha_programacion_visita = None
         informe.modo = "MANUAL"
+        await db.execute(delete(InformeRecursoAfectado).where(InformeRecursoAfectado.informe_id == informe_id))
     else:
         # Viene de MANUAL: liberar el archivo cargado a mano, si lo hay.
         if informe.documento_informe_id:
@@ -725,6 +743,7 @@ async def cambiar_modo_informe(
         informe.profesional_asignado_id = None
         informe.revisor_asignado_id = None
         informe.modo = "FLUJO"
+        await db.execute(delete(InformeRecursoAfectado).where(InformeRecursoAfectado.informe_id == informe_id))
 
     await db.commit()
 
@@ -764,6 +783,12 @@ async def cargue_manual_informe(
         fecha_aceptacion = date.fromisoformat(body.fecha_aceptacion)
     except ValueError:
         raise HTTPException(status_code=400, detail="Formato de fecha inválido, debe ser YYYY-MM-DD")
+
+    if fecha_aceptacion < fecha_recibido:
+        raise HTTPException(status_code=400, detail="La fecha de aceptación no puede ser anterior a la fecha de recibido")
+
+    if body.profesional_id is not None and body.profesional_id == body.revisor_id:
+        raise HTTPException(status_code=400, detail="El profesional y el revisor deben ser personas distintas")
 
     fecha_programacion = None
     if body.fecha_programacion_visita:
@@ -894,6 +919,16 @@ async def obtener_mis_informes(
     data = []
     for inf in informes:
         informe_doc = await _get_active_informe_documento(db, inf.id)
+        estado_doc = None
+        if informe_doc:
+            doc_detail = await get_doc_detail(informe_doc.docs_documento_id)
+            if doc_detail.get("ok"):
+                estado_doc = doc_detail.get("estado")
+            if estado_doc in ("aprobado", "finalizado") and inf.fecha_aceptacion_informe is None:
+                await _sincronizar_informe(db, inf, informe_doc)
+                informe_doc = await _get_active_informe_documento(db, inf.id)
+                if informe_doc is None:
+                    estado_doc = None
         data.append({
             "id": inf.id,
             "expediente_id": inf.expediente_id,
@@ -908,6 +943,7 @@ async def obtener_mis_informes(
             "documento_informe_id": inf.documento_informe_id,
             "docs_documento_id": informe_doc.docs_documento_id if informe_doc else None,
             "proceso_activo": informe_doc is not None,
+            "estado_doc": estado_doc,
             "aceptado": inf.fecha_aceptacion_informe is not None,
             "puede_diligenciar_matriz": (
                 inf.tipo_informe == "VISITA"

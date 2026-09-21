@@ -12,6 +12,8 @@ import {
   Filter,
   RefreshCw,
   X,
+  Lock,
+  Minus,
 } from "lucide-react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import type { MiInforme } from "../../../types/infraccionApp";
@@ -30,25 +32,62 @@ const formatDate = (d: string | null) => {
   return `${day}/${month}/${year}`;
 };
 
+const ESTADO_CONFIG: Record<string, { label: string; className: string; Icon: typeof CheckCircle }> = {
+  aceptado: { label: "Aceptado", className: "text-success bg-success/10", Icon: CheckCircle },
+  aprobado: { label: "Aprobado", className: "text-success bg-success/10", Icon: CheckCircle },
+  aprobado_firma: { label: "Aprobado para firma, sube la versión firmada", className: "text-info bg-info/10", Icon: Clock },
+  rechazado: { label: "Devuelto", className: "text-error bg-error/10", Icon: AlertCircle },
+  finalizado: { label: "Finalizado (3 devoluciones)", className: "text-error bg-error/10", Icon: AlertCircle },
+  en_revision: { label: "Cargado, en revisión", className: "text-warning bg-warning/10", Icon: Clock },
+  sin_proceso: { label: "Sin proceso", className: "text-base-content/50 bg-base-200", Icon: AlertCircle },
+};
+
+const estadoKeyOf = (informe: MiInforme): string => {
+  if (informe.aceptado) return "aceptado";
+  if (informe.estado_doc) return informe.estado_doc;
+  return "sin_proceso";
+};
+
 const EstadoBadge = ({ informe }: { informe: MiInforme }) => {
-  if (informe.aceptado) {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs font-semibold text-success bg-success/10 px-2 py-0.5 rounded-full">
-        <CheckCircle size={12} /> Aceptado
-      </span>
-    );
-  }
-  if (informe.proceso_activo) {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning bg-warning/10 px-2 py-0.5 rounded-full">
-        <Clock size={12} /> En proceso
-      </span>
-    );
-  }
+  const cfg = ESTADO_CONFIG[estadoKeyOf(informe)] ?? ESTADO_CONFIG.sin_proceso;
+  const { Icon } = cfg;
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-semibold text-base-content/50 bg-base-200 px-2 py-0.5 rounded-full">
-      <AlertCircle size={12} /> Sin proceso
+    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.className}`}>
+      <Icon size={12} /> {cfg.label}
     </span>
+  );
+};
+
+const MatrizEstado = ({ icon: Icon, label, title }: { icon: typeof Lock; label: string; title?: string }) => (
+  <span
+    className="inline-flex items-center gap-1 text-xs text-base-content/40"
+    title={title}
+  >
+    <Icon size={12} /> {label}
+  </span>
+);
+
+const MatrizCell = ({ informe, onOpen }: { informe: MiInforme; onOpen: () => void }) => {
+  if (informe.tipo_informe !== "VISITA") {
+    return <MatrizEstado icon={Minus} label="No aplica" title="La matriz solo aplica a informes de visita" />;
+  }
+  if (!informe.aceptado) {
+    return <MatrizEstado icon={Lock} label="Bloqueada" title="Disponible cuando el informe sea aceptado" />;
+  }
+  if (informe.puede_diligenciar_matriz) {
+    return (
+      <button onClick={onOpen} className="btn btn-ghost btn-xs gap-1 text-success">
+        <Leaf size={13} />
+        {informe.tiene_matriz ? "Editar matriz" : "Diligenciar"}
+      </button>
+    );
+  }
+  return informe.tiene_matriz ? (
+    <span className="inline-flex items-center gap-1 text-xs text-success">
+      <CheckCircle size={12} /> Diligenciada
+    </span>
+  ) : (
+    <MatrizEstado icon={Clock} label="Pendiente" title="La diligencia el profesional asignado" />
   );
 };
 
@@ -72,8 +111,8 @@ export default function MisInformes({ setToast }: Props) {
     informeId: number | null;
   }>({ open: false, informeId: null });
 
-  const loadInformes = useCallback(async () => {
-    setLoading(true);
+  const loadInformes = useCallback(async (silencioso = false) => {
+    if (!silencioso) setLoading(true);
     try {
       const res = await apiCall(API_CONFIG.ENDPOINTS.INFRACTION_MIS_INFORMES, { method: "GET" });
       if (res.ok) {
@@ -121,14 +160,7 @@ export default function MisInformes({ setToast }: Props) {
             : rolFilter === "profesional"
               ? inf.soy_profesional
               : inf.soy_revisor;
-        const matchesEstado =
-          estadoFilter === "all"
-            ? true
-            : estadoFilter === "aceptado"
-              ? inf.aceptado
-              : estadoFilter === "en_proceso"
-                ? !inf.aceptado && inf.proceso_activo
-                : !inf.aceptado && !inf.proceso_activo;
+        const matchesEstado = estadoFilter === "all" ? true : estadoKeyOf(inf) === estadoFilter;
         return matchesRadicado && matchesTipo && matchesRol && matchesEstado;
       }),
     [informes, radicadoFilter, tipoFilter, rolFilter, estadoFilter],
@@ -164,7 +196,7 @@ export default function MisInformes({ setToast }: Props) {
                 </span>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={loadInformes}
+                    onClick={() => loadInformes()}
                     className="btn btn-ghost btn-xs gap-1"
                     disabled={loading}
                   >
@@ -231,7 +263,10 @@ export default function MisInformes({ setToast }: Props) {
                     options={[
                       { value: "all", label: "Todos" },
                       { value: "aceptado", label: "Aceptado" },
-                      { value: "en_proceso", label: "En proceso" },
+                      { value: "en_revision", label: "Cargado, en revisión" },
+                      { value: "aprobado_firma", label: "Aprobado para firma" },
+                      { value: "rechazado", label: "Devuelto" },
+                      { value: "finalizado", label: "Finalizado (3 devoluciones)" },
                       { value: "sin_proceso", label: "Sin proceso" },
                     ]}
                   />
@@ -264,7 +299,8 @@ export default function MisInformes({ setToast }: Props) {
                         <th className="text-xs">Modo</th>
                         <th className="text-xs">Fecha Aceptación</th>
                         <th className="text-xs">Estado</th>
-                        <th className="text-xs text-center">Acciones</th>
+                        <th className="text-xs text-center border-l border-base-300">Informe</th>
+                        <th className="text-xs text-center border-l border-base-300">Matriz</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -280,7 +316,7 @@ export default function MisInformes({ setToast }: Props) {
                             </button>
                           </td>
                           <td>
-                            <span className={`badge badge-sm ${inf.tipo_informe === "VISITA" ? "badge-info" : "badge-secondary"}`}>
+                            <span className={`badge badge-sm text-white ${inf.tipo_informe === "VISITA" ? "badge-info" : "badge-secondary"}`}>
                               {inf.tipo_informe}
                             </span>
                           </td>
@@ -295,39 +331,35 @@ export default function MisInformes({ setToast }: Props) {
                           <td>
                             <EstadoBadge informe={inf} />
                           </td>
-                          <td>
-                            <div className="flex items-center justify-center gap-1">
-                              {inf.aceptado && inf.documento_informe_id && (
-                                <button
-                                  onClick={() => openDocumentById(inf.documento_informe_id!)}
-                                  className="btn btn-ghost btn-xs gap-1 text-success"
-                                  title="Ver documento aceptado"
-                                >
-                                  <Download size={13} />
-                                  Ver doc
-                                </button>
-                              )}
-                              {inf.proceso_activo && inf.docs_documento_id && (
-                                <button
-                                  onClick={() =>
-                                    setDocsModal({ open: true, docsDocumentoId: inf.docs_documento_id })
-                                  }
-                                  className="btn btn-ghost btn-xs gap-1 text-info"
-                                >
-                                  <Eye size={13} />
-                                  Proceso
-                                </button>
-                              )}
-                              {inf.puede_diligenciar_matriz && (
-                                <button
-                                  onClick={() => setMatrizModal({ open: true, informeId: inf.id })}
-                                  className="btn btn-ghost btn-xs gap-1 text-success"
-                                >
-                                  <Leaf size={13} />
-                                  {inf.tiene_matriz ? "Editar matriz" : "Matriz"}
-                                </button>
-                              )}
-                            </div>
+                          <td className="text-center border-l border-base-200">
+                            {inf.aceptado && inf.documento_informe_id ? (
+                              <button
+                                onClick={() => openDocumentById(inf.documento_informe_id!)}
+                                className="btn btn-ghost btn-xs gap-1 text-success"
+                                title="Ver documento aceptado"
+                              >
+                                <Download size={13} />
+                                Ver doc
+                              </button>
+                            ) : inf.proceso_activo && inf.docs_documento_id ? (
+                              <button
+                                onClick={() =>
+                                  setDocsModal({ open: true, docsDocumentoId: inf.docs_documento_id })
+                                }
+                                className="btn btn-ghost btn-xs gap-1 text-info"
+                              >
+                                <Eye size={13} />
+                                Proceso
+                              </button>
+                            ) : (
+                              <span className="text-xs text-base-content/40">—</span>
+                            )}
+                          </td>
+                          <td className="text-center border-l border-base-200">
+                            <MatrizCell
+                              informe={inf}
+                              onOpen={() => setMatrizModal({ open: true, informeId: inf.id })}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -347,12 +379,12 @@ export default function MisInformes({ setToast }: Props) {
           documentoId={docsModal.docsDocumentoId}
           setToast={setToast}
           onUpdate={(accion) => {
-            if (accion === "revision" && docsModal.docsDocumentoId) {
+            if ((accion === "revision" || accion === "upload") && docsModal.docsDocumentoId) {
               apiCall(API_CONFIG.ENDPOINTS.INFRACTION_REPORTS_SYNC_BY_DOC(docsModal.docsDocumentoId), {
                 method: "PUT",
               }).catch(() => {});
             }
-            loadInformes();
+            loadInformes(true);
           }}
         />
       )}
@@ -360,10 +392,8 @@ export default function MisInformes({ setToast }: Props) {
       {matrizModal.open && matrizModal.informeId && (
         <MatrizRecursosAfectadosModal
           isOpen={matrizModal.open}
-          onClose={() => {
-            setMatrizModal({ open: false, informeId: null });
-            loadInformes();
-          }}
+          onClose={() => setMatrizModal({ open: false, informeId: null })}
+          onSaved={() => loadInformes(true)}
           informeId={matrizModal.informeId}
           setToast={setToast}
         />

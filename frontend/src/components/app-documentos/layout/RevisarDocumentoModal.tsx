@@ -1,13 +1,17 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { API_CONFIG, apiCall, formatApiErrorDetail } from "../../../utils/api";
-import { X, CheckCircle, XCircle, Eye } from "lucide-react";
+import { X, CheckCircle, XCircle, FileSignature, Eye } from "lucide-react";
+
+type EstadoRevision = "aprobado" | "aprobado_firma" | "devuelto";
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   documentoId: number;
   nombreDocumento: string;
+  /** Habilita la opción "Aprobar para firma", exclusiva del flujo de informe técnico. */
+  esInformeTecnico?: boolean;
   onSuccess: () => void;
 };
 
@@ -16,9 +20,10 @@ export default function RevisarDocumentoModal({
   onClose,
   documentoId,
   nombreDocumento,
+  esInformeTecnico = false,
   onSuccess,
 }: Props) {
-  const [estadoRevision, setEstadoRevision] = useState<"aprobado" | "devuelto">(
+  const [estadoRevision, setEstadoRevision] = useState<EstadoRevision>(
     "aprobado",
   );
   const [comentarios, setComentarios] = useState("");
@@ -173,7 +178,7 @@ export default function RevisarDocumentoModal({
             <label className="block text-sm font-medium text-base-content/70 mb-3">
               Decisión <span className="text-error">*</span>
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className={`grid gap-3 ${esInformeTecnico ? "grid-cols-3" : "grid-cols-2"}`}>
               <button
                 onClick={() => {
                   setEstadoRevision("aprobado");
@@ -211,6 +216,46 @@ export default function RevisarDocumentoModal({
                   </span>
                 </div>
               </button>
+
+              {esInformeTecnico && (
+                <button
+                  onClick={() => {
+                    setEstadoRevision("aprobado_firma");
+                    if (errors.comentarios) {
+                      setErrors((prev) => ({ ...prev, comentarios: "" }));
+                    }
+                  }}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    estadoRevision === "aprobado_firma"
+                      ? "border-blue-500 bg-blue-500/10"
+                      : "border-base-300 hover:border-blue-500/50"
+                  }`}
+                  disabled={isSubmitting}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <FileSignature
+                      className={
+                        estadoRevision === "aprobado_firma"
+                          ? "text-blue-600"
+                          : "text-base-content/40"
+                      }
+                      size={32}
+                    />
+                    <span
+                      className={`font-semibold ${
+                        estadoRevision === "aprobado_firma"
+                          ? "text-blue-600"
+                          : "text-base-content/60"
+                      }`}
+                    >
+                      Aprobar para firma
+                    </span>
+                    <span className="text-xs text-base-content/50 text-center">
+                      La versión firmada que suban se aprueba sola
+                    </span>
+                  </div>
+                </button>
+              )}
 
               <button
                 onClick={() => setEstadoRevision("devuelto")}
@@ -282,6 +327,29 @@ export default function RevisarDocumentoModal({
             )}
           </div>
 
+          {/* Advertencia si es aprobado para firma */}
+          {estadoRevision === "aprobado_firma" && (
+            <div className="alert alert-info">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="stroke-current shrink-0 h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span className="text-sm">
+                El creador debe subir la versión firmada, esa versión se
+                aprobará automáticamente, sin pasar de nuevo por revisión.
+              </span>
+            </div>
+          )}
+
           {/* Advertencia si es devolución */}
           {estadoRevision === "devuelto" && (
             <div className="alert alert-warning">
@@ -338,7 +406,11 @@ export default function RevisarDocumentoModal({
             <button
               onClick={handleSubmit}
               className={`btn ${
-                estadoRevision === "aprobado" ? "btn-success" : "btn-error"
+                estadoRevision === "aprobado"
+                  ? "btn-success"
+                  : estadoRevision === "aprobado_firma"
+                    ? "btn-info"
+                    : "btn-error"
               } text-white`}
               disabled={isSubmitting}
             >
@@ -347,19 +419,20 @@ export default function RevisarDocumentoModal({
                   <span className="loading loading-spinner loading-sm"></span>
                   Procesando...
                 </>
+              ) : estadoRevision === "aprobado" ? (
+                <>
+                  <CheckCircle size={18} />
+                  Aprobar Documento
+                </>
+              ) : estadoRevision === "aprobado_firma" ? (
+                <>
+                  <FileSignature size={18} />
+                  Aprobar para Firma
+                </>
               ) : (
                 <>
-                  {estadoRevision === "aprobado" ? (
-                    <>
-                      <CheckCircle size={18} />
-                      Aprobar Documento
-                    </>
-                  ) : (
-                    <>
-                      <XCircle size={18} />
-                      Devolver Documento
-                    </>
-                  )}
+                  <XCircle size={18} />
+                  Devolver Documento
                 </>
               )}
             </button>

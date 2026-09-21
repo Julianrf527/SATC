@@ -73,7 +73,8 @@ async def crear_documento_service(
                 documento_id=nuevo_documento.id,
                 documento_nombre=body.nombre,
                 revisor_id=revisor_id,
-                version_actual=1
+                version_actual=1,
+                origen=body.origen,
             )
         except Exception as e:
             logger.error(f"Error notificando revisor {revisor_id}: {e}")
