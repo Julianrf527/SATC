@@ -28,9 +28,8 @@ export default function PermissionSelector({
   onTogglePermission,
 }: Props) {
   return (
-    <div className="xl:col-span-2">
-      <div className="card bg-base-100 shadow-xl border border-base-300">
-        <div className="card-body">
+    <div className="xl:w-2/3 flex-1 min-h-0 flex flex-col">
+      <div className="p-6 flex flex-col flex-1 min-h-0">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-xl font-bold flex items-center gap-2">
               <svg
@@ -81,7 +80,7 @@ export default function PermissionSelector({
           <div className="divider my-2"></div>
 
           {/* Categorías de permisos */}
-          <div className="space-y-4 max-h-[600px] overflow-y-auto">
+          <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
             {categories.map((category) => {
               const categoryPerms = getFilteredPermissions(category.prefix);
               const selectedInCategory = categoryPerms.filter((p) =>
@@ -168,7 +167,6 @@ export default function PermissionSelector({
               );
             })}
           </div>
-        </div>
       </div>
     </div>
   );

@@ -6,8 +6,7 @@ from sqlalchemy import select, exists, insert, update
 from pydantic import BaseModel, EmailStr, validator
 from utils import emailUtil
 from dotenv import load_dotenv
-import string
-import random
+from typing import Optional
 import logging
 import os
 
@@ -34,7 +33,8 @@ logger = logging.getLogger(__name__)
 from utils.verify_token import verify_gateway_token
 from utils.permission_crud import get_role_permissions, get_permissions_by_rol_id
 from utils.insertLog import insert_auditoria
-from utils.passwords import hash_password
+from utils.passwords import hash_password, generate_temp_password
+from utils.redis_session import get_redis_client
 
 
 async def _get_user_perm_names(rol_id: int, db: AsyncSession) -> set[str]:
@@ -85,6 +85,53 @@ class User(BaseModel):
         if v <= 0:
             raise ValueError('Debe seleccionar un rol válido')
         return v
+
+
+class AdminUserUpdate(BaseModel):
+    """Actualización parcial: solo se aplican los campos que llegan (no None)."""
+    first_name: Optional[str] = None
+    middle_name: Optional[str] = None
+    lastname: Optional[str] = None
+    second_lastname: Optional[str] = None
+    document: Optional[int] = None
+    email: Optional[EmailStr] = None
+    rol_id: Optional[int] = None
+    activo: Optional[bool] = None
+
+    @validator('first_name', 'lastname')
+    def validate_required_names(cls, v):
+        """first_name/lastname, si llegan, no pueden llegar vacíos."""
+        if v is not None and not v.strip():
+            raise ValueError('Este campo no puede estar vacío')
+        return v
+
+    @validator('first_name', 'middle_name', 'lastname', 'second_lastname')
+    def validate_names(cls, v):
+        """Valida y limpia los nombres"""
+        if v:
+            v = v.strip()
+            if len(v) > 20:
+                raise ValueError('El nombre no puede exceder 20 caracteres')
+
+            if not all(c.isalpha() or c.isspace() for c in v):
+                raise ValueError('El nombre solo puede contener letras')
+        return v
+
+    @validator('document')
+    def validate_document(cls, v):
+        """Valida el documento"""
+        if v is None:
+            return v
+        if v < 100000:
+            raise ValueError('El documento debe tener al menos 6 dígitos')
+        if v > 9999999999:
+            raise ValueError('El documento no puede exceder 10 dígitos')
+        return v
+
+    @validator('email')
+    def validate_email_lowercase(cls, v):
+        """Convierte el email a minúsculas"""
+        return v.lower() if v else v
 
 # ---------- ENDPOINTS ----------
 
@@ -144,16 +191,7 @@ async def registrar_usuario(
     email = data.email.lower()
     rol = data.rol
 
-    mayuscula = random.choice(string.ascii_uppercase)
-    numeros = random.choices(string.digits, k=2)
-    simbolo = random.choice("!@#$%^&*()-_=+?¿¡[]{}<>")
-
-    restantes = 10 - (1 + 2 + 1)
-    otros = random.choices(string.ascii_letters + string.digits, k=restantes)
-
-    cont_list = list(mayuscula + "".join(numeros) + simbolo + "".join(otros))
-    random.shuffle(cont_list)
-    password_plain = "".join(cont_list)
+    password_plain = generate_temp_password()
     password_hashed = hash_password(password_plain)
 
     exist_doc = await db.execute(select(exists().where(Usuario.numero_documento == document)))
@@ -291,105 +329,124 @@ async def obtener_usuarios(
 
     return JSONResponse(content={"ok": True, "data": user_list}, status_code=200)
 
-@router.patch("/toggleState/{user_id}")
-async def actualizar_estado(
+@router.patch("/{user_id}")
+async def admin_actualizar_usuario(
     request: Request,
     user_id: int,
+    data: AdminUserUpdate,
     db: AsyncSession = Depends(get_db_managed),
 ):
+    """Actualización parcial de un usuario por un admin: documento, nombres, correo, rol y/o estado.
+    Solo se tocan los campos enviados y que realmente cambian (contraseña no se maneja aquí)."""
     token_data = verify_gateway_token(request)
     user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
 
     if GESTION_USER not in user_permission_names:
         raise HTTPException(
             status_code=403,
-            detail="No tiene permiso para actualizar el estado de los usuarios"
-        )
-
-    stmr = select(Usuario.activo, Usuario.numero_documento).where(Usuario.id == user_id)
-    result = await db.execute(stmr)
-    row = result.first()
-
-    if row is None:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-
-    current_state, numero_documento = row.activo, row.numero_documento
-
-    datos_anteriores = {"user_id": user_id, "numero_documento": numero_documento, "activo": current_state}
-
-    await db.execute(update(Usuario).where(Usuario.id == user_id).values(activo=not current_state))
-
-    datos_nuevos = {"user_id": user_id, "numero_documento": numero_documento, "activo": not current_state}
-
-    audit_result = await insert_auditoria(
-        db=db,
-        usuario_id=token_data["user_id"],
-        tipo_evento="DESACTIVACION" if current_state else "ACTIVACION",
-        resultado="EXITOSO",
-        detalle=f"Cambio de estado de usuario ID {user_id}: {current_state} → {not current_state}",
-        datos_anteriores=datos_anteriores,
-        datos_nuevos=datos_nuevos
-    )
-
-    if not audit_result["ok"]:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
-
-    await db.commit()
-    return JSONResponse({"ok": True}, status_code=200)
-
-@router.patch("/toggleRol/{user_id}/{rol_id}")
-async def actualizar_rol_usuario(
-    request: Request,
-    user_id: int,
-    rol_id: int,
-    db: AsyncSession = Depends(get_db_managed),
-):
-    token_data = verify_gateway_token(request)
-    user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
-
-    if GESTION_USER not in user_permission_names:
-        raise HTTPException(
-            status_code=403,
-            detail="No tiene permiso para actualizar el rol de los usuarios"
+            detail="No tiene permiso para editar los usuarios"
         )
 
     usuario = await db.scalar(select(Usuario).where(Usuario.id == user_id))
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    rol_exists = await db.scalar(select(exists().where(Rol.id == rol_id)))
-    if not rol_exists:
-        raise HTTPException(status_code=404, detail="El rol seleccionado no existe")
+    def capitalize_name(name: str) -> str:
+        return name.strip().capitalize() if name else ""
 
-    # Anti escalada: no se puede asignar un rol con permisos que el actor no tiene.
-    user_permissions = await get_role_permissions(token_data["rol_id"], db)
-    role_permissions = await get_role_permissions(rol_id, db)
-    permisos_no_autorizados = role_permissions - user_permissions
+    valores = {}
+    datos_anteriores = {}
+    datos_nuevos = {}
 
-    if permisos_no_autorizados:
-        stmt_names = select(Permiso.nombre).where(Permiso.id.in_(permisos_no_autorizados))
-        result_names = await db.execute(stmt_names)
-        nombres = result_names.scalars().all()
-        raise HTTPException(
-            status_code=403,
-            detail=f"No puede asignar un rol con permisos que no posee: {', '.join(nombres)}"
-        )
+    if data.rol_id is not None and data.rol_id != usuario.rol_id:
+        rol_exists = await db.scalar(select(exists().where(Rol.id == data.rol_id)))
+        if not rol_exists:
+            raise HTTPException(status_code=404, detail="El rol seleccionado no existe")
 
-    datos_anteriores = {"user_id": user_id, "rol_id": usuario.rol_id}
+        # Anti escalada: no se puede asignar un rol con permisos que el actor no tiene.
+        user_permissions = await get_role_permissions(token_data["rol_id"], db)
+        role_permissions = await get_role_permissions(data.rol_id, db)
+        permisos_no_autorizados = role_permissions - user_permissions
+        if permisos_no_autorizados:
+            stmt_names = select(Permiso.nombre).where(Permiso.id.in_(permisos_no_autorizados))
+            result_names = await db.execute(stmt_names)
+            nombres = result_names.scalars().all()
+            raise HTTPException(
+                status_code=403,
+                detail=f"No puede asignar un rol con permisos que no posee: {', '.join(sorted(nombres))}"
+            )
 
-    await db.execute(update(Usuario).where(Usuario.id == user_id).values(rol_id=rol_id))
+        valores["rol_id"] = data.rol_id
+        datos_anteriores["rol_id"] = usuario.rol_id
+        datos_nuevos["rol_id"] = data.rol_id
 
-    datos_nuevos = {"user_id": user_id, "rol_id": rol_id}
+    if data.activo is not None and data.activo != usuario.activo:
+        valores["activo"] = data.activo
+        datos_anteriores["activo"] = usuario.activo
+        datos_nuevos["activo"] = data.activo
+
+    if data.document is not None and data.document != usuario.numero_documento:
+        exist_doc = await db.scalar(select(exists().where(
+            Usuario.numero_documento == data.document, Usuario.id != user_id
+        )))
+        if exist_doc:
+            raise HTTPException(status_code=409, detail="El número de documento ya está registrado")
+        valores["numero_documento"] = data.document
+        datos_anteriores["numero_documento"] = usuario.numero_documento
+        datos_nuevos["numero_documento"] = data.document
+
+    if data.email is not None and data.email.lower() != usuario.correo:
+        email = data.email.lower()
+        exist_email = await db.scalar(select(exists().where(
+            Usuario.correo == email, Usuario.id != user_id
+        )))
+        if exist_email:
+            raise HTTPException(status_code=409, detail="El correo electrónico ya está registrado")
+        valores["correo"] = email
+        datos_anteriores["correo"] = usuario.correo
+        datos_nuevos["correo"] = email
+
+    if data.first_name is not None:
+        first_name = capitalize_name(data.first_name)
+        if first_name != usuario.primer_nombre:
+            valores["primer_nombre"] = first_name
+            datos_anteriores["primer_nombre"] = usuario.primer_nombre
+            datos_nuevos["primer_nombre"] = first_name
+
+    if data.lastname is not None:
+        lastname = capitalize_name(data.lastname)
+        if lastname != usuario.primer_apellido:
+            valores["primer_apellido"] = lastname
+            datos_anteriores["primer_apellido"] = usuario.primer_apellido
+            datos_nuevos["primer_apellido"] = lastname
+
+    if data.middle_name is not None:
+        middle_name = capitalize_name(data.middle_name) or None
+        if middle_name != usuario.segundo_nombre:
+            valores["segundo_nombre"] = middle_name
+            datos_anteriores["segundo_nombre"] = usuario.segundo_nombre
+            datos_nuevos["segundo_nombre"] = middle_name
+
+    if data.second_lastname is not None:
+        second_lastname = capitalize_name(data.second_lastname) or None
+        if second_lastname != usuario.segundo_apellido:
+            valores["segundo_apellido"] = second_lastname
+            datos_anteriores["segundo_apellido"] = usuario.segundo_apellido
+            datos_nuevos["segundo_apellido"] = second_lastname
+
+    if not valores:
+        return JSONResponse({"ok": True, "message": "No se realizaron cambios"}, status_code=200)
+
+    await db.execute(update(Usuario).where(Usuario.id == user_id).values(**valores))
 
     audit_result = await insert_auditoria(
         db=db,
         usuario_id=token_data["user_id"],
-        tipo_evento="CAMBIO_ROL",
+        tipo_evento="EDICION_USUARIO",
         resultado="EXITOSO",
-        detalle=f"Cambio de rol del usuario ID {user_id}: {usuario.rol_id} → {rol_id}",
+        detalle=f"Edición administrativa del usuario ID {user_id}: {', '.join(valores.keys())}",
         datos_anteriores=datos_anteriores,
-        datos_nuevos=datos_nuevos
+        datos_nuevos=datos_nuevos,
     )
 
     if not audit_result["ok"]:
@@ -397,4 +454,96 @@ async def actualizar_rol_usuario(
         raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
 
     await db.commit()
-    return JSONResponse({"ok": True, "msg": "Rol actualizado correctamente"}, status_code=200)
+
+    return JSONResponse({
+        "ok": True,
+        "message": "Usuario actualizado correctamente",
+        "data": datos_nuevos,
+    }, status_code=200)
+
+@router.post("/resend-password/{user_id}")
+async def reenviar_contrasena(
+    request: Request,
+    user_id: int,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    token_data = verify_gateway_token(request)
+    user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
+
+    if GESTION_USER not in user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permiso para reenviar contraseñas"
+        )
+
+    usuario = await db.scalar(select(Usuario).where(Usuario.id == user_id))
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    password_plain = generate_temp_password()
+    password_hashed = hash_password(password_plain)
+
+    await db.execute(update(Usuario).where(Usuario.id == user_id).values(hash_contrasena=password_hashed))
+
+    # La contraseña cambió: se invalida la sesión activa para forzar reingreso.
+    r = get_redis_client()
+    if r:
+        await r.delete(f"session:user:{user_id}")
+    else:
+        logger.warning("Redis no disponible, no se pudo eliminar sesión tras reenvío de contraseña")
+
+    full_name = f"{usuario.primer_nombre} {usuario.primer_apellido}"
+
+    audit_result = await insert_auditoria(
+        db=db,
+        usuario_id=token_data["user_id"],
+        tipo_evento="REENVIO_CONTRASENA",
+        resultado="EXITOSO",
+        detalle=f"Reenvío de contraseña temporal para usuario ID {user_id} ({full_name}), iniciado por administrador",
+        datos_nuevos={"user_id": user_id, "correo": usuario.correo},
+    )
+
+    if not audit_result["ok"]:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
+
+    await db.commit()
+
+    email_sent = True
+    try:
+        message = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <p>Hola <strong>{full_name}</strong>,</p>
+            <p>Un administrador ha generado una nueva contraseña temporal para tu cuenta. A continuación la encontrarás:</p>
+            <div style="background: #f0f0f0; padding: 15px; border-radius: 5px; text-align: center; margin: 20px 0;">
+                <p style="font-size: 18px; font-weight: bold; color: #2c3e50; letter-spacing: 2px; margin: 0;">
+                    {password_plain}
+                </p>
+            </div>
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 20px 0;">
+                <p style="margin: 0; color: #856404;">
+                    <strong>⚠️ Importante:</strong> Por tu seguridad, debes cambiar esta contraseña inmediatamente al iniciar sesión.
+                </p>
+            </div>
+            <p>Tu sesión activa fue cerrada por este cambio.</p>
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+            <p style="color: #7f8c8d; font-size: 12px;">
+                Este es un mensaje automático, por favor no responder a este correo.
+            </p>
+        </div>
+        """
+        await emailUtil.sendEmail(
+            "Contraseña temporal reenviada",
+            message,
+            usuario.correo,
+            "Contraseña Temporal Reenviada"
+        )
+    except Exception as e:
+        email_sent = False
+        logger.warning(f"No se pudo reenviar el email de contraseña temporal a {usuario.correo}: {str(e)}")
+
+    return JSONResponse({
+        "ok": True,
+        "email_sent": email_sent,
+        "message": "Contraseña reenviada correctamente" if email_sent else "Contraseña actualizada, pero el envío del correo falló",
+    }, status_code=200)

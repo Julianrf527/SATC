@@ -3,14 +3,23 @@ import { createPortal } from "react-dom";
 import { X, UserCheck, Calendar } from "lucide-react";
 import type { ProfesionalDisponible } from "../../../types/infraccionApp";
 import { getErrorMessage } from "../../../utils/api";
+import CustomSelect from "../../Common/Form/CustomSelect";
+import CustomDateInput from "../../Common/Form/CustomDateInput";
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (profesionalId: number, fechaProgramacion: string) => Promise<void>;
+  onSubmit: (
+    profesionalId: number,
+    revisorId: number,
+    fechaProgramacion: string,
+  ) => Promise<void>;
   profesionales: ProfesionalDisponible[];
+  revisores: ProfesionalDisponible[];
   /** Si es reasignación, pasar el profesional actual para mostrarlo */
   profesionalActualId?: number | null;
+  /** Si es reasignación, pasar el revisor actual para mostrarlo */
+  revisorActualId?: number | null;
   /** Fecha de programación actual */
   fechaProgramacionActual?: string | null;
   isReassign?: boolean;
@@ -21,11 +30,14 @@ export default function AsignarProfesionalModal({
   onClose,
   onSubmit,
   profesionales,
+  revisores,
   profesionalActualId,
+  revisorActualId,
   fechaProgramacionActual,
   isReassign = false,
 }: Props) {
   const [profesionalId, setProfesionalId] = useState<number | "">("");
+  const [revisorId, setRevisorId] = useState<number | "">("");
   const [fechaProgramacion, setFechaProgramacion] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -34,11 +46,12 @@ export default function AsignarProfesionalModal({
   useEffect(() => {
     if (isOpen) {
       setProfesionalId(profesionalActualId ?? "");
+      setRevisorId(revisorActualId ?? "");
       setFechaProgramacion(fechaProgramacionActual ?? "");
       setError("");
       setSubmitting(false);
     }
-  }, [isOpen, profesionalActualId, fechaProgramacionActual]);
+  }, [isOpen, profesionalActualId, revisorActualId, fechaProgramacionActual]);
 
   useEffect(() => {
     const update = () => {
@@ -57,10 +70,18 @@ export default function AsignarProfesionalModal({
       setError("Selecciona un profesional");
       return;
     }
+    if (!revisorId) {
+      setError("Selecciona un revisor");
+      return;
+    }
+    if (revisorId === profesionalId) {
+      setError("El profesional y el revisor deben ser personas distintas");
+      return;
+    }
     setError("");
     setSubmitting(true);
     try {
-      await onSubmit(Number(profesionalId), fechaProgramacion);
+      await onSubmit(Number(profesionalId), Number(revisorId), fechaProgramacion);
       onClose();
     } catch (e) {
       setError(getErrorMessage(e, "Error al asignar el profesional"));
@@ -120,19 +141,27 @@ export default function AsignarProfesionalModal({
             <label className="label py-1">
               <span className="label-text font-medium">Profesional <span className="text-error">*</span></span>
             </label>
-            <select
-              className="select select-bordered w-full"
-              value={profesionalId}
-              onChange={(e) => setProfesionalId(e.target.value === "" ? "" : Number(e.target.value))}
+            <CustomSelect
+              value={profesionalId === "" ? 0 : profesionalId}
+              onChange={(v) => setProfesionalId(v === 0 ? "" : v)}
+              placeholder="Seleccionar profesional..."
               disabled={submitting}
-            >
-              <option value="">Seleccionar profesional...</option>
-              {profesionales.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nombre}
-                </option>
-              ))}
-            </select>
+              options={profesionales.map((p) => ({ value: p.id, label: p.nombre }))}
+            />
+          </div>
+
+          {/* Selector de revisor */}
+          <div className="form-control">
+            <label className="label py-1">
+              <span className="label-text font-medium">Revisor <span className="text-error">*</span></span>
+            </label>
+            <CustomSelect
+              value={revisorId === "" ? 0 : revisorId}
+              onChange={(v) => setRevisorId(v === 0 ? "" : v)}
+              placeholder="Seleccionar revisor..."
+              disabled={submitting}
+              options={revisores.map((r) => ({ value: r.id, label: r.nombre }))}
+            />
           </div>
 
           {/* Fecha de programación */}
@@ -144,12 +173,9 @@ export default function AsignarProfesionalModal({
                 <span className="text-base-content/40 text-xs font-normal">(Opcional)</span>
               </span>
             </label>
-            <input
-              type="date"
-              className="input input-bordered w-full"
+            <CustomDateInput
               value={fechaProgramacion}
-              onChange={(e) => setFechaProgramacion(e.target.value)}
-              max={new Date().toISOString().split('T')[0]}
+              onChange={setFechaProgramacion}
               disabled={submitting}
             />
           </div>
@@ -169,7 +195,7 @@ export default function AsignarProfesionalModal({
           <button
             onClick={handleSubmit}
             className="btn btn-success text-white btn-sm gap-2"
-            disabled={submitting || !profesionalId}
+            disabled={submitting || !profesionalId || !revisorId}
           >
             {submitting ? (
               <><span className="loading loading-spinner loading-xs" />Procesando...</>

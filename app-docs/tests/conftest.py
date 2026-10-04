@@ -39,7 +39,7 @@ import main as main_module
 _VIEW_SQL = """
 CREATE OR REPLACE VIEW vista_documentos_detalle AS
 SELECT d.id, d.id AS documento_id, d.nombre, d.descripcion, d.tipo_archivo,
-       d.estado, d.version_actual, d.numero_devoluciones, d.usuario_creador_id,
+       d.estado, d.origen, d.version_actual, d.numero_devoluciones, d.usuario_creador_id,
        d.fecha_creacion, d.fecha_ultima_actualizacion,
        COALESCE(rev_count.total_revisiones, 0) AS total_revisiones,
        COALESCE(asig_count.total_revisores, 0) AS total_revisores

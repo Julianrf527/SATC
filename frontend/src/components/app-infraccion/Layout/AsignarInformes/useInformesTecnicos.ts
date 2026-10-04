@@ -25,6 +25,7 @@ export function useInformesTecnicos(setToast: ToastSetter) {
   const [profesionales, setProfesionales] = useState<ProfesionalDisponible[]>(
     [],
   );
+  const [revisores, setRevisores] = useState<ProfesionalDisponible[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -75,6 +76,9 @@ export function useInformesTecnicos(setToast: ToastSetter) {
           setTotalPages(res.total_pages ?? 1);
           if (res.profesionales_disponibles) {
             setProfesionales(res.profesionales_disponibles);
+          }
+          if (res.revisores_disponibles) {
+            setRevisores(res.revisores_disponibles);
           }
         } else {
           setToast({
@@ -142,6 +146,7 @@ export function useInformesTecnicos(setToast: ToastSetter) {
   return {
     informes,
     profesionales,
+    revisores,
     loading,
     totalCount,
     totalPages,

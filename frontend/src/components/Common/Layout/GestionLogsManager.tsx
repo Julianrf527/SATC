@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { apiCall } from "../../../utils/api";
 import TableFileLog from "../../app-sancionatorio/Table/TableFileLog";
+import CustomDateInput from "../Form/CustomDateInput";
 
 type LogAuditoria = {
   id: number;
@@ -158,7 +159,7 @@ export default function GestionLogsManager({ title, body: _body, endpoint, modul
   return (
     <>
       {/* Header estilo SignUpLayout */}
-      <div className="bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm sticky top-0 z-10">
+      <div className="bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
@@ -253,14 +254,14 @@ export default function GestionLogsManager({ title, body: _body, endpoint, modul
                 )}
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-base-content/60">Fecha desde</span>
-                  <input type="date" className="input input-sm input-bordered"
-                    value={searchFechaInicio} onChange={(e) => setSearchFechaInicio(e.target.value)} />
+                  <CustomDateInput className="input-sm"
+                    value={searchFechaInicio} onChange={setSearchFechaInicio} />
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-base-content/60">Fecha hasta</span>
                   <div className="flex gap-2">
-                    <input type="date" className="input input-sm input-bordered flex-1"
-                      value={searchFechaFin} onChange={(e) => setSearchFechaFin(e.target.value)} />
+                    <CustomDateInput className="input-sm flex-1"
+                      value={searchFechaFin} onChange={setSearchFechaFin} />
                     <button className="btn btn-sm btn-success text-white self-end" onClick={handleSearch} disabled={loading}>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}

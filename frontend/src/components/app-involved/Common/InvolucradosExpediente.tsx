@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import type { Involucrado } from "../../../types/involucradoApp";
 import { apiCall, API_CONFIG, getErrorMessage } from "../../../utils/api";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
+import CustomSelect from "../../Common/Form/CustomSelect";
 
 interface Props {
   expedienteId: number;
@@ -344,17 +345,18 @@ export default function InvolucradoExpediente({
                 {/* [1.1] Tipo */}
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-base-content/60">Tipo documento *</span>
-                  <select
+                  <CustomSelect
+                    hidePlaceholderOption
                     value={formData.tipo_documento}
-                    onChange={(e) => handleTipoChange(e.target.value)}
-                    className="select select-bordered w-full"
-                    required disabled={isLoading}
-                  >
-                    <option value="CC">Cédula (CC)</option>
-                    <option value="NIT">NIT</option>
-                    <option value="CE">Extranjería (CE)</option>
-                    <option value="PP">Pasaporte</option>
-                  </select>
+                    onChange={handleTipoChange}
+                    disabled={isLoading}
+                    options={[
+                      { value: "CC", label: "Cédula (CC)" },
+                      { value: "NIT", label: "NIT" },
+                      { value: "CE", label: "Extranjería (CE)" },
+                      { value: "PP", label: "Pasaporte" },
+                    ]}
+                  />
                 </div>
 
                 {/* [1.2 + 1.3] Número (ocupa 2 columnas) */}

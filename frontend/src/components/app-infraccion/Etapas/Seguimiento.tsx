@@ -2,6 +2,7 @@ import { apiCall, API_CONFIG } from "../../../utils/api";
 import type { InformeTecnico } from "../../../types/infraccionApp";
 import { useCallback, useEffect, useState, useRef } from "react";
 import { openDocumentById } from "../../../utils/documentViewer";
+import CargueManualInforme from "./CargueManualInforme";
 
 type Props = {
   expedienteId: number;
@@ -206,45 +207,24 @@ export default function Seguimiento({
                 Para continuar, debe crear esta etapa y así poder gestionar el {STAGE_NAME} correspondiente.
               </p>
             </div>
-            <button
-              className="btn btn-success text-white btn-lg gap-2 shadow-md hover:shadow-lg transition-all"
-              onClick={handleCreateStage}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
-              Crear Etapa
-            </button>
+            {isEditable && (
+              <button
+                className="btn btn-success text-white btn-lg gap-2 shadow-md hover:shadow-lg transition-all"
+                onClick={handleCreateStage}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                </svg>
+                Crear Etapa
+              </button>
+            )}
           </div>
         </div>
       </div>
     );
   }
 
-  if (informeTecnico && !informeTecnico.fecha_aceptacion_informe) {
-    return (
-      <div className="card bg-base-100 shadow-xl w-full border border-yellow-200">
-        <div className="card-body">
-          <div className="flex flex-col items-center justify-center py-8 space-y-4">
-            <div className="bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-full p-4 shadow-lg">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="text-center space-y-2">
-              <h3 className="text-lg font-semibold text-yellow-700">{STAGE_NAME}</h3>
-              <p className="text-gray-600 max-w-md mx-auto">El informe de seguimiento está en proceso.</p>
-              <p className="text-sm text-gray-500 max-w-md mx-auto">
-                Aún no ha sido aceptado. El seguimiento se gestiona desde{" "}
-                <strong>Informes Técnicos</strong>.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const aceptado = !!informeTecnico?.fecha_aceptacion_informe;
 
   return (
     <div className="card bg-base-100 shadow-md border border-base-300">
@@ -260,16 +240,27 @@ export default function Seguimiento({
             </div>
             <div>
               <h3 className="text-xl font-bold">Datos del {STAGE_NAME}</h3>
-              <p className="text-sm text-base-content/60">Informe aceptado</p>
+              <p className="text-sm text-base-content/60">
+                {aceptado ? "Informe aceptado" : "Informe en proceso"}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="badge badge-success text-white gap-1">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Aceptado
-            </span>
+            {aceptado ? (
+              <span className="badge badge-success text-white gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Aceptado
+              </span>
+            ) : (
+              <span className="badge badge-warning gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                En proceso
+              </span>
+            )}
             {informeTecnico?.documento_informe_id && (
               <button
                 onClick={() => openDocumentById(informeTecnico!.documento_informe_id!)}
@@ -286,7 +277,7 @@ export default function Seguimiento({
         </div>
 
         {/* DATOS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <div className="flex items-start gap-2">
             <div className="w-8 h-8 bg-base-200 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
               <svg className="w-4 h-4 text-base-content/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -298,6 +289,25 @@ export default function Seguimiento({
               <p className="text-xs font-medium text-base-content/60 uppercase tracking-wide">Profesional Asignado</p>
               <p className="text-sm font-semibold">
                 {informeTecnico?.profesional_nombre ?? (
+                  <span className="text-base-content/40 italic">Sin asignar</span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2">
+            <div className="w-8 h-8 bg-base-200 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+              <svg className="w-4 h-4 text-base-content/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-base-content/60 uppercase tracking-wide">Revisor Asignado</p>
+              <p className="text-sm font-semibold">
+                {informeTecnico?.revisor_nombre ?? (
                   <span className="text-base-content/40 italic">Sin asignar</span>
                 )}
               </p>
@@ -345,16 +355,29 @@ export default function Seguimiento({
           </div>
         </div>
 
-        <div className="mt-4 alert py-2 bg-base-200 border-0">
-          <svg className="w-4 h-4 text-base-content/50 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span className="text-xs text-base-content/60">
-            La asignación de profesionales y el seguimiento del proceso se gestiona desde{" "}
-            <strong>Informes Técnicos</strong>.
-          </span>
-        </div>
+        {isEditable && (
+          <div className="mt-4 alert py-2 bg-base-200 border-0">
+            <svg className="w-4 h-4 text-base-content/50 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-xs text-base-content/60">
+              La asignación de profesionales y el seguimiento del proceso se gestiona desde{" "}
+              <strong>Informes Técnicos</strong>.
+            </span>
+          </div>
+        )}
+
+        {(!aceptado || informeTecnico.modo === "MANUAL") && informeTecnico && (
+          <div className="mt-4">
+            <CargueManualInforme
+              informe={informeTecnico}
+              setToast={setToast}
+              onUpdated={fetchReport}
+              isEditable={!!isEditable}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

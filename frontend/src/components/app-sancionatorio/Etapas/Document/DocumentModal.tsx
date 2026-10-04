@@ -4,6 +4,7 @@ import {
   uploadFileToDocuments,
   validateFile,
 } from "../../../../utils/fileUpload";
+import CustomSelect from "../../../Common/Form/CustomSelect";
 
 type DocumentoData = {
   id: number;
@@ -121,13 +122,13 @@ export default function DocumentModal({
     }
   };
 
-  const handleTipoChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setTipoDocumento(e.target.value);
+  const handleTipoChange = (value: string) => {
+    setTipoDocumento(value);
     if (errors.tipo) {
       setErrors((prev) => ({ ...prev, tipo: "" }));
     }
     // Limpiar nombre personalizado si no es "Otro"
-    if (e.target.value !== "Otro") {
+    if (value !== "Otro") {
       setNombrePersonalizado("");
       if (errors.nombre) {
         setErrors((prev) => ({ ...prev, nombre: "" }));
@@ -333,22 +334,17 @@ export default function DocumentModal({
             <label className="block text-sm font-medium text-base-content/70 mb-1">
               Tipo de Documento <span className="text-error">*</span>
             </label>
-            <select
-              className={`select select-bordered w-full ${
-                errors.tipo ? "select-error" : ""
-              }`}
-              value={tipoDocumento}
-              onChange={handleTipoChange}
+            <CustomSelect
+              error={!!errors.tipo}
+              value={[...tiposDocumento, "Otro"].indexOf(tipoDocumento) + 1}
+              onChange={(i) => handleTipoChange(i === 0 ? "" : [...tiposDocumento, "Otro"][i - 1])}
+              placeholder="Seleccione un tipo"
               disabled={isSubmitting || isUploadingFile}
-            >
-              <option value="">Seleccione un tipo</option>
-              {tiposDocumento.map((tipo) => (
-                <option key={tipo} value={tipo}>
-                  {tipo}
-                </option>
-              ))}
-              <option value="Otro">Otro</option>
-            </select>
+              options={[...tiposDocumento, "Otro"].map((tipo, i) => ({
+                value: i + 1,
+                label: tipo,
+              }))}
+            />
             {errors.tipo && (
               <p className="text-error text-xs mt-1">{errors.tipo}</p>
             )}

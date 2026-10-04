@@ -21,6 +21,7 @@ from .solicitud_informacion import SolicitudInformacion
 from .tipo_notificacion import TipoNotificacion
 from .notificacion import Notificacion
 from .informe_documento import InformeDocumento
+from .informe_recurso_afectado import InformeRecursoAfectado
 from .tipo_medida import TipoMedida
 from .medida_preventiva import MedidaPreventiva
 
@@ -48,6 +49,7 @@ __all__ = [
     "TipoNotificacion",
     "Notificacion",
     "InformeDocumento",
+    "InformeRecursoAfectado",
     "TipoMedida",
     "MedidaPreventiva",
 ]

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, BigInteger, String, Boolean, ForeignKey, Date, TIMESTAMP, Index
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date, TIMESTAMP, Index
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from zoneinfo import ZoneInfo

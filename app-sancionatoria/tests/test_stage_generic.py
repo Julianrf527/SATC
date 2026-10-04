@@ -42,17 +42,30 @@ async def test_indagacion_crear_duplicada_da_409(client, make_expediente):
     assert resp.status_code == 409
 
 
-# ── PERMISOS: no debe distinguir "no existe" de "existe pero no es tuyo" ───
+# ── PERMISOS: GET es solo lectura para cualquier usuario, POST/PUT exigen encargado ──
 
-async def test_indagacion_expediente_inexistente_da_403(client):
+async def test_indagacion_get_expediente_inexistente_da_403(client):
     resp = await client.get("/investigation/999999", headers=gateway_headers(1))
     assert resp.status_code == 403
     assert resp.json()["detail"] == "Sin permisos sobre este expediente"
 
 
-async def test_indagacion_expediente_de_otro_usuario_da_403_mismo_mensaje(client, make_expediente):
+async def test_indagacion_get_expediente_de_otro_usuario_es_de_solo_lectura(client, make_expediente):
     exp = await make_expediente(encargado_id=1)
     resp = await client.get(f"/investigation/{exp.id}", headers=gateway_headers(2))
+    assert resp.status_code == 200
+    assert resp.json() == {"ok": True, "indagacion": None}
+
+
+async def test_indagacion_post_expediente_inexistente_da_403(client):
+    resp = await client.post("/investigation/999999", headers=gateway_headers(1))
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Sin permisos sobre este expediente"
+
+
+async def test_indagacion_post_expediente_de_otro_usuario_da_403_mismo_mensaje(client, make_expediente):
+    exp = await make_expediente(encargado_id=1)
+    resp = await client.post(f"/investigation/{exp.id}", headers=gateway_headers(2))
     assert resp.status_code == 403
     assert resp.json()["detail"] == "Sin permisos sobre este expediente"
 

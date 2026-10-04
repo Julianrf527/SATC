@@ -154,7 +154,9 @@ async def obtener_auditoria(
         "CAMBIO_ROL":             ("UPDATE", "Usuario"),
         "CAMBIO_CONTRASENA":      ("UPDATE", "Contraseña"),
         "ACTUALIZACION_PERFIL":   ("UPDATE", "Usuario"),
+        "EDICION_USUARIO":        ("UPDATE", "Usuario"),
         "RECUPERACION_CONTRASENA":("UPDATE", "Contraseña"),
+        "REENVIO_CONTRASENA":     ("UPDATE", "Contraseña"),
     }
     _OCULTOS = {"id"}
 

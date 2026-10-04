@@ -53,14 +53,14 @@ async def test_login_email_invalido_422(client):
 
 @pytest.mark.asyncio
 async def test_me_devuelve_usuario_y_permisos(client, make_permiso, make_rol, make_usuario):
-    p = await make_permiso("admin_roles", "/user/role")
+    p = await make_permiso("admin_roles_y_permisos", "/user/role")
     rol = await make_rol("admin", [p])
     u = await make_usuario(rol_id=rol.id, correo="me@test.com")
     resp = await client.get("/auth/me", headers=gateway_headers(u.id, rol.id))
     assert resp.status_code == 200
     data = resp.json()["usuario"]
     assert data["correo"] == "me@test.com"
-    assert any(perm["name"] == "admin_roles" for perm in data["permisos"])
+    assert any(perm["name"] == "admin_roles_y_permisos" for perm in data["permisos"])
 
 
 @pytest.mark.asyncio

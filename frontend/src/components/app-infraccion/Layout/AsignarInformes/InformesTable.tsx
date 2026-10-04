@@ -94,6 +94,7 @@ export default function InformesTable({
                   <th className="text-xs">Expediente</th>
                   <th className="text-xs">Tipo</th>
                   <th className="text-xs">Profesional</th>
+                  <th className="text-xs">Revisor</th>
                   <th className="text-xs">Fecha Programación</th>
                   <th className="text-xs">Fecha Recibido</th>
                   <th className="text-xs">Fecha Aceptación</th>
@@ -120,13 +121,20 @@ export default function InformesTable({
                     </td>
                     <td>
                       <span
-                        className={`badge badge-sm ${inf.tipo_informe === "VISITA" ? "badge-info" : "badge-secondary"}`}
+                        className={`badge badge-sm text-white ${inf.tipo_informe === "VISITA" ? "badge-info" : "badge-secondary"}`}
                       >
                         {inf.tipo_informe || "—"}
                       </span>
                     </td>
                     <td className="text-xs">
                       {inf.profesional_nombre ?? (
+                        <span className="text-base-content/40 italic">
+                          Sin asignar
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-xs">
+                      {inf.revisor_nombre ?? (
                         <span className="text-base-content/40 italic">
                           Sin asignar
                         </span>

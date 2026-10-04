@@ -23,10 +23,9 @@ export const API_CONFIG = {
     // user route
     USER_REGISTER: "/users/user/register",
     USERS: "/users/user/all",
-    USER_TOGGLE_STATE: (user_id: number) =>
-      `/users/user/toggleState/${user_id}`,
-    USER_TOGGLE_ROLE: (user_id: number, rol_id: number) =>
-      `/users/user/toggleRol/${user_id}/${rol_id}`,
+    USER_ADMIN_UPDATE: (user_id: number) => `/users/user/${user_id}`,
+    USER_RESEND_PASSWORD: (user_id: number) =>
+      `/users/user/resend-password/${user_id}`,
     PASSWORD_CHANGE: "/users/user/password-change",
     USER_UPDATE: "/users/user/update-user",
     USER_LOG: "/users/user/log",
@@ -93,6 +92,7 @@ export const API_CONFIG = {
       `/sanctioning/stage/investigation/${expediente_id}`,
 
     FILE_TIPO_MEDIDA: "/sanctioning/stage/measure-type",
+    FILE_TIPO_CESACION: "/sanctioning/stage/cessation-type",
     FILE_MEASURE: (expediente_id: number) =>
       `/sanctioning/stage/measure/${expediente_id}`,
     FILE_MEASURE_CREATE: (expediente_id: number) =>
@@ -183,6 +183,8 @@ export const API_CONFIG = {
     DOCS_REVIEW: (documentId: number) => `/documents/docs/review/${documentId}`,
     DOCS_DOWNLOAD: (versionId: number) =>
       `/documents/docs/download/${versionId}`,
+    DOCS_DOWNLOAD_REVISION: (revisionId: number) =>
+      `/documents/docs/download-revision/${revisionId}`,
     DOCS_STATS: "/documents/docs/stats",
     DOCS_REVIEWERS: "/documents/docs/reviewers",
     // document route
@@ -303,8 +305,18 @@ export const API_CONFIG = {
       `/infraction/informes/${informe_id}/assign`,
     INFRACTION_REPORTS_SYNC: (informe_id: number) =>
       `/infraction/informes/${informe_id}/sync`,
+    INFRACTION_REPORTS_SYNC_BY_DOC: (docs_documento_id: number) =>
+      `/infraction/informes/sync-by-doc/${docs_documento_id}`,
     INFRACTION_REPORTS_DOC_PROCESS: (informe_id: number) =>
       `/infraction/informes/${informe_id}/doc-process`,
+    INFRACTION_REPORTS_SWITCH_MODE: (informe_id: number) =>
+      `/infraction/informes/${informe_id}/switch-mode`,
+    INFRACTION_REPORTS_MANUAL_UPLOAD: (informe_id: number) =>
+      `/infraction/informes/${informe_id}/manual-upload`,
+    INFRACTION_REPORTS_DISPONIBLES: "/infraction/informes/disponibles",
+    INFRACTION_MIS_INFORMES: "/infraction/informes/mios",
+    INFRACTION_INFORME_RECURSOS: (informe_id: number) =>
+      `/infraction/informes/${informe_id}/recursos`,
   },
 };
 
@@ -339,6 +351,7 @@ export const apiCall = async (
   // Se intercepta antes del parseo genérico: el 401 dispara logout y redirección.
   if (response.status === 401) {
     const data = await response.json().catch(() => ({}));
+    normalizeDetail(data);
     const yaEnLogin = window.location.pathname.startsWith("/login");
 
     document.cookie =
@@ -374,6 +387,7 @@ export const apiCall = async (
   // 403 se centraliza aquí para dar el mismo feedback en toda la app.
   if (response.status === 403) {
     const data = await response.json().catch(() => ({}));
+    normalizeDetail(data);
 
     toastService.showToast({
       id: Date.now(),
@@ -411,6 +425,7 @@ export const apiCall = async (
   }
 
   const data = await response.json().catch(() => ({}));
+  normalizeDetail(data);
 
   return {
     ok: response.ok,
@@ -418,6 +433,20 @@ export const apiCall = async (
     ...data,
   };
 };
+
+/**
+ * Normaliza `data.detail` in-place a un string legible. FastAPI devuelve
+ * errores de validación (422) como array de objetos Pydantic
+ * ([{type, loc, msg, input}]) — sin esto, código que hace
+ * `message: res.detail || "..."` termina mostrando ese JSON crudo en el
+ * toast. Se aplica una sola vez acá para no depender de que cada uno de los
+ * ~70 call sites recuerde envolverlo en formatApiErrorDetail.
+ */
+function normalizeDetail(data: Record<string, unknown>): void {
+  if (data && "detail" in data && typeof data.detail !== "string") {
+    data.detail = formatApiErrorDetail(data.detail, "Ocurrió un error inesperado.");
+  }
+}
 
 /** Extrae un mensaje legible de un valor atrapado en catch (tipo unknown). */
 export function getErrorMessage(e: unknown, fallback = "Error desconocido"): string {

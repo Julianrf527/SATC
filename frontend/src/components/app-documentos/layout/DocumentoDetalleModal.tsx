@@ -19,7 +19,7 @@ import {
 import SubirVersionModal from "./SubirVersionModal";
 import RevisarDocumentoModal from "./RevisarDocumentoModal";
 
-type EstadoDocumento = "en_revision" | "aprobado" | "rechazado" | "finalizado";
+type EstadoDocumento = "en_revision" | "aprobado" | "aprobado_firma" | "rechazado" | "finalizado";
 
 type Version = {
   version_id: number;
@@ -38,6 +38,7 @@ type Revision = {
   comentarios?: string;
   fecha_revision: string;
   version_revisada: number;
+  adjunto_nombre?: string | null;
 };
 
 type RevisorAsignado = {
@@ -60,6 +61,7 @@ type DocumentoCompleto = {
   descripcion?: string;
   tipo_archivo: string;
   estado: EstadoDocumento;
+  origen: string | null;
   version_actual: number;
   numero_devoluciones: number;
   fecha_creacion: string;
@@ -74,8 +76,10 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   documentoId: number;
-  onUpdate: () => void;
+  onUpdate: (accion?: "upload" | "revision") => void;
   setToast?: (toast: { id: number; message: string; type: "success" | "error" }) => void;
+  /** Solo lectura: oculta las acciones de subir/revisar aunque el usuario califique — usado desde pantallas donde solo se debe poder ver el proceso, no operarlo (esas acciones viven en "Mis Informes"). */
+  readOnly?: boolean;
 };
 
 const formatDate = (dateString: string) => {
@@ -89,6 +93,9 @@ const formatDate = (dateString: string) => {
   }).format(date);
 };
 
+const esArchivoPdf = (nombre?: string | null) =>
+  !!nombre && nombre.toLowerCase().endsWith(".pdf");
+
 const formatFileSize = (bytes: number) => {
   if (bytes < 1024) return bytes + " B";
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
@@ -101,6 +108,7 @@ export default function DocumentoDetalleModal({
   documentoId,
   onUpdate,
   setToast,
+  readOnly = false,
 }: Props) {
   const [documento, setDocumento] = useState<DocumentoCompleto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -176,14 +184,26 @@ export default function DocumentoDetalleModal({
     }
   };
 
+  const handleDescargarAdjunto = (revisionId: number, nombre: string) => {
+    const url = `${BASE_URL}${API_CONFIG.ENDPOINTS.DOCS_DOWNLOAD_REVISION(revisionId)}`;
+    if (esArchivoPdf(nombre)) {
+      window.open(url, "_blank");
+    } else {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = nombre;
+      link.click();
+    }
+  };
+
   const handleVersionSubida = () => {
     cargarDocumento();
-    onUpdate();
+    onUpdate("upload");
   };
 
   const handleRevisionRealizada = () => {
     cargarDocumento();
-    onUpdate();
+    onUpdate("revision");
   };
 
   const getEstadoBadge = (estado: EstadoDocumento) => {
@@ -197,6 +217,11 @@ export default function DocumentoDetalleModal({
         color: "bg-green-500/20 text-green-700 border-green-500/30",
         icon: CheckCircle,
         text: "Aprobado",
+      },
+      aprobado_firma: {
+        color: "bg-blue-500/20 text-blue-700 border-blue-500/30",
+        icon: CheckCircle,
+        text: "Aprobado para firma",
       },
       rechazado: {
         color: "bg-red-500/20 text-red-700 border-red-500/30",
@@ -235,6 +260,8 @@ export default function DocumentoDetalleModal({
         return "Devuelto";
       case "aprobar":
         return "Aprobado";
+      case "aprobar_firma":
+        return "Aprobado para firma";
       case "actualizar":
         return "Actualizado";
       case "finalizar":
@@ -256,6 +283,8 @@ export default function DocumentoDetalleModal({
         return <XCircle className="text-red-500" size={16} />;
       case "aprobar":
         return <CheckCircle className="text-green-500" size={16} />;
+      case "aprobar_firma":
+        return <CheckCircle className="text-blue-500" size={16} />;
       case "actualizar":
         return <Clock className="text-purple-500" size={16} />;
       case "finalizar":
@@ -277,6 +306,8 @@ export default function DocumentoDetalleModal({
         return "border-red-500";
       case "aprobar":
         return "border-green-500";
+      case "aprobar_firma":
+        return "border-blue-500";
       case "actualizar":
         return "border-purple-500";
       case "finalizar":
@@ -292,10 +323,14 @@ export default function DocumentoDetalleModal({
     (r) => Number(r.revisor_id) === Number(usuarioActualId),
   );
   const sinVersiones = (documento?.versiones?.length ?? 0) === 0;
-  // Puede subir: si fue rechazado (re-entrega) O si aún no hay ninguna versión (primera carga)
+  // Puede subir: si fue rechazado (re-entrega), si aún no hay ninguna versión
+  // (primera carga), o (informe técnico) si está "aprobado para firma"
+  // (la firmada se auto-aprueba sin pasar de nuevo por revisión).
   const puedeSubirVersion =
+    !readOnly &&
     esCreador &&
     (documento?.estado === "rechazado" ||
+      documento?.estado === "aprobado_firma" ||
       (documento?.estado === "en_revision" && sinVersiones));
 
   const yaRevisoVersionActual = documento?.revisiones.some(
@@ -305,6 +340,7 @@ export default function DocumentoDetalleModal({
   );
 
   const puedeRevisar =
+    !readOnly &&
     esRevisor &&
     documento?.estado === "en_revision" &&
     !yaRevisoVersionActual &&
@@ -404,7 +440,11 @@ export default function DocumentoDetalleModal({
                     className="btn btn-sm btn-primary gap-2"
                   >
                     <Upload size={16} />
-                    {sinVersiones ? "Subir Documento" : "Subir Nueva Versión"}
+                    {sinVersiones
+                      ? "Subir Documento"
+                      : documento.estado === "aprobado_firma"
+                        ? "Subir Versión Firmada"
+                        : "Subir Nueva Versión"}
                   </button>
                 )}
                 {puedeRevisar && (
@@ -491,7 +531,7 @@ export default function DocumentoDetalleModal({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-semibold text-base-content">
-                              v{version.numero_version}
+                              Versión {version.numero_version}
                             </span>
                             {version.numero_version ===
                               documento.version_actual && (
@@ -513,26 +553,28 @@ export default function DocumentoDetalleModal({
                             </p>
                           )}
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 flex-shrink-0">
                           <button
                             onClick={() =>
                               handleDescargarArchivo(
                                 version.version_id,
                                 version.archivo_nombre,
-                                documento.tipo_archivo,
+                                esArchivoPdf(version.archivo_nombre) ? "pdf" : "otro",
                               )
                             }
-                            className="btn btn-ghost btn-sm btn-circle"
-                            title={
-                              documento.tipo_archivo === "pdf"
-                                ? "Ver PDF"
-                                : "Descargar"
-                            }
+                            className="btn btn-xs btn-outline btn-success gap-1"
+                            title={version.archivo_nombre}
                           >
-                            {documento.tipo_archivo === "pdf" ? (
-                              <Eye size={16} />
+                            {esArchivoPdf(version.archivo_nombre) ? (
+                              <>
+                                <Eye size={12} />
+                                Ver documento
+                              </>
                             ) : (
-                              <Download size={16} />
+                              <>
+                                <Download size={12} />
+                                Descargar
+                              </>
                             )}
                           </button>
                         </div>
@@ -564,7 +606,9 @@ export default function DocumentoDetalleModal({
                             className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                               revision.estado === "aprobado"
                                 ? "bg-green-500/20"
-                                : "bg-red-500/20"
+                                : revision.estado === "aprobado_firma"
+                                  ? "bg-blue-500/20"
+                                  : "bg-red-500/20"
                             }`}
                           >
                             {revision.estado === "aprobado" ? (
@@ -572,6 +616,8 @@ export default function DocumentoDetalleModal({
                                 className="text-green-600"
                                 size={16}
                               />
+                            ) : revision.estado === "aprobado_firma" ? (
+                              <CheckCircle className="text-blue-600" size={16} />
                             ) : (
                               <XCircle className="text-red-600" size={16} />
                             )}
@@ -580,19 +626,45 @@ export default function DocumentoDetalleModal({
                             <div className="flex items-center justify-between mb-1">
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold text-sm text-base-content capitalize">
-                                  {revision.estado}
+                                  {revision.estado === "aprobado_firma"
+                                    ? "Aprobado para firma"
+                                    : revision.estado}
                                 </span>
                                 <span className="text-xs text-base-content/50">
-                                  • v{revision.version_revisada}
+                                  • Versión {revision.version_revisada}
                                 </span>
                               </div>
-                              <span className="text-xs text-base-content/60 font-medium">
-                                {(revision as any).revisor_nombre ||
-                                  `Revisor ${revision.revisor_id}`}
-                              </span>
+                              {revision.adjunto_nombre && (
+                                <button
+                                  onClick={() =>
+                                    handleDescargarAdjunto(
+                                      revision.revision_id,
+                                      revision.adjunto_nombre!,
+                                    )
+                                  }
+                                  className="btn btn-xs btn-outline btn-error gap-1 flex-shrink-0"
+                                  title={revision.adjunto_nombre}
+                                >
+                                  {esArchivoPdf(revision.adjunto_nombre) ? (
+                                    <>
+                                      <Eye size={12} />
+                                      Ver observaciones
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Download size={12} />
+                                      Descargar observaciones
+                                    </>
+                                  )}
+                                </button>
+                              )}
                             </div>
                             <p className="text-xs text-base-content/60 mb-2">
                               {formatDate(revision.fecha_revision)}
+                              <span className="ml-2 font-medium">
+                                {(revision as any).revisor_nombre ||
+                                  `Revisor ${revision.revisor_id}`}
+                              </span>
                             </p>
                             {revision.comentarios && (
                               <p className="text-xs text-base-content/70 bg-base-200 rounded p-2">
@@ -624,6 +696,7 @@ export default function DocumentoDetalleModal({
           isOpen={showSubirVersionModal}
           onClose={() => setShowSubirVersionModal(false)}
           documentoId={documento.documento_id}
+          soloPdf={documento.estado === "aprobado_firma"}
           onSuccess={handleVersionSubida}
           setToast={setToast}
         />
@@ -635,6 +708,12 @@ export default function DocumentoDetalleModal({
           onClose={() => setShowRevisarModal(false)}
           documentoId={documento.documento_id}
           nombreDocumento={documento.nombre}
+          esInformeTecnico={documento.origen === "informe_tecnico"}
+          versionActualEsPdf={
+            documento.versiones.find(
+              (v) => v.numero_version === documento.version_actual,
+            )?.archivo_nombre.toLowerCase().endsWith(".pdf") ?? false
+          }
           onSuccess={handleRevisionRealizada}
         />
       )}

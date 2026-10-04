@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 from utils.insertLog import insert_auditoria
 from utils.emailUtil import sendEmail
-from utils.passwords import hash_password, verify_password, verify_password_async
+from utils.passwords import hash_password, verify_password, verify_password_async, generate_temp_password
 from utils.redis_session import get_redis_client
 from utils.rate_limiter import RateLimiter, LoginThrottler
 from utils.verify_token import verify_gateway_token
@@ -388,16 +388,7 @@ async def validar_code_de_recuperacion(
         )
         await db.execute(stmr)
 
-        mayuscula = random.choice(string.ascii_uppercase)
-        numeros = random.choices(string.digits, k=2)
-        simbolo = random.choice("!@#$%^&*()-_=+?¿¡[]{}<>")
-
-        restantes = 10 - (1 + 2 + 1)
-        otros = random.choices(string.ascii_letters + string.digits, k=restantes)
-
-        cont_list = list(mayuscula + "".join(numeros) + simbolo + "".join(otros))
-        random.shuffle(cont_list)
-        cont = "".join(cont_list)
+        cont = generate_temp_password()
 
         message = f"""
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

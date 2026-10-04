@@ -4,7 +4,6 @@ from sqlalchemy import insert
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 import logging
-import os
 
 
 from db.models.auditoria import Auditoria

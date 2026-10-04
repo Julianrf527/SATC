@@ -53,11 +53,11 @@ export default function RoleManager({ setToast }: Props) {
   return (
     <div className="w-full min-h-[calc(100vh-4rem)] bg-gradient-to-br from-base-200 to-base-300 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* Navegación entre vistas */}
-        <div className="mb-6">
-          <div className="tabs tabs-boxed bg-base-100 shadow-md p-1">
+        <div className="card bg-base-100 shadow-xl border border-base-300 flex flex-col h-[calc(100vh-8rem)] overflow-hidden">
+          {/* Navegación entre vistas: pestañas como encabezado de la misma caja */}
+          <div className="grid grid-cols-2 border-b border-base-300 flex-none">
             <button
-              className={`tab tab-lg flex-1 gap-2 transition-all ${
+              className={`flex items-center justify-center gap-2 py-4 font-semibold border-r border-base-300 transition-colors ${
                 activeView === "roles"
                   ? "bg-green-600 text-white"
                   : "hover:bg-base-200"
@@ -80,7 +80,7 @@ export default function RoleManager({ setToast }: Props) {
               Gestión de Roles
             </button>
             <button
-              className={`tab tab-lg flex-1 gap-2 transition-all ${
+              className={`flex items-center justify-center gap-2 py-4 font-semibold transition-colors ${
                 activeView === "permissions"
                   ? "bg-blue-600 text-white"
                   : "hover:bg-base-200"
@@ -103,26 +103,26 @@ export default function RoleManager({ setToast }: Props) {
               Gestión de Permisos
             </button>
           </div>
-        </div>
 
-        {/* Contenido principal */}
-        <div className="animate-fadeIn">
-          {loading ? (
-            <div className="flex items-center justify-center min-h-[400px]">
-              <div className="text-center">
-                <span className="loading loading-spinner loading-lg text-primary"></span>
-                <p className="mt-4 text-base-content/60">Cargando datos...</p>
+          {/* Contenido principal */}
+          <div className="flex-1 min-h-0 flex flex-col">
+            {loading ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <span className="loading loading-spinner loading-lg text-primary"></span>
+                  <p className="mt-4 text-base-content/60">Cargando datos...</p>
+                </div>
               </div>
-            </div>
-          ) : activeView === "roles" ? (
-            <RoleForm permisoList={permisoList} setToast={setToast} />
-          ) : (
-            <PermissionForm
-              permisoList={permisoList}
-              setToast={setToast}
-              onPermissionChange={loadPermissions}
-            />
-          )}
+            ) : activeView === "roles" ? (
+              <RoleForm permisoList={permisoList} setToast={setToast} />
+            ) : (
+              <PermissionForm
+                permisoList={permisoList}
+                setToast={setToast}
+                onPermissionChange={loadPermissions}
+              />
+            )}
+          </div>
         </div>
       </div>
     </div>

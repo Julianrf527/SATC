@@ -3,7 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 
 type Props = {
-  required: string;
+  required: string | string[];
   children: ReactElement;
 };
 
@@ -22,13 +22,11 @@ export default function RequirePermission({ required, children }: Props) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  const requiredNorm = norm(required);
+  const requiredList = (Array.isArray(required) ? required : [required]).map(norm);
 
-  const hasPermission =
-    (user.permisos ?? []).some((p) => {
-      const permisoName = norm(p?.name);
-      return permisoName === requiredNorm;
-    });
+  const hasPermission = (user.permisos ?? []).some((p) =>
+    requiredList.includes(norm(p?.name)),
+  );
 
   if (!hasPermission) {
     return <Navigate to="/" replace />;

@@ -141,7 +141,7 @@ export default function CardNotification({
         </div>
 
         {/* Body del mensaje */}
-        <p className="text-xs text-base-content/70 leading-relaxed mb-3 pl-11 line-clamp-2">
+        <p className="text-xs text-base-content/70 leading-relaxed mb-3 pl-11 line-clamp-2 whitespace-pre-line">
           {body}
         </p>
 
@@ -283,8 +283,8 @@ const NOTIFICATION_TYPES = {
       </svg>
     ),
     color: "warning",
-    hasRoute: false,
-    route: null,
+    hasRoute: true,
+    route: () => "/infraction/my-reports",
     label: "Informe Técnico",
   },
 };

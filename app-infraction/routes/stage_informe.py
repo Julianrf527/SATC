@@ -1,32 +1,20 @@
 from fastapi import Request, APIRouter, Depends, HTTPException, Path as PathParam
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
-from sqlalchemy.exc import IntegrityError
-from datetime import datetime, date, timedelta
+from sqlalchemy import select
+from datetime import date
 from dotenv import load_dotenv
-from pydantic import BaseModel
-from typing import Optional
-import holidays
 import logging
-import os
 import pytz
-import re
 
 from db.deps import get_db_managed
 from db.models.expediente import Expediente
 from db.models.etapa_respuesta import EtapaRespuesta
 from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
-from db.models.etapa_cierre import EtapaCierre
 from db.models.informe_tecnico import InformeTecnico
+from db.models.informe_recurso_afectado import InformeRecursoAfectado, RECURSOS_MATRIZ
 from db.models.medida_preventiva import MedidaPreventiva
-from db.models.tipo_medida import TipoMedida
-from db.models.acto_administrativo import ActoAdministrativo
 from db.models.comunicacion import Comunicacion
-from db.models.notificacion import Notificacion
-from db.models.oficio_remite import OficioRemite
-from db.models.solicitud_informacion import SolicitudInformacion
-from db.models.expediente_involucrado import ExpedienteInvolucrado
 
 router = APIRouter()
 load_dotenv()
@@ -37,12 +25,11 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 from utils.verify_token import verify_gateway_token
-from services.users import get_user_info
-from services.involved import get_involucrados_by_ids
-from services.docs import decrement_file_usage
-from services.etapas import build_acto_for_frontend as _build_acto_for_frontend
+from services.users import get_user_info, verify_permission
 from services.etapas import get_expediente_con_permiso
+from routes.reports import autosincronizar_informe
 from utils.log import insert_log
+from core.permission import Permission
 
 
 # ── INFORMES TÉCNICOS ──────────────────────────────────────────────────────────
@@ -54,7 +41,7 @@ async def obtener_informe_tecnico(
     tipo_informe: str = PathParam(..., description="Tipo de informe"),
     db: AsyncSession = Depends(get_db_managed),
 ):
-    verify_gateway_token(request)
+    user_id = verify_gateway_token(request)["user_id"]
     existe = await db.scalar(
         select(Expediente.id).where(Expediente.id == expediente_id)
     )
@@ -67,6 +54,9 @@ async def obtener_informe_tecnico(
             InformeTecnico.tipo_informe == tipo_informe,
         )
     )
+
+    if informe_tecnico:
+        await autosincronizar_informe(db, informe_tecnico)
 
     if not informe_tecnico:
         creable = False
@@ -93,11 +83,6 @@ async def obtener_informe_tecnico(
                 elif not medida.acto_administrativo_id:
                     creable_msg = "El acto administrativo de la medida preventiva aún no ha sido creado"
                 else:
-                    involucrados = (await db.execute(
-                        select(ExpedienteInvolucrado.involucrado_id)
-                        .where(ExpedienteInvolucrado.expediente_id == expediente_id)
-                    )).scalars().all()
-
                     comunicacion = await db.scalar(
                         select(Comunicacion).where(
                             Comunicacion.acto_administrativo_id == medida.acto_administrativo_id,
@@ -120,16 +105,21 @@ async def obtener_informe_tecnico(
             elif concepto.tipo_acogida_concepto == "OFICIO":
                 creable_msg = "No aplica seguimiento: el concepto fue remitido por competencia (Oficio)"
             elif concepto.tipo_acogida_concepto == "RESOLUCION_ARCHIVO":
-                creable_msg = "No aplica seguimiento: el trámite fue archivado"
+                creable_msg = "El trámite fue acogido por resolución de archivo"
             elif concepto.tipo_acogida_concepto == "AUTO_REQUERIMIENTO":
                 if not concepto.fecha_termino_calculada:
                     creable_msg = "El término de días hábiles aún no ha sido calculado en la etapa de Concepto"
                 elif date.today() <= concepto.fecha_termino_calculada:
-                    dias_restantes = (concepto.fecha_termino_calculada - date.today()).days
-                    creable_msg = (
-                        f"El término vence el {concepto.fecha_termino_calculada.isoformat()}. "
-                        f"Faltan {dias_restantes} día(s) para poder crear el seguimiento"
-                    )
+                    # El rol de cargue manual (carga de expedientes históricos) no
+                    # debe esperar a que venza el término real.
+                    if await verify_permission(user_id, Permission.MANUAL_UPLOAD):
+                        creable = True
+                    else:
+                        dias_restantes = (concepto.fecha_termino_calculada - date.today()).days
+                        creable_msg = (
+                            f"El término vence el {concepto.fecha_termino_calculada.isoformat()}. "
+                            f"Faltan {dias_restantes} día(s) para poder crear el seguimiento"
+                        )
                 else:
                     creable = True
         else:
@@ -151,10 +141,37 @@ async def obtener_informe_tecnico(
         )
 
     profesional_nombre = None
-    if informe_tecnico.profesional_asignado_id:
-        users = await get_user_info([informe_tecnico.profesional_asignado_id])
-        user_data = users.get(informe_tecnico.profesional_asignado_id)
-        profesional_nombre = user_data.get("nombre") if user_data else None
+    revisor_nombre = None
+    ids_a_buscar = [
+        uid for uid in (informe_tecnico.profesional_asignado_id, informe_tecnico.revisor_asignado_id) if uid
+    ]
+    if ids_a_buscar:
+        users = await get_user_info(ids_a_buscar)
+        if informe_tecnico.profesional_asignado_id:
+            user_data = users.get(informe_tecnico.profesional_asignado_id)
+            profesional_nombre = user_data.get("nombre") if user_data else None
+        if informe_tecnico.revisor_asignado_id:
+            user_data = users.get(informe_tecnico.revisor_asignado_id)
+            revisor_nombre = user_data.get("nombre") if user_data else None
+
+    tiene_matriz = False
+    recursos_afectados = None
+    if tipo_informe == "VISITA" and informe_tecnico.fecha_aceptacion_informe is not None:
+        filas = (await db.execute(
+            select(InformeRecursoAfectado).where(InformeRecursoAfectado.informe_id == informe_tecnico.id)
+        )).scalars().all()
+        if filas:
+            tiene_matriz = True
+            filas_map = {f.recurso: f for f in filas}
+            recursos_afectados = [
+                {
+                    "recurso": recurso,
+                    "magnitud": filas_map[recurso].magnitud if recurso in filas_map else None,
+                    "reversibilidad": filas_map[recurso].reversibilidad if recurso in filas_map else None,
+                    "no_existe": filas_map[recurso].no_existe if recurso in filas_map else True,
+                }
+                for recurso in RECURSOS_MATRIZ
+            ]
 
     return JSONResponse(
         content={
@@ -164,6 +181,8 @@ async def obtener_informe_tecnico(
                 "expediente_id": informe_tecnico.expediente_id,
                 "profesional_asignado_id": informe_tecnico.profesional_asignado_id,
                 "profesional_nombre": profesional_nombre,
+                "revisor_asignado_id": informe_tecnico.revisor_asignado_id,
+                "revisor_nombre": revisor_nombre,
                 "fecha_programacion_visita": informe_tecnico.fecha_programacion_visita.isoformat() if informe_tecnico.fecha_programacion_visita else None,
                 "fecha_recibido_informe": informe_tecnico.fecha_recibido_informe.isoformat() if informe_tecnico.fecha_recibido_informe else None,
                 "fecha_aceptacion_informe": informe_tecnico.fecha_aceptacion_informe.isoformat() if informe_tecnico.fecha_aceptacion_informe else None,
@@ -171,6 +190,9 @@ async def obtener_informe_tecnico(
                 "tipo_informe": informe_tecnico.tipo_informe,
                 "fecha_creacion": informe_tecnico.fecha_creacion.isoformat(),
                 "aceptado": informe_tecnico.fecha_aceptacion_informe is not None,
+                "modo": informe_tecnico.modo,
+                "tiene_matriz": tiene_matriz,
+                "recursos_afectados": recursos_afectados,
             },
             "message": "Informe técnico obtenido correctamente",
         },
@@ -219,6 +241,7 @@ async def crear_informe_tecnico(
                 "fecha_aceptacion_informe": nuevo_informe.fecha_aceptacion_informe.isoformat() if nuevo_informe.fecha_aceptacion_informe else None,
                 "tipo_informe": nuevo_informe.tipo_informe,
                 "fecha_creacion": nuevo_informe.fecha_creacion.isoformat(),
+                "modo": nuevo_informe.modo,
             },
             "message": "Informe técnico creado correctamente",
         },

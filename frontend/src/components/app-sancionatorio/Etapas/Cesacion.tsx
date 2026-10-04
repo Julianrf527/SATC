@@ -49,7 +49,15 @@ export default function Cesacion({
   const [existActoAdmin, setExistActoAdmin] = useState<boolean>(false);
   const [documentos, setDocumentos] = useState<DocumentoData[]>([]);
   const [localCreable, setLocalCreable] = useState<{ status: boolean; msg: string } | null>(null);
+  const [tiposCesacionList, setTiposCesacionList] = useState<{ id: number; nombre: string }[]>([]);
   const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fetch tipos en mount — independiente del estado de la etapa
+  useEffect(() => {
+    apiCall(API_CONFIG.ENDPOINTS.FILE_TIPO_CESACION, { method: "GET" })
+      .then((res) => { if (res.ok) setTiposCesacionList(res.data || []); })
+      .catch(() => {});
+  }, []);
 
   const fetchCesacion = useCallback(async () => {
     if (!expedienteId) {
@@ -380,8 +388,8 @@ export default function Cesacion({
 
         {existActoAdmin && (
           <DataStageCessation
-            data={cesacionData.informacion || null}
-            tipoMedida={cesacionData.informacion?.tipo_cesacion || []}
+            data={cesacionData}
+            tipoMedida={tiposCesacionList}
             setToast={setToast}
             etapaId={cesacionData.etapa_id}
             expedienteId={expedienteId}

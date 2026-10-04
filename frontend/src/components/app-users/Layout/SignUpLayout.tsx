@@ -19,7 +19,7 @@ export default function SignUpLayout({ setToast }: Props) {
   const secondLastNameRef = useRef<HTMLInputElement>(null);
   const documentRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
-  const rolRef = useRef<HTMLSelectElement>(null);
+  const [rolId, setRolId] = useState(0);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -30,7 +30,7 @@ export default function SignUpLayout({ setToast }: Props) {
     if (secondLastNameRef.current) secondLastNameRef.current.value = "";
     if (documentRef.current) documentRef.current.value = "";
     if (emailRef.current) emailRef.current.value = "";
-    if (rolRef.current) rolRef.current.value = "0";
+    setRolId(0);
   };
 
   const capitalize = (text: string): string =>
@@ -48,8 +48,7 @@ export default function SignUpLayout({ setToast }: Props) {
       documentRef.current?.focus();
       return;
     }
-    const rolValue = rolRef.current!.value;
-    if (!rolValue || rolValue === "0") {
+    if (!rolId) {
       setToast({
         id: Date.now(),
         message: "Debe seleccionar un rol",
@@ -68,7 +67,7 @@ export default function SignUpLayout({ setToast }: Props) {
         ? capitalize(secondLastNameRef.current.value)
         : "";
       const email = emailRef.current!.value.trim().toLowerCase();
-      const rol = parseInt(rolValue);
+      const rol = rolId;
 
       const res = await apiCall(API_CONFIG.ENDPOINTS.USER_REGISTER, {
         method: "POST",
@@ -266,7 +265,7 @@ export default function SignUpLayout({ setToast }: Props) {
                   </div>
                   <h2 className="font-semibold text-base-content">Rol *</h2>
                 </div>
-                <RolList rolRef={rolRef} />
+                <RolList value={rolId} onChange={setRolId} />
               </div>
 
               {/* Botones */}

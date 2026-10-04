@@ -19,7 +19,17 @@ select:-webkit-autofill {
 
 .drawer-overlay {
   background-color: rgba(0, 0, 0, 0.4) !important;
-  backdrop-filter: blur(4px);
+}
+
+[data-theme="emerald"] {
+  color-scheme: light;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+select {
+  accent-color: var(--color-success);
 }
 
 .checkbox-white-check:checked {

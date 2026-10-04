@@ -1,6 +1,8 @@
 import type { InvolucradoNotificacion } from "../../../types/sancionatorioApp";
 import type { Involucrado } from "../../../types/involucradoApp";
 import type { NotificacionFormApi } from "./useNotificacionForm";
+import CustomSelect from "../Form/CustomSelect";
+import CustomDateInput from "../Form/CustomDateInput";
 
 type Props = {
   form: NotificacionFormApi;
@@ -50,27 +52,22 @@ export default function NotificacionCitacionFields({
               <span className="text-error ml-1">*</span>
             </span>
           </label>
-          <select
+          <CustomSelect
             value={notificacionForm.involucrado_id}
-            onChange={(e) =>
+            onChange={(v) =>
               setNotificacionForm({
                 ...notificacionForm,
-                involucrado_id: Number(e.target.value),
+                involucrado_id: v,
               })
             }
-            className={`select select-bordered w-full ${
-              errors.involucrado_id ? "select-error" : "focus:select-success"
-            }`}
+            placeholder="Seleccione un involucrado"
+            error={!!errors.involucrado_id}
             disabled={isSubmitting || isUploadingFiles}
-          >
-            <option value={0}>Seleccione un involucrado</option>
-            {involucradosDisponibles.map((involucrado) => (
-              <option key={involucrado.id} value={involucrado.id}>
-                {involucrado.nombre} ({involucrado.tipo_documento}:{" "}
-                {formatDocumentNumber(involucrado)})
-              </option>
-            ))}
-          </select>
+            options={involucradosDisponibles.map((involucrado) => ({
+              value: involucrado.id,
+              label: `${involucrado.nombre} (${involucrado.tipo_documento}: ${formatDocumentNumber(involucrado)})`,
+            }))}
+          />
           {errors.involucrado_id && (
             <label className="label">
               <span className="label-text-alt text-error">
@@ -118,21 +115,18 @@ export default function NotificacionCitacionFields({
               <span className="text-error ml-1">*</span>
             </span>
           </label>
-          <input
-            type="date"
+          <CustomDateInput
             value={notificacionForm.fecha_numerado}
-            onChange={(e) => {
+            onChange={(v) => {
               setNotificacionForm({
                 ...notificacionForm,
-                fecha_numerado: e.target.value,
+                fecha_numerado: v,
               });
               if (errors.fecha_numerado) {
                 setErrors((prev) => ({ ...prev, fecha_numerado: "" }));
               }
             }}
-            className={`input input-bordered w-full ${
-              errors.fecha_numerado ? "input-error" : "focus:input-success"
-            }`}
+            error={!!errors.fecha_numerado}
             max={new Date().toISOString().split("T")[0]}
             disabled={isSubmitting || isUploadingFiles}
           />
@@ -155,13 +149,12 @@ export default function NotificacionCitacionFields({
               <span className="text-error ml-1">*</span>
             </span>
           </label>
-          <input
-            type="date"
+          <CustomDateInput
             value={notificacionForm.fecha_envio_citacion}
-            onChange={(e) => {
+            onChange={(v) => {
               setNotificacionForm({
                 ...notificacionForm,
-                fecha_envio_citacion: e.target.value,
+                fecha_envio_citacion: v,
               });
               if (errors.fecha_envio_citacion) {
                 setErrors((prev) => ({
@@ -170,11 +163,7 @@ export default function NotificacionCitacionFields({
                 }));
               }
             }}
-            className={`input input-bordered w-full ${
-              errors.fecha_envio_citacion
-                ? "input-error"
-                : "focus:input-success"
-            }`}
+            error={!!errors.fecha_envio_citacion}
             max={new Date().toISOString().split("T")[0]}
             disabled={isSubmitting || isUploadingFiles}
           />
@@ -193,16 +182,14 @@ export default function NotificacionCitacionFields({
               Fecha Constancia Citación
             </span>
           </label>
-          <input
-            type="date"
+          <CustomDateInput
             value={notificacionForm.fecha_constancia_citacion}
-            onChange={(e) =>
+            onChange={(v) =>
               setNotificacionForm({
                 ...notificacionForm,
-                fecha_constancia_citacion: e.target.value,
+                fecha_constancia_citacion: v,
               })
             }
-            className="input input-bordered w-full focus:input-success"
             max={new Date().toISOString().split("T")[0]}
             disabled={isSubmitting || isUploadingFiles}
           />

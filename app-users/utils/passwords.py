@@ -2,6 +2,8 @@ from passlib.hash import bcrypt as passlib_bcrypt
 import bcrypt as raw_bcrypt
 import asyncio
 import os
+import random
+import string
 from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 
@@ -66,3 +68,17 @@ async def verify_password_async(password: str, hashed: str) -> bool:
     """Corre verify_password en el thread pool para no bloquear el event loop."""
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(_executor, verify_password, password, hashed)
+
+
+def generate_temp_password(length: int = 10) -> str:
+    """Genera una contraseña temporal: 1 mayúscula, 2 dígitos, 1 símbolo y el resto alfanumérico, mezclados."""
+    mayuscula = random.choice(string.ascii_uppercase)
+    numeros = random.choices(string.digits, k=2)
+    simbolo = random.choice("!@#$%^&*()-_=+?¿¡[]{}<>")
+
+    restantes = length - (1 + 2 + 1)
+    otros = random.choices(string.ascii_letters + string.digits, k=restantes)
+
+    cont_list = list(mayuscula + "".join(numeros) + simbolo + "".join(otros))
+    random.shuffle(cont_list)
+    return "".join(cont_list)

@@ -5,6 +5,7 @@ import {
   uploadFileToDocuments,
   generateDocumentFileName,
 } from "../../../../utils/fileUpload";
+import CustomDateInput from "../../../Common/Form/CustomDateInput";
 
 type Props = {
   expedienteId: number;
@@ -70,10 +71,8 @@ export default function RespuestaData({
   const handleRadicadoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSelectedRadicado(e.target.value);
   };
-  const handleFechaRadicadoChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    setSelectedFechaRadicado(e.target.value);
+  const handleFechaRadicadoChange = (value: string) => {
+    setSelectedFechaRadicado(value);
   };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -107,6 +106,12 @@ export default function RespuestaData({
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (!selectedFechaRadicado) {
+      setToast({ id: Date.now(), message: "Seleccione la fecha de radicado", type: "error" });
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -312,16 +317,12 @@ export default function RespuestaData({
                     Fecha Radicado SIAF
                   </span>
                 </label>
-                <input
-                  type="date"
-                  name="fecha_radicado"
+                <CustomDateInput
                   value={selectedFechaRadicado}
                   onChange={handleFechaRadicadoChange}
-                  className="input input-bordered w-full font-mono"
                   max={new Date().toISOString().split('T')[0]}
-                  required
                   disabled={isSubmitting || isUploadingFile}
-                ></input>
+                />
               </div>
 
               {/* Requiere Medida Preventiva */}

@@ -29,6 +29,7 @@ class CreateServiceRequest(BaseModel):
     tipo_archivo: str = "pdf"
     creador_id: int
     revisores_ids: list[int]
+    origen: str | None = None
 
 
 @router.post("/create-service")
@@ -55,6 +56,7 @@ async def crear_documento_service(
         tipo_archivo=body.tipo_archivo,
         usuario_creador_id=body.creador_id,
         estado='en_revision',
+        origen=body.origen,
         version_actual=1
     )
     db.add(nuevo_documento)
@@ -71,7 +73,8 @@ async def crear_documento_service(
                 documento_id=nuevo_documento.id,
                 documento_nombre=body.nombre,
                 revisor_id=revisor_id,
-                version_actual=1
+                version_actual=1,
+                origen=body.origen,
             )
         except Exception as e:
             logger.error(f"Error notificando revisor {revisor_id}: {e}")

@@ -16,6 +16,8 @@ import { API_CONFIG, apiCall } from "../../../utils/api";
 import DocumentoCard from "./DocumentoCard";
 import DocumentoDetalleModal from "./DocumentoDetalleModal";
 import CrearDocumentoModal from "./CrearDocumentoModal";
+import CustomSelect from "../../Common/Form/CustomSelect";
+import CustomDateInput from "../../Common/Form/CustomDateInput";
 
 type EstadoDocumento = "en_revision" | "aprobado" | "rechazado" | "finalizado";
 
@@ -206,7 +208,16 @@ export default function DocumentosPage({ setToast }: Props) {
     cargarDatos(1);
   };
 
-  const handleDocumentoActualizado = () => {
+  const handleDocumentoActualizado = (accion?: "upload" | "revision") => {
+    // Best-effort: si el documento revisado es en realidad un informe técnico
+    // de app-infraction (asignado a un revisor distinto de quien lo asignó),
+    // esto sincroniza su estado allá. Si no lo es, el endpoint responde
+    // ok=false sin error y no pasa nada.
+    if (accion === "revision" && selectedDocId) {
+      apiCall(API_CONFIG.ENDPOINTS.INFRACTION_REPORTS_SYNC_BY_DOC(selectedDocId), {
+        method: "PUT",
+      }).catch(() => {});
+    }
     cargarDatos(page);
   };
 
@@ -249,7 +260,7 @@ export default function DocumentosPage({ setToast }: Props) {
   return (
     <div className="min-h-screen bg-base-200">
       {/* Header */}
-      <div className="bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm sticky top-0 z-10">
+      <div className="bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -334,28 +345,27 @@ export default function DocumentosPage({ setToast }: Props) {
                       <label className="block text-sm font-medium text-base-content/70 mb-1">
                         Estado
                       </label>
-                      <select
+                      <CustomSelect
                         value={filtroEstado}
-                        onChange={(e) => setFiltroEstado(e.target.value)}
-                        className="select select-bordered w-full"
-                      >
-                        <option value="">Todos los estados</option>
-                        <option value="en_revision">En Revisión</option>
-                        <option value="aprobado">Aprobado</option>
-                        <option value="rechazado">Rechazado</option>
-                        <option value="finalizado">Finalizado</option>
-                      </select>
+                        onChange={setFiltroEstado}
+                        emptyValue=""
+                        placeholder="Todos los estados"
+                        options={[
+                          { value: "en_revision", label: "En Revisión" },
+                          { value: "aprobado", label: "Aprobado" },
+                          { value: "rechazado", label: "Rechazado" },
+                          { value: "finalizado", label: "Finalizado" },
+                        ]}
+                      />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-base-content/70 mb-1">
                         Fecha Desde
                       </label>
-                      <input
-                        type="date"
+                      <CustomDateInput
                         value={filtroFechaDesde}
-                        onChange={(e) => setFiltroFechaDesde(e.target.value)}
-                        className="input input-bordered w-full"
+                        onChange={setFiltroFechaDesde}
                       />
                     </div>
 
@@ -363,11 +373,9 @@ export default function DocumentosPage({ setToast }: Props) {
                       <label className="block text-sm font-medium text-base-content/70 mb-1">
                         Fecha Hasta
                       </label>
-                      <input
-                        type="date"
+                      <CustomDateInput
                         value={filtroFechaHasta}
-                        onChange={(e) => setFiltroFechaHasta(e.target.value)}
-                        className="input input-bordered w-full"
+                        onChange={setFiltroFechaHasta}
                       />
                     </div>
                   </div>
