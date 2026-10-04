@@ -2,6 +2,7 @@ import Input from "../../Common/Input/Input";
 import { useEffect, useState, useRef } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import ConfirmationModal from "./ConfirmationModal";
+import CustomSelect from "../../Common/Form/CustomSelect";
 
 type Permission = { id: number; name: string; menu_path: string };
 
@@ -25,11 +26,11 @@ export default function EditPermission({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const handlePermissionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handlePermissionChange = (value: string) => {
     const permissionTemp = permissions.find(
-      (p) => p.id === Number(e.target.value),
+      (p) => p.id === Number(value),
     );
-    setSelectedPermissionId(e.target.value);
+    setSelectedPermissionId(value);
 
     if (permissionNameRef.current) {
       permissionNameRef.current.value = permissionTemp
@@ -263,18 +264,16 @@ export default function EditPermission({
                 Seleccionar permiso
               </span>
             </label>
-            <select
-              className="select select-bordered w-full"
+            <CustomSelect
               onChange={handlePermissionChange}
               value={selectedPermissionId}
-            >
-              <option value="0">Seleccione un permiso</option>
-              {permissions.map((permission) => (
-                <option key={permission.id} value={permission.id}>
-                  {permission.name} - {permission.menu_path}
-                </option>
-              ))}
-            </select>
+              emptyValue="0"
+              placeholder="Seleccione un permiso"
+              options={permissions.map((permission) => ({
+                value: String(permission.id),
+                label: `${permission.name} - ${permission.menu_path}`,
+              }))}
+            />
           </div>
         </div>
 

@@ -2,7 +2,7 @@
 import pytest
 from conftest import gateway_headers, service_headers
 
-PERMISO_ROL = "admin_roles"
+PERMISO_ROL = "admin_roles_y_permisos"
 
 
 @pytest.mark.asyncio
@@ -81,7 +81,7 @@ async def test_add_rol_duplicado_400(client, make_permiso, make_rol, make_usuari
 
 @pytest.mark.asyncio
 async def test_verify_requiere_service_token(client):
-    resp = await client.post("/role/verify", json={"permission_name": "admin_roles", "user_id": 1})
+    resp = await client.post("/role/verify", json={"permission_name": "admin_roles_y_permisos", "user_id": 1})
     assert resp.status_code == 403
 
 

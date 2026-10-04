@@ -6,6 +6,8 @@ import AdvancedFiltersModal, { type FilterData } from "./AvancedFilterModal";
 import type { Expediente, Quejoso, TipoAfectacion } from "../../../types/infraccionApp";
 import type { Municipio, ModeloGenerico } from "../../../types/common";
 import { API_CONFIG, apiCall } from "../../../utils/api";
+import CustomSelect from "../../Common/Form/CustomSelect";
+import CustomDateInput from "../../Common/Form/CustomDateInput";
 
 type Props = {
   municipioList: Municipio[];
@@ -45,6 +47,7 @@ export default function ExpedienteList({
   const [townFilter, setTownFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
   const [archivedFilter, setArchivedFilter] = useState("all");
+  const [estadoFilter, setEstadoFilter] = useState("all");
   const [showQuickFilters, setShowQuickFilters] = useState(false);
 
   const [showAdvancedModal, setShowAdvancedModal] = useState(false);
@@ -97,6 +100,18 @@ export default function ExpedienteList({
       }
     });
     return Array.from(etapas).sort();
+  }, [expedienteList, avanzadaExpedienteList, advancedFilters]);
+
+  const availableEstados = useMemo(() => {
+    const estados = new Set<string>();
+    const currentList =
+      (advancedFilters ? avanzadaExpedienteList : expedienteList) || [];
+    currentList.forEach((f) => {
+      if (f.estado) {
+        estados.add(f.estado);
+      }
+    });
+    return Array.from(estados).sort();
   }, [expedienteList, avanzadaExpedienteList, advancedFilters]);
 
   // Aplicar filtros avanzados (llamada al backend)
@@ -176,6 +191,9 @@ export default function ExpedienteList({
             ? f.archivado === true
             : f.archivado === false;
 
+      const matchesEstado =
+        estadoFilter === "all" ? true : f.estado === estadoFilter;
+
       return (
         matchesRadicado &&
         matchesName &&
@@ -183,7 +201,8 @@ export default function ExpedienteList({
         matchesUntilDate &&
         matchesTown &&
         matchesStage &&
-        matchesArchived
+        matchesArchived &&
+        matchesEstado
       );
     });
   }, [
@@ -197,6 +216,7 @@ export default function ExpedienteList({
     townFilter,
     stageFilter,
     archivedFilter,
+    estadoFilter,
   ]);
 
   const clearAllFilters = () => {
@@ -207,6 +227,7 @@ export default function ExpedienteList({
     setTownFilter("all");
     setStageFilter("all");
     setArchivedFilter("all");
+    setEstadoFilter("all");
     clearAdvancedFilters();
   };
 
@@ -217,6 +238,7 @@ export default function ExpedienteList({
     untilDateFilter ||
     townFilter !== "all" ||
     stageFilter !== "all" ||
+    estadoFilter !== "all" ||
     archivedFilter !== "all" ||
     advancedFilters !== null;
 
@@ -338,57 +360,64 @@ export default function ExpedienteList({
               />
 
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="date"
-                  className="input input-bordered input-sm"
+                <CustomDateInput
+                  className="input-sm"
+                  placeholder="Fecha desde"
                   value={fromDateFilter}
-                  onChange={(e) => setFromDateFilter(e.target.value)}
-                  title="Fecha desde"
+                  onChange={setFromDateFilter}
                 />
-                <input
-                  type="date"
-                  className="input input-bordered input-sm"
+                <CustomDateInput
+                  className="input-sm"
+                  placeholder="Fecha hasta"
                   value={untilDateFilter}
-                  onChange={(e) => setUntilDateFilter(e.target.value)}
-                  title="Fecha hasta"
+                  onChange={setUntilDateFilter}
                 />
               </div>
 
-              <select
-                className="select select-bordered select-sm w-full"
+              <CustomSelect
+                className="select-sm"
+                hidePlaceholderOption
                 value={townFilter}
-                onChange={(e) => setTownFilter(e.target.value)}
-              >
-                <option value="all">Todos los municipios</option>
-                {availableTowns.map((mun) => (
-                  <option value={mun} key={mun}>
-                    {mun}
-                  </option>
-                ))}
-              </select>
+                onChange={setTownFilter}
+                options={[
+                  { value: "all", label: "Todos los municipios" },
+                  ...availableTowns.map((mun) => ({ value: mun, label: mun })),
+                ]}
+              />
 
-              <select
-                className="select select-bordered select-sm w-full"
+              <CustomSelect
+                className="select-sm"
+                hidePlaceholderOption
                 value={stageFilter}
-                onChange={(e) => setStageFilter(e.target.value)}
-              >
-                <option value="all">Todas las etapas</option>
-                {availableStages.map((etapa) => (
-                  <option value={etapa} key={etapa}>
-                    {etapa}
-                  </option>
-                ))}
-              </select>
+                onChange={setStageFilter}
+                options={[
+                  { value: "all", label: "Todas las etapas" },
+                  ...availableStages.map((etapa) => ({ value: etapa, label: etapa })),
+                ]}
+              />
 
-              <select
-                className="select select-bordered select-sm w-full"
+              <CustomSelect
+                className="select-sm"
+                hidePlaceholderOption
                 value={archivedFilter}
-                onChange={(e) => setArchivedFilter(e.target.value)}
-              >
-                <option value="all">Todos los estados</option>
-                <option value="archived">Solo archivados</option>
-                <option value="active">Solo activos</option>
-              </select>
+                onChange={setArchivedFilter}
+                options={[
+                  { value: "all", label: "Todos" },
+                  { value: "archived", label: "Solo archivados" },
+                  { value: "active", label: "Solo activos" },
+                ]}
+              />
+
+              <CustomSelect
+                className="select-sm"
+                hidePlaceholderOption
+                value={estadoFilter}
+                onChange={setEstadoFilter}
+                options={[
+                  { value: "all", label: "Todos los estados" },
+                  ...availableEstados.map((estado) => ({ value: estado, label: estado })),
+                ]}
+              />
             </div>
 
             {/* Botón limpiar filtros */}

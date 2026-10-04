@@ -44,6 +44,7 @@ async def create_doc_for_professional(
             "tipo_archivo": "pdf",
             "creador_id": creador_id,
             "revisores_ids": [revisor_id],
+            "origen": "informe_tecnico",
         }
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(

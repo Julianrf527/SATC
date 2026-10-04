@@ -1,11 +1,8 @@
-from fastapi import Request, APIRouter, Depends, HTTPException, Query, Path as PathParam
+from fastapi import Request, APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, func, desc, union_all, literal
+from sqlalchemy import select, update, delete, and_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from datetime import datetime, date, timedelta
-from pydantic import BaseModel
-from collections import defaultdict
 from pathlib import Path
 from dotenv import load_dotenv
 from typing import List
@@ -13,7 +10,6 @@ import logging
 import os
 import pytz
 import re
-import holidays
 
 from db.deps import get_db_managed
 from db.models.recurso_afectado import RecursoAfectado
@@ -22,21 +18,9 @@ from db.models.expediente_tipo_afectacion import ExpedienteTipoAfectacion
 from db.models.tipo_afectacion import TipoAfectacion
 from db.models.quejoso_expediente import QuejosoExpediente
 from db.models.expediente import Expediente
-from db.models.etapa_respuesta import EtapaRespuesta
-from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
-from db.models.etapa_cierre import EtapaCierre
-from db.models.informe_tecnico import InformeTecnico
-from db.models.medida_preventiva import MedidaPreventiva
-from db.models.notificacion import Notificacion
-from db.models.comunicacion import Comunicacion
-from db.models.acto_administrativo import ActoAdministrativo
 from db.models.vereda import Vereda
-from db.models.municipio import Municipio
 from db.models.radicado_asociado import RadicadoAsociado
-from db.models.oficio_remite import OficioRemite
-from db.models.solicitud_informacion import SolicitudInformacion
 from db.models.quejoso import Quejoso
-from db.models.auditoria import Auditoria
 
 from core.permission import Permission
 ASSIGN_PERMISSION = Permission.ASSIGN_PERMISSION
@@ -61,15 +45,12 @@ from .models.file_models import (
     ExpedienteSchema,
     QuejosoSchema,
     BulkEncargadoRequest,
-    FiltroAvanzado,
 )
 
 from utils.verify_token import verify_gateway_token
 from utils.log import insert_log
 from services.notification import create_notification
-from services.users import get_users_by_permission, get_user_info, verify_permission
-from services.involved import get_involved_by_expedientes_ids
-from services.docs import download_unified_pdf
+from services.users import get_user_info, verify_permission
 
 
 def normalize_radicados_asociados(radicados: List[str]) -> List[str]:
@@ -93,7 +74,9 @@ async def crear_quejoso(
     quejoso: QuejosoSchema,
     db: AsyncSession = Depends(get_db_managed),
 ):
-    verify_gateway_token(request)
+    user_id = verify_gateway_token(request)["user_id"]
+    if not await verify_permission(user_id, FILE_MANAGE):
+        raise HTTPException(status_code=403, detail="No cuenta con permisos")
 
     if quejoso.anonimo:
         new_quejoso = Quejoso(anonimo=True)
@@ -426,6 +409,9 @@ async def agregar_expediente(
     token_data = verify_gateway_token(request)
     user_id = token_data["user_id"]
 
+    if not await verify_permission(user_id, FILE_MANAGE):
+        raise HTTPException(status_code=403, detail="No cuenta con permisos")
+
     # Validar radicado duplicado
     duplicado = await db.execute(
         select(Expediente.id).where(Expediente.radicado == expediente.radicado)
@@ -558,6 +544,8 @@ async def actualizar_encargado_de_expediente(
     token_data = verify_gateway_token(request)
     user_id = token_data["user_id"]
 
+    if not await verify_permission(user_id, ASSIGN_PERMISSION):
+        raise HTTPException(status_code=403, detail="No cuenta con permisos")
 
     # Obtener datos anteriores
     stmt_check = select(Expediente).where(Expediente.id == expediente_id)
@@ -626,7 +614,7 @@ async def actualizar_encargado_de_expediente(
     # Crear notificación si se asignó un encargado
     if encargado_id != 0:
         notif_result = await create_notification(
-            mensaje=f"Se te ha asignado el expediente de infraccion {expediente.radicado}",
+            mensaje=f"Expediente {expediente.radicado}\nTe han asignado este expediente de infracción",
             id_vinculada=str(expediente_id),
             tipo="expediente",
             usuario_id=encargado_id
@@ -653,7 +641,8 @@ async def actualizar_encargado_bulk(
     token_data = verify_gateway_token(request)
     user_id = token_data["user_id"]
 
-
+    if not await verify_permission(user_id, ASSIGN_PERMISSION):
+        raise HTTPException(status_code=403, detail="No cuenta con permisos")
 
     expediente_ids = list(dict.fromkeys(data.expediente_id or []))
     if not expediente_ids:
@@ -718,7 +707,7 @@ async def actualizar_encargado_bulk(
     if new_value:
         for expediente_actualizado in updated:
             await create_notification(
-                mensaje=f"Se te ha asignado el expediente de infraccion {expediente_actualizado['radicado']}",
+                mensaje=f"Expediente {expediente_actualizado['radicado']}\nTe han asignado este expediente de infracción",
                 id_vinculada=str(expediente_actualizado['id']),
                 tipo="expediente",
                 usuario_id=new_value

@@ -16,7 +16,7 @@ type DocumentoData = {
 type FormulationCharges = {
   id: number;
   descargos: boolean | null;
-  url_documento?: string | null;
+  documento_id?: number | null;
 };
 
 type Props = {
@@ -85,7 +85,7 @@ export default function FormulacionCargos({
       if (res.ok) {
         setLocalFormulacion(res.formulacion_cargos);
         setDocumentos(res.formulacion_cargos?.documentos_anexos || []);
-        setFormulationData(res.formulacion_cargos?.informacion);
+        setFormulationData(res.formulacion_cargos);
 
         if (res.formulacion_cargos?.acto_admin?.id) {
           setExistActoAdmin(true);

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiCall, API_CONFIG } from "../../../../utils/api";
+import CustomSelect from "../../../Common/Form/CustomSelect";
 
 type Medida = {
   id: number;
@@ -46,6 +47,12 @@ export default function MedidaPreventivaData({
     return { valor: cantidad, unidad: "" };
   };
 
+  const [tipoMedidaId, setTipoMedidaId] = useState(medida?.tipo_medida_id || 0);
+  const [cantidadUnidad, setCantidadUnidad] = useState(parseCantidad(medida?.cantidad).unidad);
+  const [estadoMedida, setEstadoMedida] = useState(
+    medida?.estado_medida === null ? "null" : medida?.estado_medida?.toString() || "null",
+  );
+
   const getTipoNombre = (idTipo: number) => {
     return tipoMedida.find((t) => t.id === idTipo)?.nombre || "No definido";
   };
@@ -62,24 +69,31 @@ export default function MedidaPreventivaData({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!tipoMedidaId) {
+      setToast({ id: Date.now(), message: "Seleccione el tipo de medida", type: "error" });
+      return;
+    }
+    if (!cantidadUnidad) {
+      setToast({ id: Date.now(), message: "Seleccione la unidad de la cantidad", type: "error" });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const formData = new FormData(e.target as HTMLFormElement);
 
-      const estadoValue = formData.get("estado_medida") as string;
       let estadoBoolean: boolean | null = null;
-
-      if (estadoValue === "true") estadoBoolean = true;
-      else if (estadoValue === "false") estadoBoolean = false;
-      else if (estadoValue === "null") estadoBoolean = null;
+      if (estadoMedida === "true") estadoBoolean = true;
+      else if (estadoMedida === "false") estadoBoolean = false;
+      else if (estadoMedida === "null") estadoBoolean = null;
 
       const cantidadValor = formData.get("cantidad_valor") as string;
-      const cantidadUnidad = formData.get("cantidad_unidad") as string;
       const cantidadCompleta = `${cantidadValor} ${cantidadUnidad}`;
 
       const medidaData = {
-        tipo_medida_id: Number(formData.get("id_tipo")),
+        tipo_medida_id: tipoMedidaId,
         cantidad: cantidadCompleta,
         especie: (formData.get("especie") as string).trim(),
         estado_medida: estadoBoolean,
@@ -203,7 +217,14 @@ export default function MedidaPreventivaData({
           {!showForm && medida && isEditable && (
             <button
               className="btn btn-ghost btn-sm gap-2 text-info hover:bg-info/10"
-              onClick={() => setShowForm(true)}
+              onClick={() => {
+                setTipoMedidaId(medida?.tipo_medida_id || 0);
+                setCantidadUnidad(parseCantidad(medida?.cantidad).unidad);
+                setEstadoMedida(
+                  medida?.estado_medida === null ? "null" : medida?.estado_medida?.toString() || "null",
+                );
+                setShowForm(true);
+              }}
               disabled={isLoading}
             >
               <svg
@@ -373,22 +394,13 @@ export default function MedidaPreventivaData({
                 <label className="label">
                   <span className="label-text font-medium">Tipo de Medida</span>
                 </label>
-                <select
-                  name="id_tipo"
-                  defaultValue={medida?.tipo_medida_id || ""}
-                  className="select select-bordered w-full"
-                  required
+                <CustomSelect
+                  value={tipoMedidaId}
+                  onChange={setTipoMedidaId}
+                  placeholder="Seleccione un tipo"
                   disabled={isLoading}
-                >
-                  <option value="" disabled>
-                    Seleccione un tipo
-                  </option>
-                  {tipoMedida.map((tipo) => (
-                    <option key={tipo.id} value={tipo.id}>
-                      {tipo.nombre}
-                    </option>
-                  ))}
-                </select>
+                  options={tipoMedida.map((tipo) => ({ value: tipo.id, label: tipo.nombre }))}
+                />
               </div>
 
               {/* Cantidad */}
@@ -408,24 +420,25 @@ export default function MedidaPreventivaData({
                     required
                     disabled={isLoading}
                   />
-                  <select
-                    name="cantidad_unidad"
-                    defaultValue={parseCantidad(medida?.cantidad).unidad}
-                    className="select select-bordered w-1/3"
-                    required
+                  <CustomSelect
+                    className="w-1/3"
+                    value={cantidadUnidad}
+                    onChange={setCantidadUnidad}
+                    emptyValue=""
+                    placeholder="Unidad"
                     disabled={isLoading}
-                  >
-                    <option value="">Unidad</option>
-                    <option value="m³">m³</option>
-                    <option value="L">Litros</option>
-                    <option value="m²">m²</option>
-                    <option value="Ha">Hectáreas</option>
-                    <option value="kg">Kilogramos</option>
-                    <option value="ton">Toneladas</option>
-                    <option value="und">Unidades</option>
-                    <option value="m">Metros</option>
-                    <option value="km">Kilómetros</option>
-                  </select>
+                    options={[
+                      { value: "m³", label: "m³" },
+                      { value: "L", label: "Litros" },
+                      { value: "m²", label: "m²" },
+                      { value: "Ha", label: "Hectáreas" },
+                      { value: "kg", label: "Kilogramos" },
+                      { value: "ton", label: "Toneladas" },
+                      { value: "und", label: "Unidades" },
+                      { value: "m", label: "Metros" },
+                      { value: "km", label: "Kilómetros" },
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -451,21 +464,17 @@ export default function MedidaPreventivaData({
                     Estado de la Medida
                   </span>
                 </label>
-                <select
-                  name="estado_medida"
-                  defaultValue={
-                    medida?.estado_medida === null
-                      ? "null"
-                      : medida?.estado_medida?.toString() || "null"
-                  }
-                  className="select select-bordered w-full"
-                  required
+                <CustomSelect
+                  hidePlaceholderOption
+                  value={estadoMedida}
+                  onChange={setEstadoMedida}
                   disabled={isLoading}
-                >
-                  <option value="true">Vigente</option>
-                  <option value="false">Levantada</option>
-                  <option value="null">No Aplica</option>
-                </select>
+                  options={[
+                    { value: "true", label: "Vigente" },
+                    { value: "false", label: "Levantada" },
+                    { value: "null", label: "No Aplica" },
+                  ]}
+                />
               </div>
             </div>
 

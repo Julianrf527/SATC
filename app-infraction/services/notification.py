@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://app-users:8001")
 SERVICE_SECRET_KEY = os.getenv("SERVICE_SECRET_KEY")
 
-logger.info(f"Servicio de notificaciones configurado")
+logger.info("Servicio de notificaciones configurado")
 
 async def create_notification(
     mensaje: str,

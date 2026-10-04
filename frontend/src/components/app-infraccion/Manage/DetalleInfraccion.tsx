@@ -1,6 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from "react";
 import { API_CONFIG, apiCall } from "../../../utils/api";
 import { downloadBlobFile } from "../../../utils/DownloadFile";
+import ErrorBoundary from "../../Common/ErrorBoundary";
 import "boxicons/css/boxicons.min.css";
 import type {
   Expediente,
@@ -110,6 +111,7 @@ export default function DetalleInfraccion({
             fecha_creacion: expedienteActual.fecha_creacion,
             archivado: expedienteActual.archivado,
             etapa_actual: expedienteActual.etapa_actual || null,
+            estado: information.estado ?? expedienteActual.estado ?? null,
 
             // Datos adicionales del endpoint /file/full
             direccion: information.direccion || "",
@@ -152,7 +154,7 @@ export default function DetalleInfraccion({
     return () => {
       cancelado = true;
     };
-  }, [expedienteActual, setToast]);
+  }, [expedienteActual?.id, setToast]);
 
   const tabs: Tab[] = [
     {
@@ -342,18 +344,20 @@ export default function DetalleInfraccion({
     };
 
     return (
-      <Suspense
-        fallback={
-          <div className="flex justify-center items-center py-20">
-            <div className="flex flex-col items-center gap-4">
-              <span className="loading loading-spinner loading-lg text-success"></span>
-              <p className="text-base-content/70">Cargando contenido...</p>
+      <ErrorBoundary key={activeTab}>
+        <Suspense
+          fallback={
+            <div className="flex justify-center items-center py-20">
+              <div className="flex flex-col items-center gap-4">
+                <span className="loading loading-spinner loading-lg text-success"></span>
+                <p className="text-base-content/70">Cargando contenido...</p>
+              </div>
             </div>
-          </div>
-        }
-      >
-        <Component {...commonProps} />
-      </Suspense>
+          }
+        >
+          <Component {...commonProps} />
+        </Suspense>
+      </ErrorBoundary>
     );
   };
 
@@ -362,7 +366,7 @@ export default function DetalleInfraccion({
   return (
     <div className="flex-1 flex flex-col h-full bg-base-200">
       {/* HEADER MEJORADO */}
-      <div className="flex-shrink-0 bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm sticky top-0 z-10">
+      <div className="flex-shrink-0 bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

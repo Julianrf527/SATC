@@ -44,7 +44,7 @@ def stub_externos(monkeypatch):
 
     for fn in [
         "notify_assignment", "notify_new_version", "notify_document_approved",
-        "notify_document_rejected", "notify_document_finalized",
+        "notify_document_rejected", "notify_document_finalized", "notify_document_approved_firma",
     ]:
         _patch_everywhere(monkeypatch, fn, _noop)
 
@@ -193,6 +193,86 @@ async def test_review_tres_devoluciones_finaliza(client, perms, stub_externos, m
                           data={"estado_revision": "devuelto"})
     assert r.status_code == 200
     assert r.json()["estado"] == "finalizado"
+
+
+# ---------------- informe técnico: PDF obligatorio y adjunto al devolver ----------------
+
+async def _informe_en_revision(make_documento, make_version, make_asignacion, nombre_archivo):
+    doc = await make_documento(creador_id=1, estado="en_revision", origen="informe_tecnico")
+    await make_version(doc.id, archivo_nombre_original=nombre_archivo)
+    await make_asignacion(doc.id, revisor_id=2)
+    return doc
+
+
+async def test_review_informe_aprobar_word_400(client, perms, stub_externos, make_documento, make_version, make_asignacion):
+    perms[(2, "documento_revisar")] = True
+    doc = await _informe_en_revision(make_documento, make_version, make_asignacion, "informe.docx")
+    r = await client.post(f"/docs/review/{doc.id}", headers=gateway_headers(2),
+                          data={"estado_revision": "aprobado"})
+    assert r.status_code == 400
+    assert "PDF" in r.json()["detail"]
+
+
+async def test_review_informe_aprobar_para_firma_word_ok(client, perms, stub_externos, make_documento, make_version, make_asignacion):
+    perms[(2, "documento_revisar")] = True
+    doc = await _informe_en_revision(make_documento, make_version, make_asignacion, "informe.docx")
+    r = await client.post(f"/docs/review/{doc.id}", headers=gateway_headers(2),
+                          data={"estado_revision": "aprobado_firma"})
+    assert r.status_code == 200
+    assert r.json()["estado"] == "aprobado_firma"
+
+
+async def test_review_informe_devolver_con_adjunto(client, perms, stub_externos, make_documento, make_version, make_asignacion, db_session):
+    from sqlalchemy import select
+    from db.models.revisiones import Revision
+
+    perms[(2, "documento_revisar")] = True
+    doc = await _informe_en_revision(make_documento, make_version, make_asignacion, "informe.docx")
+    r = await client.post(
+        f"/docs/review/{doc.id}", headers=gateway_headers(2),
+        data={"estado_revision": "devuelto", "comentarios": "Ver observaciones"},
+        files={"archivo": ("observaciones.docx", io.BytesIO(b"PK docx"), "application/octet-stream")},
+    )
+    assert r.status_code == 200
+    revision = await db_session.scalar(select(Revision).where(Revision.documento_id == doc.id))
+    assert revision.archivo_adjunto_nombre == "observaciones.docx"
+    assert revision.archivo_adjunto_url
+
+
+async def test_review_adjunto_en_documento_normal_400(client, perms, stub_externos, make_documento, make_asignacion):
+    perms[(2, "documento_revisar")] = True
+    doc = await make_documento(creador_id=1, estado="en_revision")
+    await make_asignacion(doc.id, revisor_id=2)
+    r = await client.post(
+        f"/docs/review/{doc.id}", headers=gateway_headers(2),
+        data={"estado_revision": "devuelto", "comentarios": "x"},
+        files=_pdf_upload(),
+    )
+    assert r.status_code == 400
+
+
+async def test_upload_version_firmada_word_400(client, perms, stub_externos, make_documento, make_version):
+    perms[(1, "documento_crear")] = True
+    doc = await make_documento(creador_id=1, estado="aprobado_firma", origen="informe_tecnico")
+    await make_version(doc.id, archivo_nombre_original="informe.docx")
+    r = await client.post(
+        f"/docs/upload-version/{doc.id}", headers=gateway_headers(1),
+        files={"archivo": ("firmado.docx", io.BytesIO(b"PK docx"), "application/octet-stream")},
+    )
+    assert r.status_code == 400
+    assert "PDF" in r.json()["detail"]
+
+
+async def test_download_revision_ajeno_403(client, perms, make_documento, db_session):
+    from db.models.revisiones import Revision
+
+    doc = await make_documento(creador_id=42, origen="informe_tecnico")
+    revision = Revision(documento_id=doc.id, version_revisada=1, revisor_id=43, estado_revision="devuelto",
+                        archivo_adjunto_url="satc-documentos/x/obs.pdf", archivo_adjunto_nombre="obs.pdf")
+    db_session.add(revision)
+    await db_session.flush()
+    r = await client.get(f"/docs/download-revision/{revision.id}", headers=gateway_headers(1))
+    assert r.status_code == 403
 
 
 # ---------------- /download (fuga de info) ----------------

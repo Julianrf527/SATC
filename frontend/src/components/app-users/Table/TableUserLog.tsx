@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import AuditDetailModal from "../AuditDetailModal";
+import CustomSelect from "../../Common/Form/CustomSelect";
+import CustomDateInput from "../../Common/Form/CustomDateInput";
 
 type Auditoria = {
   id: number;
@@ -172,40 +174,39 @@ export default function TableUserLog({
                     />
                   </th>
                   <th>
-                    <select
-                      className="select select-bordered select-sm w-full"
+                    <CustomSelect
+                      className="select-sm"
+                      hidePlaceholderOption
                       value={tablaFilter}
-                      onChange={(e) => onTablaFilterChange(e.target.value)}
-                    >
-                      <option value="all">Todas</option>
-                      {uniqueTables.map((table) => (
-                        <option key={table} value={table}>
-                          {table}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={onTablaFilterChange}
+                      options={[
+                        { value: "all", label: "Todas" },
+                        ...uniqueTables.map((table) => ({ value: table, label: table })),
+                      ]}
+                    />
                   </th>
                   <th>
-                    <select
-                      className="select select-bordered select-sm w-full"
+                    <CustomSelect
+                      className="select-sm"
+                      hidePlaceholderOption
                       value={operacionFilter}
-                      onChange={(e) => onOperacionFilterChange(e.target.value)}
-                    >
-                      <option value="all">Todas</option>
-                      <option value="INSERT">Creación</option>
-                      <option value="UPDATE">Actualización</option>
-                      <option value="DELETE">Eliminación</option>
-                    </select>
+                      onChange={onOperacionFilterChange}
+                      options={[
+                        { value: "all", label: "Todas" },
+                        { value: "INSERT", label: "Creación" },
+                        { value: "UPDATE", label: "Actualización" },
+                        { value: "DELETE", label: "Eliminación" },
+                      ]}
+                    />
                   </th>
                   <th>
                     <div className="text-xs text-base-content/60">-</div>
                   </th>
                   <th>
-                    <input
-                      type="date"
-                      className="input input-bordered input-sm w-full"
+                    <CustomDateInput
+                      className="input-sm"
                       value={fechaFilter}
-                      onChange={(e) => onFechaFilterChange(e.target.value)}
+                      onChange={onFechaFilterChange}
                     />
                   </th>
                   <th>

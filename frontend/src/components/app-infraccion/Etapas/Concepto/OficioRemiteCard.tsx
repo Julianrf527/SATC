@@ -7,6 +7,7 @@ import {
   generateDocumentFileName,
 } from "../../../../utils/fileUpload";
 import { openDocumentById } from "../../../../utils/documentViewer";
+import CustomDateInput from "../../../Common/Form/CustomDateInput";
 
 type OficioRemite = {
   id: number;
@@ -73,6 +74,16 @@ export default function OficioRemiteCard({
 
       if (!RADICADO_REGEX.test(radicado.trim())) {
         setToast({ id: Date.now(), message: "El radicado no cumple el formato requerido (ej: 2024EE0001)", type: "error" });
+        return;
+      }
+
+      if (!fechaRadicado) {
+        setToast({ id: Date.now(), message: "Seleccione la fecha de radicado", type: "error" });
+        return;
+      }
+
+      if (!fechaRemitido) {
+        setToast({ id: Date.now(), message: "Seleccione la fecha de remitido", type: "error" });
         return;
       }
 
@@ -205,28 +216,22 @@ export default function OficioRemiteCard({
                 <label className="label">
                   <span className="label-text font-medium">Fecha Radicado *</span>
                 </label>
-                <input
-                  type="date"
-                  className="input input-bordered w-full"
+                <CustomDateInput
                   value={fechaRadicado}
-                  onChange={(e) => setFechaRadicado(e.target.value)}
+                  onChange={setFechaRadicado}
                   max={hoy}
                   disabled={isSubmitting}
-                  required
                 />
               </div>
               <div className="form-control">
                 <label className="label">
                   <span className="label-text font-medium">Fecha Remitido *</span>
                 </label>
-                <input
-                  type="date"
-                  className="input input-bordered w-full"
+                <CustomDateInput
                   value={fechaRemitido}
-                  onChange={(e) => setFechaRemitido(e.target.value)}
+                  onChange={setFechaRemitido}
                   max={hoy}
                   disabled={isSubmitting}
-                  required
                 />
               </div>
             </div>

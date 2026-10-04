@@ -5,6 +5,7 @@ import type {
 } from "../../../types/sancionatorioApp";
 import type { Municipio, ModeloGenerico } from "../../../types/common";
 import { apiCall, API_CONFIG } from "../../../utils/api";
+import CustomSelect from "../../Common/Form/CustomSelect";
 
 type Props = {
   userId: number;
@@ -28,23 +29,19 @@ export default function NuevoExpediente({
   addExpediente,
 }: Props) {
   const [veredaList, setVeredaList] = useState<ModeloGenerico[]>([]);
+  const [municipioId, setMunicipioId] = useState(0);
+  const [veredaId, setVeredaId] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
   const [recursoAfectadoSeleccionado, setRecursoAfectadoSeleccionado] =
     useState<number[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const formRef = useRef<HTMLFormElement | null>(null);
 
-  const toggleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const municipioId = Number(e.target.value);
-    const municipio = municipioList.find((m) => m.id === municipioId);
+  const toggleChange = (id: number) => {
+    setMunicipioId(id);
+    setVeredaId(0);
+    const municipio = municipioList.find((m) => m.id === id);
     setVeredaList(municipio?.veredas ?? []);
-
-    if (formRef.current) {
-      const veredaEl = formRef.current.elements.namedItem(
-        "vereda",
-      ) as HTMLSelectElement | null;
-      if (veredaEl) veredaEl.value = "";
-    }
   };
 
   const onSubmit = async (formData: any) => {
@@ -97,6 +94,8 @@ export default function NuevoExpediente({
         formRef.current?.reset();
         setErrorMsg("");
         setVeredaList([]);
+        setMunicipioId(0);
+        setVeredaId(0);
         setRecursoAfectadoSeleccionado([]);
         onCancel();
       } else {
@@ -119,6 +118,14 @@ export default function NuevoExpediente({
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
 
+    if (!municipioId) {
+      setErrorMsg("Seleccione un municipio");
+      return;
+    }
+    if (!veredaId) {
+      setErrorMsg("Seleccione una vereda");
+      return;
+    }
     if (recursoAfectadoSeleccionado.length === 0) {
       setErrorMsg("Seleccione al menos un recurso afectado");
     } else {
@@ -129,8 +136,8 @@ export default function NuevoExpediente({
         recurso: recursoAfectadoSeleccionado,
         motivo: formData.get("motivo"),
         encargado_id: userId,
-        municipio: formData.get("municipio"),
-        vereda: formData.get("vereda"),
+        municipio: String(municipioId),
+        vereda: String(veredaId),
         direccion: formData.get("direccion"),
       };
 
@@ -141,6 +148,8 @@ export default function NuevoExpediente({
   const handleCancelClick = () => {
     formRef.current?.reset();
     setVeredaList([]);
+    setMunicipioId(0);
+    setVeredaId(0);
     setRecursoAfectadoSeleccionado([]);
     setErrorMsg("");
     onCancel();
@@ -279,23 +288,13 @@ export default function NuevoExpediente({
             <label className="label">
               <span className="label-text font-medium">Municipio *</span>
             </label>
-            <select
-              name="municipio"
-              defaultValue=""
+            <CustomSelect
+              value={municipioId}
               onChange={toggleChange}
-              className="select select-bordered w-full"
-              required
+              placeholder="Seleccione un municipio"
               disabled={isSubmitting}
-            >
-              <option value="" disabled>
-                Seleccione un municipio
-              </option>
-              {municipioList.map((town) => (
-                <option value={town.id} key={town.id}>
-                  {town.nombre}
-                </option>
-              ))}
-            </select>
+              options={municipioList.map((town) => ({ value: town.id, label: town.nombre }))}
+            />
           </div>
 
           {/* Vereda */}
@@ -303,24 +302,17 @@ export default function NuevoExpediente({
             <label className="label">
               <span className="label-text font-medium">Vereda *</span>
             </label>
-            <select
-              name="vereda"
-              defaultValue=""
-              className="select select-bordered w-full"
-              required
-              disabled={isSubmitting || veredaList.length === 0}
-            >
-              <option value="" disabled>
-                {veredaList.length === 0
+            <CustomSelect
+              value={veredaId}
+              onChange={setVeredaId}
+              placeholder={
+                veredaList.length === 0
                   ? "Seleccione primero un municipio"
-                  : "Seleccione una vereda"}
-              </option>
-              {veredaList.map((vereda) => (
-                <option value={vereda.id} key={vereda.id}>
-                  {vereda.nombre}
-                </option>
-              ))}
-            </select>
+                  : "Seleccione una vereda"
+              }
+              disabled={isSubmitting || veredaList.length === 0}
+              options={veredaList.map((vereda) => ({ value: vereda.id, label: vereda.nombre }))}
+            />
           </div>
 
           {/* Dirección */}

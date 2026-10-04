@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { apiCall, API_CONFIG } from "../../../utils/api";
 import TableAudit from "../../app-users/Table/TableUserLog";
+import CustomDateInput from "../../Common/Form/CustomDateInput";
 
 type Auditoria = {
   id: number;
@@ -102,7 +103,7 @@ export default function AuditLayout({ setToast }: Props) {
   return (
     <>
       {/* Header */}
-      <div className="bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm sticky top-0 z-10">
+      <div className="bg-gradient-to-r from-base-100 to-base-200/50 border-b border-base-300 shadow-sm">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
@@ -181,13 +182,13 @@ export default function AuditLayout({ setToast }: Props) {
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-base-content/60">Fecha desde</span>
-                  <input type="date" className="input input-sm input-bordered w-full"
-                    value={searchFechaInicio} onChange={(e) => setSearchFechaInicio(e.target.value)} disabled={loading} />
+                  <CustomDateInput className="input-sm"
+                    value={searchFechaInicio} onChange={setSearchFechaInicio} disabled={loading} />
                 </div>
                 <div className="flex flex-col gap-1">
                   <span className="text-xs font-medium text-base-content/60">Fecha hasta</span>
-                  <input type="date" className="input input-sm input-bordered w-full"
-                    value={searchFechaFin} onChange={(e) => setSearchFechaFin(e.target.value)} disabled={loading} />
+                  <CustomDateInput className="input-sm"
+                    value={searchFechaFin} onChange={setSearchFechaFin} disabled={loading} />
                 </div>
                 <div className="flex items-end">
                   <button className="btn btn-sm btn-success text-white gap-2 w-full"

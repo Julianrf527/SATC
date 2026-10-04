@@ -32,6 +32,7 @@ from db.models.documentos import Documento
 from db.models.versiones_documento import VersionDocumento
 from db.models.asignaciones_revisores import AsignacionRevisor
 from db.models.auditoria_documentos import AuditoriaDocumento
+from db.models.revisiones import Revision
 from db.models.v_documentos_detalle import VDocumentoDetalle
 from db.models.file_hash import FileHash
 
@@ -46,6 +47,45 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 init_minio()
+
+
+async def _registrar_uso_version(db: AsyncSession, file_hash_id: Optional[int]) -> None:
+    """Cada versión de documento es un uso del archivo: sin esto el archivo
+    queda con numero_usos=0 y la limpieza nocturna lo borra de MinIO."""
+    if not file_hash_id:
+        return
+    file_record = await db.get(FileHash, file_hash_id)
+    if file_record:
+        file_record.numero_usos += 1
+
+
+def es_pdf(nombre_archivo: Optional[str]) -> bool:
+    # La extensión es confiable: validate_file_complete exige que coincida con el MIME real.
+    return bool(nombre_archivo) and nombre_archivo.lower().endswith(".pdf")
+
+
+async def ultima_version(db: AsyncSession, documento_id: int) -> Optional[VersionDocumento]:
+    return await db.scalar(
+        select(VersionDocumento)
+        .where(VersionDocumento.documento_id == documento_id)
+        .order_by(VersionDocumento.numero_version.desc())
+        .limit(1)
+    )
+
+
+async def subir_archivo_adjunto(db: AsyncSession, archivo: UploadFile, extensiones: tuple[str, ...]) -> tuple[str, str]:
+    """Valida, escanea y sube un archivo; registra su uso. Devuelve (url, nombre)."""
+    nombre = (archivo.filename or "").lower()
+    if not nombre.endswith(extensiones):
+        raise HTTPException(status_code=400, detail=f"Formato no permitido. Permitidos: {', '.join(extensiones)}")
+    _, sanitized_filename, mime_type, _, file_data = await _procesar_archivo_seguro(archivo)
+    resultado = await upload_file_with_deduplication(
+        db=db, file_data=file_data, original_filename=sanitized_filename, content_type=mime_type
+    )
+    if not resultado["ok"]:
+        raise HTTPException(status_code=500, detail=f"Error subiendo archivo: {resultado.get('message', 'Error desconocido')}")
+    await _registrar_uso_version(db, resultado.get("id"))
+    return resultado["url"], sanitized_filename
 
 
 class DocumentoResumen(BaseModel):
@@ -84,7 +124,9 @@ async def listar_documentos(
     if not tiene_permiso_creador and not tiene_permiso_revisor:
         raise HTTPException(status_code=403, detail="No tienes permisos para ver documentos")
 
-    stmt = select(VDocumentoDetalle)
+    # Los documentos del flujo de informes técnicos (app-infraction) no se
+    # listan acá — se gestionan desde "Mis Informes".
+    stmt = select(VDocumentoDetalle).where(VDocumentoDetalle.origen.is_(None))
 
     if tiene_permiso_creador and tiene_permiso_revisor:
         subquery = select(AsignacionRevisor.documento_id).where(AsignacionRevisor.revisor_id == user_id)
@@ -210,6 +252,7 @@ async def obtener_documento_completo(
         "descripcion": documento.descripcion or "",
         "tipo_archivo": documento.tipo_archivo,
         "estado": documento.estado,
+        "origen": documento.origen,
         "version_actual": documento.version_actual or 1,
         "numero_devoluciones": documento.numero_devoluciones or 0,
         "fecha_creacion": documento.fecha_creacion.isoformat() if documento.fecha_creacion else None,
@@ -234,7 +277,8 @@ async def obtener_documento_completo(
                 "estado": r.estado_revision,
                 "comentarios": r.comentarios or "",
                 "fecha_revision": r.fecha_revision.isoformat() if r.fecha_revision else None,
-                "version_revisada": r.version_revisada
+                "version_revisada": r.version_revisada,
+                "adjunto_nombre": r.archivo_adjunto_nombre if r.archivo_adjunto_url else None,
             }
             for r in revisiones
         ],
@@ -309,12 +353,7 @@ async def crear_documento(
         )
 
     archivo_url = resultado_upload["url"]
-    if resultado_upload.get("deduplicated"):
-        file_hash_id = resultado_upload.get("id")
-        if file_hash_id:
-            file_record = await db.get(FileHash, file_hash_id)
-            if file_record:
-                file_record.numero_usos += 1
+    await _registrar_uso_version(db, resultado_upload.get("id"))
 
     nuevo_documento = Documento(
         nombre=nombre,
@@ -350,7 +389,8 @@ async def crear_documento(
                 documento_id=nuevo_documento.id,
                 documento_nombre=nombre,
                 revisor_id=revisor_id,
-                version_actual=1
+                version_actual=1,
+                origen=nuevo_documento.origen,
             )
         except Exception as e:
             logger.error(f"Error al notificar revisor {revisor_id}: {e}")
@@ -404,12 +444,17 @@ async def subir_nueva_version(
     versions_count = (await db.execute(stmt_ver_count)).scalar() or 0
     is_initial_upload = versions_count == 0
 
-    # Permitir upload inicial (sin versiones) o re-subida tras rechazo.
-    if not is_initial_upload and documento.estado != 'rechazado':
+    # Permitir upload inicial (sin versiones), re-subida tras rechazo, o
+    # (informe técnico) la versión firmada tras "aprobado para firma".
+    es_version_firmada = not is_initial_upload and documento.estado == 'aprobado_firma'
+    if not is_initial_upload and documento.estado not in ('rechazado', 'aprobado_firma'):
         raise HTTPException(
             status_code=400,
             detail="Solo puedes subir una nueva versión cuando el documento ha sido devuelto"
         )
+    # La firmada se auto-aprueba y se une al PDF del expediente: debe ser PDF.
+    if es_version_firmada and not es_pdf(archivo.filename):
+        raise HTTPException(status_code=400, detail="La versión firmada debe subirse en PDF")
 
     file_hash, sanitized_filename, mime_type, archivo_size, file_data = await _procesar_archivo_seguro(archivo)
 
@@ -436,6 +481,7 @@ async def subir_nueva_version(
         )
 
     archivo_url = resultado_upload["url"]
+    await _registrar_uso_version(db, resultado_upload.get("id"))
 
     nueva_version_num = documento.version_actual if is_initial_upload else documento.version_actual + 1
     nueva_version = VersionDocumento(
@@ -450,22 +496,44 @@ async def subir_nueva_version(
     db.add(nueva_version)
 
     documento.version_actual = nueva_version_num
-    documento.estado = 'en_revision'
     documento.fecha_ultima_actualizacion = datetime.now(_BOGOTA)
 
-    stmt_revisores = select(AsignacionRevisor).where(AsignacionRevisor.documento_id == documento_id)
-    revisores = (await db.execute(stmt_revisores)).scalars().all()
-    await notify_new_version(
-        documento_id=documento_id,
-        documento_nombre=documento.nombre,
-        version_numero=nueva_version_num,
-        revisores_ids=[r.revisor_id for r in revisores]
-    )
+    if es_version_firmada:
+        # Aprobado para firma: la versión firmada se auto-aprueba, sin pasar
+        # de nuevo por el revisor.
+        documento.estado = 'aprobado'
+        stmt_ultimo_revisor = (
+            select(Revision.revisor_id)
+            .where(Revision.documento_id == documento_id, Revision.estado_revision == 'aprobado_firma')
+            .order_by(Revision.fecha_revision.desc())
+            .limit(1)
+        )
+        ultimo_revisor_id = (await db.execute(stmt_ultimo_revisor)).scalar_one_or_none()
+        db.add(Revision(
+            documento_id=documento_id,
+            version_revisada=nueva_version_num,
+            revisor_id=ultimo_revisor_id or user_id,
+            estado_revision='aprobado',
+            comentarios='Auto-aprobado: versión firmada subida tras aprobación para firma'
+        ))
+    else:
+        documento.estado = 'en_revision'
+        stmt_revisores = select(AsignacionRevisor).where(AsignacionRevisor.documento_id == documento_id)
+        revisores = (await db.execute(stmt_revisores)).scalars().all()
+        await notify_new_version(
+            documento_id=documento_id,
+            documento_nombre=documento.nombre,
+            version_numero=nueva_version_num,
+            revisores_ids=[r.revisor_id for r in revisores],
+            origen=documento.origen,
+        )
 
     accion_version = 'subir_version_inicial' if is_initial_upload else 'subir_version'
     descripcion_version = (
         f'Documento cargado por primera vez (v{nueva_version_num})'
         if is_initial_upload
+        else f'Versión firmada auto-aprobada (v{nueva_version_num})'
+        if es_version_firmada
         else f'Nueva versión subida (v{nueva_version_num}) tras devolución'
     )
     db.add(AuditoriaDocumento(
@@ -543,6 +611,57 @@ async def descargar_archivo(
         iter([file_data]),
         media_type=content_type,
         headers={"Content-Disposition": f'attachment; filename="{version.archivo_nombre_original}"'}
+    )
+
+
+_CONTENT_TYPES_ADJUNTO = {
+    '.pdf': 'application/pdf',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.doc': 'application/msword',
+}
+
+
+@router.get("/download-revision/{revision_id}")
+async def descargar_adjunto_revision(
+    request: Request,
+    revision_id: int,
+    db: AsyncSession = Depends(get_db_managed)
+):
+    """Descarga el archivo de observaciones adjunto a una devolución. Solo creador y revisores del documento."""
+    token_data = verify_gateway_token(request)
+    user_id = int(token_data["user_id"])
+
+    revision = await db.scalar(select(Revision).where(Revision.id == revision_id))
+    documento = None
+    es_revisor = False
+    if revision is not None:
+        documento = await db.scalar(select(Documento).where(Documento.id == revision.documento_id))
+        es_revisor = await db.scalar(
+            select(AsignacionRevisor.id).where(
+                AsignacionRevisor.documento_id == revision.documento_id,
+                AsignacionRevisor.revisor_id == user_id,
+            )
+        ) is not None
+    es_creador = documento is not None and documento.usuario_creador_id == user_id
+
+    # 403 también si no existe o no tiene adjunto: no revelar qué IDs existen.
+    if not (es_creador or es_revisor) or not revision.archivo_adjunto_url:
+        raise HTTPException(status_code=403, detail="No tienes permiso para descargar este archivo")
+
+    file_path = revision.archivo_adjunto_url
+    if file_path.startswith(MINIO_BUCKET + "/"):
+        file_path = file_path.replace(MINIO_BUCKET + "/", "", 1)
+
+    resultado = await asyncio.to_thread(get_file_from_minio, file_path)
+    if not resultado["ok"]:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+
+    nombre = revision.archivo_adjunto_nombre or "observaciones"
+    extension = os.path.splitext(nombre.lower())[1]
+    return StreamingResponse(
+        iter([resultado["data"]]),
+        media_type=_CONTENT_TYPES_ADJUNTO.get(extension, 'application/octet-stream'),
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'}
     )
 
 

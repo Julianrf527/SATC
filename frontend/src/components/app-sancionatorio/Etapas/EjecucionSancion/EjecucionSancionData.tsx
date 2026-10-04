@@ -52,6 +52,7 @@ export default function EjecucionSancionData({
   const [isLoading, setIsLoading] = useState(false);
   const [autoTipo, setAutoTipo] = useState<string>("AUTO");
   const [autoNumero, setAutoNumero] = useState<string>("");
+  const [fechaAuto, setFechaAuto] = useState<string>(data?.fecha_auto || "");
   const [cobroCoactivoFile, setCobroCoactivoFile] = useState<File | null>(null);
   const [ruiaFile, setRuiaFile] = useState<File | null>(null);
   const [memorandoFile, setMemorandoFile] = useState<File | null>(null);
@@ -76,7 +77,8 @@ export default function EjecucionSancionData({
       setAutoTipo("AUTO");
       setAutoNumero("");
     }
-  }, [data?.auto_admin]);
+    setFechaAuto(data?.fecha_auto || "");
+  }, [data?.auto_admin, data?.fecha_auto]);
 
   const handleFileChange = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -156,9 +158,6 @@ export default function EjecucionSancionData({
       const memorandoChecked =
         (form.elements.namedItem("memorando") as HTMLInputElement)?.checked ||
         false;
-      const fechaAuto = (
-        form.elements.namedItem("fecha_auto") as HTMLInputElement
-      )?.value;
 
       // Validaciones: Si el checkbox está marcado, debe tener documento
       if (
@@ -473,8 +472,10 @@ export default function EjecucionSancionData({
             onFileChange={handleFileChange}
             autoTipo={autoTipo}
             autoNumero={autoNumero}
+            fechaAuto={fechaAuto}
             onAutoTipoChange={setAutoTipo}
             onAutoNumeroChange={handleAutoNumeroChange}
+            onFechaAutoChange={setFechaAuto}
             cobroCoactivoInputRef={cobroCoactivoInputRef}
             ruiaInputRef={ruiaInputRef}
             memorandoInputRef={memorandoInputRef}

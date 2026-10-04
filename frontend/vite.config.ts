@@ -10,6 +10,20 @@ const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(file
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   plugins: [tailwindcss()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Sin esto todo cae en un solo bundle de ~630 KB: las librerías cambian
+        // poco, así que en trozos aparte se quedan cacheadas entre despliegues.
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('lucide-react')) return 'icons';
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) return 'react';
+          return 'vendor';
+        },
+      },
+    },
+  },
   test: {
     projects: [{
       extends: true,

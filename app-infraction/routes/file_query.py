@@ -1,19 +1,14 @@
 from fastapi import Request, APIRouter, Depends, HTTPException, Query, Path as PathParam
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, func, desc, union_all, literal
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from datetime import datetime, date, timedelta
-from pydantic import BaseModel
+from sqlalchemy import select, and_, func, desc, union_all, literal
+from datetime import datetime
 from collections import defaultdict
 from pathlib import Path
 from dotenv import load_dotenv
-from typing import List
 import logging
 import os
 import pytz
-import re
-import holidays
 
 from db.deps import get_db_managed
 from db.models.recurso_afectado import RecursoAfectado
@@ -26,17 +21,10 @@ from db.models.etapa_respuesta import EtapaRespuesta
 from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
 from db.models.etapa_cierre import EtapaCierre
 from db.models.informe_tecnico import InformeTecnico
-from db.models.medida_preventiva import MedidaPreventiva
-from db.models.notificacion import Notificacion
-from db.models.comunicacion import Comunicacion
-from db.models.acto_administrativo import ActoAdministrativo
 from db.models.vereda import Vereda
 from db.models.municipio import Municipio
 from db.models.radicado_asociado import RadicadoAsociado
-from db.models.oficio_remite import OficioRemite
-from db.models.solicitud_informacion import SolicitudInformacion
 from db.models.quejoso import Quejoso
-from db.models.auditoria import Auditoria
 
 from core.permission import Permission
 ASSIGN_PERMISSION = Permission.ASSIGN_PERMISSION
@@ -58,18 +46,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 from .models.file_models import (
-    ExpedienteSchema,
-    QuejosoSchema,
-    BulkEncargadoRequest,
     FiltroAvanzado,
 )
 
 from utils.verify_token import verify_gateway_token
-from utils.log import insert_log
-from services.notification import create_notification
-from services.users import get_users_by_permission, get_user_info, verify_permission
+from services.users import get_users_by_permission
 from services.involved import get_involved_by_expedientes_ids
-from services.docs import download_unified_pdf
+from services.estado_expediente import calcular_estados, calcular_estado_uno
 
 
 @router.get("/get")
@@ -100,6 +83,7 @@ async def obtener_expedientes(
         Expediente.fecha_radicado,
         Expediente.abogado_responsable_id,
         Expediente.fecha_creacion,
+        Expediente.archivado,
     )
 
     if radicado:
@@ -126,6 +110,10 @@ async def obtener_expedientes(
 
     usuarios_disponibles = await get_users_by_permission(FILE_MANAGE)
 
+    estados_map = await calcular_estados(
+        db, [r[0] for r in rows], {r[0]: r[5] for r in rows}
+    )
+
     payload = [
         {
             "id": r[0],
@@ -135,6 +123,8 @@ async def obtener_expedientes(
             "encargado_nombre": usuarios_disponibles.get(r[3], {}).get("nombre") if r[3] else None,
             "encargado_documento": (usuarios_disponibles.get(r[3], {}).get("numero_documento") or usuarios_disponibles.get(r[3], {}).get("documento")) if r[3] else None,
             "fecha_creacion": r[4].isoformat() if r[4] else None,
+            "archivado": r[5],
+            "estado": estados_map.get(r[0]),
         }
         for r in rows
     ]
@@ -413,6 +403,7 @@ async def obtener_expediente_completo_por_expediente_id(
             Expediente.direccion,
             Expediente.descripcion,
             Expediente.vereda_id,
+            Expediente.archivado,
             etapa_actual.c.tipo.label("etapa_actual"),
         )
         .where(Expediente.id == expediente_id)
@@ -422,7 +413,7 @@ async def obtener_expediente_completo_por_expediente_id(
     expediente = (await db.execute(stmt)).mappings().first()
 
     if not expediente:
-        return JSONResponse(content={"ok": True, "data": []}, status_code=200)
+        raise HTTPException(status_code=404, detail="Expediente no encontrado")
 
     # Recursos afectados
     recursos_stmt = (
@@ -506,6 +497,8 @@ async def obtener_expediente_completo_por_expediente_id(
             etapas_existentes.append(legacy_id)
 
     # Armar respuesta con toda la data
+    estado = await calcular_estado_uno(db, expediente_id, expediente["archivado"])
+
     exp_dict = {
         "id": expediente["id"],
         "radicado": expediente["radicado"],
@@ -519,6 +512,8 @@ async def obtener_expediente_completo_por_expediente_id(
         "radicados_asociados": radicados_asociados,
         "ultima_etapa": expediente["etapa_actual"],
         "involucrados": involucrados,
+        "archivado": expediente["archivado"],
+        "estado": estado,
     }
 
     return JSONResponse(
@@ -623,6 +618,10 @@ async def obtener_expedientes_para_vista(
     # Obtener involucrados
     involucrados_map = await get_involved_by_expedientes_ids(db, expediente_ids)
 
+    estados_map = await calcular_estados(
+        db, expediente_ids, {exp.id: exp.archivado for exp in expedientes_raw}
+    )
+
     vereda_ids = [exp.vereda_id for exp in expedientes_raw if exp.vereda_id]
     veredas_map = {}
     municipios_map = {}
@@ -662,6 +661,7 @@ async def obtener_expedientes_para_vista(
             "municipio": municipio_obj,
             "involucrados": involucrados_map.get(exp.id, []),
             "etapa_actual": exp.etapa_actual,
+            "estado": estados_map.get(exp.id),
         })
 
     return JSONResponse(content={"ok": True, "data": data}, status_code=200)
@@ -753,6 +753,10 @@ async def obtener_expedientes_por_encargado(
     expediente_ids = [r["id"] for r in expedientes_raw]
     involucrados_map = await get_involved_by_expedientes_ids(db, expediente_ids)
 
+    estados_map = await calcular_estados(
+        db, expediente_ids, {r["id"]: r["archivado"] for r in expedientes_raw}
+    )
+
     data = [
         {
             "id": r["id"],
@@ -763,6 +767,7 @@ async def obtener_expedientes_por_encargado(
             "involucrados": involucrados_map.get(r["id"], []),
             "etapa_actual": r["etapa_actual"],
             "archivado": r["archivado"],
+            "estado": estados_map.get(r["id"]),
         }
         for r in expedientes_raw
     ]

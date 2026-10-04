@@ -1,26 +1,20 @@
-from fastapi import Request, APIRouter, Depends, HTTPException, Form, Body, Query
+from fastapi import Request, APIRouter, Depends, HTTPException, Form
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, and_
+from sqlalchemy import select
 from datetime import datetime
-from pydantic import BaseModel
 from pathlib import Path
 from dotenv import load_dotenv
 from typing import Optional
 import logging
-import os
 import pytz
 
 from db.deps import get_db_managed
 from db.models.expediente import Expediente
 from db.models.acto_administrativo import ActoAdministrativo
 from db.models.notificacion import Notificacion
-from db.models.tipo_notificacion import TipoNotificacion
-from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
-from db.models.etapa_cierre import EtapaCierre
 from db.models.medida_preventiva import MedidaPreventiva
 from db.models.etapa_respuesta import EtapaRespuesta
-from db.models.comunicacion import Comunicacion
 
 router = APIRouter()
 load_dotenv()
@@ -34,7 +28,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 from utils.verify_token import verify_gateway_token
-from services.involved import get_involved_by_expedientes_ids
 from services.docs import increment_file_usage, decrement_file_usage
 from services.actos import (
     resolve_etapa_ids as _resolve_etapa_ids,

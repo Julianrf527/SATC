@@ -204,8 +204,11 @@ export function useActoAdminActions({
         return;
       }
 
+      const deleteUrl = apiEndpoints.actoAdmin.delete(
+        (localActoAdmin as ActoAdministrativo).id,
+      );
       const res = await apiCall(
-        apiEndpoints.actoAdmin.delete((localActoAdmin as ActoAdministrativo).id),
+        `${deleteUrl}${deleteUrl.includes("?") ? "&" : "?"}expediente_id=${expedienteId}`,
         { method: "DELETE" },
       );
 

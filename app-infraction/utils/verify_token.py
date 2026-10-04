@@ -2,7 +2,6 @@ from fastapi import APIRouter, Request, HTTPException
 from dotenv import load_dotenv
 from jose import jwt
 import os
-import json
 
 router = APIRouter()
 
