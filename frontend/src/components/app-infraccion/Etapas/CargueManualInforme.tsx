@@ -118,11 +118,7 @@ export default function CargueManualInforme({
       return;
     }
     if (archivo) {
-      const validacion = validateFile(archivo, [
-        "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      ]);
+      const validacion = validateFile(archivo, ["application/pdf"]);
       if (!validacion.isValid) {
         setToast({ id: Date.now(), message: validacion.error!, type: "error" });
         return;
@@ -265,7 +261,7 @@ export default function CargueManualInforme({
             <div className="form-control">
               <label className="label py-1">
                 <span className="label-text font-medium">
-                  Archivo{" "}
+                  Archivo PDF{" "}
                   {!informe.documento_informe_id && <span className="text-error">*</span>}
                   {informe.documento_informe_id && (
                     <span className="text-base-content/40 text-xs font-normal ml-1">
@@ -285,7 +281,7 @@ export default function CargueManualInforme({
               )}
               <input
                 type="file"
-                accept=".pdf,.doc,.docx"
+                accept=".pdf,application/pdf"
                 className="file-input file-input-bordered w-full"
                 onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
                 disabled={uploading}

@@ -1,32 +1,21 @@
 from fastapi import Request, APIRouter, Depends, HTTPException, Path as PathParam
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import Optional
-import holidays
 import logging
-import os
 import pytz
-import re
 
 from db.deps import get_db_managed
 from db.models.expediente import Expediente
 from db.models.etapa_respuesta import EtapaRespuesta
-from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
-from db.models.etapa_cierre import EtapaCierre
-from db.models.informe_tecnico import InformeTecnico
 from db.models.medida_preventiva import MedidaPreventiva
 from db.models.tipo_medida import TipoMedida
 from db.models.acto_administrativo import ActoAdministrativo
-from db.models.comunicacion import Comunicacion
-from db.models.notificacion import Notificacion
-from db.models.oficio_remite import OficioRemite
-from db.models.solicitud_informacion import SolicitudInformacion
-from db.models.expediente_involucrado import ExpedienteInvolucrado
 
 router = APIRouter()
 load_dotenv()
@@ -37,9 +26,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 from utils.verify_token import verify_gateway_token
-from services.users import get_user_info
-from services.involved import get_involucrados_by_ids
-from services.docs import decrement_file_usage
 from services.etapas import build_acto_for_frontend as _build_acto_for_frontend
 from services.etapas import get_expediente_con_permiso
 from utils.log import insert_log

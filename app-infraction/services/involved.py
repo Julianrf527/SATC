@@ -2,7 +2,7 @@ from collections import defaultdict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from dotenv import load_dotenv
-from typing import List, Dict, Optional
+from typing import List, Dict
 import logging
 import httpx
 import os

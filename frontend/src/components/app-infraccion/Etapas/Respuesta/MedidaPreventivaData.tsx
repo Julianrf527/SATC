@@ -217,7 +217,7 @@ export default function MedidaPreventivaData({
         );
       } else {
         if (!etapaRespuestaId) {
-          console.error("[MedidaPreventiva] etapaRespuestaId no disponible al crear medida");
+          if (import.meta.env.DEV) console.error("[MedidaPreventiva] etapaRespuestaId no disponible al crear medida");
           setToast({ id: Date.now(), message: "No se puede registrar la medida. Recarga la página e intenta de nuevo.", type: "error" });
           return;
         }
@@ -249,7 +249,7 @@ export default function MedidaPreventivaData({
           : res.status === 403
           ? "No tienes permisos para realizar esta acción"
           : "No se pudo guardar la medida. Intenta de nuevo.";
-        console.error("[MedidaPreventiva] Error al guardar:", res.detail ?? res.status);
+        if (import.meta.env.DEV) console.error("[MedidaPreventiva] Error al guardar:", res.detail ?? res.status);
         setToast({ id: Date.now(), message: userMsg, type: "error" });
       }
     } catch (err) {

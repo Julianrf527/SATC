@@ -65,20 +65,24 @@ async def build_acto_for_frontend(db: AsyncSession, acto: ActoAdministrativo) ->
     }
 
 
-async def get_expediente_con_permiso(db: AsyncSession, expediente_id: int, user_id: int):
-    """Verifica que el expediente existe y que el usuario es su abogado responsable.
+async def get_expediente_con_permiso(
+    db: AsyncSession, expediente_id: int, user_id: int, require_owner: bool = True,
+):
+    """Verifica que el expediente existe y, si `require_owner`, que el usuario es
+    su abogado responsable. 403 (no 404) en ambos casos para no distinguir "no
+    existe" de "no es tuyo"; el frontend intercepta ese 403 con su toast.
 
-    Filtra por id + abogado_responsable_id en el mismo WHERE y responde el mismo
-    403 tanto si el expediente no existe como si existe pero es de otro: así
-    nadie puede descubrir, probando IDs, qué expedientes existen. Se usa 403 y
-    no 404 para conservar el toast de "sin permisos" que intercepta el frontend.
+    `require_owner=False` es para lecturas: el Modo Consulta abre cualquier
+    expediente en solo lectura (misma regla que app-sancionatoria).
 
     Devuelve la Row (id, radicado, abogado_responsable_id).
     """
-    row = (await db.execute(
-        select(Expediente.id, Expediente.radicado, Expediente.abogado_responsable_id)
-        .where(Expediente.id == expediente_id, Expediente.abogado_responsable_id == user_id)
-    )).fetchone()
+    stmt = select(Expediente.id, Expediente.radicado, Expediente.abogado_responsable_id).where(
+        Expediente.id == expediente_id
+    )
+    if require_owner:
+        stmt = stmt.where(Expediente.abogado_responsable_id == user_id)
+    row = (await db.execute(stmt)).fetchone()
     if not row:
         raise HTTPException(status_code=403, detail="Sin permisos sobre este expediente")
     return row

@@ -7,6 +7,8 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   documentoId: number;
+  /** Versión firmada de un informe técnico: se auto-aprueba y se une al PDF del expediente. */
+  soloPdf?: boolean;
   onSuccess: () => void;
   setToast?: (toast: { id: number; message: string; type: "success" | "error" }) => void;
 };
@@ -15,6 +17,7 @@ export default function SubirVersionModal({
   isOpen,
   onClose,
   documentoId,
+  soloPdf = false,
   onSuccess,
   setToast,
 }: Props) {
@@ -81,11 +84,16 @@ export default function SubirVersionModal({
         fileName.endsWith(".pdf") ||
         fileName.endsWith(".docx") ||
         fileName.endsWith(".doc");
+      const invalido = soloPdf
+        ? !fileName.endsWith(".pdf")
+        : !validTypes.includes(file.type) && !validExtension;
 
-      if (!validTypes.includes(file.type) && !validExtension) {
+      if (invalido) {
         setErrors((prev) => ({
           ...prev,
-          file: "Solo se permiten archivos PDF, DOCX o DOC",
+          file: soloPdf
+            ? "La versión firmada debe ser PDF"
+            : "Solo se permiten archivos PDF, DOCX o DOC",
         }));
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
@@ -242,13 +250,17 @@ export default function SubirVersionModal({
             <label className="block text-sm font-medium text-base-content/70 mb-1">
               Archivo <span className="text-error">*</span>
               <span className="text-xs text-base-content/50 ml-2">
-                (PDF, DOCX, DOC - Máx. 15MB)
+                {soloPdf ? "(Solo PDF firmado - Máx. 15MB)" : "(PDF, DOCX, DOC - Máx. 15MB)"}
               </span>
             </label>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
+              accept={
+                soloPdf
+                  ? ".pdf,application/pdf"
+                  : ".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
+              }
               className={`file-input file-input-bordered w-full ${
                 errors.file ? "file-input-error" : ""
               }`}

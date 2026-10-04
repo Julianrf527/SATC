@@ -124,9 +124,11 @@ async def notify_document_rejected(
     creador_id: int,
     numero_devoluciones: int,
     origen: str | None = None,
+    con_adjunto: bool = False,
 ) -> dict:
     """Notifica al creador que su documento fue rechazado."""
-    mensaje = f"Documento devuelto ({numero_devoluciones}/3)\n{documento_nombre}"
+    detalle = ", con documento de observaciones" if con_adjunto else ""
+    mensaje = f"Documento devuelto ({numero_devoluciones}/3){detalle}\n{documento_nombre}"
     return await create_notification(
         mensaje=mensaje,
         id_vinculada=str(documento_id),

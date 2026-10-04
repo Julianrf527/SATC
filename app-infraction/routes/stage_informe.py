@@ -1,33 +1,20 @@
 from fastapi import Request, APIRouter, Depends, HTTPException, Path as PathParam
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
-from sqlalchemy.exc import IntegrityError
-from datetime import datetime, date, timedelta
+from sqlalchemy import select
+from datetime import date
 from dotenv import load_dotenv
-from pydantic import BaseModel
-from typing import Optional
-import holidays
 import logging
-import os
 import pytz
-import re
 
 from db.deps import get_db_managed
 from db.models.expediente import Expediente
 from db.models.etapa_respuesta import EtapaRespuesta
 from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
-from db.models.etapa_cierre import EtapaCierre
 from db.models.informe_tecnico import InformeTecnico
 from db.models.informe_recurso_afectado import InformeRecursoAfectado, RECURSOS_MATRIZ
 from db.models.medida_preventiva import MedidaPreventiva
-from db.models.tipo_medida import TipoMedida
-from db.models.acto_administrativo import ActoAdministrativo
 from db.models.comunicacion import Comunicacion
-from db.models.notificacion import Notificacion
-from db.models.oficio_remite import OficioRemite
-from db.models.solicitud_informacion import SolicitudInformacion
-from db.models.expediente_involucrado import ExpedienteInvolucrado
 
 router = APIRouter()
 load_dotenv()
@@ -39,9 +26,6 @@ logger = logging.getLogger(__name__)
 
 from utils.verify_token import verify_gateway_token
 from services.users import get_user_info, verify_permission
-from services.involved import get_involucrados_by_ids
-from services.docs import decrement_file_usage
-from services.etapas import build_acto_for_frontend as _build_acto_for_frontend
 from services.etapas import get_expediente_con_permiso
 from routes.reports import autosincronizar_informe
 from utils.log import insert_log
@@ -99,11 +83,6 @@ async def obtener_informe_tecnico(
                 elif not medida.acto_administrativo_id:
                     creable_msg = "El acto administrativo de la medida preventiva aún no ha sido creado"
                 else:
-                    involucrados = (await db.execute(
-                        select(ExpedienteInvolucrado.involucrado_id)
-                        .where(ExpedienteInvolucrado.expediente_id == expediente_id)
-                    )).scalars().all()
-
                     comunicacion = await db.scalar(
                         select(Comunicacion).where(
                             Comunicacion.acto_administrativo_id == medida.acto_administrativo_id,

@@ -1,7 +1,7 @@
 from fastapi import Request, APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, or_, func
+from sqlalchemy import select, delete, and_, or_, func
 from datetime import datetime, date, timezone
 from zoneinfo import ZoneInfo
 
@@ -9,6 +9,7 @@ _BOGOTA = ZoneInfo("America/Bogota")
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from typing import Optional
+import asyncio
 import logging
 import os
 
@@ -33,11 +34,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 from utils.verify_token import verify_gateway_token
-from utils.log import insert_log
 from services.notification import create_notification
-from services.users import get_users_by_permission, get_user_info, verify_permission
+from services.users import get_users_by_permission, verify_permission
 from services.docs_service import create_doc_for_professional, finalize_doc_as_rejected, get_doc_detail
-from services.docs import increment_file_usage, decrement_file_usage
+from services.docs import increment_file_usage, decrement_file_usage, get_file_info
 
 
 # ─── SCHEMAS ────────────────────────────────────────────────────────────────
@@ -81,6 +81,35 @@ async def _get_active_informe_documento(db: AsyncSession, informe_id: int) -> Op
     )
     result = await db.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def _procesos_activos(db: AsyncSession, informe_ids: list[int]) -> dict[int, InformeDocumento]:
+    """Proceso activo de cada informe en una sola consulta (antes: una por fila)."""
+    if not informe_ids:
+        return {}
+    filas = (await db.execute(
+        select(InformeDocumento).where(
+            and_(InformeDocumento.informe_id.in_(informe_ids), InformeDocumento.activo == True)
+        )
+    )).scalars().all()
+    return {f.informe_id: f for f in filas}
+
+
+async def _detalles_docs(procesos: dict[int, InformeDocumento]) -> dict[int, dict]:
+    """Consulta a app-docs el detalle de varios procesos en paralelo: el listado
+    hacía una llamada HTTP por fila, en serie."""
+    if not procesos:
+        return {}
+    informe_ids = list(procesos)
+    detalles = await asyncio.gather(
+        *(get_doc_detail(procesos[i].docs_documento_id) for i in informe_ids),
+        return_exceptions=True,
+    )
+    return {
+        informe_id: d
+        for informe_id, d in zip(informe_ids, detalles)
+        if isinstance(d, dict)
+    }
 
 
 # ─── GET /reports ─────────────────────────────────────────────────────────────
@@ -184,14 +213,20 @@ async def obtener_informes_tecnicos(
         )
         radicados_map = {row.id: row.radicado for row in exp_result.all()}
 
+    # Estado del proceso en app-docs de toda la página, en paralelo
+    procesos = await _procesos_activos(db, [inf.id for inf in informes])
+    detalles = await _detalles_docs(procesos)
+
     # Enriquecer con estado del proceso docs y nombre del profesional
     data = []
     for inf in informes:
         profesional_info = users.get(inf.profesional_asignado_id) if inf.profesional_asignado_id else None
         revisor_info = revisores.get(inf.revisor_asignado_id) if inf.revisor_asignado_id else None
 
-        await autosincronizar_informe(db, inf)
-        informe_doc = await _get_active_informe_documento(db, inf.id)
+        await autosincronizar_informe(db, inf, detalles.get(inf.id))
+        informe_doc = procesos.get(inf.id)
+        if informe_doc is not None and not informe_doc.activo:
+            informe_doc = None  # la sincronización acaba de cerrarlo
 
         data.append({
             "id": inf.id,
@@ -473,6 +508,7 @@ async def _sincronizar_informe(
     db: AsyncSession,
     informe: InformeTecnico,
     informe_doc: InformeDocumento,
+    doc_detail: Optional[dict] = None,
 ) -> dict:
     """
     Consulta el estado del documento en app-docs y actualiza el InformeTecnico
@@ -496,7 +532,8 @@ async def _sincronizar_informe(
     if informe_doc is None or not informe_doc.activo:
         return {"ok": False, "message": "El proceso ya fue sincronizado", "estado": None}
 
-    doc_detail = await get_doc_detail(informe_doc.docs_documento_id)
+    if doc_detail is None:
+        doc_detail = await get_doc_detail(informe_doc.docs_documento_id)
     if not doc_detail.get("ok"):
         return {"ok": False, "message": f"Error consultando app-docs: {doc_detail.get('message')}", "estado": None}
 
@@ -581,18 +618,24 @@ async def _sincronizar_informe(
     }
 
 
-async def autosincronizar_informe(db: AsyncSession, informe: InformeTecnico) -> None:
+async def autosincronizar_informe(
+    db: AsyncSession, informe: InformeTecnico, doc_detail: Optional[dict] = None,
+) -> None:
     """Cierra el informe si su proceso en app-docs ya terminó (aprobado o
     finalizado) sin que nadie disparara /sync, ej. la versión firmada que se
-    auto-aprueba al subirla tras "aprobado para firma"."""
+    auto-aprueba al subirla tras "aprobado para firma".
+
+    `doc_detail` evita volver a consultar app-docs cuando el llamador ya trae
+    el detalle (listados que lo piden en paralelo para toda la página)."""
     if informe.modo != "FLUJO" or informe.fecha_aceptacion_informe is not None:
         return
     informe_doc = await _get_active_informe_documento(db, informe.id)
     if not informe_doc:
         return
-    doc_detail = await get_doc_detail(informe_doc.docs_documento_id)
+    if doc_detail is None:
+        doc_detail = await get_doc_detail(informe_doc.docs_documento_id)
     if doc_detail.get("ok") and doc_detail.get("estado") in ("aprobado", "finalizado"):
-        await _sincronizar_informe(db, informe, informe_doc)
+        await _sincronizar_informe(db, informe, informe_doc, doc_detail)
 
 
 # ─── PUT /reports/{informe_id}/sync ──────────────────────────────────────────
@@ -809,6 +852,12 @@ async def cargue_manual_informe(
     # el mismo file_id (ej. edición que solo cambia fechas) no debe inflar el
     # contador ni decrementarlo de más.
     if informe.documento_informe_id != body.file_id:
+        # El informe aceptado se une al PDF del expediente: debe ser PDF.
+        file_info = await get_file_info(body.file_id)
+        if not file_info.get("ok"):
+            raise HTTPException(status_code=400, detail="No se encontró el archivo cargado")
+        if file_info["data"].get("content_type") != "application/pdf":
+            raise HTTPException(status_code=400, detail="El informe técnico debe cargarse en PDF")
         if informe.documento_informe_id:
             try:
                 await decrement_file_usage([informe.documento_informe_id])
@@ -916,18 +965,21 @@ async def obtener_mis_informes(
         )
         informes_con_matriz = {row[0] for row in filas_result.all()}
 
+    procesos = await _procesos_activos(db, informe_ids)
+    detalles = await _detalles_docs(procesos)
+
     data = []
     for inf in informes:
-        informe_doc = await _get_active_informe_documento(db, inf.id)
+        informe_doc = procesos.get(inf.id)
         estado_doc = None
         if informe_doc:
-            doc_detail = await get_doc_detail(informe_doc.docs_documento_id)
+            doc_detail = detalles.get(inf.id) or {}
             if doc_detail.get("ok"):
                 estado_doc = doc_detail.get("estado")
             if estado_doc in ("aprobado", "finalizado") and inf.fecha_aceptacion_informe is None:
-                await _sincronizar_informe(db, inf, informe_doc)
-                informe_doc = await _get_active_informe_documento(db, inf.id)
-                if informe_doc is None:
+                await _sincronizar_informe(db, inf, informe_doc, doc_detail)
+                if not informe_doc.activo:  # la sincronización cerró el proceso
+                    informe_doc = None
                     estado_doc = None
         data.append({
             "id": inf.id,

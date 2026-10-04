@@ -136,10 +136,10 @@ async def tarea_envio_alertas_semanal(db: AsyncSession):
                         logger.info(f"    Email enviado ({expedientes_con_alertas} expedientes)")
                         enviados += 1
                     else:
-                        logger.error(f"    Fallo al enviar email")
+                        logger.error("    Fallo al enviar email")
                         errores += 1
                 else:
-                    logger.info(f"    Sin alertas pendientes")
+                    logger.info("    Sin alertas pendientes")
                     sin_alertas += 1
 
             except Exception as e:

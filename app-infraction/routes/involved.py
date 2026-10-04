@@ -1,14 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, and_
-from pydantic import BaseModel, EmailStr
 import logging
-import os
 
 
 from db.deps import get_db_managed
 from db.models.expediente import Expediente
-from db.models.acto_administrativo import ActoAdministrativo
 from db.models.notificacion import Notificacion
 from db.models.expediente_involucrado import ExpedienteInvolucrado
 from db.models.etapa_respuesta import EtapaRespuesta
@@ -324,7 +321,7 @@ async def obtener_involucrados_por_expediente(
     """Obtener todos los involucrados de un expediente (consulta centralizada al microservicio involved)"""
 
     try:
-        user_id = verify_gateway_token(request)["user_id"]
+        verify_gateway_token(request)
 
         # Buscar expediente con involucrados
         stmt = select(ExpedienteInvolucrado.involucrado_id).where(
@@ -369,7 +366,7 @@ async def obtener_expedientes_por_involucrado(
 
     """
     try:
-        user_id = verify_gateway_token(request)["user_id"]
+        verify_gateway_token(request)
         # Buscar involucrado con expedientes
         stmt = (
             select(ExpedienteInvolucrado.expediente_id).where(ExpedienteInvolucrado.involucrado_id == involved_id)
@@ -380,18 +377,20 @@ async def obtener_expedientes_por_involucrado(
         if not expediente_ids:
             raise HTTPException(status_code=404, detail="Sin expedientes asociados a este involucrado")
 
-        all_expedientes = []
-        for exp_involucrado in expediente_ids:
-            stmt = select(Expediente.id, Expediente.radicado, Expediente.fecha_radicado, Expediente.fecha_creacion).where(Expediente.id == exp_involucrado.expediente_id)
-            result = await db.execute(stmt)
-            expediente = result.first()
-            if expediente:
-                all_expedientes.append({
-                    "id": expediente.id,
-                    "radicado": expediente.radicado,
-                    "fecha_radicado": expediente.fecha_radicado.isoformat() if expediente.fecha_radicado else None,
-                    "fecha_creacion": expediente.fecha_creacion.isoformat() if expediente.fecha_creacion else None
-                })
+        ids = [row.expediente_id for row in expediente_ids]
+        result = await db.execute(
+            select(Expediente.id, Expediente.radicado, Expediente.fecha_radicado, Expediente.fecha_creacion)
+            .where(Expediente.id.in_(ids))
+        )
+        all_expedientes = [
+            {
+                "id": expediente.id,
+                "radicado": expediente.radicado,
+                "fecha_radicado": expediente.fecha_radicado.isoformat() if expediente.fecha_radicado else None,
+                "fecha_creacion": expediente.fecha_creacion.isoformat() if expediente.fecha_creacion else None,
+            }
+            for expediente in result.all()
+        ]
 
         return {
             "ok": True,

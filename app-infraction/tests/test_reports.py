@@ -23,6 +23,13 @@ async def _create_doc_ok(*a, **k):
     return {"ok": True, "documento_id": 555}
 
 
+def _file_info(content_type: str):
+    async def _get(file_id):
+        return {"ok": True, "data": {"id": file_id, "content_type": content_type}}
+
+    return _get
+
+
 def _make_verify_permission(allowed: bool = True):
     async def _verify(user_id, permission):
         return allowed
@@ -39,6 +46,7 @@ def _mock_permissions(monkeypatch):
     monkeypatch.setattr(reports_mod, "finalize_doc_as_rejected", _ok)
     monkeypatch.setattr(reports_mod, "increment_file_usage", _ok)
     monkeypatch.setattr(reports_mod, "decrement_file_usage", _ok)
+    monkeypatch.setattr(reports_mod, "get_file_info", _file_info("application/pdf"))
 
 
 @pytest.fixture
@@ -212,6 +220,26 @@ class TestManualUpload:
         assert informe.fecha_recibido_informe == date(2024, 1, 1)
         assert informe.fecha_aceptacion_informe == date(2024, 1, 2)
         assert informe.fecha_programacion_visita == date(2023, 12, 20)
+
+    async def test_cargue_manual_rechaza_word(self, client, make_expediente, make_informe, db_session, monkeypatch):
+        monkeypatch.setattr(
+            reports_mod,
+            "get_file_info",
+            _file_info("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        )
+        exp = await make_expediente(abogado_responsable_id=7)
+        informe = await make_informe(exp.id, modo="MANUAL")
+
+        resp = await client.post(
+            f"/informes/{informe.id}/manual-upload",
+            json={"file_id": 123, "fecha_recibido": "2024-01-01", "fecha_aceptacion": "2024-01-02"},
+            headers=gateway_headers(1),
+        )
+        assert resp.status_code == 400
+        assert "PDF" in resp.json()["detail"]
+
+        await db_session.refresh(informe)
+        assert informe.documento_informe_id is None
 
 
 class TestSyncEstadoRechazado:
