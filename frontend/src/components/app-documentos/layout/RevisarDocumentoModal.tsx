@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { API_CONFIG, apiCall, formatApiErrorDetail } from "../../../utils/api";
 import { X, CheckCircle, XCircle, FileSignature, Eye } from "lucide-react";
@@ -12,6 +12,8 @@ type Props = {
   nombreDocumento: string;
   /** Habilita la opción "Aprobar para firma", exclusiva del flujo de informe técnico. */
   esInformeTecnico?: boolean;
+  /** Informe técnico: solo se aprueba directo si la versión actual es PDF (se une al PDF del expediente). */
+  versionActualEsPdf?: boolean;
   onSuccess: () => void;
 };
 
@@ -21,12 +23,15 @@ export default function RevisarDocumentoModal({
   documentoId,
   nombreDocumento,
   esInformeTecnico = false,
+  versionActualEsPdf = true,
   onSuccess,
 }: Props) {
-  const [estadoRevision, setEstadoRevision] = useState<EstadoRevision>(
-    "aprobado",
-  );
+  const aprobarBloqueado = esInformeTecnico && !versionActualEsPdf;
+  const estadoInicial: EstadoRevision = aprobarBloqueado ? "aprobado_firma" : "aprobado";
+  const [estadoRevision, setEstadoRevision] = useState<EstadoRevision>(estadoInicial);
   const [comentarios, setComentarios] = useState("");
+  const [adjunto, setAdjunto] = useState<File | null>(null);
+  const adjuntoRef = useRef<HTMLInputElement>(null);
   const [theme, setTheme] = useState<string>("emerald");
   const [errors, setErrors] = useState({
     comentarios: "",
@@ -59,8 +64,10 @@ export default function RevisarDocumentoModal({
 
   useEffect(() => {
     if (isOpen) {
-      setEstadoRevision("aprobado");
+      setEstadoRevision(estadoInicial);
       setComentarios("");
+      setAdjunto(null);
+      if (adjuntoRef.current) adjuntoRef.current.value = "";
       setErrors({
         comentarios: "",
         general: "",
@@ -100,6 +107,9 @@ export default function RevisarDocumentoModal({
       formData.append("estado_revision", estadoRevision);
       if (comentarios.trim()) {
         formData.append("comentarios", comentarios.trim());
+      }
+      if (adjunto && estadoRevision === "devuelto") {
+        formData.append("archivo", adjunto);
       }
 
       const res = await apiCall(API_CONFIG.ENDPOINTS.DOCS_REVIEW(documentoId), {
@@ -186,12 +196,13 @@ export default function RevisarDocumentoModal({
                     setErrors((prev) => ({ ...prev, comentarios: "" }));
                   }
                 }}
-                className={`p-4 rounded-lg border-2 transition-all ${
+                className={`p-4 rounded-lg border-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                   estadoRevision === "aprobado"
                     ? "border-green-500 bg-green-500/10"
                     : "border-base-300 hover:border-green-500/50"
                 }`}
-                disabled={isSubmitting}
+                disabled={isSubmitting || aprobarBloqueado}
+                title={aprobarBloqueado ? "La versión actual no es PDF" : undefined}
               >
                 <div className="flex flex-col items-center gap-2">
                   <CheckCircle
@@ -212,7 +223,9 @@ export default function RevisarDocumentoModal({
                     Aprobar
                   </span>
                   <span className="text-xs text-base-content/50 text-center">
-                    El documento cumple con los requisitos
+                    {aprobarBloqueado
+                      ? "Requiere la versión en PDF"
+                      : "El documento cumple con los requisitos"}
                   </span>
                 </div>
               </button>
@@ -326,6 +339,36 @@ export default function RevisarDocumentoModal({
               <p className="text-error text-xs mt-1">{errors.comentarios}</p>
             )}
           </div>
+
+          {esInformeTecnico && estadoRevision === "devuelto" && (
+            <div>
+              <label className="block text-sm font-medium text-base-content/70 mb-1">
+                Documento con observaciones
+                <span className="text-base-content/50 text-xs ml-2">
+                  (Opcional - PDF, DOCX, DOC)
+                </span>
+              </label>
+              <input
+                ref={adjuntoRef}
+                type="file"
+                accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
+                className="file-input file-input-bordered file-input-sm w-full"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  const nombre = file?.name.toLowerCase() ?? "";
+                  if (file && ![".pdf", ".docx", ".doc"].some((ext) => nombre.endsWith(ext))) {
+                    setErrors((prev) => ({ ...prev, general: "El documento de observaciones debe ser PDF, DOCX o DOC" }));
+                    e.target.value = "";
+                    setAdjunto(null);
+                    return;
+                  }
+                  setErrors((prev) => ({ ...prev, general: "" }));
+                  setAdjunto(file);
+                }}
+                disabled={isSubmitting}
+              />
+            </div>
+          )}
 
           {/* Advertencia si es aprobado para firma */}
           {estadoRevision === "aprobado_firma" && (

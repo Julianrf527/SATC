@@ -183,6 +183,8 @@ export const API_CONFIG = {
     DOCS_REVIEW: (documentId: number) => `/documents/docs/review/${documentId}`,
     DOCS_DOWNLOAD: (versionId: number) =>
       `/documents/docs/download/${versionId}`,
+    DOCS_DOWNLOAD_REVISION: (revisionId: number) =>
+      `/documents/docs/download-revision/${revisionId}`,
     DOCS_STATS: "/documents/docs/stats",
     DOCS_REVIEWERS: "/documents/docs/reviewers",
     // document route

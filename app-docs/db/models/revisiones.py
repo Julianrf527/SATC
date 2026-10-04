@@ -13,6 +13,8 @@ class Revision(Base):
     revisor_id = Column(Integer, index=True)
     estado_revision = Column(String(20))
     comentarios = Column(Text)
+    archivo_adjunto_url = Column(String(500), nullable=True)
+    archivo_adjunto_nombre = Column(String(255), nullable=True)
     fecha_revision = Column(
         TIMESTAMP(timezone=True),
         default=lambda: datetime.now(ZoneInfo("America/Bogota"))

@@ -1,19 +1,14 @@
 from fastapi import Request, APIRouter, Depends, HTTPException, Query, Path as PathParam
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, func, desc, union_all, literal
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from datetime import datetime, date, timedelta
-from pydantic import BaseModel
+from sqlalchemy import select, and_, func, desc, union_all, literal
+from datetime import datetime
 from collections import defaultdict
 from pathlib import Path
 from dotenv import load_dotenv
-from typing import List
 import logging
 import os
 import pytz
-import re
-import holidays
 
 from db.deps import get_db_managed
 from db.models.recurso_afectado import RecursoAfectado
@@ -26,17 +21,10 @@ from db.models.etapa_respuesta import EtapaRespuesta
 from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
 from db.models.etapa_cierre import EtapaCierre
 from db.models.informe_tecnico import InformeTecnico
-from db.models.medida_preventiva import MedidaPreventiva
-from db.models.notificacion import Notificacion
-from db.models.comunicacion import Comunicacion
-from db.models.acto_administrativo import ActoAdministrativo
 from db.models.vereda import Vereda
 from db.models.municipio import Municipio
 from db.models.radicado_asociado import RadicadoAsociado
-from db.models.oficio_remite import OficioRemite
-from db.models.solicitud_informacion import SolicitudInformacion
 from db.models.quejoso import Quejoso
-from db.models.auditoria import Auditoria
 
 from core.permission import Permission
 ASSIGN_PERMISSION = Permission.ASSIGN_PERMISSION
@@ -58,18 +46,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 from .models.file_models import (
-    ExpedienteSchema,
-    QuejosoSchema,
-    BulkEncargadoRequest,
     FiltroAvanzado,
 )
 
 from utils.verify_token import verify_gateway_token
-from utils.log import insert_log
-from services.notification import create_notification
-from services.users import get_users_by_permission, get_user_info, verify_permission
+from services.users import get_users_by_permission
 from services.involved import get_involved_by_expedientes_ids
-from services.docs import download_unified_pdf
 from services.estado_expediente import calcular_estados, calcular_estado_uno
 
 

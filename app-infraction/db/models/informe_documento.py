@@ -1,7 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import TIMESTAMP, Boolean, Column, Integer, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import TIMESTAMP, Boolean, Column, Integer, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from .base import Base
 
