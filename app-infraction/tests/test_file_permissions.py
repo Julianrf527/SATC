@@ -41,18 +41,18 @@ def con_permisos(monkeypatch):
 class TestReasignarEncargado:
     async def test_sin_permiso_asignar_da_403(self, client, make_expediente, sin_permisos):
         exp = await make_expediente(abogado_responsable_id=1)
-        resp = await client.patch(f"/file/{exp.id}/charge/9", headers=gateway_headers(2))
+        resp = await client.patch(f"/expedientes/{exp.id}/encargado/9", headers=gateway_headers(2))
         assert resp.status_code == 403
 
     async def test_no_reasigna_si_no_tiene_permiso(self, client, make_expediente, db_session, sin_permisos):
         exp = await make_expediente(abogado_responsable_id=1)
-        await client.patch(f"/file/{exp.id}/charge/9", headers=gateway_headers(2))
+        await client.patch(f"/expedientes/{exp.id}/encargado/9", headers=gateway_headers(2))
         await db_session.refresh(exp)
         assert exp.abogado_responsable_id == 1
 
     async def test_con_permiso_reasigna(self, client, make_expediente, db_session, con_permisos):
         exp = await make_expediente(abogado_responsable_id=1)
-        resp = await client.patch(f"/file/{exp.id}/charge/9", headers=gateway_headers(2))
+        resp = await client.patch(f"/expedientes/{exp.id}/encargado/9", headers=gateway_headers(2))
         assert resp.status_code == 200
         await db_session.refresh(exp)
         assert exp.abogado_responsable_id == 9
@@ -60,7 +60,7 @@ class TestReasignarEncargado:
     async def test_bulk_sin_permiso_da_403(self, client, make_expediente, sin_permisos):
         exp = await make_expediente(abogado_responsable_id=1)
         resp = await client.patch(
-            "/file/charge/bulk",
+            "/expedientes/encargado/masivo",
             json={"expediente_id": [exp.id], "encargado_id": 9},
             headers=gateway_headers(2),
         )
@@ -70,7 +70,7 @@ class TestReasignarEncargado:
 class TestCrearExpediente:
     async def test_sin_permiso_gestionar_da_403(self, client, sin_permisos):
         resp = await client.post(
-            "/file/add",
+            "/expedientes",
             json={
                 "radicado": "2026ER9999",
                 "fecha_radicado": "2026-01-10",
@@ -89,7 +89,7 @@ class TestCrearExpediente:
 
     async def test_quejoso_sin_permiso_da_403(self, client, sin_permisos):
         resp = await client.post(
-            "/file/complainer/add",
+            "/expedientes/denunciantes",
             json={"nombre": "Pedro", "anonimo": False},
             headers=gateway_headers(2),
         )
@@ -97,7 +97,7 @@ class TestCrearExpediente:
 
     async def test_quejoso_con_permiso_ok(self, client, con_permisos):
         resp = await client.post(
-            "/file/complainer/add",
+            "/expedientes/denunciantes",
             json={"nombre": "Pedro", "anonimo": False},
             headers=gateway_headers(2),
         )

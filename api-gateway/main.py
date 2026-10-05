@@ -36,28 +36,22 @@ MICROSERVICES = {
 # convertirlo en un bypass de sesión. Scopear elimina esa clase de bug.
 #
 # El path es lo que va DESPUÉS del `/{service}/` de la URL:
-# /documents/files/increment-usage → service=documents, path=files/increment-usage
+# /users/auth/login → service=users, path=auth/login
+#
+# Las rutas solo de servicio (users: role/verify, user/batch, user/permission,
+# notification/add, email/*; documents: files/increment-usage,
+# decrement-usage, batch) NO van aquí: los microservicios se llaman directo
+# (UsersClient / FilesClient contra USER_SERVICE_URL / DOCS_SERVICE_URL), nunca
+# a través del gateway, y el destino exige X-Service-Token. Publicarlas solo
+# agregaba superficie (auditoría de permisos 2026-10, M18).
 PUBLIC_ROUTES = {
     "users": {
         "auth/login",
         "auth/recovery-code",
         "auth/recovery",
         "auth/logout",
-        "role/verify",
-        "user/batch",
-        "user/permission",
-        "notification/add",
-        "email/send",
-        "email/send-bulk",
-        "email/send-alert-report",
     },
-    # Rutas internas microservicio→docs (sin JWT de usuario; el destino exige
-    # X-Service-Token).
-    "documents": {
-        "files/increment-usage",
-        "files/decrement-usage",
-        "files/batch",
-    },
+    "documents": set(),
     "sanctioning": set(),
     "involveds": set(),
     "infraction": set(),

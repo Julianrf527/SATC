@@ -3,6 +3,7 @@ El rol de cargue manual (infraccion_cargue) no debe esperar a que venza el
 término real del Auto de Requerimiento para poder crear la etapa de
 Seguimiento — necesario para cargar expedientes históricos sin esperar días.
 """
+import pytest
 from datetime import date, timedelta
 
 import routes.stage_informe as stage_informe_mod
@@ -18,6 +19,7 @@ async def _false(*a, **k):
     return False
 
 
+@pytest.mark.usefixtures("permiso_consulta")
 class TestSeguimientoCreableAutoRequerimiento:
     async def _make_concepto(self, db_session, expediente_id: int, dias_desde_hoy: int):
         concepto = EtapaAcogerConcepto(
@@ -36,7 +38,7 @@ class TestSeguimientoCreableAutoRequerimiento:
         exp = await make_expediente(abogado_responsable_id=7)
         await self._make_concepto(db_session, exp.id, dias_desde_hoy=5)
 
-        resp = await client.get(f"/stage/technical-report/{exp.id}/SEGUIMIENTO", headers=gateway_headers(7))
+        resp = await client.get(f"/etapas/informe-tecnico/{exp.id}/SEGUIMIENTO", headers=gateway_headers(7))
         assert resp.status_code == 404
         body = resp.json()
         assert body["creable"] is False
@@ -48,7 +50,7 @@ class TestSeguimientoCreableAutoRequerimiento:
         exp = await make_expediente(abogado_responsable_id=7)
         await self._make_concepto(db_session, exp.id, dias_desde_hoy=5)
 
-        resp = await client.get(f"/stage/technical-report/{exp.id}/SEGUIMIENTO", headers=gateway_headers(7))
+        resp = await client.get(f"/etapas/informe-tecnico/{exp.id}/SEGUIMIENTO", headers=gateway_headers(7))
         assert resp.status_code == 404
         body = resp.json()
         assert body["creable"] is True
@@ -59,7 +61,7 @@ class TestSeguimientoCreableAutoRequerimiento:
         exp = await make_expediente(abogado_responsable_id=7)
         await self._make_concepto(db_session, exp.id, dias_desde_hoy=-1)
 
-        resp = await client.get(f"/stage/technical-report/{exp.id}/SEGUIMIENTO", headers=gateway_headers(7))
+        resp = await client.get(f"/etapas/informe-tecnico/{exp.id}/SEGUIMIENTO", headers=gateway_headers(7))
         assert resp.status_code == 404
         body = resp.json()
         assert body["creable"] is True

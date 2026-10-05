@@ -247,11 +247,14 @@ async def calcular_alertas_expediente(radicado: str, db: AsyncSession, fecha_hoy
                     recurso = await db.scalar(
                         select(EtapaProbatoriaRecurso).where(EtapaProbatoriaRecurso.expediente_id == expediente_id)
                     )
-                    if recurso and recurso.acto_administrativo_id:
+                    if recurso:
+                        # La decisión del recurso es el acto auxiliar de la
+                        # probatoria (acto_decision_id), no su acto principal.
+                        # Sin ese acto, o sin notificación exitosa, sigue pendiente.
                         noti_rec = (await db.execute(
                             select(Notificacion.notificacion_exitosa)
-                            .where(Notificacion.acto_administrativo_id == recurso.acto_administrativo_id)
-                        )).scalars().all()
+                            .where(Notificacion.acto_administrativo_id == recurso.acto_decision_id)
+                        )).scalars().all() if recurso.acto_decision_id else []
                         if not any(noti_rec):
                             dias_t = (fecha_hoy - fecha_noti).days
                             alertas["alerta6"] = {

@@ -31,7 +31,7 @@ async def test_cliente_no_puede_inyectar_identidad_en_ruta_publica(cliente, upst
     """El caso peligroso: en rutas públicas el gateway no declara usuario, así
     que una cabecera del cliente que sobreviva llegaría sin ninguna otra
     validación al microservicio."""
-    await cliente.post("/users/user/batch", json={}, headers=CABECERAS_FORJADAS)
+    await cliente.post("/users/auth/login", json={}, headers=CABECERAS_FORJADAS)
     assert "x-gateway-user-id" not in upstream.headers
     assert "x-gateway-role-id" not in upstream.headers
     assert "x-service-token" not in upstream.headers

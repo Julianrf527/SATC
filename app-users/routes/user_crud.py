@@ -292,7 +292,8 @@ async def obtener_usuarios(
     token_data = verify_gateway_token(request)
     user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
 
-    if PERMISO_USER not in user_permission_names:
+    # La tabla de /user/manage exige admin_gestionar_usuarios en el frontend.
+    if not user_permission_names.intersection(Permisos.VER_USUARIOS):
         raise HTTPException(
             status_code=403,
             detail="No tiene permiso para ver los usuarios"

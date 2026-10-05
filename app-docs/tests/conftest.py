@@ -33,20 +33,9 @@ from db.models.documentos import Documento
 from db.models.versiones_documento import VersionDocumento
 from db.models.asignaciones_revisores import AsignacionRevisor
 from db.models.file_hash import FileHash
+from db.migrations import aplicar_migraciones
 from utils.generate_service_jwt import generate_service_jwt
 import main as main_module
-
-_VIEW_SQL = """
-CREATE OR REPLACE VIEW vista_documentos_detalle AS
-SELECT d.id, d.id AS documento_id, d.nombre, d.descripcion, d.tipo_archivo,
-       d.estado, d.origen, d.version_actual, d.numero_devoluciones, d.usuario_creador_id,
-       d.fecha_creacion, d.fecha_ultima_actualizacion,
-       COALESCE(rev_count.total_revisiones, 0) AS total_revisiones,
-       COALESCE(asig_count.total_revisores, 0) AS total_revisores
-FROM documentos d
-LEFT JOIN (SELECT documento_id, COUNT(*) AS total_revisiones FROM revisiones GROUP BY documento_id) rev_count ON rev_count.documento_id = d.id
-LEFT JOIN (SELECT documento_id, COUNT(*) AS total_revisores FROM asignaciones_revisores GROUP BY documento_id) asig_count ON asig_count.documento_id = d.id
-"""
 
 engine = create_async_engine(TEST_DATABASE_URL)
 TestSessionLocal = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
@@ -56,8 +45,10 @@ _id_counter = itertools.count(1)
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _crear_esquema():
     async with engine.begin() as conn:
+        # Mismo camino que init_db: create_all + migración idempotente (en una
+        # docs_test_db antigua también agrega columnas, quita `origen` y recrea la vista).
         await conn.run_sync(Base.metadata.create_all)
-        await conn.execute(text(_VIEW_SQL))
+        await aplicar_migraciones(conn)
     yield
     await engine.dispose()
 
@@ -113,7 +104,7 @@ async def make_documento(db_session):
             nombre=f"Documento {n}",
             descripcion="Desc de prueba",
             tipo_archivo="pdf",
-            usuario_creador_id=creador_id,
+            creador_id=creador_id,
             estado=estado,
             version_actual=1,
             numero_devoluciones=0,
@@ -132,10 +123,10 @@ async def make_version(db_session):
     async def _make(documento_id: int, numero_version: int = 1, **overrides) -> VersionDocumento:
         n = next(_id_counter)
         defaults = dict(
-            documento_id=documento_id,
+            proceso_id=documento_id,
             numero_version=numero_version,
             archivo_url=f"satc-documentos/hash{n}/archivo.pdf",
-            archivo_nombre_original="archivo.pdf",
+            archivo_nombre="archivo.pdf",
             archivo_size=1234,
             usuario_subida_id=1,
             comentario="v",
@@ -152,7 +143,7 @@ async def make_version(db_session):
 @pytest_asyncio.fixture
 async def make_asignacion(db_session):
     async def _make(documento_id: int, revisor_id: int) -> AsignacionRevisor:
-        asig = AsignacionRevisor(documento_id=documento_id, revisor_id=revisor_id, notificado=True)
+        asig = AsignacionRevisor(proceso_id=documento_id, revisor_id=revisor_id, notificado=True)
         db_session.add(asig)
         await db_session.flush()
         return asig

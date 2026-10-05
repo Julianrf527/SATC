@@ -282,3 +282,24 @@ async def test_permission_por_nombre_service(client, make_permiso, make_rol, mak
     resp = await client.get("/user/permission/permiso_x", headers=service_headers())
     assert resp.status_code == 200
     assert any(item["correo"] == "permx@test.com" for item in resp.json()["data"])
+
+
+# --- /user/all lo usa /user/manage (admin_gestionar_usuarios) (auditoría 2026-10, M14) ---
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("permiso", ["admin_gestionar_usuarios", "admin_registrar_usuarios"])
+async def test_all_gestionar_o_registrar_200(client, make_permiso, make_rol, make_usuario, permiso):
+    p = await make_permiso(permiso)
+    rol = await make_rol("gestor", [p])
+    u = await make_usuario(rol_id=rol.id)
+    resp = await client.get("/user/all", headers=gateway_headers(u.id, rol.id))
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_all_auditor_403(client, make_permiso, make_rol, make_usuario):
+    p = await make_permiso("auditoria_usuarios")
+    rol = await make_rol("auditor", [p])
+    u = await make_usuario(rol_id=rol.id)
+    resp = await client.get("/user/all", headers=gateway_headers(u.id, rol.id))
+    assert resp.status_code == 403

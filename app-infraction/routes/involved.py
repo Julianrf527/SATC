@@ -32,9 +32,14 @@ from .models.involved_models import (
 from utils.log import insert_log
 from utils.verify_token import verify_gateway_token
 from services.involved import get_involucrado_by_id, get_involucrados_by_ids
+from services.etapas import exigir_lectura_expediente
+from services.users import verify_permission
+from core.permission import Permission
+
+INVOLUCRADO_GESTIONAR = "involucrado_gestionar"
 
 
-@router.post("/involved-file")
+@router.post("/vinculos")
 async def vincular_involucrado_a_expediente(
     request: Request,
     link_data: InvolucradoExpedienteCreate,
@@ -156,7 +161,7 @@ async def vincular_involucrado_a_expediente(
         logger.error(f"Error vinculando involucrado a expediente: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
-@router.delete("/involved-file/{involucrado_id}")
+@router.delete("/vinculos/{involucrado_id}")
 async def desvincular_involucrado_a_expediente(
     request: Request,
     involucrado_id: int,
@@ -312,7 +317,7 @@ async def desvincular_involucrado_a_expediente(
         logger.error(f"Error desvinculando involucrado: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
-@router.get("/involved-list/{expediente_id}")
+@router.get("/expediente/{expediente_id}")
 async def obtener_involucrados_por_expediente(
     request: Request,
     expediente_id: int,
@@ -321,7 +326,9 @@ async def obtener_involucrados_por_expediente(
     """Obtener todos los involucrados de un expediente (consulta centralizada al microservicio involved)"""
 
     try:
-        verify_gateway_token(request)
+        user_id = verify_gateway_token(request)["user_id"]
+        # Datos personales: consultar ve cualquiera; gestionar solo los suyos.
+        await exigir_lectura_expediente(db, expediente_id, user_id)
 
         # Buscar expediente con involucrados
         stmt = select(ExpedienteInvolucrado.involucrado_id).where(
@@ -355,7 +362,7 @@ async def obtener_involucrados_por_expediente(
         logger.error(f"Error obteniendo involucrados del expediente: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
-@router.get("/file-list/{involved_id}")
+@router.get("/{involved_id}/expedientes")
 async def obtener_expedientes_por_involucrado(
     request:Request,
     involved_id: int,
@@ -366,7 +373,12 @@ async def obtener_expedientes_por_involucrado(
 
     """
     try:
-        verify_gateway_token(request)
+        user_id = verify_gateway_token(request)["user_id"]
+        # Perfila a una persona en todos los expedientes: solo consulta de
+        # infracciones o gestión de involucrados (sin consumidor en el frontend).
+        if not (await verify_permission(user_id, Permission.FILE_CONSULT)
+                or await verify_permission(user_id, INVOLUCRADO_GESTIONAR)):
+            raise HTTPException(status_code=403, detail="Sin permisos")
         # Buscar involucrado con expedientes
         stmt = (
             select(ExpedienteInvolucrado.expediente_id).where(ExpedienteInvolucrado.involucrado_id == involved_id)

@@ -155,10 +155,15 @@ async def borrar_notificacion_por_vinculada(
     linked_id: str,
     db: AsyncSession = Depends(get_db_managed),
 ):
-    """Elimina las notificaciones asociadas a un id_vinculada (entidad cerrada o borrada)."""
+    """Elimina las notificaciones del usuario autenticado asociadas a un
+    id_vinculada (entidad cerrada o borrada). Nunca las de otros usuarios."""
     token_data = verify_gateway_token(request)
+    user_id = token_data["user_id"]
 
-    query = select(Notificacion).where(Notificacion.id_vinculada == linked_id)
+    query = select(Notificacion).where(
+        Notificacion.id_vinculada == linked_id,
+        Notificacion.usuario_id == user_id,
+    )
     res = await db.execute(query)
     notificaciones = res.scalars().all()
 
@@ -186,7 +191,10 @@ async def borrar_notificacion_por_vinculada(
         )
         ids_eliminados.append(notificacion.id)
 
-    stmr = delete(Notificacion).where(Notificacion.id_vinculada == linked_id)
+    stmr = delete(Notificacion).where(
+        Notificacion.id_vinculada == linked_id,
+        Notificacion.usuario_id == user_id,
+    )
     result = await db.execute(stmr)
     await db.commit()
 

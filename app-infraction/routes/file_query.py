@@ -29,6 +29,7 @@ from db.models.quejoso import Quejoso
 from core.permission import Permission
 ASSIGN_PERMISSION = Permission.ASSIGN_PERMISSION
 FILE_MANAGE = Permission.FILE_MANAGE
+FILE_CONSULT = Permission.FILE_CONSULT
 LOG_PERMISSION = Permission.LOG_PERMISSION
 
 router = APIRouter()
@@ -36,7 +37,6 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXP_DAYS = os.getenv("JWT_EXP_DAYS")
-GATEWAY_URL = os.getenv("GATEWAY_URL", "http://api-gateway:8000")
 
 bogota_tz = pytz.timezone("America/Bogota")
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -50,12 +50,32 @@ from .models.file_models import (
 )
 
 from utils.verify_token import verify_gateway_token
-from services.users import get_users_by_permission
+from services.users import get_users_by_permission, verify_permission
 from services.involved import get_involved_by_expedientes_ids
 from services.estado_expediente import calcular_estados, calcular_estado_uno
 
 
-@router.get("/get")
+# ─── Permisos de lectura ─────────────────────────────────────────────────────
+# El gateway solo autentica; los permisos se verifican aquí. Cada endpoint
+# exige lo mismo que la pantalla del frontend que lo consume (App.tsx):
+#   - /infraction/consult       -> infraccion_consultar (ve todos)
+#   - /infraction/manage        -> infraccion_gestionar (solo los suyos)
+#   - /infraction/assign_manage -> infraccion_asignar
+#   - /audit/infractions        -> auditoria_infracciones
+
+async def _tiene_alguno(user_id: int, *permisos: str) -> bool:
+    for permiso in permisos:
+        if await verify_permission(user_id, permiso):
+            return True
+    return False
+
+
+async def _exigir_alguno(user_id: int, *permisos: str) -> None:
+    if not await _tiene_alguno(user_id, *permisos):
+        raise HTTPException(status_code=403, detail="Sin permisos")
+
+
+@router.get("")
 async def obtener_expedientes(
     request: Request,
     db: AsyncSession = Depends(get_db_managed),
@@ -66,7 +86,10 @@ async def obtener_expedientes(
     fecha_creacion: str = Query(None),
     encargado_id: int = Query(None),
 ):
-    verify_gateway_token(request)
+    # Lista TODOS los expedientes + usuarios con documento: solo la pantalla
+    # de asignación de encargados (/infraction/assign_manage).
+    user_id = verify_gateway_token(request)["user_id"]
+    await _exigir_alguno(user_id, ASSIGN_PERMISSION)
 
     fecha = None
     if fecha_creacion:
@@ -148,128 +171,211 @@ async def obtener_expedientes(
     }
 
 
-@router.post("/filter")
+# ─── Listados de expedientes (forma compartida) ─────────────────────────────
+# GET /todos (vista de consulta), GET /encargado/{id} (vista de gestión) y
+# POST /filtrar devuelven items con la MISMA forma; los tres pasan por
+# _listar_expedientes. Lo único que cambia entre vistas es cómo se calcula
+# etapa_actual (etiquetas y fecha de referencia), que se conserva tal cual
+# estaba en cada endpoint.
+
+def _etapa_actual_vista_todos():
+    """Etapa más reciente por expediente, como la calcula GET /todos."""
+    concepto_q = select(
+        EtapaAcogerConcepto.expediente_id,
+        EtapaAcogerConcepto.fecha_creacion,
+        literal("Etapa concepto").label("tipo")
+    )
+    cierre_q = select(
+        EtapaCierre.expediente_id,
+        EtapaCierre.fecha_creacion,
+        literal("Etapa cierre").label("tipo")
+    )
+    visita_q = select(
+        InformeTecnico.expediente_id,
+        InformeTecnico.fecha_creacion,
+        literal("Etapa visita").label("tipo")
+    ).where(InformeTecnico.tipo_informe == "VISITA")
+    seguimiento_q = select(
+        InformeTecnico.expediente_id,
+        InformeTecnico.fecha_creacion,
+        literal("Etapa seguimiento").label("tipo")
+    ).where(InformeTecnico.tipo_informe == "SEGUIMIENTO")
+    return _etapa_mas_reciente(concepto_q, cierre_q, visita_q, seguimiento_q)
+
+
+def _etapa_actual_vista_encargado():
+    """Etapa más reciente por expediente, como la calcula GET /encargado/{id}."""
+    def fecha_informe():
+        return func.coalesce(
+            InformeTecnico.fecha_aceptacion_informe,
+            InformeTecnico.fecha_recibido_informe,
+            InformeTecnico.fecha_programacion_visita,
+        ).label("fecha_creacion")
+
+    concepto_q = select(
+        EtapaAcogerConcepto.expediente_id,
+        EtapaAcogerConcepto.fecha_creacion,
+        literal("concepto").label("tipo")
+    )
+    cierre_q = select(
+        EtapaCierre.expediente_id,
+        EtapaCierre.fecha_creacion,
+        literal("cierre").label("tipo")
+    )
+    visita_q = select(
+        InformeTecnico.expediente_id,
+        fecha_informe(),
+        literal("visita").label("tipo")
+    ).where(InformeTecnico.tipo_informe == "VISITA")
+    seguimiento_q = select(
+        InformeTecnico.expediente_id,
+        fecha_informe(),
+        literal("seguimiento").label("tipo")
+    ).where(InformeTecnico.tipo_informe == "SEGUIMIENTO")
+    return _etapa_mas_reciente(concepto_q, cierre_q, visita_q, seguimiento_q)
+
+
+def _etapa_mas_reciente(*selects):
+    etapas_union = union_all(*selects).subquery()
+    etapa_reciente = select(
+        etapas_union.c.expediente_id,
+        etapas_union.c.tipo,
+        func.row_number().over(
+            partition_by=etapas_union.c.expediente_id,
+            order_by=etapas_union.c.fecha_creacion.desc()
+        ).label("rn")
+    ).subquery()
+    return select(
+        etapa_reciente.c.expediente_id,
+        etapa_reciente.c.tipo
+    ).where(etapa_reciente.c.rn == 1).subquery()
+
+
+async def _listar_expedientes(db: AsyncSession, etapa_actual, condiciones=()) -> list[dict]:
+    """
+    Ejecuta el listado de expedientes y lo serializa con la forma común:
+    id, radicado, fecha_radicado, fecha_creacion, archivado, municipio,
+    involucrados, etapa_actual, estado.
+
+    `condiciones` se aplican sobre Expediente/Vereda (Vereda va por outer
+    join, así que se puede filtrar por Vereda.municipio_id).
+    """
+    stmt = (
+        select(
+            Expediente.id,
+            Expediente.radicado,
+            Expediente.fecha_radicado,
+            Expediente.fecha_creacion,
+            Expediente.archivado,
+            etapa_actual.c.tipo.label("etapa_actual"),
+            Municipio.id.label("municipio_id"),
+            Municipio.nombre.label("municipio_nombre"),
+        )
+        .join(Vereda, Vereda.id == Expediente.vereda_id, isouter=True)
+        .join(Municipio, Municipio.id == Vereda.municipio_id, isouter=True)
+        .outerjoin(etapa_actual, etapa_actual.c.expediente_id == Expediente.id)
+    )
+    if condiciones:
+        stmt = stmt.where(and_(*condiciones))
+
+    rows = (await db.execute(stmt)).mappings().all()
+    if not rows:
+        return []
+
+    expediente_ids = [r["id"] for r in rows]
+    involucrados_map = await get_involved_by_expedientes_ids(db, expediente_ids)
+    estados_map = await calcular_estados(
+        db, expediente_ids, {r["id"]: r["archivado"] for r in rows}
+    )
+
+    return [
+        {
+            "id": r["id"],
+            "radicado": r["radicado"],
+            "fecha_radicado": r["fecha_radicado"].isoformat() if r["fecha_radicado"] else None,
+            "fecha_creacion": r["fecha_creacion"].isoformat() if r["fecha_creacion"] else None,
+            "archivado": r["archivado"],
+            "municipio": {"id": r["municipio_id"], "nombre": r["municipio_nombre"]} if r["municipio_id"] else None,
+            "involucrados": involucrados_map.get(r["id"], []),
+            "etapa_actual": r["etapa_actual"],
+            "estado": estados_map.get(r["id"]),
+        }
+        for r in rows
+    ]
+
+
+@router.post("/filtrar")
 async def filtrar_expedientes(
     request: Request,
     filtros: FiltroAvanzado,
     db: AsyncSession = Depends(get_db_managed),
 ):
     """
-    Filtrado avanzado de expedientes.
-    Solo incluye filtros que NO están en quick filters: motivo, dirección, veredas, recursos, estado.
-    
-    """
-    try:
-        user_id = verify_gateway_token(request)["user_id"]
+    Filtrado avanzado de expedientes (dirección, municipio, veredas, recursos,
+    tipos de afectación). Cada item tiene la misma forma que GET /todos y
+    GET /encargado/{id} (ver _listar_expedientes).
 
-        # Consulta base con joins necesarios
-        stmt = (
-            select(
-                Expediente.id,
-                Expediente.radicado,
-                Expediente.fecha_creacion,
-                Expediente.direccion,
-                Vereda.municipio_id,
-                Expediente.vereda_id
-            )
-            .join(Vereda, Vereda.id == Expediente.vereda_id, isouter=True)
-            .where(Expediente.abogado_responsable_id == user_id)
+    Alcance:
+      - alcance="propios" (por defecto): solo expedientes con
+        abogado_responsable_id == usuario, como la vista de gestión.
+      - alcance="todos": todos los expedientes, como la vista de consulta
+        (GET /todos), solo si el usuario tiene infraccion_consultar; si no lo
+        tiene, se limita a los suyos.
+      - Los "propios" exigen infraccion_gestionar (vista de gestión); sin
+        ninguno de los dos permisos responde 403.
+
+    Sin try/except propio: get_db_managed convierte los errores inesperados en
+    500 (con rollback) y deja pasar las HTTPException y los 422 tal cual.
+    """
+    user_id = verify_gateway_token(request)["user_id"]
+
+    ver_todos = filtros.alcance == "todos" and await verify_permission(user_id, FILE_CONSULT)
+    if not ver_todos:
+        await _exigir_alguno(user_id, FILE_MANAGE)
+
+    condiciones = []
+    if ver_todos:
+        etapa_actual = _etapa_actual_vista_todos()
+    else:
+        etapa_actual = _etapa_actual_vista_encargado()
+        condiciones.append(Expediente.abogado_responsable_id == user_id)
+
+    if filtros.direccion:
+        condiciones.append(
+            Expediente.direccion == filtros.direccion if filtros.valor_exacto
+            else Expediente.direccion.ilike(f"%{filtros.direccion}%")
         )
 
-        condiciones = []
+    if filtros.municipio_id:
+        condiciones.append(Vereda.municipio_id == filtros.municipio_id)
 
-        # Filtro: Dirección
-        if filtros.direccion:
-            expr = Expediente.direccion == filtros.direccion if filtros.valor_exacto \
-                else Expediente.direccion.ilike(f"%{filtros.direccion}%")
-            condiciones.append(expr)
-            logger.info(f"Aplicando filtro direccion: {filtros.direccion}")
+    if filtros.vereda_ids:
+        condiciones.append(Expediente.vereda_id.in_(filtros.vereda_ids))
 
-        # Filtro: Municipio
-        if filtros.municipio_id:
-            condiciones.append(Vereda.municipio_id == filtros.municipio_id)
-            logger.info(f"Aplicando filtro municipio_id: {filtros.municipio_id}")
+    # Recursos y tipos de afectación: basta con que el expediente tenga alguno
+    # de los seleccionados (OR dentro de cada filtro, AND entre filtros).
+    if filtros.recurso_ids:
+        condiciones.append(Expediente.id.in_(
+            select(ExpedienteRecurso.expediente_id)
+            .where(ExpedienteRecurso.recurso_id.in_(filtros.recurso_ids))
+        ))
 
-        # Filtro: Veredas (múltiples)
-        if filtros.vereda_ids:
-            condiciones.append(Expediente.vereda_id.in_(filtros.vereda_ids))
-            logger.info(f"Aplicando filtro vereda_ids: {filtros.vereda_ids}")
+    if filtros.tipo_afectacion_ids:
+        condiciones.append(Expediente.id.in_(
+            select(ExpedienteTipoAfectacion.expediente_id)
+            .where(ExpedienteTipoAfectacion.tipo_afectacion_id.in_(filtros.tipo_afectacion_ids))
+        ))
 
-        # Aplicar condiciones
-        if condiciones:
-            stmt = stmt.where(and_(*condiciones))
+    data = await _listar_expedientes(db, etapa_actual, condiciones)
 
-        # Ejecutar consulta base
-        res = await db.execute(stmt)
-        expedientes_raw = res.all()
+    logger.info(
+        f"filtrar_expedientes: usuario {user_id}, alcance {'todos' if ver_todos else 'propios'}, "
+        f"{len(data)} resultados"
+    )
+    return JSONResponse(content={"ok": True, "data": data}, status_code=200)
 
-        if not expedientes_raw:
-            logger.info("No se encontraron expedientes con los filtros aplicados")
-            return JSONResponse(content={"ok": True, "data": []}, status_code=200)
 
-        ids = [r[0] for r in expedientes_raw]
-        ids_filtrados = set(ids)
-
-        # Filtro: Recursos afectados (múltiples)
-        if filtros.recurso_ids:
-            logger.info(f"Filtrando por recursos: {filtros.recurso_ids}")
-            stmt_recursos = (
-                select(ExpedienteRecurso.expediente_id)
-                .where(
-                    and_(
-                        ExpedienteRecurso.expediente_id.in_(ids_filtrados),
-                        ExpedienteRecurso.recurso_id.in_(filtros.recurso_ids)
-                    )
-                )
-                .distinct()
-            )
-            res_rec = await db.execute(stmt_recursos)
-            ids_con_recursos = {r[0] for r in res_rec.all()}
-            ids_filtrados &= ids_con_recursos
-
-            if not ids_filtrados:
-                logger.info("No se encontraron expedientes con los recursos especificados")
-                return JSONResponse(content={"ok": True, "data": []}, status_code=200)
-
-        # Filtrar expedientes_raw según ids_filtrados
-        expedientes_raw = [e for e in expedientes_raw if e[0] in ids_filtrados]
-
-        # Obtener municipios
-        municipio_ids = [r[5] for r in expedientes_raw if r[5] is not None]
-        municipios_map = {}
-        if municipio_ids:
-            res_mun = await db.execute(
-                select(Municipio.id, Municipio.nombre).where(Municipio.id.in_(municipio_ids))
-            )
-            municipios_map = {
-                m_id: {"id": m_id, "nombre": m_nombre}
-                for m_id, m_nombre in res_mun.all()
-            }
-
-        # Obtener involucrados
-        involucrados_map = await get_involved_by_expedientes_ids(db, list(ids_filtrados))
-
-        # Construir respuesta
-        data = []
-        for id, rad, fecha_crea, direccion, municipio_id, vereda_id in expedientes_raw:
-            data.append({
-                "id": id,
-                "radicado": rad,
-                "fecha_creacion": fecha_crea.isoformat() if fecha_crea else None,
-                "direccion": direccion,
-                "municipio": municipios_map.get(municipio_id),
-                "involucrados": involucrados_map.get(rad, [])
-            })
-
-        logger.info(f"Se encontraron {len(data)} expedientes")
-        return JSONResponse(content={"ok": True, "data": data}, status_code=200)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error en filtrar_expedientes: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
-@router.get("/affected-resource")
+@router.get("/recursos-afectados")
 async def obtener_recurso_afectado(
     request: Request,
     db: AsyncSession = Depends(get_db_managed),
@@ -308,12 +414,15 @@ async def obtener_tipos_afectacion(
     return JSONResponse(content={"ok": True, "data": data}, status_code=200)
 
 
-@router.get("/complainer/list")
+@router.get("/denunciantes")
 async def obtener_quejosos(
     request: Request,
     db: AsyncSession = Depends(get_db_managed),
 ):
-    verify_gateway_token(request)
+    # Datos personales (teléfono, correo) de los quejosos: catálogo de las
+    # vistas de consulta/gestión y de la auditoría de infracciones.
+    user_id = verify_gateway_token(request)["user_id"]
+    await _exigir_alguno(user_id, FILE_CONSULT, FILE_MANAGE, LOG_PERMISSION)
     stmr = select(Quejoso)
     result = await db.execute(stmr)
     result = result.scalars().all()
@@ -334,13 +443,23 @@ async def obtener_quejosos(
 
 
 
-@router.get("/full/{expediente_id}")
+@router.get("/completo/{expediente_id}")
 async def obtener_expediente_completo_por_expediente_id(
     request: Request,
     expediente_id: int = PathParam(..., description="ID del expediente"),
     db: AsyncSession = Depends(get_db_managed)
 ):
-    verify_gateway_token(request)
+    # Consulta (infraccion_consultar) abre cualquier expediente; gestión
+    # (infraccion_gestionar) solo los que tiene a cargo. 403 (no 404) cuando
+    # no es suyo, para no revelar si el expediente existe.
+    user_id = verify_gateway_token(request)["user_id"]
+    if not await verify_permission(user_id, FILE_CONSULT):
+        await _exigir_alguno(user_id, FILE_MANAGE)
+        encargado = await db.scalar(
+            select(Expediente.abogado_responsable_id).where(Expediente.id == expediente_id)
+        )
+        if encargado is None or encargado != user_id:
+            raise HTTPException(status_code=403, detail="Sin permisos sobre este expediente")
 
     # Subquery con todas las fechas de etapas en un solo query
     concepto_q = select(
@@ -526,148 +645,18 @@ async def obtener_expediente_completo_por_expediente_id(
     )
 
 
-@router.get("/get/all")
+@router.get("/todos")
 async def obtener_expedientes_para_vista(
     request: Request,
     db: AsyncSession = Depends(get_db_managed),
 ):
-    verify_gateway_token(request)
-
-    # Subquery con todas las fechas de etapas en un solo query
-    concepto_q = select(
-        EtapaAcogerConcepto.expediente_id,
-        EtapaAcogerConcepto.fecha_creacion,
-        literal("Etapa concepto").label("tipo")
-    )
-
-    cierre_q = select(
-        EtapaCierre.expediente_id,
-        EtapaCierre.fecha_creacion,
-        literal("Etapa cierre").label("tipo")
-    )
-
-    visita_q = select(
-        InformeTecnico.expediente_id,
-        InformeTecnico.fecha_creacion,
-        literal("Etapa visita").label("tipo")
-    ).where(InformeTecnico.tipo_informe == "VISITA")
-
-    seguimiento_q = select(
-        InformeTecnico.expediente_id,
-        InformeTecnico.fecha_creacion,
-        literal("Etapa seguimiento").label("tipo")
-    ).where(InformeTecnico.tipo_informe == "SEGUIMIENTO")
-
-    etapas_union = union_all(concepto_q, cierre_q, visita_q, seguimiento_q).subquery()
-
-    # Subquery con la etapa más reciente por expediente
-    etapa_reciente = (
-        select(
-            etapas_union.c.expediente_id,
-            etapas_union.c.tipo,
-            func.row_number().over(
-                partition_by=etapas_union.c.expediente_id,
-                order_by=etapas_union.c.fecha_creacion.desc()
-            ).label("rn")
-        )
-    ).subquery()
-
-    etapa_actual = (
-        select(etapa_reciente.c.expediente_id, etapa_reciente.c.tipo)
-        .where(etapa_reciente.c.rn == 1)
-    ).subquery()
-
-    # Query principal
-    stmt = (
-        select(
-            Expediente.id,
-            Expediente.radicado,
-            Expediente.fecha_radicado,
-            Expediente.descripcion,
-            Expediente.direccion,
-            Expediente.fecha_creacion,
-            Expediente.archivado,
-            Expediente.vereda_id,
-            etapa_actual.c.tipo.label("etapa_actual")
-        )
-        .outerjoin(etapa_actual, etapa_actual.c.expediente_id == Expediente.id)
-    )
-
-    res = await db.execute(stmt)
-    expedientes_raw = res.all()
-
-    if not expedientes_raw:
-        return JSONResponse(content={"ok": True, "data": []}, status_code=200)
-
-
-    expediente_ids = [exp.id for exp in expedientes_raw]
-
-    recursos_map = defaultdict(list)
-    if expediente_ids:
-        st_rec = (
-            select(
-                ExpedienteRecurso.expediente_id,
-                ExpedienteRecurso.recurso_id,
-            )
-            .where(ExpedienteRecurso.expediente_id.in_(expediente_ids))
-        )
-        res_rec = await db.execute(st_rec)
-        for exp_id, recurso_id in res_rec.all():
-            recursos_map[exp_id].append(recurso_id)
-
-    # Obtener involucrados
-    involucrados_map = await get_involved_by_expedientes_ids(db, expediente_ids)
-
-    estados_map = await calcular_estados(
-        db, expediente_ids, {exp.id: exp.archivado for exp in expedientes_raw}
-    )
-
-    vereda_ids = [exp.vereda_id for exp in expedientes_raw if exp.vereda_id]
-    veredas_map = {}
-    municipios_map = {}
-
-    if vereda_ids:
-        res_ver = await db.execute(
-            select(Vereda.id, Vereda.nombre, Vereda.municipio_id)
-            .where(Vereda.id.in_(vereda_ids))
-        )
-        veredas = res_ver.all()
-        veredas_map = {
-            v_id: {"id": v_id, "nombre": v_name, "municipio_id": m_id}
-            for v_id, v_name, m_id in veredas
-        }
-
-        municipio_ids = [m_id for _, _, m_id in veredas if m_id]
-        if municipio_ids:
-            res_mun = await db.execute(
-                select(Municipio.id, Municipio.nombre).where(Municipio.id.in_(municipio_ids))
-            )
-            municipios_map = {
-                m_id: {"id": m_id, "nombre": m_name}
-                for m_id, m_name in res_mun.all()
-            }
-
-    data = []
-    for exp in expedientes_raw:
-        vereda_obj = veredas_map.get(exp.vereda_id)
-        municipio_obj = municipios_map.get(vereda_obj["municipio_id"]) if vereda_obj else None
-
-        data.append({
-            "id": exp.id,
-            "radicado": exp.radicado,
-            "fecha_radicado": exp.fecha_radicado.isoformat() if exp.fecha_radicado else None,
-            "fecha_creacion": exp.fecha_creacion.isoformat() if exp.fecha_creacion else None,
-            "archivado": exp.archivado,
-            "municipio": municipio_obj,
-            "involucrados": involucrados_map.get(exp.id, []),
-            "etapa_actual": exp.etapa_actual,
-            "estado": estados_map.get(exp.id),
-        })
-
+    user_id = verify_gateway_token(request)["user_id"]
+    await _exigir_alguno(user_id, FILE_CONSULT)
+    data = await _listar_expedientes(db, _etapa_actual_vista_todos())
     return JSONResponse(content={"ok": True, "data": data}, status_code=200)
 
 
-@router.get("/{encargado_id}")
+@router.get("/encargado/{encargado_id}")
 async def obtener_expedientes_por_encargado(
     request: Request,
     encargado_id: int,
@@ -676,101 +665,12 @@ async def obtener_expedientes_por_encargado(
     user_id = verify_gateway_token(request)["user_id"]
 
     if user_id != encargado_id:
-        raise HTTPException(status_code=400, detail="Sin permisos")
+        raise HTTPException(status_code=403, detail="Sin permisos")
+    await _exigir_alguno(user_id, FILE_MANAGE)
 
-    concepto_q = select(
-        EtapaAcogerConcepto.expediente_id,
-        EtapaAcogerConcepto.fecha_creacion,
-        literal("concepto").label("tipo")
+    data = await _listar_expedientes(
+        db,
+        _etapa_actual_vista_encargado(),
+        [Expediente.abogado_responsable_id == encargado_id],
     )
-    cierre_q = select(
-        EtapaCierre.expediente_id,
-        EtapaCierre.fecha_creacion,
-        literal("cierre").label("tipo")
-    )
-    visita_q = select(
-        InformeTecnico.expediente_id,
-        func.coalesce(
-            InformeTecnico.fecha_aceptacion_informe,
-            InformeTecnico.fecha_recibido_informe,
-            InformeTecnico.fecha_programacion_visita,
-        ).label("fecha_creacion"),
-        literal("visita").label("tipo")
-    ).where(InformeTecnico.tipo_informe == "VISITA")
-
-    seguimiento_q = select(
-        InformeTecnico.expediente_id,
-        func.coalesce(
-            InformeTecnico.fecha_aceptacion_informe,
-            InformeTecnico.fecha_recibido_informe,
-            InformeTecnico.fecha_programacion_visita,
-        ).label("fecha_creacion"),
-        literal("seguimiento").label("tipo")
-    ).where(InformeTecnico.tipo_informe == "SEGUIMIENTO")
-
-    etapas_union = union_all(
-        concepto_q, cierre_q, visita_q, seguimiento_q
-    ).subquery()
-
-    etapa_reciente = select(
-        etapas_union.c.expediente_id,
-        etapas_union.c.tipo,
-        func.row_number().over(
-            partition_by=etapas_union.c.expediente_id,
-            order_by=etapas_union.c.fecha_creacion.desc()
-        ).label("rn")
-    ).subquery()
-
-    etapa_actual = select(
-        etapa_reciente.c.expediente_id,
-        etapa_reciente.c.tipo
-    ).where(etapa_reciente.c.rn == 1).subquery()
-
-    # Query principal trayendo Municipio directamente
-    stmt = (
-        select(
-            Expediente.id,
-            Expediente.radicado,
-            Expediente.fecha_radicado,
-            Expediente.fecha_creacion,
-            Expediente.archivado,
-            etapa_actual.c.tipo.label("etapa_actual"),
-            Municipio.id.label("municipio_id"),
-            Municipio.nombre.label("municipio_nombre"),
-        )
-        .join(Vereda, Vereda.id == Expediente.vereda_id, isouter=True)
-        .join(Municipio, Municipio.id == Vereda.municipio_id, isouter=True)
-        .outerjoin(etapa_actual, etapa_actual.c.expediente_id == Expediente.id)
-        .where(Expediente.abogado_responsable_id == encargado_id)
-    )
-
-    res = await db.execute(stmt)
-    expedientes_raw = res.mappings().all()
-
-    if not expedientes_raw:
-        return JSONResponse(content={"ok": True, "data": []}, status_code=200)
-
-    expediente_ids = [r["id"] for r in expedientes_raw]
-    involucrados_map = await get_involved_by_expedientes_ids(db, expediente_ids)
-
-    estados_map = await calcular_estados(
-        db, expediente_ids, {r["id"]: r["archivado"] for r in expedientes_raw}
-    )
-
-    data = [
-        {
-            "id": r["id"],
-            "radicado": r["radicado"],
-            "fecha_radicado": r["fecha_radicado"].isoformat() if r["fecha_radicado"] else None,
-            "fecha_creacion": r["fecha_creacion"].isoformat() if r["fecha_creacion"] else None,
-            "municipio": {"id": r["municipio_id"], "nombre": r["municipio_nombre"]} if r["municipio_id"] else None,
-            "involucrados": involucrados_map.get(r["id"], []),
-            "etapa_actual": r["etapa_actual"],
-            "archivado": r["archivado"],
-            "estado": estados_map.get(r["id"]),
-        }
-        for r in expedientes_raw
-    ]
-
     return JSONResponse(content={"ok": True, "data": data}, status_code=200)
-

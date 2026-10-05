@@ -7,6 +7,8 @@ from db.models.expediente import Expediente
 from db.models.acto_administrativo import ActoAdministrativo
 from db.models.notificacion import Notificacion
 from db.models.comunicacion import Comunicacion
+from core.permission import Permission
+from services.users import verify_permission
 
 
 def serialize_notif(n) -> dict:
@@ -84,5 +86,38 @@ async def get_expediente_con_permiso(
         stmt = stmt.where(Expediente.abogado_responsable_id == user_id)
     row = (await db.execute(stmt)).fetchone()
     if not row:
+        raise HTTPException(status_code=403, detail="Sin permisos sobre este expediente")
+    return row
+
+
+async def puede_leer_expediente(
+    user_id: int, abogado_responsable_id: int | None, *ven_todos: str,
+) -> bool:
+    """Regla de lectura (la misma de GET /expedientes/completo):
+    `infraccion_consultar` (o cualquiera de `ven_todos`) ve cualquier
+    expediente; `infraccion_gestionar` solo los que tiene a cargo."""
+    for permiso in (Permission.FILE_CONSULT, *ven_todos):
+        if await verify_permission(user_id, permiso):
+            return True
+    return (
+        abogado_responsable_id is not None
+        and abogado_responsable_id == user_id
+        and bool(await verify_permission(user_id, Permission.FILE_MANAGE))
+    )
+
+
+async def exigir_lectura_expediente(
+    db: AsyncSession, expediente_id: int, user_id: int, *ven_todos: str,
+):
+    """Lecturas de un expediente (etapas, involucrados, descarga). 403 tanto si
+    no existe como si no lo puede ver, para no revelar qué IDs existen.
+
+    Devuelve la Row (id, radicado, abogado_responsable_id).
+    """
+    row = (await db.execute(
+        select(Expediente.id, Expediente.radicado, Expediente.abogado_responsable_id)
+        .where(Expediente.id == expediente_id)
+    )).fetchone()
+    if not row or not await puede_leer_expediente(user_id, row.abogado_responsable_id, *ven_todos):
         raise HTTPException(status_code=403, detail="Sin permisos sobre este expediente")
     return row

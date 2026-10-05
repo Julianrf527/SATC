@@ -1,7 +1,7 @@
 """
 Tests de informes técnicos: asignación con revisor separado, cambio de modo
-FLUJO/MANUAL, cargue manual, y el bug fix de sync (estado 'rechazado', antes
-comparado incorrectamente contra 'devuelto' — nunca coincidía).
+FLUJO/MANUAL y cargue manual. El ciclo de revisión propio está en
+test_revision_informes.py.
 """
 from datetime import date
 from types import SimpleNamespace
@@ -19,10 +19,6 @@ async def _ok(*a, **k):
     return {"ok": True}
 
 
-async def _create_doc_ok(*a, **k):
-    return {"ok": True, "documento_id": 555}
-
-
 def _file_info(content_type: str):
     async def _get(file_id):
         return {"ok": True, "data": {"id": file_id, "content_type": content_type}}
@@ -38,12 +34,10 @@ def _make_verify_permission(allowed: bool = True):
 
 
 @pytest.fixture(autouse=True)
-def _mock_permissions(monkeypatch):
+def _mock_permissions(monkeypatch, stubs_clientes):
     """Por defecto todos los permisos pasan; los tests que necesiten negar
     uno específico sobreescriben con su propio monkeypatch."""
     monkeypatch.setattr(reports_mod, "verify_permission", _make_verify_permission(True))
-    monkeypatch.setattr(reports_mod, "create_doc_for_professional", _create_doc_ok)
-    monkeypatch.setattr(reports_mod, "finalize_doc_as_rejected", _ok)
     monkeypatch.setattr(reports_mod, "increment_file_usage", _ok)
     monkeypatch.setattr(reports_mod, "decrement_file_usage", _ok)
     monkeypatch.setattr(reports_mod, "get_file_info", _file_info("application/pdf"))
@@ -68,7 +62,7 @@ class TestAssign:
         informe = await make_informe(exp.id)
 
         resp = await client.post(
-            f"/informes/{informe.id}/assign",
+            f"/informes/{informe.id}/asignar",
             json={"profesional_id": 10, "revisor_id": 20},
             headers=gateway_headers(1),
         )
@@ -81,7 +75,7 @@ class TestAssign:
         informe = await make_informe(exp.id)
 
         resp = await client.post(
-            f"/informes/{informe.id}/assign",
+            f"/informes/{informe.id}/asignar",
             json={"profesional_id": 10, "revisor_id": 10},
             headers=gateway_headers(1),
         )
@@ -97,7 +91,7 @@ class TestAssign:
         informe = await make_informe(exp.id)
 
         resp = await client.post(
-            f"/informes/{informe.id}/assign",
+            f"/informes/{informe.id}/asignar",
             json={"profesional_id": 10, "revisor_id": 20},
             headers=gateway_headers(1),
         )
@@ -108,7 +102,7 @@ class TestAssign:
         informe = await make_informe(exp.id, modo="MANUAL")
 
         resp = await client.post(
-            f"/informes/{informe.id}/assign",
+            f"/informes/{informe.id}/asignar",
             json={"profesional_id": 10, "revisor_id": 20},
             headers=gateway_headers(1),
         )
@@ -126,7 +120,7 @@ class TestSwitchMode:
         )
 
         resp = await client.put(
-            f"/informes/{informe.id}/switch-mode",
+            f"/informes/{informe.id}/cambiar-modo",
             json={"modo": "MANUAL"},
             headers=gateway_headers(1),
         )
@@ -158,7 +152,7 @@ class TestSwitchMode:
         )
 
         resp = await client.put(
-            f"/informes/{informe.id}/switch-mode",
+            f"/informes/{informe.id}/cambiar-modo",
             json={"modo": "FLUJO"},
             headers=gateway_headers(1),
         )
@@ -175,7 +169,7 @@ class TestSwitchMode:
         informe = await make_informe(exp.id, modo="FLUJO")
 
         resp = await client.put(
-            f"/informes/{informe.id}/switch-mode",
+            f"/informes/{informe.id}/cambiar-modo",
             json={"modo": "FLUJO"},
             headers=gateway_headers(1),
         )
@@ -189,7 +183,7 @@ class TestManualUpload:
         informe = await make_informe(exp.id, modo="FLUJO")
 
         resp = await client.post(
-            f"/informes/{informe.id}/manual-upload",
+            f"/informes/{informe.id}/cargue-manual",
             json={
                 "file_id": 123,
                 "fecha_recibido": "2024-01-01",
@@ -204,7 +198,7 @@ class TestManualUpload:
         informe = await make_informe(exp.id, modo="MANUAL")
 
         resp = await client.post(
-            f"/informes/{informe.id}/manual-upload",
+            f"/informes/{informe.id}/cargue-manual",
             json={
                 "file_id": 123,
                 "fecha_recibido": "2024-01-01",
@@ -231,7 +225,7 @@ class TestManualUpload:
         informe = await make_informe(exp.id, modo="MANUAL")
 
         resp = await client.post(
-            f"/informes/{informe.id}/manual-upload",
+            f"/informes/{informe.id}/cargue-manual",
             json={"file_id": 123, "fecha_recibido": "2024-01-01", "fecha_aceptacion": "2024-01-02"},
             headers=gateway_headers(1),
         )
@@ -240,64 +234,6 @@ class TestManualUpload:
 
         await db_session.refresh(informe)
         assert informe.documento_informe_id is None
-
-
-class TestSyncEstadoRechazado:
-    """Bug fix: el estado real de un documento devuelto en app-docs es
-    'rechazado', no 'devuelto' — antes esa rama nunca se ejecutaba."""
-
-    async def test_sync_detecta_rechazado(self, client, make_expediente, make_informe, monkeypatch):
-        async def _get_doc_detail(docs_id):
-            return {"ok": True, "estado": "rechazado"}
-
-        monkeypatch.setattr(reports_mod, "get_doc_detail", _get_doc_detail)
-
-        exp = await make_expediente(abogado_responsable_id=7)
-        informe = await make_informe(exp.id, profesional_asignado_id=10)
-
-        # Necesita un proceso activo para que /sync lo encuentre.
-        resp_assign = await client.post(
-            f"/informes/{informe.id}/assign",
-            json={"profesional_id": 10, "revisor_id": 20},
-            headers=gateway_headers(1),
-        )
-        assert resp_assign.status_code == 200
-
-        resp = await client.put(f"/informes/{informe.id}/sync", headers=gateway_headers(1))
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["ok"] is False
-        assert body["estado"] == "rechazado"
-        assert "devuelto" in body["message"].lower()
-
-    async def test_sync_aprobado_actualiza_informe(self, client, make_expediente, make_informe, monkeypatch, db_session):
-        async def _get_doc_detail(docs_id):
-            return {
-                "ok": True,
-                "estado": "aprobado",
-                "fecha_ultima_actualizacion": "2024-02-01T10:00:00",
-                "ultima_version": {"fecha_subida": "2024-01-30T10:00:00", "file_hash_id": 777},
-            }
-
-        monkeypatch.setattr(reports_mod, "get_doc_detail", _get_doc_detail)
-
-        exp = await make_expediente(abogado_responsable_id=7)
-        informe = await make_informe(exp.id, profesional_asignado_id=10)
-
-        resp_assign = await client.post(
-            f"/informes/{informe.id}/assign",
-            json={"profesional_id": 10, "revisor_id": 20},
-            headers=gateway_headers(1),
-        )
-        assert resp_assign.status_code == 200
-
-        resp = await client.put(f"/informes/{informe.id}/sync", headers=gateway_headers(1))
-        assert resp.status_code == 200
-        assert resp.json()["ok"] is True
-
-        await db_session.refresh(informe)
-        assert informe.documento_informe_id == 777
-        assert informe.fecha_aceptacion_informe == date(2024, 2, 1)
 
 
 class TestEstadoExpedienteCascade:
