@@ -58,17 +58,15 @@ async def test_cierre_post_ok_con_apertura_y_acto_sin_notificar(client, db_sessi
     assert resp.status_code == 201
 
 
-# ── DECISIÓN DE FONDO (empty_value={} en vez de None, creable = notif en cierre) ──
+# ── DECISIÓN DE FONDO (creable = notif en cierre) ──
 
-async def test_decision_sin_etapa_devuelve_dict_vacio_no_none(client, make_expediente):
-    """decision_fondo es la única de las 7 genéricas con empty_value={} en vez
-    de None: el frontend distingue ambos casos, así que la diferencia es
-    intencional y no debe uniformarse."""
+async def test_decision_sin_etapa_devuelve_none(client, make_expediente):
+    """Como todas las etapas: null cuando no existe y `creable` en la raíz."""
     exp = await make_expediente(encargado_id=1)
     resp = await client.get(f"/decision/{exp.id}", headers=gateway_headers(1))
     assert resp.status_code == 200
     body = resp.json()
-    assert body["decision_fondo"] == {}
+    assert body["decision_fondo"] is None
     assert body["creable"]["status"] is False
 
 
@@ -84,8 +82,13 @@ async def test_decision_crear_y_actualizar(client, db_session, make_expediente, 
     assert creado.status_code == 201
 
     obtenido = (await client.get(f"/decision/{exp.id}", headers=gateway_headers(1))).json()
-    assert obtenido["decision_fondo"]["detalle"] == "Sanción por decomiso"
-    assert obtenido["decision_fondo"]["acto_recurso"] is None
+    decision = obtenido["decision_fondo"]
+    assert decision["etapa_id"] == creado.json()["etapa_id"]
+    assert decision["tipo_sancion_id"] == tipo_sancion.id
+    assert decision["detalle"] == "Sanción por decomiso"
+    assert "informacion" not in decision
+    assert decision["acto_recurso"] is None
+    assert decision["creable_acto_recurso"]["status"] is False
 
     nuevo_body = {"tipo_sancion_id": tipo_sancion.id, "detalle": "Sanción actualizada"}
     actualizado = await client.put(f"/decision/{exp.id}", headers=gateway_headers(1), json=nuevo_body)

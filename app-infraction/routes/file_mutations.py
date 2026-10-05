@@ -32,7 +32,6 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXP_DAYS = os.getenv("JWT_EXP_DAYS")
-GATEWAY_URL = os.getenv("GATEWAY_URL", "http://api-gateway:8000")
 
 bogota_tz = pytz.timezone("America/Bogota")
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -68,7 +67,7 @@ def normalize_radicados_asociados(radicados: List[str]) -> List[str]:
     return normalized
 
 
-@router.post("/complainer/add")
+@router.post("/denunciantes")
 async def crear_quejoso(
     request: Request,
     quejoso: QuejosoSchema,
@@ -123,7 +122,7 @@ async def crear_quejoso(
     return JSONResponse(content={"ok": True, "data": data}, status_code=201)
 
 
-@router.put("/{expediente_id}/basic-data")
+@router.put("/{expediente_id}/datos-basicos")
 async def actualizar_informacion_expediente(
     request: Request,
     expediente_id: int,
@@ -400,7 +399,7 @@ async def actualizar_informacion_expediente(
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 
-@router.post("/add")
+@router.post("")
 async def agregar_expediente(
     request: Request,
     expediente: ExpedienteSchema,
@@ -534,7 +533,7 @@ async def agregar_expediente(
     )
 
 
-@router.patch("/{expediente_id}/charge/{encargado_id}")
+@router.patch("/{expediente_id}/encargado/{encargado_id}")
 async def actualizar_encargado_de_expediente(
     request: Request,
     expediente_id: int,
@@ -615,8 +614,9 @@ async def actualizar_encargado_de_expediente(
     if encargado_id != 0:
         notif_result = await create_notification(
             mensaje=f"Expediente {expediente.radicado}\nTe han asignado este expediente de infracción",
-            id_vinculada=str(expediente_id),
-            tipo="expediente",
+            # El frontend selecciona el expediente por radicado (ver notificationTypes.ts).
+            id_vinculada=expediente.radicado,
+            tipo="expediente_infraccion",
             usuario_id=encargado_id
         )
         
@@ -632,7 +632,7 @@ async def actualizar_encargado_de_expediente(
     )
 
 
-@router.patch("/charge/bulk")
+@router.patch("/encargado/masivo")
 async def actualizar_encargado_bulk(
     request: Request,
     data: BulkEncargadoRequest,
@@ -708,8 +708,8 @@ async def actualizar_encargado_bulk(
         for expediente_actualizado in updated:
             await create_notification(
                 mensaje=f"Expediente {expediente_actualizado['radicado']}\nTe han asignado este expediente de infracción",
-                id_vinculada=str(expediente_actualizado['id']),
-                tipo="expediente",
+                id_vinculada=expediente_actualizado['radicado'],
+                tipo="expediente_infraccion",
                 usuario_id=new_value
             )
 
@@ -720,7 +720,7 @@ async def actualizar_encargado_bulk(
 
 
 # Archivar expediente
-@router.patch("/{expediente_id}/archive")
+@router.patch("/{expediente_id}/archivar")
 async def archivar_expediente(
     request: Request,
     expediente_id: int,

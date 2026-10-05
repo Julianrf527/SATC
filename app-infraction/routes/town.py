@@ -16,12 +16,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from .models.town_models import BusinessDaysRequest
-from utils.funtions import calcular_dias_laborales
 from utils.verify_token import verify_gateway_token
 
 
-@router.get("/rural-district")
+@router.get("/veredas")
 async def cargar_municipios_y_veredas(
     request: Request,
     db: AsyncSession = Depends(get_db_managed)
@@ -66,7 +64,7 @@ async def cargar_municipios_y_veredas(
     )
 
 
-@router.get("/rural-district/{municipio_id}")
+@router.get("/veredas/{municipio_id}")
 async def obtener_veredas_por_municipio(
     request: Request,
     municipio_id: int,
@@ -85,14 +83,3 @@ async def obtener_veredas_por_municipio(
         status_code=200
     )
 
-
-@router.post("/utils/business-days")
-async def calcular_dias_laborales_endpoint(
-    request: BusinessDaysRequest
-):
-    from datetime import datetime
-    fecha_inicio = datetime.strptime(request.fecha_inicio.split(' ')[0], "%Y-%m-%d").date()
-    fecha_fin = datetime.strptime(request.fecha_fin.split(' ')[0], "%Y-%m-%d").date()
-
-    dias = calcular_dias_laborales(fecha_inicio, fecha_fin)
-    return {"dias_laborales": dias}

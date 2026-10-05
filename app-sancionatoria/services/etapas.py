@@ -62,6 +62,20 @@ ETAPA_LEGACY_ID: dict[Type, int] = {
 }
 
 
+# Model -> columna del acto auxiliar (el que el frontend crea con
+# nivel_auxiliar=true). Solo dos etapas tienen un segundo acto.
+ACTO_AUXILIAR_COLUMNA: dict[Type, str] = {
+    EtapaDecisionFondo: "acto_recurso_id",       # acto de recurso
+    EtapaProbatoriaRecurso: "acto_decision_id",  # acto de decisión del recurso
+}
+
+
+def columna_acto_auxiliar(Model: Type):
+    """Columna ORM del acto auxiliar de la etapa, o None si no tiene."""
+    nombre = ACTO_AUXILIAR_COLUMNA.get(Model)
+    return getattr(Model, nombre) if nombre else None
+
+
 async def find_stage_by_id(db: AsyncSession, etapa_id: int):
     """Escanea las 10 tablas de etapa buscando este id.
     Retorna (etapa_tipo, Model, row) o (None, None, None)."""
@@ -77,12 +91,17 @@ async def get_expediente_con_permiso(
 ):
     """Verifica que el expediente existe y, si `require_owner`, que el usuario
     es el encargado. 403 (no 404) en ambos casos para no distinguir "no existe"
-    de "no es tuyo"."""
+    de "no es tuyo".
+
+    Con ``require_owner=False`` (lecturas: GET de etapas) aplica la regla de
+    lectura de services.permisos: sancionatorio_consultar, o
+    sancionatorio_gestionar y ser el encargado."""
+    if not require_owner:
+        from services.permisos import exigir_lectura_expediente
+        return await exigir_lectura_expediente(db, expediente_id, user_id)
     stmt = select(Expediente.id, Expediente.radicado, Expediente.encargado_id).where(
-        Expediente.id == expediente_id
+        Expediente.id == expediente_id, Expediente.encargado_id == user_id
     )
-    if require_owner:
-        stmt = stmt.where(Expediente.encargado_id == user_id)
     row = (await db.execute(stmt)).fetchone()
     if not row:
         raise HTTPException(status_code=403, detail="Sin permisos sobre este expediente")

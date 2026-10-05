@@ -16,12 +16,14 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "`n[ 1/5 ] Construyendo imágenes locales..." -ForegroundColor Yellow
 # Usamos un tag local para el registry
 $Prefix = "satc-local"
+# Los servicios Python instalan el paquete compartido shared/ (satc_shared):
+# se pasa como contexto adicional con --build-context shared=.\shared
 docker build -t ${Prefix}/satc-gateway:latest .\api-gateway
-docker build -t ${Prefix}/satc-users:latest .\app-users
-docker build -t ${Prefix}/satc-sanctioning:latest .\app-sancionatoria
-docker build -t ${Prefix}/satc-docs:latest .\app-docs
-docker build -t ${Prefix}/satc-involved:latest .\app-involved
-docker build -t ${Prefix}/satc-infraction:latest .\app-infraction
+docker build -t ${Prefix}/satc-users:latest --build-context shared=.\shared .\app-users
+docker build -t ${Prefix}/satc-sanctioning:latest --build-context shared=.\shared .\app-sancionatoria
+docker build -t ${Prefix}/satc-docs:latest --build-context shared=.\shared .\app-docs
+docker build -t ${Prefix}/satc-involved:latest --build-context shared=.\shared .\app-involved
+docker build -t ${Prefix}/satc-infraction:latest --build-context shared=.\shared .\app-infraction
 docker build -t ${Prefix}/satc-frontend:latest --build-arg VITE_API_URL=http://${ServerIp}:8000 .\frontend
 
 Write-Host "`n[ 2/5 ] Exportando imágenes a ${TarName} (esto puede tomar unos minutos)..." -ForegroundColor Yellow

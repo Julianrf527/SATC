@@ -1,6 +1,11 @@
 from fastapi import APIRouter, Request, HTTPException
 from dotenv import load_dotenv
-from jose import jwt
+from satc_shared.auth import (
+    ServiceTokenConfigError,
+    ServiceTokenInvalid,
+    ServiceTokenMissing,
+    identify_caller,
+)
 import os
 
 router = APIRouter()
@@ -52,20 +57,13 @@ def verify_service_token(request: Request) -> str:
     exige que ambos coincidan, así una firma válida con identidad falseada
     también se rechaza.
     """
-    if not EXPECTED_CALLERS:
+    try:
+        return identify_caller(
+            request.headers.get("x-service-token"), EXPECTED_CALLERS, algorithm=JWT_ALGORITHM
+        )
+    except ServiceTokenConfigError:
         raise HTTPException(status_code=500, detail="No hay secretos de servicio configurados")
-
-    service_token = request.headers.get("x-service-token")
-    if not service_token:
+    except ServiceTokenMissing:
         raise HTTPException(status_code=403, detail="Service token requerido")
-
-    for caller_name, secret in EXPECTED_CALLERS.items():
-        try:
-            payload = jwt.decode(service_token, secret, algorithms=[JWT_ALGORITHM])
-        except Exception:
-            continue
-        if payload.get("service") != caller_name:
-            raise HTTPException(status_code=403, detail="Service token inválido")
-        return caller_name
-
-    raise HTTPException(status_code=403, detail="Service token inválido")
+    except ServiceTokenInvalid:
+        raise HTTPException(status_code=403, detail="Service token inválido")

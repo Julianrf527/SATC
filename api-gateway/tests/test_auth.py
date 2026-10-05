@@ -168,16 +168,39 @@ async def test_ninguna_ruta_publica_vale_en_todos_los_servicios_por_accidente(
                 )
 
 
-async def test_prefijo_publico_cubre_subrutas(cliente, upstream):
-    r = await cliente.get("/users/user/permission/ver_expedientes")
+async def test_prefijo_publico_cubre_subrutas(cliente, upstream, monkeypatch):
+    monkeypatch.setitem(main.PUBLIC_ROUTES, "users", main.PUBLIC_ROUTES["users"] | {"x/prefijo"})
+    r = await cliente.get("/users/x/prefijo/sub")
     assert r.status_code == 200
-    assert str(upstream.url).endswith("/user/permission/ver_expedientes")
+    assert str(upstream.url).endswith("/x/prefijo/sub")
+
+
+# Rutas solo de servicio: los microservicios se llaman directo, nunca vía
+# gateway (auditoría 2026-10, M18). Sin sesión ya no llegan al backend.
+@pytest.mark.parametrize(
+    "servicio,ruta",
+    [
+        ("users", "role/verify"),
+        ("users", "user/batch"),
+        ("users", "user/permission/infraccion_gestionar"),
+        ("users", "notification/add"),
+        ("users", "email/send"),
+        ("users", "email/send-bulk"),
+        ("users", "email/send-alert-report"),
+        ("documents", "files/increment-usage"),
+        ("documents", "files/decrement-usage"),
+        ("documents", "files/batch"),
+    ],
+)
+async def test_rutas_de_servicio_ya_no_son_publicas(servicio, ruta, cliente, upstream):
+    r = await cliente.post(f"/{servicio}/{ruta}", json={})
+    assert r.status_code == 401
+    assert upstream.request is None
 
 
 async def test_ruta_publica_no_lleva_identidad_de_usuario(cliente, upstream):
-    """Sin sesión no hay usuario que declarar; el destino debe exigir
-    X-Service-Token para estos endpoints."""
-    await cliente.post("/users/user/batch", json={"user_ids": [1]})
+    """Sin sesión no hay usuario que declarar."""
+    await cliente.post("/users/auth/login", json={})
     assert "X-Gateway-User-Id" not in upstream.headers
     assert "X-Gateway-Role-Id" not in upstream.headers
 

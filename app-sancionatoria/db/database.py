@@ -25,5 +25,10 @@ SessionLocal = sessionmaker(
 
 async def init_db():
     from . import models
+    from .migrations import aplicar_migraciones
+
     async with engine.begin() as conn:
+        # Tablas nuevas (BD vacía). No altera tablas existentes: eso lo hace
+        # aplicar_migraciones con DDL idempotente.
         await conn.run_sync(lambda sync_conn: models.Base.metadata.create_all(sync_conn, checkfirst=True))
+        await aplicar_migraciones(conn)

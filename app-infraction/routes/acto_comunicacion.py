@@ -32,7 +32,7 @@ from utils.log import insert_log
 
 # ── COMUNICACIÓN ──────────────────────────────────────────────────────────────
 
-@router.post("/comunicacion")
+@router.post("/comunicaciones")
 async def crear_comunicacion(
     request: Request,
     expediente_id: int = Form(...),
@@ -110,7 +110,7 @@ async def crear_comunicacion(
     )
 
 
-@router.put("/comunicacion/{comunicacion_id}")
+@router.put("/comunicaciones/{comunicacion_id}")
 async def actualizar_comunicacion(
     request: Request,
     comunicacion_id: int,
@@ -188,7 +188,7 @@ async def actualizar_comunicacion(
     )
 
 
-@router.delete("/comunicacion/{comunicacion_id}")
+@router.delete("/comunicaciones/{comunicacion_id}")
 async def eliminar_comunicacion(
     request: Request,
     comunicacion_id: int,

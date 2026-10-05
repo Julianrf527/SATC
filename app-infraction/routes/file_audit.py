@@ -22,7 +22,6 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXP_DAYS = os.getenv("JWT_EXP_DAYS")
-GATEWAY_URL = os.getenv("GATEWAY_URL", "http://api-gateway:8000")
 
 bogota_tz = pytz.timezone("America/Bogota")
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -36,7 +35,7 @@ from utils.verify_token import verify_gateway_token
 from services.users import get_user_info, verify_permission
 
 
-@router.get("/audit/logs")
+@router.get("/auditoria/registros")
 async def obtener_logs_auditoria(
     request: Request,
     usuario_id: int = Query(None, description="ID del usuario"),

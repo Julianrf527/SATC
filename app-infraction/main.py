@@ -4,7 +4,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 import os
 
-from routes import involved, town, reports
+from routes import involved, town, reports, revision_informes
 from routes import file_query, file_mutations, file_audit, file_alerts, file_download
 from routes import stage_respuesta, stage_informe, stage_concepto, stage_cierre
 from routes import acto_admin, acto_notificacion, acto_comunicacion
@@ -46,21 +46,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(file_query.router, prefix="/file", tags=["File"])
-app.include_router(file_mutations.router, prefix="/file", tags=["File"])
-app.include_router(file_audit.router, prefix="/file", tags=["File - Auditoría"])
-app.include_router(file_alerts.router, prefix="/file", tags=["File - Alertas"])
-app.include_router(file_download.router, prefix="/file", tags=["File - Descarga"])
-app.include_router(involved.router, prefix="/involved", tags=["Involved"])
-app.include_router(town.router, prefix="/town", tags=["Town"])
-app.include_router(acto_admin.router, prefix="/acto", tags=["Acto Administrativo"])
-app.include_router(acto_notificacion.router, prefix="/acto", tags=["Notificación"])
-app.include_router(acto_comunicacion.router, prefix="/acto", tags=["Comunicación"])
-app.include_router(stage_respuesta.router, prefix="/stage", tags=["Stage - Respuesta"])
-app.include_router(stage_informe.router, prefix="/stage", tags=["Stage - Informe"])
-app.include_router(stage_concepto.router, prefix="/stage", tags=["Stage - Concepto"])
-app.include_router(stage_cierre.router, prefix="/stage", tags=["Stage - Cierre"])
-app.include_router(reports.router, prefix="/informes", tags=["Reports"])
+app.include_router(file_query.router, prefix="/expedientes", tags=["Expedientes"])
+app.include_router(file_mutations.router, prefix="/expedientes", tags=["Expedientes"])
+app.include_router(file_audit.router, prefix="/expedientes", tags=["Expedientes - Auditoría"])
+app.include_router(file_alerts.router, prefix="/expedientes", tags=["Expedientes - Alertas"])
+app.include_router(file_download.router, prefix="/expedientes", tags=["Expedientes - Descarga"])
+app.include_router(involved.router, prefix="/involucrados", tags=["Involucrados"])
+app.include_router(town.router, prefix="/municipios", tags=["Municipios"])
+app.include_router(acto_admin.router, prefix="/actos", tags=["Acto Administrativo"])
+app.include_router(acto_notificacion.router, prefix="/actos", tags=["Notificación"])
+app.include_router(acto_comunicacion.router, prefix="/actos", tags=["Comunicación"])
+app.include_router(stage_respuesta.router, prefix="/etapas", tags=["Etapas - Respuesta"])
+app.include_router(stage_informe.router, prefix="/etapas", tags=["Etapas - Informe"])
+app.include_router(stage_concepto.router, prefix="/etapas", tags=["Etapas - Concepto"])
+app.include_router(stage_cierre.router, prefix="/etapas", tags=["Etapas - Cierre"])
+app.include_router(reports.router, prefix="/informes", tags=["Informes técnicos"])
+app.include_router(revision_informes.router, prefix="/revision-informes", tags=["Informes técnicos - Revisión"])
 
 
 @app.get("/health")

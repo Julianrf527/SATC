@@ -42,7 +42,8 @@ async def test_indagacion_crear_duplicada_da_409(client, make_expediente):
     assert resp.status_code == 409
 
 
-# ── PERMISOS: GET es solo lectura para cualquier usuario, POST/PUT exigen encargado ──
+# ── PERMISOS: GET con consultar (o gestionar + encargado), POST/PUT exigen encargado ──
+# (ver test_permisos.py para los casos sin permiso)
 
 async def test_indagacion_get_expediente_inexistente_da_403(client):
     resp = await client.get("/investigation/999999", headers=gateway_headers(1))
@@ -50,7 +51,8 @@ async def test_indagacion_get_expediente_inexistente_da_403(client):
     assert resp.json()["detail"] == "Sin permisos sobre este expediente"
 
 
-async def test_indagacion_get_expediente_de_otro_usuario_es_de_solo_lectura(client, make_expediente):
+async def test_indagacion_get_expediente_de_otro_usuario_es_de_solo_lectura(client, permisos, make_expediente):
+    permisos({"sancionatorio_consultar"})
     exp = await make_expediente(encargado_id=1)
     resp = await client.get(f"/investigation/{exp.id}", headers=gateway_headers(2))
     assert resp.status_code == 200
@@ -79,20 +81,21 @@ async def test_medida_crear_con_body_y_actualizar(client, make_expediente, tipo_
     assert creado.status_code == 201
 
     obtenido = (await client.get(f"/measure/{exp.id}", headers=gateway_headers(1))).json()
-    info = obtenido["medida"]["informacion"]
-    assert info["cantidad"] == "10"
-    assert info["especie"] == "Roble"
-    assert "tipo_medidas" in info
+    medida = obtenido["medida"]
+    assert medida["etapa_id"] == creado.json()["etapa_id"]
+    assert medida["tipo_medida_id"] == tipo_medida.id
+    assert medida["cantidad"] == "10"
+    assert medida["especie"] == "Roble"
+    assert "informacion" not in medida
 
     nuevo_body = {"tipo_medida_id": tipo_medida.id, "cantidad": "20", "especie": "Cedro", "estado_medida": False}
     actualizado = await client.put(f"/measure/{exp.id}", headers=gateway_headers(1), json=nuevo_body)
     assert actualizado.status_code == 200
 
-    releido = (await client.get(f"/measure/{exp.id}", headers=gateway_headers(1))).json()
-    info2 = releido["medida"]["informacion"]
-    assert info2["cantidad"] == "20"
-    assert info2["especie"] == "Cedro"
-    assert info2["estado_medida"] is False
+    releido = (await client.get(f"/measure/{exp.id}", headers=gateway_headers(1))).json()["medida"]
+    assert releido["cantidad"] == "20"
+    assert releido["especie"] == "Cedro"
+    assert releido["estado_medida"] is False
 
 
 # ── CESACIÓN (creable depende de otra etapa) ────────────────────────────────

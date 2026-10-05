@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 from utils.verify_token import verify_gateway_token
 from services.etapas import build_acto_for_frontend as _build_acto_for_frontend
-from services.etapas import get_expediente_con_permiso
+from services.etapas import get_expediente_con_permiso, exigir_lectura_expediente
 from utils.log import insert_log
 
 
@@ -82,7 +82,7 @@ async def _get_local_medida(db: AsyncSession, etapa_respuesta_id: int) -> dict:
 
 # ── ETAPA RESPUESTA ────────────────────────────────────────────────────────────
 
-@router.post("/answer/{expediente_id}", status_code=201)
+@router.post("/respuesta/{expediente_id}", status_code=201)
 async def crear_respuesta(
     request: Request,
     expediente_id: int = PathParam(..., description="ID del expediente"),
@@ -180,7 +180,7 @@ async def crear_respuesta(
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 
-@router.put("/answer/{etapa_id}", status_code=200)
+@router.put("/respuesta/{etapa_id}", status_code=200)
 async def actualizar_respuesta(
     request: Request,
     etapa_id: int = PathParam(..., description="ID de la etapa a actualizar"),
@@ -300,13 +300,14 @@ async def actualizar_respuesta(
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 
-@router.get("/answer/{expediente_id}", status_code=200)
+@router.get("/respuesta/{expediente_id}", status_code=200)
 async def obtener_respuesta(
     request: Request,
     expediente_id: int = PathParam(..., description="ID del expediente"),
     db: AsyncSession = Depends(get_db_managed),
 ):
-    verify_gateway_token(request)
+    user_id = verify_gateway_token(request)["user_id"]
+    await exigir_lectura_expediente(db, expediente_id, user_id)
 
     etapa_respuesta = await db.scalar(
         select(EtapaRespuesta).where(EtapaRespuesta.expediente_id == expediente_id)
@@ -338,7 +339,7 @@ async def obtener_respuesta(
 
 # ── MEDIDA PREVENTIVA ──────────────────────────────────────────────────────────
 
-@router.get("/tipo-medida", status_code=200)
+@router.get("/tipos-medida", status_code=200)
 async def listar_tipos_medida(
     request: Request,
     db: AsyncSession = Depends(get_db_managed),
@@ -351,7 +352,7 @@ async def listar_tipos_medida(
     )
 
 
-@router.post("/medida/{etapa_respuesta_id}", status_code=201)
+@router.post("/medidas/{etapa_respuesta_id}", status_code=201)
 async def crear_medida(
     request: Request,
     etapa_respuesta_id: int = PathParam(..., description="ID de la etapa respuesta"),
@@ -423,7 +424,7 @@ async def crear_medida(
     return JSONResponse(content={"ok": True, **result}, status_code=201)
 
 
-@router.put("/medida/{medida_id}", status_code=200)
+@router.put("/medidas/{medida_id}", status_code=200)
 async def actualizar_medida(
     request: Request,
     medida_id: int = PathParam(..., description="ID de la medida preventiva"),

@@ -26,15 +26,15 @@ logger = logging.getLogger(__name__)
 
 from utils.verify_token import verify_gateway_token
 from services.users import get_user_info, verify_permission
-from services.etapas import get_expediente_con_permiso
-from routes.reports import autosincronizar_informe
+from services.etapas import get_expediente_con_permiso, exigir_lectura_expediente
+from services.revision_informes import proceso_vigente, resumen_proceso
 from utils.log import insert_log
 from core.permission import Permission
 
 
 # ── INFORMES TÉCNICOS ──────────────────────────────────────────────────────────
 
-@router.get("/technical-report/{expediente_id}/{tipo_informe}", status_code=200)
+@router.get("/informe-tecnico/{expediente_id}/{tipo_informe}", status_code=200)
 async def obtener_informe_tecnico(
     request: Request,
     expediente_id: int = PathParam(..., description="ID del expediente"),
@@ -42,11 +42,7 @@ async def obtener_informe_tecnico(
     db: AsyncSession = Depends(get_db_managed),
 ):
     user_id = verify_gateway_token(request)["user_id"]
-    existe = await db.scalar(
-        select(Expediente.id).where(Expediente.id == expediente_id)
-    )
-    if not existe:
-        raise HTTPException(status_code=403, detail="Sin permisos sobre este expediente")
+    await exigir_lectura_expediente(db, expediente_id, user_id)
 
     informe_tecnico = await db.scalar(
         select(InformeTecnico).where(
@@ -54,9 +50,6 @@ async def obtener_informe_tecnico(
             InformeTecnico.tipo_informe == tipo_informe,
         )
     )
-
-    if informe_tecnico:
-        await autosincronizar_informe(db, informe_tecnico)
 
     if not informe_tecnico:
         creable = False
@@ -193,6 +186,11 @@ async def obtener_informe_tecnico(
                 "modo": informe_tecnico.modo,
                 "tiene_matriz": tiene_matriz,
                 "recursos_afectados": recursos_afectados,
+                **resumen_proceso(
+                    await proceso_vigente(db, informe_tecnico.id),
+                    user_id,
+                    informe_tecnico.revisor_asignado_id,
+                ),
             },
             "message": "Informe técnico obtenido correctamente",
         },
@@ -200,7 +198,7 @@ async def obtener_informe_tecnico(
     )
 
 
-@router.post("/technical-report/{expediente_id}/create/{tipo_informe}", status_code=200)
+@router.post("/informe-tecnico/{expediente_id}/crear/{tipo_informe}", status_code=200)
 async def crear_informe_tecnico(
     request: Request,
     expediente_id: int = PathParam(..., description="ID del expediente"),

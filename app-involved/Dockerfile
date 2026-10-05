@@ -26,6 +26,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Paquete compartido satc_shared (service JWT, clientes inter-servicio, proceso
+# de revisión). Viene del contexto adicional "shared": docker-compose lo define
+# en additional_contexts; con docker build directo usar
+#   --build-context shared=./shared
+COPY --from=shared . /shared
+RUN pip install --no-cache-dir /shared && rm -rf /shared
+
 COPY . .
 
 RUN chown -R involved:involved /app

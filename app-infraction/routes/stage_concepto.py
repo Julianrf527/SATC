@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 from utils.verify_token import verify_gateway_token
 from services.docs import decrement_file_usage
 from services.etapas import build_acto_for_frontend as _build_acto_for_frontend
-from services.etapas import get_expediente_con_permiso
+from services.etapas import get_expediente_con_permiso, exigir_lectura_expediente
 from utils.log import insert_log
 
 
@@ -152,7 +152,8 @@ async def obtener_concepto(
     expediente_id: int = PathParam(...),
     db: AsyncSession = Depends(get_db_managed),
 ):
-    verify_gateway_token(request)
+    user_id = verify_gateway_token(request)["user_id"]
+    await exigir_lectura_expediente(db, expediente_id, user_id)
 
     etapa = await db.scalar(
         select(EtapaAcogerConcepto).where(EtapaAcogerConcepto.expediente_id == expediente_id)

@@ -30,7 +30,6 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXP_DAYS = os.getenv("JWT_EXP_DAYS")
-GATEWAY_URL = os.getenv("GATEWAY_URL", "http://api-gateway:8000")
 
 bogota_tz = pytz.timezone("America/Bogota")
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -42,11 +41,12 @@ logger = logging.getLogger(__name__)
 
 from utils.verify_token import verify_gateway_token
 from services.docs import download_unified_pdf
+from services.etapas import exigir_lectura_expediente
 
 
 # ── DESCARGA UNIFICADA DE DOCUMENTOS ─────────────────────────────────────────
 
-@router.get("/download/{expediente_id}")
+@router.get("/descargar/{expediente_id}")
 async def descargar_expediente_completo(
     request: Request,
     expediente_id: int,
@@ -60,17 +60,10 @@ async def descargar_expediente_completo(
     from io import BytesIO
 
     try:
-        verify_gateway_token(request)
-
-        row = (await db.execute(
-            select(Expediente.radicado)
-            .where(Expediente.id == expediente_id)
-        )).fetchone()
-
-        if not row:
-            raise HTTPException(status_code=404, detail="Expediente no encontrado")
-
-        radicado = row[0]
+        user_id = verify_gateway_token(request)["user_id"]
+        # consultar descarga cualquiera; gestionar solo los suyos (403 si es
+        # ajeno o no existe).
+        radicado = (await exigir_lectura_expediente(db, expediente_id, user_id)).radicado
 
         documentos_ids: list = []
 

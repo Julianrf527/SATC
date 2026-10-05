@@ -10,6 +10,18 @@ const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(file
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   plugins: [tailwindcss()],
+  // Los *.stories.tsx están excluidos de tsconfig.app.json, así que esbuild no
+  // hereda "jsx": "react-jsx" y caía al runtime clásico ("React is not defined").
+  esbuild: { jsx: 'automatic' },
+  // Alias de capas: mantener sincronizado con "paths" de tsconfig.app.json.
+  resolve: {
+    alias: {
+      '@app': path.resolve(dirname, 'src/app'),
+      '@shared': path.resolve(dirname, 'src/shared'),
+      '@features': path.resolve(dirname, 'src/features'),
+      '@modules': path.resolve(dirname, 'src/modules'),
+    },
+  },
   build: {
     rollupOptions: {
       output: {
@@ -26,6 +38,14 @@ export default defineConfig({
   },
   test: {
     projects: [{
+      // Tests unitarios de lógica pura (shared/lib, hooks sin DOM): `npm run test:unit`
+      extends: true,
+      test: {
+        name: 'unit',
+        environment: 'node',
+        include: ['src/**/*.test.ts']
+      }
+    }, {
       extends: true,
       plugins: [
       // The plugin will run tests for the stories defined in your Storybook config

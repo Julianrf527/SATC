@@ -23,6 +23,9 @@ $serviceMap = [ordered]@{
     "frontend"          = @{ docker = "frontend";           npm = $true  }
 }
 
+# Servicios que instalan el paquete compartido shared/ (additional_contexts en docker-compose)
+$sharedConsumers = @("app-infraction", "app-sancionatoria", "app-docs", "app-involved", "app-users")
+
 # ── Determinar qué rebuildar ──────────────────────────────────────────────────
 if ($Service -ne "") {
     if (-not $serviceMap.Contains($Service)) {
@@ -44,6 +47,12 @@ if ($Service -ne "") {
     foreach ($svc in $serviceMap.Keys) {
         if ($changed | Where-Object { $_ -match "^$([regex]::Escape($svc))/" }) {
             $toRebuild += $svc
+        }
+    }
+    # shared/ (paquete satc_shared) lo instalan todos los servicios Python.
+    if ($changed | Where-Object { $_ -match "^shared/" }) {
+        foreach ($svc in $sharedConsumers) {
+            if ($toRebuild -notcontains $svc) { $toRebuild += $svc }
         }
     }
 }

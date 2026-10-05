@@ -11,7 +11,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from routes import documentos, revision, docs_service, files
+from routes import documentos, revision, files
 
 app = FastAPI()
 
@@ -46,11 +46,10 @@ from db.deps import get_db
 from services.cleanup_scheduler import configurar_scheduler_limpieza
 configurar_scheduler_limpieza(app, get_db)
 
-# Los tres routers comparten el prefijo "/docs": el frontend los ve como una
+# Los dos routers de /docs comparten el prefijo "/docs": el frontend los ve como una
 # sola API, la división es solo organización interna.
 app.include_router(documentos.router, prefix="/docs", tags=["Documents"])
 app.include_router(revision.router, prefix="/docs", tags=["Documents - Revisión"])
-app.include_router(docs_service.router, prefix="/docs", tags=["Documents - Service"])
 app.include_router(files.router, prefix="/files", tags=["Files Hash Centralized"])
 
 @app.get("/health")

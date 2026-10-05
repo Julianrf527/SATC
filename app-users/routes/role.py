@@ -70,7 +70,9 @@ async def cargar_roles(
     token_data = verify_gateway_token(request)
     user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
 
-    if PERMISO_ROL not in user_permission_names:
+    # Solo lectura: sigue devolviendo únicamente los roles cuyos permisos son
+    # subconjunto de los del usuario (no se puede asignar más de lo que se tiene).
+    if not user_permission_names.intersection(Permisos.VER_ROLES):
         raise HTTPException(
             status_code=403,
             detail="No tiene permiso para ver los roles"
@@ -88,7 +90,7 @@ async def cargar_permisos(
     token_data = verify_gateway_token(request)
     user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
 
-    if PERMISO_ROL not in user_permission_names:
+    if not user_permission_names.intersection(Permisos.VER_PERMISOS):
         raise HTTPException(
             status_code=403,
             detail="No tiene permiso para ver los permisos"

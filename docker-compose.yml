@@ -2,8 +2,6 @@
 # SATC - Sistema ApiCorp
 # ====================================
 
-version: "3.8"
-
 # ============================================
 # NETWORKS
 # ============================================
@@ -458,6 +456,9 @@ services:
     build:
       context: ./app-users
       dockerfile: Dockerfile
+      # Paquete compartido satc_shared (shared/): el Dockerfile hace COPY --from=shared
+      additional_contexts:
+        shared: ./shared
     container_name: satc-app-users
     deploy:
       resources:
@@ -537,6 +538,9 @@ services:
     build:
       context: ./app-sancionatoria
       dockerfile: Dockerfile
+      # Paquete compartido satc_shared (shared/): el Dockerfile hace COPY --from=shared
+      additional_contexts:
+        shared: ./shared
     container_name: satc-app-sancionatoria
     deploy:
       resources:
@@ -588,6 +592,9 @@ services:
     build:
       context: ./app-docs
       dockerfile: Dockerfile
+      # Paquete compartido satc_shared (shared/): el Dockerfile hace COPY --from=shared
+      additional_contexts:
+        shared: ./shared
     container_name: satc-app-docs
     deploy:
       resources:
@@ -659,6 +666,9 @@ services:
     build:
       context: ./app-involved
       dockerfile: Dockerfile
+      # Paquete compartido satc_shared (shared/): el Dockerfile hace COPY --from=shared
+      additional_contexts:
+        shared: ./shared
     container_name: satc-app-involved
     deploy:
       resources:
@@ -713,6 +723,9 @@ services:
     build:
       context: ./app-infraction
       dockerfile: Dockerfile
+      # Paquete compartido satc_shared (shared/): el Dockerfile hace COPY --from=shared
+      additional_contexts:
+        shared: ./shared
     container_name: satc-app-infraction
     deploy:
       resources:

@@ -27,6 +27,7 @@ os.environ.setdefault("JWT_ALGORITHM", "HS256")
 import itertools
 from datetime import date
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
@@ -81,7 +82,7 @@ async def client(db_session):
 
     main_module.app.dependency_overrides[get_db] = _override_get_db
     transport = ASGITransport(app=main_module.app)
-    # base_url sin prefijo: cada test usa la ruta completa ("/stage/...", "/file/...").
+    # base_url sin prefijo: cada test usa la ruta completa ("/etapas/...", "/expedientes/...").
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     main_module.app.dependency_overrides.clear()
@@ -93,6 +94,18 @@ def gateway_headers(user_id: int, rol_id: int = 1) -> dict:
         "X-Gateway-User-Id": str(user_id),
         "X-Gateway-Role-Id": str(rol_id),
     }
+
+
+@pytest.fixture
+def permiso_consulta(monkeypatch):
+    """El usuario de la petición tiene infraccion_consultar (lecturas de
+    expediente: services.etapas.exigir_lectura_expediente)."""
+    import services.etapas as etapas_mod
+
+    async def _verify(user_id, permission):
+        return permission == "infraccion_consultar"
+
+    monkeypatch.setattr(etapas_mod, "verify_permission", _verify)
 
 
 @pytest_asyncio.fixture
@@ -179,3 +192,84 @@ async def link_involucrado(db_session):
         return link
 
     return _make
+
+
+# ─── Stubs de FilesClient / UsersClient (proceso de revisión de informes) ────
+
+class FilesClientStub:
+    """Sustituye a satc_shared FilesClient: upload/usage/download en memoria."""
+
+    def __init__(self):
+        self._siguiente = 100
+        self.contenidos: dict[int, tuple[bytes, str]] = {}
+        self.subidos: list[str] = []
+        self.incrementados: list[int] = []
+        self.decrementados: list[int] = []
+
+    async def upload(self, filename, content, content_type="application/octet-stream", *, timeout=60.0):
+        from satc_shared.clients import UploadResult
+
+        self._siguiente += 1
+        fid = self._siguiente
+        self.contenidos[fid] = (content, content_type)
+        self.subidos.append(filename)
+        return UploadResult(ok=True, file_id=fid, file_url=f"/files/{fid}", file_hash=f"hash{fid}")
+
+    async def increment_usage(self, file_ids):
+        from satc_shared.clients import UsageResult
+
+        self.incrementados.extend(file_ids)
+        return UsageResult(ok=True)
+
+    async def decrement_usage(self, file_ids):
+        from satc_shared.clients import UsageResult
+
+        self.decrementados.extend(file_ids)
+        return UsageResult(ok=True)
+
+    def download(self, file_id, *, timeout=120.0):
+        from contextlib import asynccontextmanager
+
+        import httpx
+        from satc_shared.clients import NotFoundError
+
+        @asynccontextmanager
+        async def _cm():
+            if file_id not in self.contenidos:
+                raise NotFoundError("no existe", service="app-docs", status_code=404)
+            content, ctype = self.contenidos[file_id]
+            yield httpx.Response(200, content=content, headers={"content-type": ctype})
+
+        return _cm()
+
+
+class UsersClientStub:
+    def __init__(self):
+        self.notificaciones: list[dict] = []
+
+    async def create_notification(self, notification=None, *, timeout=5.0, **fields):
+        self.notificaciones.append(fields)
+
+    def para(self, usuario_id: int) -> list[str]:
+        return [n["mensaje"] for n in self.notificaciones if n["usuario_id"] == usuario_id]
+
+
+@pytest_asyncio.fixture
+async def stubs_clientes(monkeypatch):
+    """Sustituye los clientes inter-servicio por stubs en memoria."""
+    import types
+
+    import services.docs as docs_svc
+    import services.notification as notif_svc
+    import services.users as users_svc
+
+    files = FilesClientStub()
+    users = UsersClientStub()
+    monkeypatch.setattr(docs_svc, "files_client", files)
+    monkeypatch.setattr(notif_svc, "users_client", users)
+
+    async def _get_user_info(ids):
+        return {i: {"nombre": f"Usuario {i}", "correo": "", "numero_documento": ""} for i in ids}
+
+    monkeypatch.setattr(users_svc, "get_user_info", _get_user_info)
+    return types.SimpleNamespace(files=files, users=users)

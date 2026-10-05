@@ -68,3 +68,38 @@ async def test_delete_all_borra_todas(client, make_rol, make_usuario, make_notif
     resp = await client.delete("/notification/delete-all", headers=gateway_headers(u.id, rol.id))
     assert resp.status_code == 200
     assert resp.json()["count"] == 2
+
+
+# --- DELETE /notification/linked/{id}: solo las propias (auditoría 2026-10, M13) ---
+
+@pytest.mark.asyncio
+async def test_delete_linked_no_borra_las_de_otros(client, db_session, make_rol, make_usuario, make_notificacion):
+    from sqlalchemy import select
+    from db.models.notificacion import Notificacion
+
+    rol = await make_rol("operador")
+    yo = await make_usuario(rol_id=rol.id, correo="yo@test.com")
+    otro = await make_usuario(rol_id=rol.id, correo="otro2@test.com")
+    mia = await make_notificacion(usuario_id=yo.id, id_vinculada="EXP-77")
+    ajena = await make_notificacion(usuario_id=otro.id, id_vinculada="EXP-77")
+    mia_id, ajena_id = mia.id, ajena.id
+
+    resp = await client.delete("/notification/linked/EXP-77", headers=gateway_headers(yo.id, rol.id))
+    assert resp.status_code == 200
+    assert resp.json()["ids_eliminados"] == [mia_id]
+
+    db_session.expire_all()
+    quedan = (await db_session.execute(
+        select(Notificacion.id).where(Notificacion.id_vinculada == "EXP-77")
+    )).scalars().all()
+    assert quedan == [ajena_id]
+
+
+@pytest.mark.asyncio
+async def test_delete_linked_solo_ajenas_404(client, make_rol, make_usuario, make_notificacion):
+    rol = await make_rol("operador")
+    yo = await make_usuario(rol_id=rol.id, correo="yo3@test.com")
+    otro = await make_usuario(rol_id=rol.id, correo="otro3@test.com")
+    await make_notificacion(usuario_id=otro.id, id_vinculada="EXP-88")
+    resp = await client.delete("/notification/linked/EXP-88", headers=gateway_headers(yo.id, rol.id))
+    assert resp.status_code == 404

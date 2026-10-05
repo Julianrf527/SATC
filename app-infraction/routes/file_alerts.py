@@ -26,7 +26,6 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXP_DAYS = os.getenv("JWT_EXP_DAYS")
-GATEWAY_URL = os.getenv("GATEWAY_URL", "http://api-gateway:8000")
 
 bogota_tz = pytz.timezone("America/Bogota")
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -168,7 +167,7 @@ async def _calcular_alertas_expediente_infraccion(
 
 # ── ALERTAS DE INFRACCIONES ────────────────────────────────────────────────────
 
-@router.get("/alerts/all")
+@router.get("/alertas/todas")
 async def obtener_alertas_todos_expedientes_infraccion(
     request: Request,
     db: AsyncSession = Depends(get_db_managed),
@@ -207,7 +206,7 @@ async def obtener_alertas_todos_expedientes_infraccion(
     }, status_code=200)
 
 
-@router.get("/alerts/{expediente_id}")
+@router.get("/alertas/{expediente_id}")
 async def obtener_alertas_expediente_infraccion(
     request: Request,
     expediente_id: int,

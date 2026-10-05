@@ -21,7 +21,7 @@ class InformeTecnico(Base):
     fecha_creacion = Column(TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(ZoneInfo("America/Bogota")))
 
     expediente = relationship("Expediente", back_populates="informes_tecnicos")
-    documentos_proceso = relationship("InformeDocumento", back_populates="informe", lazy="select")
+    procesos_revision = relationship("InformeProceso", back_populates="informe", lazy="select")
 
     __table_args__ = (
         Index('ix_informe_tecnico_expediente', 'expediente_id'),

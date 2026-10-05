@@ -15,6 +15,14 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Alias de capas (ver ARCHITECTURE.md) */
+    "paths": {
+      "@app/*": ["./src/app/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@features/*": ["./src/features/*"],
+      "@modules/*": ["./src/modules/*"]
+    },
+
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,
