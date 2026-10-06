@@ -44,12 +44,14 @@ from .models.file_models import (
     ExpedienteSchema,
     QuejosoSchema,
     BulkEncargadoRequest,
+    RadicadoInicialSchema,
 )
 
 from utils.verify_token import verify_gateway_token
 from utils.log import insert_log
 from services.notification import create_notification
 from services.users import get_user_info, verify_permission
+from services.docs import get_file_info, increment_file_usage, decrement_file_usage
 
 
 def normalize_radicados_asociados(radicados: List[str]) -> List[str]:
@@ -397,6 +399,88 @@ async def actualizar_informacion_expediente(
         await db.rollback()
         logger.error(f"Error al actualizar expediente {expediente_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+
+@router.put("/{expediente_id}/radicado-inicial")
+async def fijar_radicado_inicial(
+    request: Request,
+    expediente_id: int,
+    body: RadicadoInicialSchema,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    """
+    Adjunta o reemplaza el documento "Radicado inicial" del expediente.
+
+    Recibe el `file_id` de un PDF ya subido a /files/upload (mismo patrón que
+    oficio remite / solicitud de información). Mismos permisos que editar los
+    datos básicos: `infraccion_gestionar` y ser el encargado. Al reemplazar,
+    +1 uso al nuevo archivo y -1 al anterior.
+    """
+    user_id = verify_gateway_token(request)["user_id"]
+    if not await verify_permission(user_id, FILE_MANAGE):
+        raise HTTPException(status_code=403, detail="No cuenta con permisos")
+
+    expediente_actual = await db.scalar(select(Expediente).where(Expediente.id == expediente_id))
+    # 403 tanto si no existe como si no es suyo (no revela qué IDs existen).
+    if expediente_actual is None or expediente_actual.abogado_responsable_id != user_id:
+        raise HTTPException(status_code=403, detail="No tiene permisos para actualizar este expediente")
+
+    anterior_id = expediente_actual.radicado_inicial_file_id
+    if anterior_id == body.file_id:
+        return JSONResponse(
+            content={"ok": True, "message": "El radicado inicial no cambió", "file_id": body.file_id},
+            status_code=200,
+        )
+
+    # Se une al PDF del expediente completo: debe ser PDF.
+    file_info = await get_file_info(body.file_id)
+    if not file_info.get("ok"):
+        raise HTTPException(status_code=400, detail="No se encontró el archivo cargado")
+    if file_info["data"].get("content_type") != "application/pdf":
+        raise HTTPException(status_code=400, detail="El radicado inicial debe cargarse en PDF")
+
+    expediente_actual.radicado_inicial_file_id = body.file_id
+    await db.flush()
+
+    audit_result = await insert_log(
+        db=db,
+        tipo_evento="UPDATE_RADICADO_INICIAL",
+        resultado="OK",
+        usuario_id=user_id,
+        detalle=(
+            f"{'Reemplazo' if anterior_id else 'Carga'} del radicado inicial del expediente "
+            f"'{expediente_actual.radicado}'"
+        ),
+        expediente_id=expediente_actual.id,
+        expediente_radicado=expediente_actual.radicado,
+        datos_anteriores={"radicado_inicial_file_id": anterior_id},
+        datos_nuevos={"radicado_inicial_file_id": body.file_id},
+    )
+    if not audit_result["ok"]:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
+
+    # Contadores de uso antes del commit (como el resto de etapas): si el
+    # nuevo no se puede registrar, no se guarda el cambio.
+    inc = await increment_file_usage([body.file_id])
+    if not inc.get("ok"):
+        await db.rollback()
+        raise HTTPException(status_code=502, detail="No se pudo registrar el uso del archivo")
+    if anterior_id:
+        dec = await decrement_file_usage([anterior_id])
+        if not dec.get("ok"):
+            logger.warning(f"No se pudo decrementar el uso del archivo {anterior_id}: {dec.get('message')}")
+
+    await db.commit()
+
+    return JSONResponse(
+        content={
+            "ok": True,
+            "message": "Radicado inicial actualizado" if anterior_id else "Radicado inicial adjuntado",
+            "file_id": body.file_id,
+        },
+        status_code=200,
+    )
 
 
 @router.post("")

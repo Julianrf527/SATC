@@ -35,9 +35,14 @@ SessionLocal = sessionmaker(
 
 async def init_db():
     from . import models
+    from .migrations import aplicar_migraciones
+
     async with engine.begin() as conn:
         await conn.execute(text("SELECT pg_advisory_lock(815123001)"))
         try:
+            # Tablas nuevas (BD vacía). No altera tablas existentes: eso lo
+            # hace aplicar_migraciones con DDL idempotente.
             await conn.run_sync(models.Base.metadata.create_all, checkfirst=True)
+            await aplicar_migraciones(conn)
         finally:
             await conn.execute(text("SELECT pg_advisory_unlock(815123001)"))

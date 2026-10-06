@@ -26,7 +26,6 @@ type Props = {
   etapa: string;
   titulo: string;
   setToast: SetToast;
-  onStageUpdate: (stage: string) => void;
   isEditable?: boolean;
   /** Contenido propio de la etapa debajo de la tarjeta (p. ej. la matriz de la visita). */
   extra?: (informe: InformeTecnico) => ReactNode;
@@ -43,7 +42,6 @@ export default function InformeTecnicoEtapa({
   etapa,
   titulo,
   setToast,
-  onStageUpdate,
   isEditable = false,
   extra,
 }: Props) {
@@ -62,7 +60,6 @@ export default function InformeTecnicoEtapa({
     crear.mutate(undefined, {
       onSuccess: () => {
         setToast({ id: Date.now(), message: "Etapa creada exitosamente", type: "success" });
-        onStageUpdate(etapa);
       },
       onError: (err) =>
         setToast({

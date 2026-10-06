@@ -14,11 +14,8 @@ import re
 from db.deps import get_db_managed
 from db.models.expediente import Expediente
 from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
-from db.models.etapa_cierre import EtapaCierre
 from db.models.informe_tecnico import InformeTecnico
 from db.models.acto_administrativo import ActoAdministrativo
-from db.models.comunicacion import Comunicacion
-from db.models.notificacion import Notificacion
 from db.models.oficio_remite import OficioRemite
 from db.models.solicitud_informacion import SolicitudInformacion
 
@@ -35,6 +32,7 @@ from services.docs import decrement_file_usage
 from services.etapas import build_acto_for_frontend as _build_acto_for_frontend
 from services.etapas import get_expediente_con_permiso, exigir_lectura_expediente
 from utils.log import insert_log
+from services.cascada_etapas import Cascada, aplicar_restas, eliminar_cierre, eliminar_datos_concepto
 
 
 class ConceptoCreateBody(BaseModel):
@@ -275,79 +273,14 @@ async def actualizar_concepto(
     }
 
     cierre_eliminado = False
+    cascada = Cascada()
 
-    # Si cambia el tipo: eliminar toda la data asociada
+    # Si cambia el tipo: eliminar la data asociada al tipo anterior (acto,
+    # notificaciones, comunicaciones y oficio; la solicitud de información es
+    # independiente del tipo y se conserva) y la etapa de Cierre.
     if tipo_anterior != tipo_nuevo:
-        if etapa.acto_administrativo_id:
-            acto = await db.scalar(
-                select(ActoAdministrativo).where(ActoAdministrativo.id == etapa.acto_administrativo_id)
-            )
-            if acto:
-                docs_dec = []
-                if acto.documento_acto_administrativo_id:
-                    docs_dec.append(acto.documento_acto_administrativo_id)
-                notifs = (await db.execute(
-                    select(Notificacion).where(Notificacion.acto_administrativo_id == acto.id)
-                )).scalars().all()
-                for n in notifs:
-                    if n.documento_citacion_id:
-                        docs_dec.append(n.documento_citacion_id)
-                    if n.documento_notificacion_id:
-                        docs_dec.append(n.documento_notificacion_id)
-                com = await db.scalar(
-                    select(Comunicacion).where(Comunicacion.acto_administrativo_id == acto.id)
-                )
-                if com and com.documento_comunicacion_id:
-                    docs_dec.append(com.documento_comunicacion_id)
-                if docs_dec:
-                    await decrement_file_usage(list(set(docs_dec)))
-                etapa.acto_administrativo_id = None
-                await db.delete(acto)
-                await db.flush()
-
-        oficio = await db.scalar(
-            select(OficioRemite).where(OficioRemite.etapa_acoger_concepto_id == etapa_concepto_id)
-        )
-        if oficio:
-            if oficio.archivo_remite_id:
-                await decrement_file_usage([oficio.archivo_remite_id])
-            await db.delete(oficio)
-            await db.flush()
-
-        # También eliminar EtapaCierre si existe
-        cierre = await db.scalar(
-            select(EtapaCierre).where(EtapaCierre.expediente_id == etapa.expediente_id)
-        )
-        if cierre:
-            if cierre.acto_administrativo_id:
-                acto_cierre = await db.scalar(
-                    select(ActoAdministrativo).where(ActoAdministrativo.id == cierre.acto_administrativo_id)
-                )
-                if acto_cierre:
-                    docs_cierre = []
-                    if acto_cierre.documento_acto_administrativo_id:
-                        docs_cierre.append(acto_cierre.documento_acto_administrativo_id)
-                    notifs_cierre = (await db.execute(
-                        select(Notificacion).where(Notificacion.acto_administrativo_id == acto_cierre.id)
-                    )).scalars().all()
-                    for n in notifs_cierre:
-                        if n.documento_citacion_id:
-                            docs_cierre.append(n.documento_citacion_id)
-                        if n.documento_notificacion_id:
-                            docs_cierre.append(n.documento_notificacion_id)
-                    com_cierre = await db.scalar(
-                        select(Comunicacion).where(Comunicacion.acto_administrativo_id == acto_cierre.id)
-                    )
-                    if com_cierre and com_cierre.documento_comunicacion_id:
-                        docs_cierre.append(com_cierre.documento_comunicacion_id)
-                    if docs_cierre:
-                        await decrement_file_usage(list(set(docs_cierre)))
-                    cierre.acto_administrativo_id = None
-                    await db.delete(acto_cierre)
-                    await db.flush()
-            await db.delete(cierre)
-            await db.flush()
-            cierre_eliminado = True
+        await eliminar_datos_concepto(db, etapa, cascada, incluir_solicitud=False)
+        cierre_eliminado = await eliminar_cierre(db, etapa.expediente_id, cascada)
 
         etapa.dias_termino = None
         etapa.fecha_termino_calculada = None
@@ -379,6 +312,8 @@ async def actualizar_concepto(
         await db.rollback()
         raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
 
+    # Como antes: la resta de usos es best-effort (no aborta el cambio de tipo).
+    await aplicar_restas(cascada.usos, decrement_file_usage, estricto=False)
     await db.commit()
     await db.refresh(etapa)
 

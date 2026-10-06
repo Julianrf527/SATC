@@ -1,11 +1,10 @@
-import { useCallback, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Modal } from "@shared/ui";
 import { useDelayedFlag } from "@shared/hooks/useDelayedFlag";
 import { useCierreEtapaQuery, useCrearCierreMutation } from "../api/etapas";
 import { useArchivarExpedienteMutation } from "../api/expediente";
 import { detalleError, esErrorDeConexion } from "../api/errors";
-import { infraccionKeys } from "../api/queryKeys";
+import { useInvalidarExpediente } from "../api/invalidar";
 import CierreActo from "./cierre/CierreActo";
 import {
   EtapaCargando,
@@ -23,7 +22,6 @@ import { useAvisoErrorCarga } from "./useAvisoErrorCarga";
 type Props = {
   expedienteId: number;
   setToast: (toast: { id: number; message: string; type: "success" | "error" }) => void;
-  onStageUpdate: (stage: string) => void;
   isEditable?: boolean;
   onArchiveSuccess?: () => void;
 };
@@ -33,11 +31,9 @@ const STAGE_NAME = "Cierre";
 export default function Cierre({
   expedienteId,
   setToast,
-  onStageUpdate,
   isEditable = true,
   onArchiveSuccess,
 }: Props) {
-  const queryClient = useQueryClient();
   const query = useCierreEtapaQuery(expedienteId);
   const crearCierre = useCrearCierreMutation(expedienteId);
   const archivar = useArchivarExpedienteMutation(expedienteId);
@@ -61,7 +57,6 @@ export default function Cierre({
     crearCierre.mutate(undefined, {
       onSuccess: () => {
         setToast({ id: Date.now(), message: "Etapa de cierre creada correctamente", type: "success" });
-        onStageUpdate(STAGE_NAME);
       },
       onError: (err) =>
         setToast({ id: Date.now(), message: mensajeError(err, "Error al crear la etapa"), type: "error" }),
@@ -73,7 +68,6 @@ export default function Cierre({
       onSuccess: () => {
         setToast({ id: Date.now(), message: "Expediente archivado exitosamente", type: "success" });
         setShowArchiveModal(false);
-        onStageUpdate(STAGE_NAME);
         onArchiveSuccess?.();
       },
       onError: (err) =>
@@ -81,10 +75,8 @@ export default function Cierre({
     });
   };
 
-  const handleDataUpdated = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: infraccionKeys.cierre(expedienteId) }),
-    [queryClient, expedienteId],
-  );
+  // Cambios dentro de ActoAdmin (acto, notificaciones): mueven el estado.
+  const handleDataUpdated = useInvalidarExpediente(expedienteId);
 
   const notifsCierre = cierreData?.acto_admin?.notificacion?.involucrados ?? [];
   const todasNotificadas =

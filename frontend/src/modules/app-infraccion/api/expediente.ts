@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, INFRACTION_ENDPOINTS, jsonBody } from "@shared/lib/api";
+import { generateDocumentFileName, uploadFileToDocuments } from "@shared/lib/fileUpload";
 import type { Involucrado } from "@shared/types/involucrado";
 import type { TipoNotificacion } from "@shared/types/sancionatorio";
 import type { ExpedienteCompletoResponse, Quejoso } from "../types";
 import { infraccionKeys } from "./queryKeys";
+import { invalidarExpediente } from "./invalidar";
 
 /**
  * Datos completos de un expediente (/expedientes/completo/{id}): dirección,
@@ -44,8 +46,30 @@ export function useActualizarDatosBasicosMutation(expedienteId: number) {
         method: "PUT",
         ...jsonBody(payload),
       }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: infraccionKeys.completo(expedienteId) }),
+    onSuccess: () => invalidarExpediente(queryClient, expedienteId),
+  });
+}
+
+/**
+ * Adjunta o reemplaza el PDF "Radicado inicial": lo sube a app-docs y fija su
+ * `file_id` en el expediente (el backend valida que sea PDF y mueve los
+ * contadores de uso). La validación de tipo/tamaño la hace el formulario.
+ */
+export function useFijarRadicadoInicialMutation(expedienteId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ archivo, radicado }: { archivo: File; radicado: string }) => {
+      const hoy = new Date().toISOString().split("T")[0];
+      const fileId = await uploadFileToDocuments(
+        archivo,
+        generateDocumentFileName("RADICADO_INICIAL", radicado, hoy),
+      );
+      return apiRequest(INFRACTION_ENDPOINTS.INFRACTION_RADICADO_INICIAL(expedienteId), {
+        method: "PUT",
+        ...jsonBody({ file_id: fileId }),
+      });
+    },
+    onSuccess: () => invalidarExpediente(queryClient, expedienteId),
   });
 }
 
@@ -75,8 +99,7 @@ export function useArchivarExpedienteMutation(expedienteId: number) {
   return useMutation({
     mutationFn: () =>
       apiRequest(INFRACTION_ENDPOINTS.INFRACTION_ARCHIVE(expedienteId), { method: "PATCH" }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: infraccionKeys.expediente(expedienteId) }),
+    onSuccess: () => invalidarExpediente(queryClient, expedienteId),
   });
 }
 

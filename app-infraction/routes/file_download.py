@@ -54,7 +54,8 @@ async def descargar_expediente_completo(
 ):
     """
     Descarga todos los documentos del expediente combinados en un único PDF.
-    Recorre todas las etapas del proceso de infracciones en orden cronológico.
+    Primero el radicado inicial (si existe) y luego todas las etapas del
+    proceso de infracciones en orden.
     """
     from fastapi.responses import StreamingResponse
     from io import BytesIO
@@ -70,6 +71,11 @@ async def descargar_expediente_completo(
         def agregar(doc_id):
             if doc_id:
                 documentos_ids.append(doc_id)
+
+        # 0. Radicado inicial (datos del expediente): siempre el primero.
+        agregar(await db.scalar(
+            select(Expediente.radicado_inicial_file_id).where(Expediente.id == expediente_id)
+        ))
 
         # 1. Etapa Respuesta
         resp = await db.scalar(

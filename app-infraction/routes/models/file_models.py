@@ -14,6 +14,11 @@ class ExpedienteSchema(BaseModel):
     recursos_ids: List[int]
     radicados_asociados: List[str]
 
+class RadicadoInicialSchema(BaseModel):
+    """file_id de un PDF ya subido a app-docs (/files/upload)."""
+    file_id: int
+
+
 class QuejosoSchema(BaseModel):
     nombre: Optional[str] = None
     telefono: Optional[str] = None

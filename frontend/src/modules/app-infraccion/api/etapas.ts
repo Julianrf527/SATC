@@ -10,6 +10,7 @@ import type {
   TipoMedida,
 } from "../types";
 import { infraccionKeys } from "./queryKeys";
+import { invalidarExpediente } from "./invalidar";
 
 // Las etapas devuelven 404 cuando todavía no existen: no es un error, es
 // "etapa por crear" (y el cuerpo trae `creable`/`creable_msg`). Por eso se usa
@@ -67,7 +68,7 @@ export function useGuardarRespuestaMutation(expedienteId: number) {
           : INFRACTION_ENDPOINTS.INFRACTION_PUT_ANSWER(respuestaId),
         { method: respuestaId === null ? "POST" : "PUT", ...jsonBody(payload) },
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: infraccionKeys.respuesta(expedienteId) }),
+    onSuccess: () => invalidarExpediente(queryClient, expedienteId),
   });
 }
 
@@ -109,7 +110,7 @@ export function useGuardarMedidaMutation(expedienteId: number) {
           : INFRACTION_ENDPOINTS.INFRACTION_CREATE_MEDIDA(etapaRespuestaId as number),
         { method: medidaId !== null ? "PUT" : "POST", ...jsonBody(payload) },
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: infraccionKeys.respuesta(expedienteId) }),
+    onSuccess: () => invalidarExpediente(queryClient, expedienteId),
   });
 }
 
@@ -136,7 +137,7 @@ export function useCrearConceptoMutation(expedienteId: number) {
         method: "POST",
         ...jsonBody({ tipo_acogida_concepto: tipo }),
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: infraccionKeys.concepto(expedienteId) }),
+    onSuccess: () => invalidarExpediente(queryClient, expedienteId),
   });
 }
 
@@ -147,7 +148,7 @@ export type ActualizarConceptoRespuesta = {
 
 /**
  * PUT del concepto: cambio de tipo de acogida y/o días de término. Cambiar el
- * tipo puede borrar el cierre, así que también se invalida esa etapa.
+ * tipo puede borrar el cierre: se invalida todo el expediente.
  */
 export function useActualizarConceptoMutation(expedienteId: number, etapaConceptoId: number) {
   const queryClient = useQueryClient();
@@ -157,11 +158,7 @@ export function useActualizarConceptoMutation(expedienteId: number, etapaConcept
         INFRACTION_ENDPOINTS.INFRACTION_PUT_CONCEPTO(etapaConceptoId),
         { method: "PUT", ...jsonBody(payload) },
       ),
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: infraccionKeys.concepto(expedienteId) }),
-        queryClient.invalidateQueries({ queryKey: infraccionKeys.cierre(expedienteId) }),
-      ]),
+    onSuccess: () => invalidarExpediente(queryClient, expedienteId),
   });
 }
 
@@ -182,7 +179,7 @@ export function useGuardarOficioRemiteMutation(expedienteId: number, etapaConcep
           : INFRACTION_ENDPOINTS.INFRACTION_CREATE_OFICIO_REMITE(etapaConceptoId),
         { method: oficioId !== null ? "PUT" : "POST", ...jsonBody(payload) },
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: infraccionKeys.concepto(expedienteId) }),
+    onSuccess: () => invalidarExpediente(queryClient, expedienteId),
   });
 }
 
@@ -202,7 +199,7 @@ export function useGuardarSolicitudInformacionMutation(expedienteId: number, eta
           : INFRACTION_ENDPOINTS.INFRACTION_CREATE_SOLICITUD_INFO(etapaConceptoId),
         { method: solicitudId !== null ? "PUT" : "POST", ...jsonBody(payload) },
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: infraccionKeys.concepto(expedienteId) }),
+    onSuccess: () => invalidarExpediente(queryClient, expedienteId),
   });
 }
 
@@ -211,7 +208,7 @@ export function useEliminarSolicitudInformacionMutation(expedienteId: number) {
   return useMutation({
     mutationFn: (solicitudId: number) =>
       apiRequest(INFRACTION_ENDPOINTS.INFRACTION_DELETE_SOLICITUD_INFO(solicitudId), { method: "DELETE" }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: infraccionKeys.concepto(expedienteId) }),
+    onSuccess: () => invalidarExpediente(queryClient, expedienteId),
   });
 }
 
@@ -235,6 +232,6 @@ export function useCrearCierreMutation(expedienteId: number) {
   return useMutation({
     mutationFn: () =>
       apiRequest(INFRACTION_ENDPOINTS.INFRACTION_CREATE_CIERRE(expedienteId), { method: "POST" }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: infraccionKeys.cierre(expedienteId) }),
+    onSuccess: () => invalidarExpediente(queryClient, expedienteId),
   });
 }

@@ -3,6 +3,8 @@ import type { Municipio, ModeloGenerico } from "@shared/types/common";
 import type { InformacionInfraccionFormState } from "./useInformacionInfraccionForm";
 import CustomSelect from "@shared/ui/form/CustomSelect";
 import CustomDateInput from "@shared/ui/form/CustomDateInput";
+import { Campo } from "@shared/ui";
+import { openDocumentById } from "@shared/lib/documentViewer";
 
 interface Props {
   form: InformacionInfraccionFormState;
@@ -40,6 +42,9 @@ export default function InformacionInfraccionForm({
     expandedRecursos,
     quejososIds,
     radicadosAsociados,
+    archivoRadicadoInicial,
+    setArchivoRadicadoInicial,
+    radicadoInicialActual,
     veredaList,
     handleResourceToggle,
     handleToggleExpand,
@@ -52,7 +57,7 @@ export default function InformacionInfraccionForm({
   } = form;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="flex flex-col">
           <label className="label">
@@ -283,6 +288,44 @@ export default function InformacionInfraccionForm({
             maxLength={300}
           />
         </div>
+
+        <Campo
+          className="md:col-span-2"
+          etiqueta="Radicado inicial"
+          htmlFor="radicado-inicial-archivo"
+          extra={radicadoInicialActual ? "Opcional: reemplazar" : "Opcional"}
+          ayuda="Solo PDF, máximo 10 MB. Es el primer documento del expediente completo."
+        >
+          {radicadoInicialActual && (
+            <div className="flex items-center gap-2 mb-2 text-sm">
+              <span className="text-base-content/70">Actual: {radicadoInicialActual.nombre}</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs text-success"
+                onClick={() => openDocumentById(radicadoInicialActual.file_id)}
+              >
+                Ver
+              </button>
+            </div>
+          )}
+          <input
+            id="radicado-inicial-archivo"
+            type="file"
+            accept="application/pdf"
+            className="file-input w-full"
+            disabled={isLoading}
+            onChange={(e) => {
+              const archivo = e.target.files?.[0] ?? null;
+              if (!setArchivoRadicadoInicial(archivo)) e.target.value = "";
+            }}
+          />
+          {archivoRadicadoInicial && (
+            <p className="mt-1 text-sm text-success">
+              {radicadoInicialActual ? "Reemplazará al actual: " : "Se adjuntará: "}
+              {archivoRadicadoInicial.name}
+            </p>
+          )}
+        </Campo>
       </div>
 
       <div className="flex gap-3 justify-end pt-4 border-t border-base-300">

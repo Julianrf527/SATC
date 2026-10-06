@@ -23,6 +23,7 @@ export type Expediente = {
   municipio: ModeloGenerico;
   fecha_creacion: string;
   involucrados: Involucrado[];
+  /** Código de la etapa más avanzada (`respuesta`, `visita`...; ver manage/etapasProceso.ts). */
   etapa_actual?: string | null;
   archivado: true | false;
   estado?: string | null;
@@ -36,7 +37,11 @@ export type ExpedienteDetalle = Expediente & {
   tipos_afectacion: TipoAfectacion[];
   recurso_afectado: ModeloGenerico[];
   radicados_asociados?: string[];
+  /** PDF "Radicado inicial" (file_id en app-docs) o null si no se ha adjuntado. */
+  radicado_inicial?: RadicadoInicial | null;
 };
+
+export type RadicadoInicial = { file_id: number; nombre: string };
 
 export type RespuestaData = {
   id: number;
@@ -125,7 +130,7 @@ export type EtapaConsulta<T> = {
 
 /** GET /expedientes/completo/{id} */
 export type ExpedienteCompletoResponse = {
-  data?: Partial<ExpedienteDetalle> | null;
+  data?: (Partial<ExpedienteDetalle> & { ultima_etapa?: string | null }) | null;
   tipo_notificacion?: ModeloGenerico | null;
   etapas_existentes?: number[];
 };
@@ -169,6 +174,18 @@ export type InformeTecnico = ResumenProcesoInforme & {
   tiene_matriz?: boolean;
   recursos_afectados?: FilaRecursoAfectado[] | null;
 };
+
+/** Etapa posterior que se borra en cascada al cambiar el modo de un informe. */
+export type EtapaEliminadaCascada = {
+  codigo: "concepto" | "seguimiento" | "cierre";
+  etiqueta: string;
+  /** Resumen legible: "1 acto administrativo, 2 notificaciones…". */
+  detalle: string;
+  conteos: Record<string, number>;
+};
+
+/** GET /informes/{id}/cambiar-modo/impacto. */
+export type ImpactoCambioModo = { etapas: EtapaEliminadaCascada[] };
 
 /** Fila de GET /informes/mios. */
 export type MiInforme = ResumenProcesoInforme & {

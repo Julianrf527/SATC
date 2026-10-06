@@ -16,6 +16,10 @@ class Expediente(Base):
     direccion = Column(String(100))
     descripcion = Column(String(400))
     archivado = Column(Boolean, default=False)
+    # Documento "Radicado inicial" (PDF): id de file_hash en app-docs. FK
+    # lógica (otra BD), sin constraint. Columna agregada por db/migrations.py
+    # en las BD existentes.
+    radicado_inicial_file_id = Column(Integer, nullable=True)
 
     vereda = relationship("Vereda", back_populates="expedientes")
     tipos_afectacion = relationship("TipoAfectacion", secondary="expediente_tipo_afectacion")

@@ -1,10 +1,9 @@
-import { useCallback, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useDelayedFlag } from "@shared/hooks/useDelayedFlag";
 import { formatDate } from "@shared/lib/format";
 import { useConceptoEtapaQuery, useCrearConceptoMutation } from "../api/etapas";
 import { detalleError, esErrorDeConexion } from "../api/errors";
-import { infraccionKeys } from "../api/queryKeys";
+import { useInvalidarExpediente } from "../api/invalidar";
 import type { TipoAcogidaConcepto } from "../types";
 import ConceptoDataCard from "./concepto/ConceptoData";
 import AutoRequerimiento from "./concepto/AutoRequerimiento";
@@ -26,7 +25,6 @@ import { useAvisoErrorCarga } from "./useAvisoErrorCarga";
 type Props = {
   expedienteId: number;
   setToast: (toast: { id: number; message: string; type: "success" | "error" }) => void;
-  onStageUpdate: (stage: string) => void;
   isEditable?: boolean;
 };
 
@@ -41,10 +39,8 @@ const TIPO_OPTIONS: { value: TipoAcogidaConcepto; label: string }[] = [
 export default function Concepto({
   expedienteId,
   setToast,
-  onStageUpdate,
   isEditable = true,
 }: Props) {
-  const queryClient = useQueryClient();
   const query = useConceptoEtapaQuery(expedienteId);
   const crearConcepto = useCrearConceptoMutation(expedienteId);
   const showLoading = useDelayedFlag(query.isPending && !!expedienteId, 300);
@@ -72,7 +68,6 @@ export default function Concepto({
         setToast({ id: Date.now(), message: "Etapa concepto creada correctamente", type: "success" });
         setIsCreatingStage(false);
         setSelectedTipoCrear("");
-        onStageUpdate(STAGE_NAME);
       },
       onError: (err) => {
         setToast({
@@ -84,13 +79,9 @@ export default function Concepto({
     });
   };
 
-  // Las tarjetas hijas ya invalidaron la etapa con su mutación; solo queda
-  // re-consultar tras cambios hechos dentro de ActoAdmin y avisar al padre.
-  const handleTipoUpdated = useCallback(() => onStageUpdate(STAGE_NAME), [onStageUpdate]);
-  const handleDataUpdated = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: infraccionKeys.concepto(expedienteId) }),
-    [queryClient, expedienteId],
-  );
+  // Las tarjetas hijas ya invalidaron el expediente con su mutación; solo
+  // queda hacerlo tras cambios hechos dentro de ActoAdmin.
+  const handleDataUpdated = useInvalidarExpediente(expedienteId);
 
   if (showLoading) return <EtapaCargando etapa="concepto" />;
   if (!expedienteId) return <EtapaSinExpediente isEditable={isEditable} />;
@@ -212,7 +203,6 @@ export default function Concepto({
         tipoActual={conceptoData.tipo_acogida_concepto}
         isEditable={isEditable}
         setToast={setToast}
-        onTipoUpdated={handleTipoUpdated}
       />
 
       {/* Sub-flujo según tipo */}

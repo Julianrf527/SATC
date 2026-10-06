@@ -17,7 +17,6 @@ interface Props {
   tipoAfectacionList: TipoAfectacion[];
   quejosoList: Quejoso[];
   setQuejosoList?: (quejosos: Quejoso[]) => void;
-  onUpdate?: (expediente: ExpedienteDetalle) => void;
   setToast: (toast: {
     id: number;
     message: string;
@@ -33,7 +32,6 @@ export default function InformacionInfraccionData({
   tipoAfectacionList,
   quejosoList,
   setQuejosoList,
-  onUpdate,
   setToast,
   isEditable = true,
 }: Props) {
@@ -47,7 +45,6 @@ export default function InformacionInfraccionData({
     tipoAfectacionList,
     quejosoList,
     setQuejosoList,
-    onUpdate,
     setToast,
     onSaved: () => setShowForm(false),
     onCancelled: () => setShowForm(false),

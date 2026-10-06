@@ -25,6 +25,8 @@ export const INFRACTION_ENDPOINTS = {
     `/infraction/expedientes/completo/${infraction_id}`,
   INFRACTION_BASIC_DATA: (infraction_id: number) =>
     `/infraction/expedientes/${infraction_id}/datos-basicos`,
+  INFRACTION_RADICADO_INICIAL: (infraction_id: number) =>
+    `/infraction/expedientes/${infraction_id}/radicado-inicial`,
   INFRACTION_TIPOS_AFECTACION: "/infraction/expedientes/tipos-afectacion",
   INFRACTION_COMPLAINER: "/infraction/expedientes/denunciantes",
   INFRACTION_CREATE_COMPLAINER: "/infraction/expedientes/denunciantes",
@@ -102,6 +104,9 @@ export const INFRACTION_ENDPOINTS = {
     `/infraction/informes/${informe_id}/asignar`,
   INFRACTION_REPORTS_CAMBIAR_MODO: (informe_id: number) =>
     `/infraction/informes/${informe_id}/cambiar-modo`,
+  /** GET: etapas posteriores que el cambio de modo borraría en cascada. */
+  INFRACTION_REPORTS_CAMBIAR_MODO_IMPACTO: (informe_id: number) =>
+    `/infraction/informes/${informe_id}/cambiar-modo/impacto`,
   INFRACTION_REPORTS_CARGUE_MANUAL: (informe_id: number) =>
     `/infraction/informes/${informe_id}/cargue-manual`,
   INFRACTION_REPORTS_DISPONIBLES: "/infraction/informes/disponibles",
