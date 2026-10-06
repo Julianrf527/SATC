@@ -22,7 +22,6 @@ type Props = {
     message: string;
     type: "success" | "error";
   }) => void;
-  onStageUpdate: (stage: string) => void;
   isEditable?: boolean;
 };
 
@@ -31,7 +30,6 @@ const STAGE_NAME = "Respuesta";
 export default function Respuesta({
   expedienteId,
   setToast,
-  onStageUpdate,
   isEditable = true,
 }: Props) {
   const [isCreatingStage, setIsCreatingStage] = useState(false);
@@ -46,11 +44,9 @@ export default function Respuesta({
   const respuestaData = query.data?.data?.respuesta ?? null;
   const medida = query.data?.data?.medida ?? null;
 
-  // RespuestaData guarda con la mutación, que ya re-consultó la etapa.
-  const handleSaveSuccess = useCallback(() => {
-    setIsCreatingStage(false);
-    onStageUpdate(STAGE_NAME);
-  }, [onStageUpdate]);
+  // RespuestaData guarda con la mutación, que ya invalidó el expediente
+  // (etapa, última etapa y estado).
+  const handleSaveSuccess = useCallback(() => setIsCreatingStage(false), []);
 
   if (showLoading) return <EtapaCargando etapa="respuesta" />;
   if (!expedienteId) return <EtapaSinExpediente isEditable={isEditable} />;

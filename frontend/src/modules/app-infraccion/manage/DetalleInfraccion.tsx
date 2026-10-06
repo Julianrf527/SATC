@@ -14,6 +14,7 @@ import type { Municipio, ModeloGenerico } from "@shared/types/common";
 import { useExpedienteCompletoQuery } from "../api/expediente";
 import DetalleHeader from "./detalle-infraccion/DetalleHeader";
 import EtapasNav, { type EtapaTabInfo } from "./detalle-infraccion/EtapasNav";
+import { ETIQUETA_ETAPA } from "./etapasProceso";
 
 const InformacionExpediente = lazy(
   () => import("../etapas/InformacionInfraccion"),
@@ -41,8 +42,6 @@ type EtapaProps = {
   setQuejosoList?: (quejosos: Quejoso[]) => void;
   tiposNotificacion: ModeloGenerico | null;
   involucrados: ExpedienteDetalle["involucrados"];
-  onUpdate: (updated: ExpedienteDetalle) => void;
-  onStageUpdate: (stage: string) => void;
   setToast: SetToast;
   isEditable: boolean;
   onArchiveSuccess?: () => void;
@@ -54,14 +53,15 @@ type Tab = EtapaTabInfo & {
 
 const TABS: Tab[] = [
   { id: "info", label: "Información", icon: "bx-info-circle", component: InformacionExpediente },
-  { id: "respuesta", label: "Respuesta", icon: "bx-search-alt", component: Respuesta },
-  { id: "visita", label: "Visita Técnica", icon: "bx-error-alt", component: Visita },
-  { id: "concepto", label: "Acoger Concepto", icon: "bx-book-bookmark", component: Concepto },
-  { id: "seguimiento", label: "Visita Seguimiento", icon: "bx-error-alt", component: Seguimiento },
-  { id: "cierre", label: "Cierre Expediente", icon: "bx-check-circle", component: Cierre },
+  { id: "respuesta", label: ETIQUETA_ETAPA.respuesta, icon: "bx-search-alt", component: Respuesta },
+  { id: "visita", label: ETIQUETA_ETAPA.visita, icon: "bx-error-alt", component: Visita },
+  { id: "concepto", label: ETIQUETA_ETAPA.concepto, icon: "bx-book-bookmark", component: Concepto },
+  { id: "seguimiento", label: ETIQUETA_ETAPA.seguimiento, icon: "bx-error-alt", component: Seguimiento },
+  { id: "cierre", label: ETIQUETA_ETAPA.cierre, icon: "bx-check-circle", component: Cierre },
 ];
 
-// tab.id -> tipo_etapa_id (Información siempre visible)
+// tab.id (= código de etapa del backend) -> tipo_etapa_id / orden del proceso
+// (Información siempre visible)
 const TAB_TO_ETAPA: Record<string, number | null> = {
   info: null,
   respuesta: 1,
@@ -71,7 +71,12 @@ const TAB_TO_ETAPA: Record<string, number | null> = {
   cierre: 5,
 };
 
-/** Combina el expediente de la lista con /expedientes/completo. */
+/**
+ * Detalle del expediente: la fuente de verdad es /expedientes/completo (última
+ * etapa y estado los calcula el backend y se refrescan al invalidar la
+ * consulta tras cada mutación). Del expediente de la lista solo se toma lo que
+ * /completo no trae si viniera vacío.
+ */
 function construirDetalle(
   base: Expediente,
   response: ExpedienteCompletoResponse | undefined,
@@ -79,16 +84,14 @@ function construirDetalle(
   const information = response?.data;
   if (!information) return null;
   return {
-    // Datos básicos del Expediente
     id: base.id,
-    radicado: base.radicado,
-    fecha_radicado: base.fecha_radicado,
-    municipio: base.municipio,
-    fecha_creacion: base.fecha_creacion,
-    archivado: base.archivado,
-    etapa_actual: base.etapa_actual || null,
-    estado: information.estado ?? base.estado ?? null,
-    // Datos adicionales del endpoint completo
+    radicado: information.radicado ?? base.radicado,
+    fecha_radicado: information.fecha_radicado ?? base.fecha_radicado,
+    municipio: information.municipio ?? base.municipio,
+    fecha_creacion: information.fecha_creacion ?? base.fecha_creacion,
+    archivado: information.archivado ?? base.archivado,
+    etapa_actual: information.etapa_actual ?? information.ultima_etapa ?? null,
+    estado: information.estado ?? null,
     direccion: information.direccion || "",
     descripcion: information.descripcion || "",
     vereda: information.vereda || { id: 0, nombre: "Sin vereda" },
@@ -96,10 +99,8 @@ function construirDetalle(
     tipos_afectacion: information.tipos_afectacion || [],
     recurso_afectado: information.recurso_afectado || [],
     radicados_asociados: information.radicados_asociados || [],
-    involucrados:
-      information.involucrados && information.involucrados.length > 0
-        ? information.involucrados
-        : base.involucrados,
+    radicado_inicial: information.radicado_inicial ?? null,
+    involucrados: information.involucrados ?? base.involucrados ?? [],
   };
 }
 
@@ -111,7 +112,6 @@ type Props = {
   tipoAfectacionList: TipoAfectacion[];
   quejosoList: Quejoso[];
   setQuejosoList?: (quejosos: Quejoso[]) => void;
-  onUpdate?: (updated: Expediente) => void;
   isEditable?: boolean;
   onArchiveSuccess?: () => void;
 };
@@ -124,7 +124,6 @@ export default function DetalleInfraccion({
   quejosoList,
   setQuejosoList,
   setToast,
-  onUpdate,
   isEditable = true,
   onArchiveSuccess,
 }: Props) {
@@ -132,16 +131,12 @@ export default function DetalleInfraccion({
   const [activeTab, setActiveTab] = useState<string>("info");
   const [isTabsCollapsed, setIsTabsCollapsed] = useState(false);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
-  // Cambios locales que llegan de las pestañas (datos editados, etapa actual)
-  // sobre lo que devolvió el servidor, por expediente.
-  const [detalleLocal, setDetalleLocal] = useState<ExpedienteDetalle | null>(null);
 
   // En modo consulta, al cambiar de expediente se vuelve a "Información".
   const [prevSeleccionado, setPrevSeleccionado] = useState(expedienteSeleccionado);
   if (prevSeleccionado !== expedienteSeleccionado) {
     setPrevSeleccionado(expedienteSeleccionado);
     if (!isEditable) setActiveTab("info");
-    if (prevSeleccionado?.id !== expedienteSeleccionado?.id) setDetalleLocal(null);
   }
 
   const query = useExpedienteCompletoQuery(expedienteActual?.id);
@@ -156,12 +151,10 @@ export default function DetalleInfraccion({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query.isError, query.isSuccess, query.data]);
 
-  const detalleServidor = useMemo(
+  const expedienteDetalle = useMemo(
     () => (expedienteActual ? construirDetalle(expedienteActual, query.data) : null),
     [expedienteActual, query.data],
   );
-  const expedienteDetalle =
-    detalleLocal && detalleLocal.id === expedienteActual?.id ? detalleLocal : detalleServidor;
 
   const tipoNotificacion = query.data?.tipo_notificacion ?? null;
   const etapasExistentes: number[] | null = query.isError
@@ -183,26 +176,6 @@ export default function DetalleInfraccion({
   const handleTabClick = (tabId: string) => {
     if (!expedienteActual || !isEtapaDisponible(tabId)) return;
     setActiveTab(tabId);
-  };
-
-  const handleUpdate = (updated: ExpedienteDetalle) => {
-    setDetalleLocal(updated);
-    // Propagar actualización al padre como Expediente
-    onUpdate?.({
-      id: updated.id,
-      radicado: updated.radicado,
-      fecha_radicado: updated.fecha_radicado,
-      municipio: updated.municipio,
-      fecha_creacion: updated.fecha_creacion,
-      involucrados: updated.involucrados,
-      etapa_actual: updated.etapa_actual || null,
-      archivado: updated.archivado,
-    });
-  };
-
-  const handleStageUpdate = (stage: string) => {
-    if (!expedienteDetalle) return;
-    setDetalleLocal({ ...expedienteDetalle, etapa_actual: stage });
   };
 
   const handleDownloadAll = async () => {
@@ -279,8 +252,6 @@ export default function DetalleInfraccion({
             setQuejosoList={setQuejosoList}
             tiposNotificacion={tipoNotificacion}
             involucrados={expedienteDetalle.involucrados}
-            onUpdate={handleUpdate}
-            onStageUpdate={handleStageUpdate}
             setToast={setToast}
             isEditable={isEditable}
             onArchiveSuccess={onArchiveSuccess}
@@ -293,7 +264,7 @@ export default function DetalleInfraccion({
   return (
     <div className="flex-1 flex flex-col h-full bg-base-200">
       <DetalleHeader
-        radicado={expedienteActual ? expedienteActual.radicado : null}
+        radicado={expedienteDetalle?.radicado ?? expedienteActual?.radicado ?? null}
         mostrarDescarga={!isEditable && !!expedienteActual}
         isDownloading={isDownloadingAll}
         onDownload={handleDownloadAll}

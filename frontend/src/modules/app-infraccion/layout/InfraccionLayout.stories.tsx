@@ -53,7 +53,7 @@ const mockExpedientes = [
         numero_documento: "12345678",
       },
     ],
-    ultima_etapa: "Respuesta",
+    etapa_actual: "concepto",
     archivado: false,
   },
 ];
@@ -79,7 +79,7 @@ const ROUTES: [string, () => unknown][] = [
       data: {
         direccion: "Vereda Catambuco",
         vereda: { id: 11, nombre: "Catambuco" },
-        ultima_etapa: "Respuesta",
+        etapa_actual: "concepto",
         recurso_afectado: [{ id: 1, nombre: "Agua" }],
         involucrados: mockExpedientes[0].involucrados,
       },

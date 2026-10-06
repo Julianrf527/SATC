@@ -11,12 +11,11 @@ const STAGE_NAME = "Visita Técnica";
 type Props = {
   expedienteId: number;
   setToast: (toast: { id: number; message: string; type: "success" | "error" }) => void;
-  onStageUpdate: (stage: string) => void;
   isEditable?: boolean;
 };
 
 /** Etapa "Visita Técnica": informe técnico VISITA + matriz de recursos afectados. */
-export default function VisitStage({ expedienteId, setToast, onStageUpdate, isEditable }: Props) {
+export default function VisitStage({ expedienteId, setToast, isEditable }: Props) {
   const { user } = useAuth();
   const tieneCarguePermiso = !!isEditable && (user?.permisos ?? []).some((p) => p.name === PERMISO_CARGUE);
   const [matrizInformeId, setMatrizInformeId] = useState<number | null>(null);
@@ -73,7 +72,6 @@ export default function VisitStage({ expedienteId, setToast, onStageUpdate, isEd
         etapa={STAGE_NAME}
         titulo="Datos de la Visita Técnica"
         setToast={setToast}
-        onStageUpdate={onStageUpdate}
         isEditable={isEditable}
         extra={matriz}
       />

@@ -52,8 +52,13 @@ _radicado_counter = itertools.count(1)
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _crear_esquema():
+    from db.migrations import aplicar_migraciones
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # La BD de pruebas persiste entre corridas: create_all no agrega
+        # columnas nuevas a tablas existentes (igual que en producción).
+        await aplicar_migraciones(conn)
     yield
     await engine.dispose()
 
@@ -205,6 +210,25 @@ class FilesClientStub:
         self.subidos: list[str] = []
         self.incrementados: list[int] = []
         self.decrementados: list[int] = []
+        self.unificados: list[list[int]] = []
+
+    def registrar(self, content: bytes = b"%PDF-1.4", content_type: str = "application/pdf") -> int:
+        """Simula un archivo ya subido a /files/upload; devuelve su id."""
+        self._siguiente += 1
+        self.contenidos[self._siguiente] = (content, content_type)
+        return self._siguiente
+
+    async def get(self, file_id):
+        from satc_shared.clients import FileInfo, NotFoundError
+
+        if file_id not in self.contenidos:
+            raise NotFoundError("no existe", service="app-docs", status_code=404)
+        content, ctype = self.contenidos[file_id]
+        return FileInfo(id=file_id, file_url=f"/files/{file_id}", content_type=ctype, file_size=len(content))
+
+    async def download_unified(self, file_ids, *, cookies=None, timeout=120.0):
+        self.unificados.append(list(file_ids))
+        return b"%PDF-unificado"
 
     async def upload(self, filename, content, content_type="application/octet-stream", *, timeout=60.0):
         from satc_shared.clients import UploadResult

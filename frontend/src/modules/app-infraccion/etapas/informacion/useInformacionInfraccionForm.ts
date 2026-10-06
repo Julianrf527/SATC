@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { validateFile } from "@shared/lib/fileUpload";
 import {
   useActualizarDatosBasicosMutation,
   useCrearQuejosoMutation,
+  useFijarRadicadoInicialMutation,
   type NuevoQuejosoPayload,
 } from "../../api/expediente";
 import { detalleError, esErrorDeConexion } from "../../api/errors";
@@ -14,7 +16,6 @@ import type { Municipio, ModeloGenerico } from "@shared/types/common";
 
 export type ExpedienteDetalleExt = ExpedienteDetalle & {
   radicados_asociados?: string[];
-  ultima_etapa?: string | null;
 };
 
 export type ToastSetter = (toast: {
@@ -41,7 +42,6 @@ interface UseInformacionInfraccionFormArgs {
   tipoAfectacionList: TipoAfectacion[];
   quejosoList: Quejoso[];
   setQuejosoList?: (quejosos: Quejoso[]) => void;
-  onUpdate?: (expediente: ExpedienteDetalle) => void;
   setToast: ToastSetter;
   onSaved?: () => void;
   onCancelled?: () => void;
@@ -54,7 +54,6 @@ export function useInformacionInfraccionForm({
   tipoAfectacionList,
   quejosoList,
   setQuejosoList,
-  onUpdate,
   setToast,
   onSaved,
   onCancelled,
@@ -92,9 +91,27 @@ export function useInformacionInfraccionForm({
       : [""];
   });
 
+  // PDF "Radicado inicial" elegido para adjuntar/reemplazar (null = no cambia).
+  const [archivoRadicadoInicial, setArchivoRadicadoInicialState] = useState<File | null>(null);
+
   const actualizarDatosBasicos = useActualizarDatosBasicosMutation(expediente.id);
+  const fijarRadicadoInicial = useFijarRadicadoInicialMutation(expediente.id);
   const crearQuejoso = useCrearQuejosoMutation();
-  const isLoading = actualizarDatosBasicos.isPending;
+  const isLoading = actualizarDatosBasicos.isPending || fijarRadicadoInicial.isPending;
+
+  /** Misma validación que el resto de documentos: solo PDF y máximo 10 MB. */
+  const setArchivoRadicadoInicial = (archivo: File | null): boolean => {
+    if (archivo) {
+      const validacion = validateFile(archivo, ["application/pdf"]);
+      if (!validacion.isValid) {
+        setToast({ id: Date.now(), message: validacion.error ?? "Archivo no válido", type: "error" });
+        setArchivoRadicadoInicialState(null);
+        return false;
+      }
+    }
+    setArchivoRadicadoInicialState(archivo);
+    return true;
+  };
 
   // Vuelve a los valores del expediente (al cambiar de expediente o cancelar).
   const resetForm = () => {
@@ -117,6 +134,7 @@ export function useInformacionInfraccionForm({
         ? next.radicados_asociados
         : [""],
     );
+    setArchivoRadicadoInicialState(null);
   };
 
   useEffect(() => {
@@ -305,7 +323,7 @@ export function useInformacionInfraccionForm({
     };
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) return;
@@ -324,22 +342,44 @@ export function useInformacionInfraccionForm({
       radicados_asociados: updated.radicados_asociados || [],
     };
 
-    actualizarDatosBasicos.mutate(payload, {
-      onSuccess: () => {
-        setToast({ id: Date.now(), message: "Expediente actualizado exitosamente", type: "success" });
-        if (onUpdate) onUpdate(updated);
-        if (onSaved) onSaved();
-      },
-      onError: (err) => {
+    // Las mutaciones invalidan /completo y los listados: la vista se
+    // actualiza sola con lo que devuelva el servidor.
+    try {
+      await actualizarDatosBasicos.mutateAsync(payload);
+    } catch (err) {
+      setToast({
+        id: Date.now(),
+        message: esErrorDeConexion(err)
+          ? "Error de conexion al actualizar el expediente"
+          : (detalleError(err) || "No se pudo actualizar el expediente"),
+        type: "error",
+      });
+      return;
+    }
+
+    if (archivoRadicadoInicial) {
+      try {
+        await fijarRadicadoInicial.mutateAsync({
+          archivo: archivoRadicadoInicial,
+          radicado: updated.radicado,
+        });
+      } catch (err) {
+        // Los datos ya quedaron guardados: el formulario sigue abierto para
+        // reintentar solo el documento.
         setToast({
           id: Date.now(),
-          message: esErrorDeConexion(err)
-            ? "Error de conexion al actualizar el expediente"
-            : (detalleError(err) || "No se pudo actualizar el expediente"),
+          message: `Datos guardados, pero no se pudo adjuntar el radicado inicial: ${
+            detalleError(err) || (err instanceof Error && err.message) || "error desconocido"
+          }`,
           type: "error",
         });
-      },
-    });
+        return;
+      }
+    }
+
+    setToast({ id: Date.now(), message: "Expediente actualizado exitosamente", type: "success" });
+    setArchivoRadicadoInicialState(null);
+    if (onSaved) onSaved();
   };
 
   const handleCancel = () => {
@@ -367,6 +407,9 @@ export function useInformacionInfraccionForm({
     quejososIds,
     setQuejososIds,
     radicadosAsociados,
+    archivoRadicadoInicial,
+    setArchivoRadicadoInicial,
+    radicadoInicialActual: expediente.radicado_inicial ?? null,
     veredaList,
     handleResourceToggle,
     handleToggleExpand,

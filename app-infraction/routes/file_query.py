@@ -1,7 +1,7 @@
 from fastapi import Request, APIRouter, Depends, HTTPException, Query, Path as PathParam
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func, desc, union_all, literal
+from sqlalchemy import select, and_, func, desc
 from datetime import datetime
 from collections import defaultdict
 from pathlib import Path
@@ -53,6 +53,7 @@ from utils.verify_token import verify_gateway_token
 from services.users import get_users_by_permission, verify_permission
 from services.involved import get_involved_by_expedientes_ids
 from services.estado_expediente import calcular_estados, calcular_estado_uno
+from services.etapa_actual import subquery_etapa_actual
 
 
 # ─── Permisos de lectura ─────────────────────────────────────────────────────
@@ -174,84 +175,11 @@ async def obtener_expedientes(
 # ─── Listados de expedientes (forma compartida) ─────────────────────────────
 # GET /todos (vista de consulta), GET /encargado/{id} (vista de gestión) y
 # POST /filtrar devuelven items con la MISMA forma; los tres pasan por
-# _listar_expedientes. Lo único que cambia entre vistas es cómo se calcula
-# etapa_actual (etiquetas y fecha de referencia), que se conserva tal cual
-# estaba en cada endpoint.
-
-def _etapa_actual_vista_todos():
-    """Etapa más reciente por expediente, como la calcula GET /todos."""
-    concepto_q = select(
-        EtapaAcogerConcepto.expediente_id,
-        EtapaAcogerConcepto.fecha_creacion,
-        literal("Etapa concepto").label("tipo")
-    )
-    cierre_q = select(
-        EtapaCierre.expediente_id,
-        EtapaCierre.fecha_creacion,
-        literal("Etapa cierre").label("tipo")
-    )
-    visita_q = select(
-        InformeTecnico.expediente_id,
-        InformeTecnico.fecha_creacion,
-        literal("Etapa visita").label("tipo")
-    ).where(InformeTecnico.tipo_informe == "VISITA")
-    seguimiento_q = select(
-        InformeTecnico.expediente_id,
-        InformeTecnico.fecha_creacion,
-        literal("Etapa seguimiento").label("tipo")
-    ).where(InformeTecnico.tipo_informe == "SEGUIMIENTO")
-    return _etapa_mas_reciente(concepto_q, cierre_q, visita_q, seguimiento_q)
+# _listar_expedientes. etapa_actual sale de services.etapa_actual (una sola
+# definición, también usada por GET /completo/{id}).
 
 
-def _etapa_actual_vista_encargado():
-    """Etapa más reciente por expediente, como la calcula GET /encargado/{id}."""
-    def fecha_informe():
-        return func.coalesce(
-            InformeTecnico.fecha_aceptacion_informe,
-            InformeTecnico.fecha_recibido_informe,
-            InformeTecnico.fecha_programacion_visita,
-        ).label("fecha_creacion")
-
-    concepto_q = select(
-        EtapaAcogerConcepto.expediente_id,
-        EtapaAcogerConcepto.fecha_creacion,
-        literal("concepto").label("tipo")
-    )
-    cierre_q = select(
-        EtapaCierre.expediente_id,
-        EtapaCierre.fecha_creacion,
-        literal("cierre").label("tipo")
-    )
-    visita_q = select(
-        InformeTecnico.expediente_id,
-        fecha_informe(),
-        literal("visita").label("tipo")
-    ).where(InformeTecnico.tipo_informe == "VISITA")
-    seguimiento_q = select(
-        InformeTecnico.expediente_id,
-        fecha_informe(),
-        literal("seguimiento").label("tipo")
-    ).where(InformeTecnico.tipo_informe == "SEGUIMIENTO")
-    return _etapa_mas_reciente(concepto_q, cierre_q, visita_q, seguimiento_q)
-
-
-def _etapa_mas_reciente(*selects):
-    etapas_union = union_all(*selects).subquery()
-    etapa_reciente = select(
-        etapas_union.c.expediente_id,
-        etapas_union.c.tipo,
-        func.row_number().over(
-            partition_by=etapas_union.c.expediente_id,
-            order_by=etapas_union.c.fecha_creacion.desc()
-        ).label("rn")
-    ).subquery()
-    return select(
-        etapa_reciente.c.expediente_id,
-        etapa_reciente.c.tipo
-    ).where(etapa_reciente.c.rn == 1).subquery()
-
-
-async def _listar_expedientes(db: AsyncSession, etapa_actual, condiciones=()) -> list[dict]:
+async def _listar_expedientes(db: AsyncSession, condiciones=()) -> list[dict]:
     """
     Ejecuta el listado de expedientes y lo serializa con la forma común:
     id, radicado, fecha_radicado, fecha_creacion, archivado, municipio,
@@ -260,6 +188,7 @@ async def _listar_expedientes(db: AsyncSession, etapa_actual, condiciones=()) ->
     `condiciones` se aplican sobre Expediente/Vereda (Vereda va por outer
     join, así que se puede filtrar por Vereda.municipio_id).
     """
+    etapa_actual = subquery_etapa_actual()
     stmt = (
         select(
             Expediente.id,
@@ -334,10 +263,7 @@ async def filtrar_expedientes(
         await _exigir_alguno(user_id, FILE_MANAGE)
 
     condiciones = []
-    if ver_todos:
-        etapa_actual = _etapa_actual_vista_todos()
-    else:
-        etapa_actual = _etapa_actual_vista_encargado()
+    if not ver_todos:
         condiciones.append(Expediente.abogado_responsable_id == user_id)
 
     if filtros.direccion:
@@ -366,7 +292,7 @@ async def filtrar_expedientes(
             .where(ExpedienteTipoAfectacion.tipo_afectacion_id.in_(filtros.tipo_afectacion_ids))
         ))
 
-    data = await _listar_expedientes(db, etapa_actual, condiciones)
+    data = await _listar_expedientes(db, condiciones)
 
     logger.info(
         f"filtrar_expedientes: usuario {user_id}, alcance {'todos' if ver_todos else 'propios'}, "
@@ -461,57 +387,7 @@ async def obtener_expediente_completo_por_expediente_id(
         if encargado is None or encargado != user_id:
             raise HTTPException(status_code=403, detail="Sin permisos sobre este expediente")
 
-    # Subquery con todas las fechas de etapas en un solo query
-    concepto_q = select(
-        EtapaAcogerConcepto.expediente_id,
-        EtapaAcogerConcepto.fecha_creacion,
-        literal("Etapa concepto").label("tipo")
-    )
-
-    cierre_q = select(
-        EtapaCierre.expediente_id,
-        EtapaCierre.fecha_creacion,
-        literal("Etapa cierre").label("tipo")
-    )
-
-    visita_q = select(
-        InformeTecnico.expediente_id,
-        func.coalesce(
-            InformeTecnico.fecha_aceptacion_informe,
-            InformeTecnico.fecha_recibido_informe,
-            InformeTecnico.fecha_programacion_visita,
-        ).label("fecha_creacion"),
-        literal("Etapa visita").label("tipo")
-    ).where(InformeTecnico.tipo_informe == "VISITA")
-
-    seguimiento_q = select(
-        InformeTecnico.expediente_id,
-        func.coalesce(
-            InformeTecnico.fecha_aceptacion_informe,
-            InformeTecnico.fecha_recibido_informe,
-            InformeTecnico.fecha_programacion_visita,
-        ).label("fecha_creacion"),
-        literal("Etapa seguimiento").label("tipo")
-    ).where(InformeTecnico.tipo_informe == "SEGUIMIENTO")
-
-    etapas_union = union_all(concepto_q, cierre_q, visita_q, seguimiento_q).subquery()
-
-    # Subquery con la etapa más reciente por expediente
-    etapa_reciente = (
-        select(
-            etapas_union.c.expediente_id,
-            etapas_union.c.tipo,
-            func.row_number().over(
-                partition_by=etapas_union.c.expediente_id,
-                order_by=etapas_union.c.fecha_creacion.desc()
-            ).label("rn")
-        )
-    ).subquery()
-
-    etapa_actual = (
-        select(etapa_reciente.c.expediente_id, etapa_reciente.c.tipo)
-        .where(etapa_reciente.c.rn == 1)
-    ).subquery()
+    etapa_actual = subquery_etapa_actual()
 
     # Query principal
     stmt = (
@@ -523,6 +399,8 @@ async def obtener_expediente_completo_por_expediente_id(
             Expediente.descripcion,
             Expediente.vereda_id,
             Expediente.archivado,
+            Expediente.fecha_creacion,
+            Expediente.radicado_inicial_file_id,
             etapa_actual.c.tipo.label("etapa_actual"),
         )
         .where(Expediente.id == expediente_id)
@@ -569,16 +447,20 @@ async def obtener_expediente_completo_por_expediente_id(
     involucrados_map = await get_involved_by_expedientes_ids(db, [expediente_id])
     involucrados = involucrados_map.get(expediente_id, [])
 
-    # Vereda
+    # Vereda y municipio
     vereda = None
+    municipio = None
     if expediente["vereda_id"]:
         res_ver = await db.execute(
-            select(Vereda.id, Vereda.nombre)
+            select(Vereda.id, Vereda.nombre, Municipio.id, Municipio.nombre)
+            .join(Municipio, Municipio.id == Vereda.municipio_id, isouter=True)
             .where(Vereda.id == expediente["vereda_id"])
         )
         ver_row = res_ver.first()
         if ver_row:
             vereda = {"id": ver_row[0], "nombre": ver_row[1]}
+            if ver_row[2] is not None:
+                municipio = {"id": ver_row[2], "nombre": ver_row[3]}
 
     # Tipos de afectación
     tipos_stmt = (
@@ -622,6 +504,8 @@ async def obtener_expediente_completo_por_expediente_id(
         "id": expediente["id"],
         "radicado": expediente["radicado"],
         "fecha_radicado": expediente["fecha_radicado"].isoformat() if expediente["fecha_radicado"] else None,
+        "fecha_creacion": expediente["fecha_creacion"].isoformat() if expediente["fecha_creacion"] else None,
+        "municipio": municipio,
         "recurso_afectado": recursos,
         "direccion": expediente["direccion"],
         "descripcion": expediente["descripcion"],
@@ -629,10 +513,19 @@ async def obtener_expediente_completo_por_expediente_id(
         "tipos_afectacion": tipos_afectacion,
         "quejosos": quejosos,
         "radicados_asociados": radicados_asociados,
+        # Código estable de la etapa más avanzada (services.etapa_actual);
+        # "ultima_etapa" se conserva por compatibilidad.
+        "etapa_actual": expediente["etapa_actual"],
         "ultima_etapa": expediente["etapa_actual"],
         "involucrados": involucrados,
         "archivado": expediente["archivado"],
         "estado": estado,
+        # El nombre del archivo no se guarda en app-docs (file_hash solo tiene
+        # url/tipo/tamaño): se muestra con un nombre fijo.
+        "radicado_inicial": (
+            {"file_id": expediente["radicado_inicial_file_id"], "nombre": "Radicado inicial"}
+            if expediente["radicado_inicial_file_id"] else None
+        ),
     }
 
     return JSONResponse(
@@ -652,7 +545,7 @@ async def obtener_expedientes_para_vista(
 ):
     user_id = verify_gateway_token(request)["user_id"]
     await _exigir_alguno(user_id, FILE_CONSULT)
-    data = await _listar_expedientes(db, _etapa_actual_vista_todos())
+    data = await _listar_expedientes(db)
     return JSONResponse(content={"ok": True, "data": data}, status_code=200)
 
 
@@ -670,7 +563,6 @@ async def obtener_expedientes_por_encargado(
 
     data = await _listar_expedientes(
         db,
-        _etapa_actual_vista_encargado(),
         [Expediente.abogado_responsable_id == encargado_id],
     )
     return JSONResponse(content={"ok": True, "data": data}, status_code=200)

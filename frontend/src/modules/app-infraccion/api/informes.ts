@@ -3,12 +3,14 @@ import { ApiError, apiCall, apiRequest, INFRACTION_ENDPOINTS, jsonBody } from "@
 import type {
   EtapaConsulta,
   FilaRecursoAfectado,
+  ImpactoCambioModo,
   InformeTecnico,
   MiInforme,
   ModoInforme,
   ProfesionalDisponible,
   TipoInforme,
 } from "../types";
+import { invalidarExpediente } from "./invalidar";
 import { infraccionKeys } from "./queryKeys";
 
 // ── Claves ──────────────────────────────────────────────────────────────────
@@ -23,15 +25,21 @@ export const informeKeys = {
   disponibles: () => [...informeKeys.all, "disponibles"] as const,
   proceso: (procesoId: number) => [...informeKeys.all, "proceso", procesoId] as const,
   recursos: (informeId: number) => [...informeKeys.all, "recursos", informeId] as const,
+  impactoCambioModo: (informeId: number) => [...informeKeys.all, "impacto-cambio-modo", informeId] as const,
   etapa: (expedienteId: number, tipo: TipoInforme) =>
     [...infraccionKeys.expediente(expedienteId), "etapa", "informe", tipo] as const,
 };
 
-const esEtapaInforme = (q: Query) => q.queryKey[3] === "etapa" && q.queryKey[4] === "informe";
+// Cualquier consulta bajo `infraccionKeys.expediente(id)`: etapas de informe
+// y también `completo` (última etapa y estado dependen de los informes).
+const esDeUnExpediente = (q: Query) => q.queryKey[1] === "expediente";
 
 /**
- * Invalida listados, matrices y las etapas de informe (Visita /
- * Seguimiento). Se usa tras asignar, revisar, subir versión, cargue manual...
+ * Invalida listados, matrices, las etapas de informe (Visita / Seguimiento),
+ * los datos de los expedientes y sus listados (última etapa y estado). Se usa
+ * tras asignar, revisar, subir versión, cargue manual... Como muchas de esas
+ * acciones no saben de qué expediente es el informe, se invalida el subárbol
+ * de todos (solo se vuelven a pedir los que están en pantalla).
  */
 // El detalle de un proceso ya lo refresca `useProcesoRevision` tras cada
 // acción: invalidarlo aquí también cancelaba y repetía esa misma petición.
@@ -42,7 +50,8 @@ export function useInvalidarInformes() {
   return () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: informeKeys.all, predicate: noEsDetalleProceso }),
-      queryClient.invalidateQueries({ queryKey: infraccionKeys.all, predicate: esEtapaInforme }),
+      queryClient.invalidateQueries({ queryKey: infraccionKeys.all, predicate: esDeUnExpediente }),
+      queryClient.invalidateQueries({ queryKey: infraccionKeys.listaExpedientes() }),
     ]);
 }
 
@@ -171,15 +180,34 @@ export function useDisponiblesQuery(enabled: boolean) {
   });
 }
 
-export function useCambiarModoMutation(informeId: number) {
+/**
+ * Vista previa del cambio de modo: etapas posteriores del expediente que se
+ * borrarían en cascada (visita → concepto, seguimiento y cierre; seguimiento
+ * → cierre). Se pide al abrir la confirmación y siempre fresca.
+ */
+export function useImpactoCambioModoQuery(informeId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: informeKeys.impactoCambioModo(informeId),
+    enabled,
+    staleTime: 0,
+    gcTime: 0,
+    queryFn: async () =>
+      (await apiRequest<Partial<ImpactoCambioModo>>(INFRACTION_ENDPOINTS.INFRACTION_REPORTS_CAMBIAR_MODO_IMPACTO(informeId)))
+        .etapas ?? [],
+  });
+}
+
+/** Cambiar el modo puede borrar etapas posteriores: se invalida todo el expediente además de los informes. */
+export function useCambiarModoMutation(informeId: number, expedienteId: number) {
+  const queryClient = useQueryClient();
   const invalidar = useInvalidarInformes();
   return useMutation({
     mutationFn: (modo: ModoInforme) =>
-      apiRequest(INFRACTION_ENDPOINTS.INFRACTION_REPORTS_CAMBIAR_MODO(informeId), {
-        method: "PUT",
-        ...jsonBody({ modo }),
-      }),
-    onSuccess: invalidar,
+      apiRequest<{ message?: string; etapas_eliminadas?: ImpactoCambioModo["etapas"] }>(
+        INFRACTION_ENDPOINTS.INFRACTION_REPORTS_CAMBIAR_MODO(informeId),
+        { method: "PUT", ...jsonBody({ modo }) },
+      ),
+    onSuccess: () => Promise.all([invalidar(), invalidarExpediente(queryClient, expedienteId)]),
   });
 }
 

@@ -36,11 +36,8 @@ export default function GestionInfraccionLayout({ setToast }: Props) {
     setExpedienteSeleccionado,
   );
 
-  // El toast de éxito lo da el formulario de información (onSuccess del mutate).
-  const handleExpedienteUpdate = (actualizado: Expediente) => {
-    setExpedienteSeleccionado({ ...actualizado });
-    void invalidarLista();
-  };
+  // Las ediciones del expediente (datos, etapas, involucrados...) invalidan
+  // el detalle y este listado desde sus mutaciones (api/invalidar.ts).
 
   const handleArchiveSuccess = () => {
     setExpedienteSeleccionado(null);
@@ -78,7 +75,6 @@ export default function GestionInfraccionLayout({ setToast }: Props) {
             quejosoList={catalogos.quejosos}
             setQuejosoList={catalogos.setQuejosos}
             setToast={setToast}
-            onUpdate={handleExpedienteUpdate}
             onArchiveSuccess={handleArchiveSuccess}
           />
         }

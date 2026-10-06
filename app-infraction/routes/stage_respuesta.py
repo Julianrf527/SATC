@@ -29,6 +29,7 @@ from utils.verify_token import verify_gateway_token
 from services.etapas import build_acto_for_frontend as _build_acto_for_frontend
 from services.etapas import get_expediente_con_permiso, exigir_lectura_expediente
 from utils.log import insert_log
+from services.docs import increment_file_usage, decrement_file_usage
 
 
 class RespuestaBody(BaseModel):
@@ -115,6 +116,10 @@ async def crear_respuesta(
         )
         db.add(nueva)
         await db.flush()
+
+        # Uso del PDF de la respuesta: sin esto numero_usos queda en 0 y la
+        # limpieza nocturna de app-docs lo borra de MinIO.
+        await increment_file_usage([body.documento_radicado_id])
 
         audit_result = await insert_log(
             db=db,
@@ -236,6 +241,12 @@ async def actualizar_respuesta(
         )
         await db.flush()
         await db.refresh(etapa_respuesta)
+
+        documento_anterior = datos_anteriores["documento_radicado_id"]
+        if body.documento_radicado_id != documento_anterior:
+            await increment_file_usage([body.documento_radicado_id])
+            if documento_anterior:
+                await decrement_file_usage([documento_anterior])
 
         audit_result = await insert_log(
             db=db,

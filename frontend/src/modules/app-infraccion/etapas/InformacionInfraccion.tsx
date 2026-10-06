@@ -4,6 +4,7 @@ import { API_CONFIG } from "@shared/lib/api";
 import Informacion from "./informacion/InformacionInfraccionData";
 import { InvolucradosExpediente } from "@features/involucrados-expediente";
 import AlertasInfraccion from "./informacion/AlertasInfraccion";
+import { useInvalidarExpediente } from "../api/invalidar";
 
 type Props = {
   expediente: ExpedienteDetalle | null;
@@ -12,7 +13,6 @@ type Props = {
   tipoAfectacionList?: TipoAfectacion[];
   quejosoList?: Quejoso[];
   setQuejosoList?: (quejosos: Quejoso[]) => void;
-  onUpdate?: (expediente: ExpedienteDetalle) => void;
   setToast: (toast: {
     id: number;
     message: string;
@@ -28,10 +28,12 @@ export default function InformationInfraccion({
   tipoAfectacionList,
   quejosoList,
   setQuejosoList,
-  onUpdate,
   setToast,
   isEditable = true,
 }: Props) {
+  // Vincular/desvincular involucrados cambia el estado del expediente.
+  const invalidarExpediente = useInvalidarExpediente(expediente?.id ?? 0);
+
   if (!expediente) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -72,7 +74,6 @@ export default function InformationInfraccion({
           tipoAfectacionList={tipoAfectacionList || []}
           quejosoList={quejosoList || []}
           setQuejosoList={setQuejosoList}
-          onUpdate={onUpdate}
           setToast={setToast}
           isEditable={isEditable}
         />
@@ -82,13 +83,7 @@ export default function InformationInfraccion({
         <InvolucradosExpediente
           expedienteId={expediente.id}
           involucradosList={expediente.involucrados}
-          onInvolucradosUpdate={(updatedInvolucrados) => {
-            if (!onUpdate) return;
-            onUpdate({
-              ...expediente,
-              involucrados: updatedInvolucrados,
-            });
-          }}
+          onInvolucradosUpdate={() => void invalidarExpediente()}
           endpoints={{
             listar: API_CONFIG.ENDPOINTS.INFRACTION_INVOLVED_LIST,
             vincular: API_CONFIG.ENDPOINTS.INFRACTION_INVOLVED_LINK,

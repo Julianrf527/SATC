@@ -29,6 +29,14 @@ logger = logging.getLogger(__name__)
 from utils.verify_token import verify_gateway_token
 from services.users import get_users_by_permission, verify_permission
 from services.docs import increment_file_usage, decrement_file_usage, get_file_info
+from services.cascada_etapas import (
+    ErrorRestaUsos,
+    aplicar_restas,
+    compensar,
+    eliminar_etapas_posteriores,
+    etapa_de_informe,
+)
+from utils.log import insert_log
 from services.revision_informes import (
     Avisos,
     cerrar_proceso_vigente,
@@ -354,6 +362,36 @@ async def reasignar_profesional(
 
 # ─── PUT /informes/{informe_id}/cambiar-modo ─────────────────────────────────
 
+async def _exigir_permiso_cambiar_modo(request: Request) -> int:
+    user_id = int(verify_gateway_token(request)["user_id"])
+    if not await verify_permission(user_id, MANUAL_UPLOAD):
+        raise HTTPException(status_code=403, detail="No tienes permiso para cambiar el modo de cargue")
+    return user_id
+
+
+@router.get("/{informe_id}/cambiar-modo/impacto", status_code=200)
+async def impacto_cambiar_modo(
+    request: Request,
+    informe_id: int,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    """
+    Vista previa de lo que borraría el cambio de modo, además del propio
+    informe: las etapas POSTERIORES del expediente (visita -> concepto,
+    seguimiento y cierre; seguimiento -> cierre). Usa el mismo código que el
+    borrado real (``eliminar_etapas_posteriores`` sin ejecutar).
+    """
+    await _exigir_permiso_cambiar_modo(request)
+    informe = await db.scalar(select(InformeTecnico).where(InformeTecnico.id == informe_id))
+    if not informe:
+        raise HTTPException(status_code=404, detail="Informe técnico no encontrado")
+
+    cascada = await eliminar_etapas_posteriores(
+        db, informe.expediente_id, etapa_de_informe(informe.tipo_informe), ejecutar=False
+    )
+    return JSONResponse(content={"ok": True, "informe_id": informe_id, **cascada.a_dict()})
+
+
 @router.put("/{informe_id}/cambiar-modo", status_code=200)
 async def cambiar_modo_informe(
     request: Request,
@@ -366,12 +404,16 @@ async def cambiar_modo_informe(
     de revisión) y modo MANUAL (cargue directo de un informe ya aceptado
     previamente, ej. expedientes históricos). Cambiar de modo borra por
     completo la información del modo anterior (archivo, fechas,
-    profesional/revisor) — el frontend debe confirmarlo con el usuario antes
-    de llamar este endpoint.
+    profesional/revisor) y, en cascada, las etapas POSTERIORES del expediente
+    (visita -> concepto, seguimiento y cierre; seguimiento -> cierre), sin
+    excepción por actos notificados. El frontend lo confirma con el usuario
+    mostrando ``GET /{informe_id}/cambiar-modo/impacto``.
+
+    Todo va en una transacción: si algo falla (incluida la resta de usos de
+    archivo en app-docs) se hace rollback y no se borra nada. Bloqueos en el
+    orden de siempre: informes primero, procesos después.
     """
-    user_id = int(verify_gateway_token(request)["user_id"])
-    if not await verify_permission(user_id, MANUAL_UPLOAD):
-        raise HTTPException(status_code=403, detail="No tienes permiso para cambiar el modo de cargue")
+    user_id = await _exigir_permiso_cambiar_modo(request)
 
     if body.modo not in ("FLUJO", "MANUAL"):
         raise HTTPException(status_code=400, detail="Modo inválido, debe ser FLUJO o MANUAL")
@@ -383,21 +425,35 @@ async def cambiar_modo_informe(
     if informe.modo == body.modo:
         return JSONResponse(content={"ok": True, "informe_id": informe_id, "modo": informe.modo, "message": "Ya estaba en ese modo"})
 
+    modo_anterior = informe.modo
+    expediente_id = informe.expediente_id
+
+    # Etapas posteriores: bloquea (y borra) los informes de seguimiento antes
+    # que cualquier proceso, incluido el vigente de este informe.
+    cascada = await eliminar_etapas_posteriores(db, expediente_id, etapa_de_informe(informe.tipo_informe))
+
     if body.modo == "MANUAL":
         # Viene de FLUJO: cerrar el proceso de revisión vigente. Sus versiones
         # conservan su uso de archivo (el historial no se borra); aquí solo se
-        # libera el uso propio del informe más abajo.
+        # libera el uso propio del informe.
         try:
             await cerrar_proceso_vigente(db, informe_id, usuario_id=user_id, descripcion="Informe cambiado a modo MANUAL")
         except ReviewError as e:
             await db.rollback()
             raise HTTPException(status_code=e.status_code, detail=e.detail)
 
-    if informe.documento_informe_id:
-        try:
-            await decrement_file_usage([informe.documento_informe_id])
-        except Exception as e:
-            logger.warning(f"Error decrementando uso de archivo {informe.documento_informe_id}: {e}")
+    datos_informe = {
+        "informe_id": informe_id,
+        "tipo_informe": informe.tipo_informe,
+        "modo": modo_anterior,
+        "documento_informe_id": informe.documento_informe_id,
+        "profesional_asignado_id": informe.profesional_asignado_id,
+        "revisor_asignado_id": informe.revisor_asignado_id,
+        "fecha_recibido_informe": _format_date(informe.fecha_recibido_informe),
+        "fecha_aceptacion_informe": _format_date(informe.fecha_aceptacion_informe),
+    }
+    # Uso propio del informe aceptado, en la misma resta que la cascada.
+    cascada.restar(informe.documento_informe_id)
 
     informe.profesional_asignado_id = None
     informe.revisor_asignado_id = None
@@ -407,11 +463,53 @@ async def cambiar_modo_informe(
     informe.fecha_programacion_visita = None
     informe.modo = body.modo
     await db.execute(delete(InformeRecursoAfectado).where(InformeRecursoAfectado.informe_id == informe_id))
+    await db.flush()
 
-    await db.commit()
+    etapas = [e.codigo for e in cascada.ordenadas]
+    detalle = f"Cambio de modo del informe {informe.tipo_informe} {modo_anterior} -> {body.modo}"
+    if etapas:
+        detalle += ". Etapas eliminadas en cascada: " + ", ".join(e.etiqueta for e in cascada.ordenadas)
+    audit_result = await insert_log(
+        db=db,
+        tipo_evento="CAMBIAR_MODO_INFORME",
+        resultado="EXITOSO",
+        usuario_id=user_id,
+        detalle=detalle,
+        expediente_id=expediente_id,
+        expediente_radicado=await _radicado(db, expediente_id),
+        datos_anteriores={"informe": datos_informe, **cascada.auditoria()},
+        datos_nuevos={"modo": body.modo, "etapas_eliminadas": etapas},
+    )
+    if not audit_result.get("ok"):
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
 
-    logger.info(f"Informe {informe_id} cambiado a modo {informe.modo}")
-    return JSONResponse(content={"ok": True, "informe_id": informe_id, "modo": informe.modo, "message": "Modo actualizado"})
+    # Lo último antes del commit: es lo único fuera de la BD. Si falla se
+    # devuelve lo ya restado y se hace rollback.
+    try:
+        aplicadas = await aplicar_restas(cascada.usos, decrement_file_usage, increment_file_usage)
+    except ErrorRestaUsos as e:
+        await db.rollback()
+        logger.error(f"Cambio de modo del informe {informe_id} revertido: {e}")
+        raise HTTPException(status_code=502, detail="No se pudo actualizar el uso de los archivos, no se realizó ningún cambio")
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        await compensar(aplicadas, increment_file_usage)
+        raise
+
+    logger.info(f"Informe {informe_id} cambiado a modo {body.modo}; etapas eliminadas: {etapas or 'ninguna'}")
+    message = "Modo actualizado"
+    if etapas:
+        message += ". También se eliminaron: " + ", ".join(e.etiqueta for e in cascada.ordenadas)
+    return JSONResponse(content={
+        "ok": True,
+        "informe_id": informe_id,
+        "modo": body.modo,
+        "message": message,
+        "etapas_eliminadas": cascada.a_dict()["etapas"],
+    })
 
 
 # ─── POST /informes/{informe_id}/cargue-manual ───────────────────────────────

@@ -1,11 +1,10 @@
-import { useCallback, useState, type FormEvent } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, type FormEvent } from "react";
 import { ActoAdmin } from "@features/acto-administrativo";
 import type { MedidaInfo, MedidaPreventiva } from "../../types";
 import { useDatosActoAdmin } from "../../api/expediente";
 import { useGuardarMedidaMutation, useTiposMedidaQuery } from "../../api/etapas";
 import { esErrorDeConexion, estadoError } from "../../api/errors";
-import { infraccionKeys } from "../../api/queryKeys";
+import { useInvalidarExpediente } from "../../api/invalidar";
 import { INFRACCION_ACTO_ENDPOINTS } from "../actoAdminEndpoints";
 import MedidaPreventivaForm, { type MedidaFormValues } from "./MedidaPreventivaForm";
 import MedidaPreventivaView from "./MedidaPreventivaView";
@@ -53,7 +52,6 @@ export default function MedidaPreventivaData({
   isEditable = true,
   setToast,
 }: Props) {
-  const queryClient = useQueryClient();
   const medidaInfo = localMedida?.informacion;
   const [showForm, setShowForm] = useState(!medidaInfo?.tipo_medida_id);
   const [values, setValues] = useState<MedidaFormValues>(() => valoresIniciales(medidaInfo));
@@ -67,9 +65,8 @@ export default function MedidaPreventivaData({
   const guardarMedida = useGuardarMedidaMutation(expedienteId);
   const isSubmitting = guardarMedida.isPending;
 
-  const handleActoAdminUpdate = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: infraccionKeys.respuesta(expedienteId) });
-  }, [queryClient, expedienteId]);
+  // Cambios dentro de ActoAdmin (acto, notificaciones) de la medida.
+  const handleActoAdminUpdate = useInvalidarExpediente(expedienteId);
 
   const handleChange = (patch: Partial<MedidaFormValues>) =>
     setValues((prev) => ({ ...prev, ...patch }));

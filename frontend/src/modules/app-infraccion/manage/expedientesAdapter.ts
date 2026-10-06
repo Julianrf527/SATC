@@ -7,8 +7,27 @@ import {
   type ExpedientesAdapter,
   type ExpedientesConfig,
   type FiltroAvanzadoBase,
+  type FiltroRapido,
 } from "@features/expedientes";
 import type { Expediente } from "../types";
+import { ETAPAS_PROCESO } from "./etapasProceso";
+
+const SIN_ETAPA = "sin-etapa";
+
+/**
+ * Filtro rápido por etapa actual: opciones fijas en el orden del proceso
+ * (código del backend -> etiqueta) más "Sin etapa".
+ */
+const filtroEtapa: FiltroRapido<Expediente> = {
+  id: "etapa",
+  tipo: "fijo",
+  etiquetaTodos: "Todas las etapas",
+  opciones: [
+    ...ETAPAS_PROCESO.map((e) => ({ value: e.codigo, label: e.etiqueta })),
+    { value: SIN_ETAPA, label: "Sin etapa" },
+  ],
+  coincide: (e, v) => (v === SIN_ETAPA ? !e.etapa_actual : e.etapa_actual === v),
+};
 
 /** Filtros avanzados de infracción: los comunes + tipos de afectación. */
 export type FiltroAvanzadoInfraccion = FiltroAvanzadoBase & {
@@ -55,7 +74,7 @@ export const expedientesInfraccionConfig: ExpedientesConfig<Expediente, FiltroAv
   campoDestacado: { etiqueta: "Fecha Radicado", valor: (e) => e.fecha_radicado },
   filtrosRapidos: [
     filtroMunicipio<Expediente>(),
-    filtroPorCampo<Expediente>("etapa", "Todas las etapas", (e) => e.etapa_actual),
+    filtroEtapa,
     filtroArchivado<Expediente>("Todos"),
     filtroPorCampo<Expediente>("estado", "Todos los estados", (e) => e.estado),
   ],

@@ -34,8 +34,6 @@ type Props = {
   tipoActual: TipoAcogidaConcepto;
   isEditable: boolean;
   setToast: (t: { id: number; message: string; type: "success" | "error" }) => void;
-  /** Tras guardar (la etapa ya se re-consultó). */
-  onTipoUpdated: () => void;
 };
 
 export default function ConceptoData({
@@ -44,7 +42,6 @@ export default function ConceptoData({
   tipoActual,
   isEditable,
   setToast,
-  onTipoUpdated,
 }: Props) {
   const [showEdit, setShowEdit] = useState(false);
   const [selectedTipo, setSelectedTipo] = useState(tipoActual);
@@ -95,7 +92,6 @@ export default function ConceptoData({
             type: res.cierre_eliminado ? "error" : "success",
           });
           setShowEdit(false);
-          onTipoUpdated();
         },
         onError: (err) => {
           setToast({
