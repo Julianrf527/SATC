@@ -39,6 +39,16 @@ PERMISOS = [
     {"nombre": "infraccion_informes_revisar", "menu_path": "/infraction/my-reports"},
     {"nombre": "infraccion_cargue", "menu_path": ""},
     {"nombre": "infraccion_informes_subir", "menu_path": "/infraction/my-reports"},
+    # Concesiones de Aguas Superficiales (app-recurso, plan §2)
+    {"nombre": "recurso_gestionar", "menu_path": "/recurso/manage"},
+    {"nombre": "recurso_consultar", "menu_path": "/recurso/consult"},
+    {"nombre": "recurso_super_gestion", "menu_path": ""},
+    {"nombre": "recurso_lider_juridico", "menu_path": "/recurso/my-reports"},
+    {"nombre": "recurso_lider_proyecto", "menu_path": "/recurso/my-reports"},
+    {"nombre": "recurso_asesora_subdireccion", "menu_path": "/recurso/my-reports"},
+    {"nombre": "recurso_lider_tecnico", "menu_path": "/recurso/my-reports"},
+    {"nombre": "recurso_sig", "menu_path": "/recurso/my-reports"},
+    {"nombre": "recurso_tecnico", "menu_path": "/recurso/my-reports"},
 ]
 
 

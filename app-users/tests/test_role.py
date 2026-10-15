@@ -162,3 +162,50 @@ async def test_auditor_no_puede_crear_roles(client, make_permiso, make_rol, make
         "nombre": "nuevo", "permisos": [p.id],
     })
     assert resp.status_code in (403, 422)
+
+
+@pytest.mark.asyncio
+async def test_add_rol_nombre_largo_422(client, make_permiso, make_rol, make_usuario):
+    # rol.nombre es varchar(20): antes un nombre más largo daba 500 en la BD.
+    p = await make_permiso(PERMISO_ROL)
+    rol = await make_rol("admin", [p])
+    u = await make_usuario(rol_id=rol.id)
+    resp = await client.post("/role/add", headers=gateway_headers(u.id, rol.id), json={
+        "nombre": "x" * 21, "permisos": [p.id],
+    })
+    assert resp.status_code == 422
+    assert "20 caracteres" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_add_rol_nombre_de_20_con_espacios_201(client, make_permiso, make_rol, make_usuario):
+    p = await make_permiso(PERMISO_ROL)
+    rol = await make_rol("admin", [p])
+    u = await make_usuario(rol_id=rol.id)
+    resp = await client.post("/role/add", headers=gateway_headers(u.id, rol.id), json={
+        "nombre": "  " + "y" * 20 + "  ", "permisos": [p.id],
+    })
+    assert resp.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_add_rol_nombre_vacio_422(client, make_permiso, make_rol, make_usuario):
+    p = await make_permiso(PERMISO_ROL)
+    rol = await make_rol("admin", [p])
+    u = await make_usuario(rol_id=rol.id)
+    resp = await client.post("/role/add", headers=gateway_headers(u.id, rol.id), json={
+        "nombre": "   ", "permisos": [p.id],
+    })
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_update_rol_nombre_largo_422(client, make_permiso, make_rol, make_usuario):
+    p = await make_permiso(PERMISO_ROL)
+    rol = await make_rol("admin", [p])
+    otro = await make_rol("otro", [p])
+    u = await make_usuario(rol_id=rol.id)
+    resp = await client.put(f"/role/update/{otro.id}", headers=gateway_headers(u.id, rol.id), json={
+        "nombre": "z" * 25, "permisos": [p.id],
+    })
+    assert resp.status_code == 422

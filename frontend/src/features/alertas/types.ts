@@ -21,6 +21,8 @@ export type Alerta = {
   fecha_inicio?: string;
   fecha_limite: string;
   semaforo: Semaforo;
+  /** Solo en "todas las alertas": el usuario es el responsable del expediente. */
+  es_responsable?: boolean;
 };
 
 /** Respuesta del endpoint de alertas de un expediente. */
@@ -31,6 +33,7 @@ export type AlertasExpedienteResponse = {
 /** Respuesta del endpoint de alertas de todos los expedientes. */
 export type AlertasTodasResponse = {
   ok: boolean;
+  alcance?: "mios" | "todos";
   alertas: Record<string, Record<string, Alerta>>;
   total_expedientes: number;
   expedientes_con_alertas: number;

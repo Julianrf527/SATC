@@ -15,6 +15,7 @@ DEFAULT_TTL = timedelta(minutes=5)
 SERVICE_SECRET_ENV: dict[str, str] = {
     "sanctioning-service": "SANCTIONING_SERVICE_SECRET",
     "infraction-service": "INFRACTION_SERVICE_SECRET",
+    "recurso-service": "RECURSO_SERVICE_SECRET",
     "docs-service": "DOCS_SERVICE_SECRET",
     "involved-service": "INVOLVED_SERVICE_SECRET",
 }

@@ -29,6 +29,8 @@ volumes:
     driver: local
   postgres-infraction-data:
     driver: local
+  postgres-recurso-data:
+    driver: local
 
   # MinIO Storage
   minio-data:
@@ -307,6 +309,56 @@ services:
         max-file: "3"
 
   # ==========================================
+  # BASE DE DATOS - PostgreSQL Recurso (Concesiones de Aguas)
+  # ==========================================
+  postgres-recurso:
+    image: postgres:15-alpine
+    container_name: satc-postgres-recurso
+    environment:
+      POSTGRES_DB: recurso_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: America/Bogota
+      PGTZ: America/Bogota
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 200M
+        reservations:
+          cpus: "0.75"
+          memory: 100M
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=250"
+      - "-c"
+      - "shared_buffers=50MB"
+      - "-c"
+      - "effective_cache_size=150MB"
+      - "-c"
+      - "maintenance_work_mem=12MB"
+      - "-c"
+      - "work_mem=1MB"
+    volumes:
+      - postgres-recurso-data:/var/lib/postgresql/data
+      - ./backups/postgres-recurso:/backups
+    networks:
+      - satc-private
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d recurso_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================
   # OBJECT STORAGE - MinIO
   # ==========================================
   minio:
@@ -484,9 +536,10 @@ services:
       SECRET_KEY_GATEWAY: ${SECRET_KEY_GATEWAY}
       SECRET_GATEWAY: ${SECRET_GATEWAY}
       SERVICE_SECRET_KEY: ${USERS_SERVICE_SECRET}
-      # Secretos de los callers este-oeste que app-users valida (sanctioning/infraction/docs/involved)
+      # Secretos de los callers este-oeste que app-users valida (sanctioning/infraction/recurso/docs/involved)
       SANCTIONING_SERVICE_SECRET: ${SANCTIONING_SERVICE_SECRET}
       INFRACTION_SERVICE_SECRET: ${INFRACTION_SERVICE_SECRET}
+      RECURSO_SERVICE_SECRET: ${RECURSO_SERVICE_SECRET}
       DOCS_SERVICE_SECRET: ${DOCS_SERVICE_SECRET}
       INVOLVED_SERVICE_SECRET: ${INVOLVED_SERVICE_SECRET}
       BCRYPT_ROUNDS: ${BCRYPT_ROUNDS}
@@ -611,9 +664,10 @@ services:
       # JWT
       SECRET_GATEWAY: ${SECRET_GATEWAY}
       SERVICE_SECRET_KEY: ${DOCS_SERVICE_SECRET}
-      # Secretos de los callers este-oeste que app-docs valida (sanctioning/infraction)
+      # Secretos de los callers este-oeste que app-docs valida (sanctioning/infraction/recurso)
       SANCTIONING_SERVICE_SECRET: ${SANCTIONING_SERVICE_SECRET}
       INFRACTION_SERVICE_SECRET: ${INFRACTION_SERVICE_SECRET}
+      RECURSO_SERVICE_SECRET: ${RECURSO_SERVICE_SECRET}
 
       # MinIO
       MINIO_ENDPOINT: minio:9000
@@ -685,9 +739,10 @@ services:
       # JWT
       SECRET_GATEWAY: ${SECRET_GATEWAY}
       SERVICE_SECRET_KEY: ${INVOLVED_SERVICE_SECRET}
-      # Secretos de los callers este-oeste que app-involved valida (sanctioning/infraction)
+      # Secretos de los callers este-oeste que app-involved valida (sanctioning/infraction/recurso)
       SANCTIONING_SERVICE_SECRET: ${SANCTIONING_SERVICE_SECRET}
       INFRACTION_SERVICE_SECRET: ${INFRACTION_SERVICE_SECRET}
+      RECURSO_SERVICE_SECRET: ${RECURSO_SERVICE_SECRET}
 
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
@@ -778,6 +833,67 @@ services:
         max-file: "3"
 
   # ==========================================
+  # MICROSERVICIO - Recurso (Concesiones de Aguas)
+  # ==========================================
+  app-recurso:
+    build:
+      context: ./app-recurso
+      dockerfile: Dockerfile
+      # Paquete compartido satc_shared (shared/): el Dockerfile hace COPY --from=shared
+      additional_contexts:
+        shared: ./shared
+    container_name: satc-app-recurso
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0" # 4 workers Gunicorn
+          memory: 450M
+        reservations:
+          cpus: "1.0"
+          memory: 225M
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@postgres-recurso:5432/recurso_db
+
+      # JWT
+      SECRET_GATEWAY: ${SECRET_GATEWAY}
+      SERVICE_SECRET_KEY: ${RECURSO_SERVICE_SECRET}
+
+      # Services URLs
+      GATEWAY_URL: http://api-gateway:8000
+      USER_SERVICE_URL: http://app-users:8001
+      DOCS_SERVICE_URL: http://app-docs:8003
+
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
+
+      # Timezone
+      TZ: America/Bogota
+    depends_on:
+      postgres-recurso:
+        condition: service_healthy
+      app-users:
+        condition: service_healthy
+    networks:
+      - satc-private
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python3 -c "import urllib.request; urllib.request.urlopen(''http://localhost:8006/health'')" || exit 1',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================
   # API GATEWAY (instancia única · 6 workers)
   # ==========================================
   api-gateway:
@@ -805,6 +921,7 @@ services:
       DOCUMENTS_ROUTE: http://app-docs:8003
       INVOLVED_ROUTE: http://app-involved:8004
       INFRACTION_ROUTE: http://app-infraction:8005
+      RECURSO_ROUTE: http://app-recurso:8006
 
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
@@ -833,6 +950,8 @@ services:
       app-involved:
         condition: service_healthy
       app-infraction:
+        condition: service_healthy
+      app-recurso:
         condition: service_healthy
     networks:
       - satc-private
@@ -929,6 +1048,8 @@ services:
       postgres-involved:
         condition: service_healthy
       postgres-infraction:
+        condition: service_healthy
+      postgres-recurso:
         condition: service_healthy
       minio:
         condition: service_healthy

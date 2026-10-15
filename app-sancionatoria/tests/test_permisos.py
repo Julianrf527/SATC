@@ -299,3 +299,96 @@ class TestDocumentosAnexos:
         permisos({GESTIONAR})
         resp = await client.delete("/doc-attached/999999/999999", headers=gateway_headers(5))
         assert resp.status_code == 403
+
+
+# ── Alertas de un expediente: misma regla que las demás lecturas ─────────────
+
+class TestAlertasExpediente:
+    """GET /expediente/alerts/{id}: consultar ve cualquiera; gestionar, solo los
+    suyos (también se muestran en la pestaña Consulta)."""
+
+    async def test_consulta_ve_expediente_ajeno(self, api, permisos, make_expediente, sin_servicios):
+        permisos({CONSULTAR})
+        exp = await make_expediente(encargado_id=9)
+        resp = await api.get(f"/expediente/alerts/{exp.id}", headers=gateway_headers(5))
+        assert resp.status_code == 200, resp.text
+
+    async def test_gestion_ve_el_suyo(self, api, permisos, make_expediente, sin_servicios):
+        permisos({GESTIONAR})
+        exp = await make_expediente(encargado_id=5)
+        resp = await api.get(f"/expediente/alerts/{exp.id}", headers=gateway_headers(5))
+        assert resp.status_code == 200, resp.text
+
+    async def test_gestion_ajeno_403(self, api, permisos, make_expediente, sin_servicios):
+        permisos({GESTIONAR})
+        exp = await make_expediente(encargado_id=9)
+        resp = await api.get(f"/expediente/alerts/{exp.id}", headers=gateway_headers(5))
+        assert resp.status_code == 403
+
+    async def test_sin_permiso_403(self, api, permisos, make_expediente, sin_servicios):
+        permisos({ALERTAS})
+        exp = await make_expediente(encargado_id=5)
+        resp = await api.get(f"/expediente/alerts/{exp.id}", headers=gateway_headers(5))
+        assert resp.status_code == 403
+
+
+# ── Pestaña Alertas: filtro "Mis expedientes / Todos" ─────────────────────────
+
+@pytest.fixture
+def alerta_fija(monkeypatch):
+    """Cada expediente devuelve una alerta fija: el test es del alcance y de
+    es_responsable, no de las reglas de plazos (services/alertas.py)."""
+    import routes.expediente_alertas as alertas_mod
+
+    async def _calcular(radicado, db, fecha_hoy):
+        return {"x": {"tipo": "x", "semaforo": {"estado": "verde"}}}
+
+    monkeypatch.setattr(alertas_mod, "calcular_alertas_expediente", _calcular)
+
+
+class TestAlertasAlcance:
+    """GET /expediente/alerts/all?alcance=mios|todos."""
+
+    async def test_mios_por_defecto_solo_los_suyos(self, api, permisos, make_expediente, alerta_fija):
+        permisos(set())  # 'mios' no exige permiso (comportamiento previo)
+        propio = await make_expediente(encargado_id=5)
+        await make_expediente(encargado_id=9)
+        resp = await api.get("/expediente/alerts/all", headers=gateway_headers(5))
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["alcance"] == "mios"
+        assert data["total_expedientes"] == 1
+        assert list(data["alertas"]) == [propio.radicado]
+        assert data["alertas"][propio.radicado]["x"]["es_responsable"] is True
+
+    async def test_mios_explicito_igual_que_por_defecto(self, api, permisos, make_expediente, alerta_fija):
+        permisos(set())
+        await make_expediente(encargado_id=5)
+        await make_expediente(encargado_id=9)
+        por_defecto = (await api.get("/expediente/alerts/all", headers=gateway_headers(5))).json()
+        explicito = (await api.get("/expediente/alerts/all?alcance=mios", headers=gateway_headers(5))).json()
+        assert por_defecto == explicito
+
+    async def test_todos_con_permiso_marca_es_responsable(self, api, permisos, make_expediente, alerta_fija):
+        permisos({ALERTAS})
+        propio = await make_expediente(encargado_id=5)
+        ajeno = await make_expediente(encargado_id=9)
+        resp = await api.get("/expediente/alerts/all?alcance=todos", headers=gateway_headers(5))
+        assert resp.status_code == 200, resp.text
+        data = resp.json()
+        assert data["alcance"] == "todos"
+        assert data["total_expedientes"] == 2
+        assert data["alertas"][propio.radicado]["x"]["es_responsable"] is True
+        assert data["alertas"][ajeno.radicado]["x"]["es_responsable"] is False
+        assert data["estadisticas_semaforo"]["verde"] == 2
+
+    async def test_todos_sin_permiso_403(self, api, permisos, make_expediente, alerta_fija):
+        permisos({GESTIONAR, CONSULTAR})
+        await make_expediente(encargado_id=5)
+        resp = await api.get("/expediente/alerts/all?alcance=todos", headers=gateway_headers(5))
+        assert resp.status_code == 403
+
+    async def test_alcance_invalido_422(self, api, permisos):
+        permisos({ALERTAS})
+        resp = await api.get("/expediente/alerts/all?alcance=otro", headers=gateway_headers(5))
+        assert resp.status_code == 422

@@ -9,7 +9,7 @@ export default function AlertasInfraccionLayout({ setToast }: Props) {
   return (
     <AlertasExpediente
       alertsAllEndpoint={API_CONFIG.ENDPOINTS.INFRACTION_ALERTS_ALL}
-      navigatePath="/infraction/manage"
+      rutas={{ gestion: "/infraction/manage", consulta: "/infraction/consult" }}
       processName="Módulo de Infracciones"
       setToast={setToast}
     />

@@ -21,6 +21,7 @@ SANCTIONING_ROUTE = os.getenv("SANCTIONING_ROUTE", "http://app-sanctioning:8002"
 DOCUMENTS_ROUTE = os.getenv("DOCUMENTS_ROUTE", "http://app-docs:8003")
 INVOLVED_ROUTE = os.getenv("INVOLVED_ROUTE", "http://app-involved:8004")
 INFRACTION_ROUTE = os.getenv("INFRACTION_ROUTE", "http://app-infraction:8005")
+RECURSO_ROUTE = os.getenv("RECURSO_ROUTE", "http://app-recurso:8006")
 
 MICROSERVICES = {
     "users": USER_ROUTE,
@@ -28,10 +29,11 @@ MICROSERVICES = {
     "documents": DOCUMENTS_ROUTE,
     "involveds": INVOLVED_ROUTE,
     "infraction": INFRACTION_ROUTE,
+    "recurso": RECURSO_ROUTE,
 }
 
 # Rutas que no exigen sesión de usuario, indexadas POR SERVICIO: un set global
-# haría pública cada entrada en los cinco servicios a la vez, y bastaría con que
+# haría pública cada entrada en todos los servicios a la vez, y bastaría con que
 # un servicio estrenara un endpoint homónimo de una ruta pública de otro para
 # convertirlo en un bypass de sesión. Scopear elimina esa clase de bug.
 #
@@ -55,9 +57,10 @@ PUBLIC_ROUTES = {
     "sanctioning": set(),
     "involveds": set(),
     "infraction": set(),
+    "recurso": set(),
 }
 
-# Transversales: los cinco microservicios exponen su propio `/health` y todos
+# Transversales: todos los microservicios exponen su propio `/health` y todos
 # deben ser alcanzables sin sesión para los healthchecks.
 PUBLIC_ROUTES_COMUNES = {
     "health",
@@ -166,6 +169,7 @@ app.add_middleware(
 # ningún flujo service-to-service.
 TRUST_HEADERS = {
     "x-gateway-token", "x-gateway-user-id", "x-gateway-role-id", "x-service-token",
+    "x-gateway-client-ip",
 }
 
 EXCLUDED_REQUEST_HEADERS = {
@@ -296,6 +300,12 @@ async def proxy(
     # Se inyectan después del copiado para que ninguna cabecera del cliente
     # pueda ganarle a las de confianza.
     headers["X-Gateway-Token"] = SECRET_GATEWAY
+
+    # IP real del cliente para el rate limit / bloqueo de login de los
+    # servicios: tras el proxy, su `request.client.host` es siempre el gateway.
+    # Se calcula desde `X-Real-IP` (nginx lo sobreescribe con $remote_addr) y la
+    # versión que mande el cliente ya se descartó arriba (TRUST_HEADERS).
+    headers["X-Gateway-Client-IP"] = rate_limit.obtener_ip_cliente(request)
 
     if token_data:
         headers["X-Gateway-User-Id"] = str(token_data["user_id"])

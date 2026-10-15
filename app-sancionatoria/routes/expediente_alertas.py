@@ -1,5 +1,6 @@
-from fastapi import Request, APIRouter, Depends, HTTPException
+from fastapi import Request, APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
+from typing import Literal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import date
@@ -9,6 +10,8 @@ from db.models.expediente import Expediente
 
 from utils.verify_token import verify_gateway_token
 from services.alertas import calcular_alertas_expediente
+from services.permisos import exigir_alguno, exigir_lectura_expediente
+from core.permission import Permission
 
 router = APIRouter()
 
@@ -16,20 +19,34 @@ router = APIRouter()
 @router.get("/alerts/all")
 async def obtener_alertas_todos_expedientes(
     request: Request,
+    alcance: Literal["mios", "todos"] = Query("mios"),
     db: AsyncSession = Depends(get_db_managed),
 ):
-    """Obtiene todas las alertas de todos los expedientes asignados al usuario autenticado."""
+    """Alertas de la pestaña Alertas.
+
+    - ``alcance=mios`` (por defecto): los expedientes asignados al usuario
+      (comportamiento previo, sin cambios).
+    - ``alcance=todos``: todos los expedientes; exige ``sancionatorio_alertas``.
+
+    Cada alerta trae ``es_responsable`` (el usuario es el encargado de ese
+    expediente) para que el frontend enlace a Gestionar o a Consultar.
+    """
     token_data = verify_gateway_token(request)
     user_id = token_data["user_id"]
 
-    stmt = select(Expediente.radicado).where(Expediente.encargado_id == user_id)
+    stmt = select(Expediente.radicado, Expediente.encargado_id)
+    if alcance == "todos":
+        await exigir_alguno(user_id, Permission.FILE_ALERTS)
+    else:
+        stmt = stmt.where(Expediente.encargado_id == user_id)
     result = await db.execute(stmt)
-    expedientes = result.scalars().all()
+    expedientes = result.all()
 
     if not expedientes:
         return JSONResponse(
             content={
                 "ok": True,
+                "alcance": alcance,
                 "alertas": {},
                 "total_expedientes": 0,
                 "expedientes_con_alertas": 0
@@ -40,9 +57,12 @@ async def obtener_alertas_todos_expedientes(
     alertas_totales = {}
     fecha_hoy = date.today()
 
-    for radicado in expedientes:
+    for radicado, encargado_id in expedientes:
         alertas = await calcular_alertas_expediente(radicado, db, fecha_hoy)
         if alertas:
+            es_responsable = encargado_id == user_id
+            for alerta in alertas.values():
+                alerta["es_responsable"] = es_responsable
             alertas_totales[radicado] = alertas
 
     estadisticas = {
@@ -60,6 +80,7 @@ async def obtener_alertas_todos_expedientes(
     return JSONResponse(
         content={
             "ok": True,
+            "alcance": alcance,
             "alertas": alertas_totales,
             "total_expedientes": len(expedientes),
             "expedientes_con_alertas": len(alertas_totales),
@@ -77,19 +98,10 @@ async def obtener_alertas_expediente(
     """Obtiene todas las alertas de un expediente específico."""
     token_data = verify_gateway_token(request)
     user_id = token_data["user_id"]
-
-    stmt = select(Expediente.radicado).where(
-        Expediente.id == expediente_id,
-        Expediente.encargado_id == user_id
-    )
-    result = await db.execute(stmt)
-    radicado = result.scalar_one_or_none()
-
-    if not radicado:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Expediente con ID {expediente_id} no encontrado o no tiene acceso"
-        )
+    # Misma regla que el resto de lecturas del expediente: consultar ve
+    # cualquiera; gestionar, solo los que tiene a cargo (403 si no).
+    row = await exigir_lectura_expediente(db, expediente_id, user_id)
+    radicado = row.radicado
 
     fecha_hoy = date.today()
     alertas = await calcular_alertas_expediente(radicado, db, fecha_hoy)

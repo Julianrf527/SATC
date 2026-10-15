@@ -22,6 +22,8 @@ export type NotificationTypeConfig = {
  * - `expediente_infraccion` → /infraction/manage, selecciona el radicado.
  * - `informe_tecnico` → /infraction/my-reports y abre el proceso del informe
  *                       `id_vinculada` (id del informe técnico) vía `informeIdToSelect`.
+ * - `recurso_doc` → /recurso/my-reports y abre el proceso de revisión
+ *                       `id_vinculada` (id del proceso) vía `procesoIdToSelect`.
  * - cualquier otro    → "Aviso", sin navegación (solo descartar).
  */
 export const NOTIFICATION_TYPES: Record<string, NotificationTypeConfig> = {
@@ -55,6 +57,14 @@ export const NOTIFICATION_TYPES: Record<string, NotificationTypeConfig> = {
     route: (id) => ({
       pathname: "/infraction/my-reports",
       state: { informeIdToSelect: id, timestamp: Date.now() },
+    }),
+  },
+  recurso_doc: {
+    label: "Documento",
+    dotClass: "bg-warning",
+    route: (id) => ({
+      pathname: "/recurso/my-reports",
+      state: { procesoIdToSelect: id, timestamp: Date.now() },
     }),
   },
 };

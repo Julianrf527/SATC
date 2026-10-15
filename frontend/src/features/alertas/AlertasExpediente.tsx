@@ -4,6 +4,13 @@ import CustomSelect from "@shared/ui/form/CustomSelect";
 import type { Alerta, EstadoSemaforo, SetToast } from "./types";
 import { TIPO_LABELS, URGENCIA_ORDER, formatFechaCorta } from "./alertasConfig";
 import { useAlertasTodasQuery, useErrorToast } from "./api/alertas";
+import {
+  ALCANCE_OPCIONES,
+  destinoAlerta,
+  endpointConAlcance,
+  type AlcanceAlertas,
+  type RutasAlertas,
+} from "./alertasAlcance";
 
 type AlertaFlat = {
   radicado: string;
@@ -12,7 +19,8 @@ type AlertaFlat = {
 
 type Props = {
   alertsAllEndpoint: string;
-  navigatePath: string;
+  /** Destino del enlace: Gestionar (expediente propio) o Consultar (ajeno). */
+  rutas: RutasAlertas;
   processName: string;
   setToast: SetToast;
 };
@@ -24,14 +32,24 @@ const SEMAFORO_BADGE: Record<EstadoSemaforo, { cls: string; label: string; emoji
   vencido:  { cls: "badge-error opacity-80", label: "Vencido", emoji: "⚫" },
 };
 
+const CONTADORES: { key: EstadoSemaforo; label: string; dot: string; text: string }[] = [
+  { key: "verde", label: "Verde", dot: "bg-success", text: "text-success" },
+  { key: "amarillo", label: "Amarillo", dot: "bg-warning", text: "text-tono-warning" },
+  { key: "rojo", label: "Rojo", dot: "bg-error", text: "text-error" },
+  { key: "vencido", label: "Vencido", dot: "bg-neutral", text: "text-base-content" },
+];
+
 export default function AlertasExpediente({
   alertsAllEndpoint,
-  navigatePath,
+  rutas,
   processName,
   setToast,
 }: Props) {
   const navigate = useNavigate();
-  const { data, isPending: isLoading, error } = useAlertasTodasQuery(alertsAllEndpoint);
+  const [alcance, setAlcance] = useState<AlcanceAlertas>("mios");
+  const { data, isPending: isLoading, error } = useAlertasTodasQuery(
+    endpointConAlcance(alertsAllEndpoint, alcance),
+  );
   useErrorToast(error, setToast, "Error al cargar alertas");
   const [radicadoFilter, setRadicadoFilter] = useState("");
   const [estadoFilter, setEstadoFilter] = useState("all");
@@ -70,9 +88,16 @@ export default function AlertasExpediente({
   const totalPages = Math.max(1, Math.ceil(alertasFiltradas.length / rowsPerPage));
   const paginatedData = alertasFiltradas.slice((page - 1) * rowsPerPage, page * rowsPerPage);
 
-  useEffect(() => setPage(1), [radicadoFilter, estadoFilter, tipoFilter]);
+  useEffect(() => setPage(1), [radicadoFilter, estadoFilter, tipoFilter, alcance]);
 
   const formatFecha = (f: string) => formatFechaCorta(f, true);
+
+  const hayFiltrosActivos = !!radicadoFilter.trim() || estadoFilter !== "all" || tipoFilter !== "all";
+  const limpiarFiltros = () => {
+    setRadicadoFilter("");
+    setEstadoFilter("all");
+    setTipoFilter("all");
+  };
 
   const stats = data?.estadisticas_semaforo ?? { verde: 0, amarillo: 0, rojo: 0, vencido: 0 };
 
@@ -98,21 +123,17 @@ export default function AlertasExpediente({
             </div>
 
             {!isLoading && (
-              <div className="flex items-center gap-3 flex-wrap">
-                {[
-                  { key: "verde",    label: "Verde",    cls: "text-success", bg: "bg-success/10",  border: "border-success/30",  emoji: "🟢" },
-                  { key: "amarillo", label: "Amarillo", cls: "text-tono-warning", bg: "bg-warning/10",  border: "border-warning/30",  emoji: "🟡" },
-                  { key: "rojo",     label: "Rojo",     cls: "text-error",   bg: "bg-error/10",    border: "border-error/30",    emoji: "🔴" },
-                  { key: "vencido",  label: "Vencido",  cls: "text-error",   bg: "bg-error/5",     border: "border-error/20",    emoji: "⚫" },
-                ].map(({ key, label, cls, bg, border, emoji }) => (
-                  <div key={key}
-                    className={`flex flex-col items-center px-4 py-2 ${bg} border ${border} rounded-xl min-w-[5rem]`}>
-                    <span className="text-lg">{emoji}</span>
-                    <span className={`text-2xl font-bold leading-tight ${cls}`}>
-                      {stats[key as EstadoSemaforo]}
-                    </span>
-                    <span className="text-xs text-base-content/60">{label}</span>
-                  </div>
+              <div className="flex items-center gap-2 flex-wrap" aria-label="Alertas por estado">
+                {CONTADORES.map(({ key, label, dot, text }) => (
+                  <span
+                    key={key}
+                    title={label}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-base-100 border border-base-300 text-xs"
+                  >
+                    <span className={`w-2 h-2 rounded-full ${dot}`} />
+                    <span className={`font-bold ${text}`}>{stats[key]}</span>
+                    <span className="text-base-content/60">{label}</span>
+                  </span>
                 ))}
               </div>
             )}
@@ -120,12 +141,78 @@ export default function AlertasExpediente({
         </div>
       </div>
 
-      {/* Body */}
+      {/* Body: un recuadro con los filtros y otro con la tabla (como asignar encargados) */}
       <div className="w-full min-h-[calc(100vh-5rem)] bg-gradient-to-br from-base-200 to-base-300 p-4">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-7xl mx-auto space-y-4">
           <div className="card bg-base-100 shadow border border-base-300">
-            <div className="card-body p-5 flex flex-col gap-4">
+            <div className="card-body p-4">
+              <div className="grid grid-cols-1 md:grid-cols-[repeat(4,minmax(0,1fr))_auto] gap-3 items-end">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-base-content/60">Expedientes</span>
+                  <div className="join w-full" role="group" aria-label="Alcance de las alertas">
+                    {ALCANCE_OPCIONES.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={alcance === value}
+                        className={`join-item btn btn-sm flex-1 ${alcance === value ? "btn-warning" : "btn-ghost border-base-300"}`}
+                        onClick={() => setAlcance(value)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-base-content/60">Radicado</span>
+                  <input className="input input-sm w-full"
+                    placeholder="Buscar por radicado..."
+                    value={radicadoFilter}
+                    onChange={(e) => setRadicadoFilter(e.target.value)} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-base-content/60">Estado</span>
+                  <CustomSelect
+                    className="select-sm"
+                    hidePlaceholderOption
+                    value={estadoFilter}
+                    onChange={setEstadoFilter}
+                    options={[
+                      { value: "all", label: "Todos los estados" },
+                      { value: "verde", label: "🟢 Verde" },
+                      { value: "amarillo", label: "🟡 Amarillo" },
+                      { value: "rojo", label: "🔴 Rojo" },
+                      { value: "vencido", label: "⚫ Vencido" },
+                    ]}
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium text-base-content/60">Tipo de alerta</span>
+                  <CustomSelect
+                    className="select-sm"
+                    hidePlaceholderOption
+                    value={tipoFilter}
+                    onChange={setTipoFilter}
+                    options={[
+                      { value: "all", label: "Todos los tipos" },
+                      ...tiposUnicos.map((t) => ({ value: t, label: TIPO_LABELS[t] ?? t })),
+                    ]}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-ghost"
+                  disabled={!hayFiltrosActivos}
+                  onClick={limpiarFiltros}
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            </div>
+          </div>
 
+          <div className="card bg-base-100 shadow border border-base-300">
+            <div className="card-body p-4">
               {isLoading ? (
                 <div className="flex justify-center items-center py-16">
                   <span className="loading loading-spinner loading-lg text-tono-warning" />
@@ -133,46 +220,6 @@ export default function AlertasExpediente({
                 </div>
               ) : (
                 <>
-                  {/* Filtros */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-base-content/60">Radicado</span>
-                      <input className="input input-sm w-full"
-                        placeholder="Buscar por radicado..."
-                        value={radicadoFilter}
-                        onChange={(e) => setRadicadoFilter(e.target.value)} />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-base-content/60">Estado</span>
-                      <CustomSelect
-                        className="select-sm"
-                        hidePlaceholderOption
-                        value={estadoFilter}
-                        onChange={setEstadoFilter}
-                        options={[
-                          { value: "all", label: "Todos los estados" },
-                          { value: "verde", label: "🟢 Verde" },
-                          { value: "amarillo", label: "🟡 Amarillo" },
-                          { value: "rojo", label: "🔴 Rojo" },
-                          { value: "vencido", label: "⚫ Vencido" },
-                        ]}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-xs font-medium text-base-content/60">Tipo de alerta</span>
-                      <CustomSelect
-                        className="select-sm"
-                        hidePlaceholderOption
-                        value={tipoFilter}
-                        onChange={setTipoFilter}
-                        options={[
-                          { value: "all", label: "Todos los tipos" },
-                          ...tiposUnicos.map((t) => ({ value: t, label: TIPO_LABELS[t] ?? t })),
-                        ]}
-                      />
-                    </div>
-                  </div>
-
                   {/* Tabla */}
                   <div className="overflow-x-auto border border-base-300 rounded-lg">
                     <table className="table table-sm w-full">
@@ -205,6 +252,7 @@ export default function AlertasExpediente({
                         ) : (
                           paginatedData.map((alerta, idx) => {
                             const badge = SEMAFORO_BADGE[alerta.semaforo.estado];
+                            const destino = destinoAlerta(alerta, rutas);
                             return (
                               <tr key={`${alerta.radicado}-${alerta.alertaKey}-${idx}`} className="hover">
                                 <td>
@@ -217,7 +265,18 @@ export default function AlertasExpediente({
                                     </span>
                                   </div>
                                 </td>
-                                <td className="font-mono text-xs font-semibold">{alerta.radicado}</td>
+                                <td>
+                                  <div className="flex flex-col items-start gap-0.5">
+                                    <span className="font-mono text-xs font-semibold">{alerta.radicado}</span>
+                                    {alcance === "todos" && (
+                                      alerta.es_responsable === false ? (
+                                        <span className="text-[10px] text-base-content/60">Otro responsable</span>
+                                      ) : (
+                                        <span className="badge badge-warning badge-outline badge-xs">Mío</span>
+                                      )
+                                    )}
+                                  </div>
+                                </td>
                                 <td>
                                   <div className="flex flex-col gap-1">
                                     <span className="badge badge-ghost badge-xs">{alerta.etapa}</span>
@@ -258,8 +317,11 @@ export default function AlertasExpediente({
                                 </td>
                                 <td>
                                   <button
-                                    className="btn btn-success btn-xs text-white gap-1"
-                                    onClick={() => navigate(navigatePath, {
+                                    className={`btn btn-xs gap-1 ${destino.accion === "Gestionar" ? "btn-success text-white" : "btn-outline btn-info"}`}
+                                    title={destino.accion === "Gestionar"
+                                      ? "Expediente a su cargo"
+                                      : "Expediente de otro responsable (solo lectura)"}
+                                    onClick={() => navigate(destino.ruta, {
                                       state: { radicadoToSelect: alerta.radicado, timestamp: Date.now() }
                                     })}
                                   >
@@ -269,7 +331,7 @@ export default function AlertasExpediente({
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                         d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
-                                    Gestionar
+                                    {destino.accion}
                                   </button>
                                 </td>
                               </tr>
@@ -280,19 +342,35 @@ export default function AlertasExpediente({
                     </table>
                   </div>
 
-                  {/* Paginación */}
-                  <div className="flex justify-between items-center pt-2">
-                    <span className="text-xs text-base-content/60">
-                      {paginatedData.length} de {alertasFiltradas.length} alerta{alertasFiltradas.length !== 1 ? "s" : ""}
-                    </span>
+                  {/* Paginación (mismo formato que asignar encargados) */}
+                  <div className="flex justify-between items-center pt-4 border-t border-base-300 mt-4">
+                    <div className="text-sm text-base-content/60">
+                      Mostrando {paginatedData.length} de {alertasFiltradas.length} alerta{alertasFiltradas.length !== 1 ? "s" : ""}
+                    </div>
                     <div className="join">
-                      <button className="join-item btn btn-sm btn-ghost"
-                        disabled={page === 1} onClick={() => setPage(page - 1)}>«</button>
-                      <button className="join-item btn btn-sm no-animation btn-ghost">
-                        {alertasFiltradas.length === 0 ? 0 : page} / {totalPages}
+                      <button
+                        className="join-item btn btn-sm"
+                        aria-label="Página anterior"
+                        disabled={page === 1 || alertasFiltradas.length === 0}
+                        onClick={() => setPage(page - 1)}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
                       </button>
-                      <button className="join-item btn btn-sm btn-ghost"
-                        disabled={page >= totalPages} onClick={() => setPage(page + 1)}>»</button>
+                      <button className="join-item btn btn-sm no-animation">
+                        Página {alertasFiltradas.length === 0 ? 0 : page} de {totalPages}
+                      </button>
+                      <button
+                        className="join-item btn btn-sm"
+                        aria-label="Página siguiente"
+                        disabled={page >= totalPages || alertasFiltradas.length === 0}
+                        onClick={() => setPage(page + 1)}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 </>

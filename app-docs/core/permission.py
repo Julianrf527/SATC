@@ -22,4 +22,15 @@ PERMISOS_ARCHIVOS: tuple[str, ...] = (
     "documento_crear",
     "documento_revisar",
     "documento_gestionar",
+    # Concesiones de Aguas (app-recurso): proyectan, revisan (adjunto al
+    # devolver), cargan versiones finales y descargan el expediente.
+    "recurso_gestionar",
+    "recurso_consultar",
+    "recurso_super_gestion",
+    "recurso_tecnico",
+    "recurso_lider_juridico",
+    "recurso_lider_proyecto",
+    "recurso_asesora_subdireccion",
+    "recurso_lider_tecnico",
+    "recurso_sig",
 )

@@ -1,5 +1,6 @@
 import type { Rol } from "../../types";
 import CustomSelect from "@shared/ui/form/CustomSelect";
+import { ROL_NOMBRE_MAX } from "./useRoleForm";
 
 type Props = {
   mode: "create" | "edit";
@@ -126,8 +127,18 @@ export default function RoleConfigPanel({
               placeholder="Ej: Editor, Supervisor..."
               className="input w-full focus:border-success"
               value={roleName}
+              maxLength={ROL_NOMBRE_MAX}
+              aria-describedby="rol-nombre-ayuda"
               onChange={(e) => onRoleNameChange(e.target.value)}
             />
+            <span
+              id="rol-nombre-ayuda"
+              className={`text-xs mt-1 text-right ${
+                roleName.length >= ROL_NOMBRE_MAX ? "text-warning" : "text-base-content/60"
+              }`}
+            >
+              {roleName.length}/{ROL_NOMBRE_MAX} caracteres
+            </span>
           </div>
 
           {/* Estadísticas */}

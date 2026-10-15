@@ -106,6 +106,13 @@ async def puede_leer_expediente(
     )
 
 
+async def exigir_permiso(user_id: int, permiso: str) -> None:
+    """403 si el usuario no tiene `permiso`. Pasa por este módulo para que los
+    tests sustituyan `services.etapas.verify_permission` en un solo sitio."""
+    if not await verify_permission(user_id, permiso):
+        raise HTTPException(status_code=403, detail="Sin permisos")
+
+
 async def exigir_lectura_expediente(
     db: AsyncSession, expediente_id: int, user_id: int, *ven_todos: str,
 ):
