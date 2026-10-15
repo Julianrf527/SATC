@@ -1,5 +1,6 @@
-from fastapi import Request, APIRouter, Depends, HTTPException
+from fastapi import Request, APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
+from typing import Literal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import date, timedelta
@@ -36,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 from utils.verify_token import verify_gateway_token
+from services.etapas import exigir_lectura_expediente, exigir_permiso
 
 
 # ── HELPERS ALERTAS ───────────────────────────────────────────────────────────
@@ -170,18 +172,30 @@ async def _calcular_alertas_expediente_infraccion(
 @router.get("/alertas/todas")
 async def obtener_alertas_todos_expedientes_infraccion(
     request: Request,
+    alcance: Literal["mios", "todos"] = Query("mios"),
     db: AsyncSession = Depends(get_db_managed),
 ):
+    """Alertas de la pestaña Alertas.
+
+    - ``alcance=mios`` (por defecto): los expedientes a cargo del usuario
+      (comportamiento previo, sin cambios).
+    - ``alcance=todos``: todos los expedientes; exige ``infraccion_alertas``.
+
+    Cada alerta trae ``es_responsable`` (el usuario es el abogado responsable
+    de ese expediente) para que el frontend enlace a Gestionar o a Consultar.
+    """
     user_id = verify_gateway_token(request)["user_id"]
 
-    expedientes = (await db.execute(
-        select(Expediente.id, Expediente.radicado)
-        .where(Expediente.abogado_responsable_id == user_id)
-    )).all()
+    stmt = select(Expediente.id, Expediente.radicado, Expediente.abogado_responsable_id)
+    if alcance == "todos":
+        await exigir_permiso(user_id, Permission.FILE_ALERTS)
+    else:
+        stmt = stmt.where(Expediente.abogado_responsable_id == user_id)
+    expedientes = (await db.execute(stmt)).all()
 
     if not expedientes:
         return JSONResponse(content={
-            "ok": True, "alertas": {}, "total_expedientes": 0,
+            "ok": True, "alcance": alcance, "alertas": {}, "total_expedientes": 0,
             "expedientes_con_alertas": 0,
             "estadisticas_semaforo": {"verde": 0, "amarillo": 0, "rojo": 0, "vencido": 0},
         }, status_code=200)
@@ -190,15 +204,18 @@ async def obtener_alertas_todos_expedientes_infraccion(
     alertas_totales = {}
     estadisticas = {"verde": 0, "amarillo": 0, "rojo": 0, "vencido": 0}
 
-    for exp_id, radicado in expedientes:
+    for exp_id, radicado, abogado_id in expedientes:
         alertas = await _calcular_alertas_expediente_infraccion(exp_id, db, fecha_hoy)
         if alertas:
-            alertas_totales[radicado] = alertas
+            es_responsable = abogado_id == user_id
             for a in alertas.values():
+                a["es_responsable"] = es_responsable
                 estadisticas[a["semaforo"]["estado"]] += 1
+            alertas_totales[radicado] = alertas
 
     return JSONResponse(content={
         "ok": True,
+        "alcance": alcance,
         "alertas": alertas_totales,
         "total_expedientes": len(expedientes),
         "expedientes_con_alertas": len(alertas_totales),
@@ -213,16 +230,10 @@ async def obtener_alertas_expediente_infraccion(
     db: AsyncSession = Depends(get_db_managed),
 ):
     user_id = verify_gateway_token(request)["user_id"]
-
-    row = (await db.execute(
-        select(Expediente.radicado, Expediente.abogado_responsable_id)
-        .where(Expediente.id == expediente_id)
-    )).fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail="Expediente no encontrado")
-    radicado, abogado_id = row
-    if abogado_id != user_id:
-        raise HTTPException(status_code=403, detail="Sin permisos")
+    # Misma regla que el resto de lecturas del expediente: consultar ve
+    # cualquiera; gestionar, solo los que tiene a cargo (403 si no).
+    row = await exigir_lectura_expediente(db, expediente_id, user_id)
+    radicado = row.radicado
 
     fecha_hoy = date.today()
     alertas = await _calcular_alertas_expediente_infraccion(expediente_id, db, fecha_hoy)

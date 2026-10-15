@@ -9,6 +9,9 @@ import { apiErrorMessage } from "../../api/errors";
 import { useConfirmacion } from "../useConfirmacion";
 import { generateCategories } from "./permissionCategories";
 
+/** Largo máximo del nombre del rol: columna `rol.nombre` es varchar(20). */
+export const ROL_NOMBRE_MAX = 20;
+
 /**
  * Estado y acciones del formulario de roles: selección de permisos,
  * alta/edición/eliminación y modal de confirmación. Los datos (roles) vienen
@@ -129,6 +132,15 @@ export function useRoleForm(permisoList: Permiso[], setToast: SetToast) {
   const handleSubmit = () => {
     if (!roleName.trim()) {
       setToast({ id: Date.now(), message: "El nombre del rol es obligatorio", type: "error" });
+      return;
+    }
+
+    if (roleName.trim().length > ROL_NOMBRE_MAX) {
+      setToast({
+        id: Date.now(),
+        message: `El nombre del rol no puede exceder ${ROL_NOMBRE_MAX} caracteres`,
+        type: "error",
+      });
       return;
     }
 

@@ -54,6 +54,7 @@ from utils.emailUtil import sendEmail
 from utils.passwords import hash_password, verify_password, verify_password_async, generate_temp_password
 from utils.redis_session import get_redis_client
 from utils.rate_limiter import RateLimiter, LoginThrottler
+from utils.client_ip import obtener_ip_cliente
 from utils.verify_token import verify_gateway_token
 
 logging.basicConfig(
@@ -108,7 +109,9 @@ async def iniciar_sesion(
     email = data.email.lower()
     password = data.password
     remember = data.remember
-    ip_address = request.client.host if request.client else "unknown"
+    # IP real del cliente (vía X-Gateway-Client-IP con gateway token válido):
+    # request.client.host es siempre el gateway y haría el límite global.
+    ip_address = obtener_ip_cliente(request)
     user_agent = request.headers.get("user-agent", "unknown")
 
     block_status = await asyncio.to_thread(LoginThrottler.check_login_block, f"{email}:{ip_address}")
@@ -571,8 +574,8 @@ async def cerrar_sesion(
                     usuario_id=user_id,
                     tipo_evento="LOGOUT",
                     resultado="EXITOSO",
-                    detalle=f"Cierre de sesión desde {request.client.host if request.client else 'unknown'}",
-                    ip_address=request.client.host if request.client else None,
+                    detalle=f"Cierre de sesión desde {obtener_ip_cliente(request)}",
+                    ip_address=obtener_ip_cliente(request),
                     user_agent=request.headers.get("user-agent"),
                 )
                 await db.commit()

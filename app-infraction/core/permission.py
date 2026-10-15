@@ -6,4 +6,6 @@ class Permission:
     ASSIGN_PERMISSION = "infraccion_asignar"
     FILE_MANAGE = "infraccion_gestionar"
     FILE_CONSULT = "infraccion_consultar"
+    # Pantalla /infraction/alerts (y su filtro "Todos").
+    FILE_ALERTS = "infraccion_alertas"
     LOG_PERMISSION = "auditoria_infracciones"

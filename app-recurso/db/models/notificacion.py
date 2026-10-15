@@ -1,0 +1,31 @@
+from sqlalchemy import Column, Integer, Boolean, ForeignKey, Date, TIMESTAMP, Index
+from sqlalchemy.orm import relationship
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from .base import Base, VersionadoMixin
+
+class Notificacion(VersionadoMixin, Base):
+    __tablename__ = 'notificacion'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    acto_admin_id = Column(Integer, ForeignKey('acto_administrativo.id', onupdate="CASCADE", ondelete="CASCADE"), nullable=False)
+    numerado = Column(Integer, nullable=False)
+    # id en app-involved (otra BD): FK lógica, sin constraint.
+    involucrado_id = Column(Integer, nullable=False)
+    fecha_numerado = Column(Date, nullable=False)
+    fecha_envio_citacion = Column(Date, nullable=False)
+    fecha_constancia_citacion = Column(Date, nullable=False)
+    documento_citacion_id = Column(Integer)
+    notificacion_exitosa = Column(Boolean)
+    tipo_notificacion_id = Column(Integer, ForeignKey('tipo_notificacion.id', onupdate="CASCADE", ondelete="RESTRICT"))
+    fecha_notificacion = Column(Date)
+    documento_notificacion_id = Column(Integer)
+    fecha_creacion = Column(TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(ZoneInfo("America/Bogota")))
+
+    acto_administrativo = relationship("ActoAdministrativo", back_populates="notificaciones")
+    tipo_notificacion = relationship("TipoNotificacion", back_populates="notificaciones")
+
+    __table_args__ = (
+        Index('ix_notificacion_acto_involucrado', 'acto_admin_id', 'involucrado_id'),
+        Index('ix_notificacion_involucrado', 'involucrado_id'),
+    )

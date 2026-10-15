@@ -95,12 +95,10 @@ export default function InformacionExpediente({
         />
       </div>
 
-      {/* Alertas solo visibles en modo editable */}
-      {isEditable && (
-        <div className="w-full">
-          <AlertasExpediente expedienteId={expediente.id} setToast={setToast} />
-        </div>
-      )}
+      {/* Alertas: en gestión y en consulta (solo lectura). */}
+      <div className="w-full">
+        <AlertasExpediente expedienteId={expediente.id} setToast={setToast} />
+      </div>
     </div>
   );
 }

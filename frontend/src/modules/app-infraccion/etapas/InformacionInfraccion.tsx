@@ -95,15 +95,13 @@ export default function InformationInfraccion({
         />
       </div>
 
-      {/* Alertas solo visibles en modo editable */}
-      {isEditable && (
-        <div className="w-full">
-          <AlertasInfraccion
-            expediente_id={expediente.id}
-            setToast={setToast}
-          />
-        </div>
-      )}
+      {/* Alertas: en gestión y en consulta (solo lectura). */}
+      <div className="w-full">
+        <AlertasInfraccion
+          expediente_id={expediente.id}
+          setToast={setToast}
+        />
+      </div>
     </div>
   );
 }

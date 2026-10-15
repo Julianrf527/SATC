@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update, insert
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 import logging
 import os
 
@@ -26,18 +26,39 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ---------- MODELOS ----------
+# Largos máximos de las columnas (db/models/rol.py, db/models/permiso.py).
+ROL_NOMBRE_MAX = 20
+PERMISO_NOMBRE_MAX = 40
+PERMISO_MENU_PATH_MAX = 50
+
 class RolCreate(BaseModel):
     # El frontend envía {"nombre", "permisos"}; internamente el campo se llama
     # `permission`. populate_by_name permite aceptar tanto el alias como el
     # nombre del campo.
     model_config = ConfigDict(populate_by_name=True)
 
-    nombre: str
+    # Largo = columna rol.nombre (varchar(20)); sin esto un nombre largo
+    # llegaba a la BD y respondía 500 en vez de 422.
+    nombre: str = Field(..., min_length=1, max_length=ROL_NOMBRE_MAX)
     permission: list[int] = Field(..., alias="permisos")
 
+    @field_validator("nombre", mode="before")
+    @classmethod
+    def validar_nombre(cls, v):
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                raise ValueError("El nombre del rol es obligatorio")
+            if len(v) > ROL_NOMBRE_MAX:
+                raise ValueError(
+                    f"El nombre del rol no puede exceder {ROL_NOMBRE_MAX} caracteres"
+                )
+        return v
+
 class PerCreate(BaseModel):
-    name:str
-    menu_path: str
+    # Largos = columnas permiso.nombre (varchar(40)) y permiso.menu_path (varchar(50)).
+    name: str = Field(..., max_length=PERMISO_NOMBRE_MAX)
+    menu_path: str = Field(..., max_length=PERMISO_MENU_PATH_MAX)
 
 class Permission(BaseModel):
     permission_name: str

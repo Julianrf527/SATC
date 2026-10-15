@@ -59,11 +59,14 @@ async def crear_notificacion(
             detail="El tipo no puede estar vacío"
         )
 
-    # Una entidad vinculada tiene a lo sumo una notificación viva por usuario:
-    # se borra la anterior antes de insertar la nueva.
+    # Una entidad vinculada tiene a lo sumo una notificación viva por usuario y
+    # tipo: se borra la anterior antes de insertar la nueva. El filtro por tipo
+    # evita que un aviso de otro módulo con el mismo id (p. ej. recurso vs.
+    # infraction) borre el que no le corresponde.
     stmt = delete(Notificacion).where(
         Notificacion.id_vinculada == data.id_vinculada,
-        Notificacion.usuario_id == data.usuario_id
+        Notificacion.usuario_id == data.usuario_id,
+        Notificacion.tipo == data.tipo.strip()
     )
     await db.execute(stmt)
     await db.commit()

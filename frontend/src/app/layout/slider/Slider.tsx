@@ -8,6 +8,7 @@ const menuBase = [
   { iconName: "contact-book", title: "Administracion", prefix: "admin_" },
   { iconName: "file-detail", title: "Sancionatorio", prefix: "sancionatorio_" },
   { iconName: "gavel", title: "Infracciones", prefix: "infraccion_" },
+  { iconName: "water", title: "Concesiones de Aguas", prefix: "recurso_" },
   { iconName: "book-alt", title: "Documentos", prefix: "documento_" },
   { iconName: "user-circle", title: "Involucrados", prefix: "involucrado_" },
   { iconName: "calendar-alt", title: "Auditoría", prefix: "auditoria_" },
@@ -36,9 +37,36 @@ const ordenInfracciones = [
 // — si el usuario tiene ambos, deben colapsar en una sola entrada "Mis Informes".
 const NOMBRES_MIS_INFORMES = ["informes subir", "informes revisar"];
 
+// Concesiones de Aguas: los permisos de revisor y técnico apuntan todos a
+// /recurso/my-reports (una sola entrada "Mis Informes"); recurso_gestionar
+// también ve Mis Informes y recurso_super_gestion (sin menu_path) entra a
+// Gestionar.
+const RECURSO_RUTAS = {
+  gestionar: "/recurso/manage",
+  consultar: "/recurso/consult",
+  misInformes: "/recurso/my-reports",
+};
+
+function menuRecurso(permission: { name: string; path: string }[]) {
+  const nombres = new Set(permission.map((p) => p.name));
+  const urls = new Set(
+    permission.filter((p) => p.name.startsWith("recurso_") && p.path?.trim()).map((p) => p.path.trim()),
+  );
+  const gestiona = nombres.has("recurso_gestionar") || nombres.has("recurso_super_gestion");
+  const items: { name: string; url: string; originalName: string }[] = [];
+  if (gestiona || urls.has(RECURSO_RUTAS.gestionar))
+    items.push({ name: "Gestionar", url: RECURSO_RUTAS.gestionar, originalName: "recurso_gestionar" });
+  if (urls.has(RECURSO_RUTAS.consultar))
+    items.push({ name: "Consultar", url: RECURSO_RUTAS.consultar, originalName: "recurso_consultar" });
+  if (nombres.has("recurso_gestionar") || urls.has(RECURSO_RUTAS.misInformes))
+    items.push({ name: "Mis Informes", url: RECURSO_RUTAS.misInformes, originalName: "recurso_mis_informes" });
+  return items;
+}
+
 export default function Slider({ permission = [] }: Props) {
   const menuFiltrado = menuBase
     .map((cat) => {
+      if (cat.prefix === "recurso_") return { ...cat, subMenu: menuRecurso(permission) };
       const subMenuPermitido = permission
         .filter((p) => p.name.startsWith(cat.prefix))
         .filter((p) => p.path && p.path.trim() !== "") // Excluir permisos sin menu_path

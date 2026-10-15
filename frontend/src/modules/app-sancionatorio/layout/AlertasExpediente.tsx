@@ -9,7 +9,7 @@ export default function AlertsLayout({ setToast }: Props) {
   return (
     <AlertasExpediente
       alertsAllEndpoint={API_CONFIG.ENDPOINTS.FILE_ALERTS_ALL}
-      navigatePath="/file/manage"
+      rutas={{ gestion: "/file/manage", consulta: "/file/consult" }}
       processName="Módulo Sancionatorio"
       setToast={setToast}
     />

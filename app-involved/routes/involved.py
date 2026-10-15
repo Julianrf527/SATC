@@ -44,6 +44,8 @@ BUSCAR_O_CREAR_INVOLUCRADO = [
     Permisos.INVOLVED_MANAGE,
     Permisos.SANCIONATORIO_MANAGE,
     Permisos.INFRACCION_MANAGE,
+    Permisos.RECURSO_MANAGE,
+    Permisos.RECURSO_SUPER_MANAGE,
 ]
 
 # Techo duro para el filtrado en memoria del log de auditoría (ver obtener_auditoria).

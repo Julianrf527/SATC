@@ -5,3 +5,5 @@ class Permisos:
     # involucrados al vincularlos a un expediente propio.
     SANCIONATORIO_MANAGE = "sancionatorio_gestionar"
     INFRACCION_MANAGE = "infraccion_gestionar"
+    RECURSO_MANAGE = "recurso_gestionar"
+    RECURSO_SUPER_MANAGE = "recurso_super_gestion"

@@ -10,6 +10,7 @@ import { SANCTIONING_ENDPOINTS } from "./endpoints/sanctioning";
 import { DOCUMENTS_ENDPOINTS } from "./endpoints/documents";
 import { INVOLVED_ENDPOINTS } from "./endpoints/involved";
 import { INFRACTION_ENDPOINTS } from "./endpoints/infraction";
+import { RECURSO_ENDPOINTS } from "./endpoints/recurso";
 
 export {
   BASE_URL,
@@ -27,6 +28,7 @@ export {
   DOCUMENTS_ENDPOINTS,
   INVOLVED_ENDPOINTS,
   INFRACTION_ENDPOINTS,
+  RECURSO_ENDPOINTS,
 };
 
 export const API_CONFIG = {
@@ -36,5 +38,6 @@ export const API_CONFIG = {
     ...DOCUMENTS_ENDPOINTS,
     ...INVOLVED_ENDPOINTS,
     ...INFRACTION_ENDPOINTS,
+    ...RECURSO_ENDPOINTS,
   },
 };

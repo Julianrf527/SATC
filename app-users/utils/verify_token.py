@@ -24,6 +24,7 @@ EXPECTED_CALLERS: dict[str, str] = {
     for name, secret in {
         "sanctioning-service": os.getenv("SANCTIONING_SERVICE_SECRET"),
         "infraction-service": os.getenv("INFRACTION_SERVICE_SECRET"),
+        "recurso-service": os.getenv("RECURSO_SERVICE_SECRET"),
         "docs-service": os.getenv("DOCS_SERVICE_SECRET"),
         "involved-service": os.getenv("INVOLVED_SERVICE_SECRET"),
     }.items()

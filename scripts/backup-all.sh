@@ -80,6 +80,7 @@ backup_db postgres-sanctioning postgres-sanctioning expedientes_db
 backup_db postgres-docs        postgres-docs        documentos_db
 backup_db postgres-involved    postgres-involved    involucrados_db
 backup_db postgres-infraction  postgres-infraction  infracciones_db
+backup_db postgres-recurso     postgres-recurso     recurso_db
 
 log "Backup MinIO..."
 sh /backup-minio.sh

@@ -35,6 +35,10 @@ const InfraccionLogLayout = lazy(() => import("@modules/app-infraccion/layout/In
 const AsignarInformes = lazy(() => import("@modules/app-infraccion/layout/AsignarInformes"));
 const MisInformes = lazy(() => import("@modules/app-infraccion/layout/MisInformes"));
 const AlertasInfraccionLayout = lazy(() => import("@modules/app-infraccion/layout/AlertasInfraccionLayout"));
+// === app-recurso (Concesiones de Aguas Superficiales) ===
+const GestionRecursoLayout = lazy(() => import("@modules/app-recurso/layout/GestionRecursoLayout"));
+const ConsultaRecursoLayout = lazy(() => import("@modules/app-recurso/layout/ConsultaRecursoLayout"));
+const MisInformesRecurso = lazy(() => import("@modules/app-recurso/layout/MisInformesRecurso"));
 // === app-involved ===
 const InvolucradoLogLayout = lazy(() => import("@modules/app-involved/layout/InvolucradoLogLayout"));
 const ManageInvolvedLayout = lazy(() => import("@modules/app-involved/layout/ManageInvolvedLayout"));
@@ -94,6 +98,20 @@ const inferPermissionFromPath = (path: string): string | string[] => {
     "/infraction/assign_manage": "infraccion_asignar",
     "/infraction/reports": "infraccion_asignar_informes",
     "/infraction/my-reports": ["infraccion_informes_subir", "infraccion_informes_revisar"],
+
+    // === CONCESIONES DE AGUAS (app-recurso) ===
+    "/recurso/manage": ["recurso_gestionar", "recurso_super_gestion"],
+    "/recurso/consult": "recurso_consultar",
+    // Quien sube (abogado o técnico) o revisa documentos (permisos de revisor).
+    "/recurso/my-reports": [
+      "recurso_gestionar",
+      "recurso_tecnico",
+      "recurso_lider_juridico",
+      "recurso_lider_proyecto",
+      "recurso_asesora_subdireccion",
+      "recurso_lider_tecnico",
+      "recurso_sig",
+    ],
   };
 
   const permission = pathToPermissionMap[path];
@@ -169,6 +187,11 @@ function App() {
     { path: "/infraction/reports", component: AsignarInformes },
     { path: "/infraction/my-reports", component: MisInformes },
     { path: "/infraction/alerts", component: AlertasInfraccionLayout },
+
+    // === CONCESIONES DE AGUAS ===
+    { path: "/recurso/manage", component: GestionRecursoLayout },
+    { path: "/recurso/consult", component: ConsultaRecursoLayout },
+    { path: "/recurso/my-reports", component: MisInformesRecurso },
   ];
 
   return (
