@@ -562,15 +562,15 @@ async def test_migracion_backfill_e_idempotencia():
             "INSERT INTO file_hash (file_hash, file_url, content_type, file_size, numero_usos, created_at) "
             "VALUES ('m2', 'satc-documentos/files/m2.docx', 'application/msword', 77, 1, now()) RETURNING id"))
         doc = await conn.scalar(text(
-            "INSERT INTO documentos (nombre, estado, usuario_creador_id, version_actual, numero_devoluciones) "
-            "VALUES ('legado', 'rechazado', 1, 1, 1) RETURNING id"))
+            "INSERT INTO documentos (nombre, estado, usuario_creador_id, version_actual, numero_devoluciones, fecha_creacion, fecha_ultima_actualizacion) "
+            "VALUES ('legado', 'rechazado', 1, 1, 1, now(), now()) RETURNING id"))
         # Filas "legadas": sin file_id / adjunto_file_id.
         await conn.execute(text(
-            "INSERT INTO versiones_documento (documento_id, numero_version, archivo_url, archivo_nombre_original, usuario_subida_id) "
-            "VALUES (:d, 1, 'satc-documentos/files/m1.pdf', 'legado.pdf', 1)"), {"d": doc})
+            "INSERT INTO versiones_documento (documento_id, numero_version, archivo_url, archivo_nombre_original, usuario_subida_id, fecha_subida) "
+            "VALUES (:d, 1, 'satc-documentos/files/m1.pdf', 'legado.pdf', 1, now())"), {"d": doc})
         await conn.execute(text(
-            "INSERT INTO revisiones (documento_id, version_revisada, revisor_id, estado_revision, archivo_adjunto_url, archivo_adjunto_nombre) "
-            "VALUES (:d, 1, 2, 'devuelto', 'satc-documentos/files/m2.docx', 'obs.docx')"), {"d": doc})
+            "INSERT INTO revisiones (documento_id, version_revisada, revisor_id, estado_revision, archivo_adjunto_url, archivo_adjunto_nombre, fecha_revision) "
+            "VALUES (:d, 1, 2, 'devuelto', 'satc-documentos/files/m2.docx', 'obs.docx', now())"), {"d": doc})
 
     async with engine.begin() as conn:
         resumen = await aplicar_migraciones(conn)
@@ -599,8 +599,8 @@ async def test_migracion_no_borra_origen_si_quedan_procesos_de_otras_apps():
         await conn.execute(text("DROP VIEW IF EXISTS vista_documentos_detalle"))
         await conn.execute(text("ALTER TABLE documentos ADD COLUMN origen VARCHAR(30)"))
         await conn.execute(text(
-            "INSERT INTO documentos (nombre, estado, usuario_creador_id, version_actual, numero_devoluciones, origen) "
-            "VALUES ('informe', 'en_revision', 1, 1, 0, 'informe_tecnico')"))
+            "INSERT INTO documentos (nombre, estado, usuario_creador_id, version_actual, numero_devoluciones, origen, fecha_creacion, fecha_ultima_actualizacion) "
+            "VALUES ('informe', 'en_revision', 1, 1, 0, 'informe_tecnico', now(), now())"))
 
     try:
         async with engine.begin() as conn:

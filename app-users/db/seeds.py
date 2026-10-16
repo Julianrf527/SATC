@@ -10,46 +10,14 @@ from db.models.permiso import Permiso
 from db.models.rol import Rol
 from db.models.rol_permiso import RolPermiso
 from db.models.usuario import Usuario
+from db.permission_catalog import PERMISOS
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-PERMISOS = [
-    {"nombre": "admin_roles_y_permisos", "menu_path": "/user/role"},
-    {"nombre": "admin_registrar_usuarios", "menu_path": "/user/add"},
-    {"nombre": "admin_gestionar_usuarios", "menu_path": "/user/manage"},
-    {"nombre": "sancionatorio_gestionar", "menu_path": "/file/manage"},
-    {"nombre": "sancionatorio_consultar", "menu_path": "/file/consult"},
-    {"nombre": "sancionatorio_alertas", "menu_path": "/file/alerts"},
-    {"nombre": "sancionatorio_asignar", "menu_path": "/file/assign_manage"},
-    {"nombre": "involucrado_gestionar", "menu_path": "/involved/manage"},
-    {"nombre": "documento_gestionar", "menu_path": "/document/manage"},
-    {"nombre": "documento_crear", "menu_path": ""},
-    {"nombre": "documento_revisar", "menu_path": ""},
-    {"nombre": "auditoria_usuarios", "menu_path": "/audit/users"},
-    {"nombre": "auditoria_expedientes", "menu_path": "/audit/files"},
-    {"nombre": "auditoria_involucrados", "menu_path": "/audit/involved"},
-    {"nombre": "auditoria_infracciones", "menu_path": "/audit/infractions"},
-    {"nombre": "infraccion_gestionar", "menu_path": "/infraction/manage"},
-    {"nombre": "infraccion_consultar", "menu_path": "/infraction/consult"},
-    {"nombre": "infraccion_alertas", "menu_path": "/infraction/alerts"},
-    {"nombre": "infraccion_asignar", "menu_path": "/infraction/assign_manage"},
-    {"nombre": "infraccion_asignar_informes", "menu_path": "/infraction/reports"},
-    {"nombre": "infraccion_informes_revisar", "menu_path": "/infraction/my-reports"},
-    {"nombre": "infraccion_cargue", "menu_path": ""},
-    {"nombre": "infraccion_informes_subir", "menu_path": "/infraction/my-reports"},
-    # Concesiones de Aguas Superficiales (app-recurso, plan §2)
-    {"nombre": "recurso_gestionar", "menu_path": "/recurso/manage"},
-    {"nombre": "recurso_consultar", "menu_path": "/recurso/consult"},
-    {"nombre": "recurso_super_gestion", "menu_path": ""},
-    {"nombre": "recurso_lider_juridico", "menu_path": "/recurso/my-reports"},
-    {"nombre": "recurso_lider_proyecto", "menu_path": "/recurso/my-reports"},
-    {"nombre": "recurso_asesora_subdireccion", "menu_path": "/recurso/my-reports"},
-    {"nombre": "recurso_lider_tecnico", "menu_path": "/recurso/my-reports"},
-    {"nombre": "recurso_sig", "menu_path": "/recurso/my-reports"},
-    {"nombre": "recurso_tecnico", "menu_path": "/recurso/my-reports"},
-]
+# Catálogo único (nombre, menu_path, descripcion): db/permission_catalog.py.
+# Los cambios posteriores en bases ya sembradas los aplica db/permission_sync.py.
 
 
 async def _acquire_seed_lock(session: AsyncSession) -> bool:

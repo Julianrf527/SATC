@@ -19,7 +19,7 @@ export type NotificationTypeConfig = {
  *
  * - `documento`       → /document/manage, selecciona el documento `id_vinculada`.
  * - `expediente`      → /file/manage (sancionatorio), selecciona el radicado.
- * - `expediente_infraccion` → /infraction/manage, selecciona el radicado.
+ * - `exp_infraccion` → /infraction/manage, selecciona el radicado (el tipo cabe en los 15 caracteres de la columna).
  * - `informe_tecnico` → /infraction/my-reports y abre el proceso del informe
  *                       `id_vinculada` (id del informe técnico) vía `informeIdToSelect`.
  * - `recurso_doc` → /recurso/my-reports y abre el proceso de revisión
@@ -43,7 +43,7 @@ export const NOTIFICATION_TYPES: Record<string, NotificationTypeConfig> = {
       state: { radicadoToSelect: id, timestamp: Date.now() },
     }),
   },
-  expediente_infraccion: {
+  exp_infraccion: {
     label: "Expediente",
     dotClass: "bg-info",
     route: (id) => ({

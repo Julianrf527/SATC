@@ -603,6 +603,12 @@ Los archivos (`documento_*_id`) los sube el front a app-docs antes (como
 infraction); el backend lleva `numero_usos` (incrementa al asociar, decrementa al
 reemplazar/borrar).
 
+**Compensación del uso** (todas las escrituras, `services/usos_archivos.py`): el +1 se
+hace antes del commit y el −1 de los reemplazados después. Cada +1 exitoso se anota en
+la petición; si la operación termina en error (cualquier `4xx`/`5xx` por excepción o un
+commit fallido) se resta exactamente lo sumado y no confirmado (best-effort, con log; la
+respuesta conserva el error original). Un error posterior al commit no resta nada.
+
 ### B.4 API interna para C (no HTTP)
 
 `services/revision_documentos.py` (ninguna función hace commit; errores
@@ -706,6 +712,14 @@ Misma información que `etapas` en `GET /recurso/expedientes/{id}`. `data`:
                "datos": {"fecha_visita_tecnica": "2026-05-02", "fecha_aceptacion": "2026-05-20",
                          "caudal_fuente": 10.5, "caudal_disponible": 8.0, "caudal_otorgado": 1.2,
                          "num_usuarios": 3, "cumple": null, "doc_concepto_tecnico_id": 400},
+               "campos": {"obligatorios": ["file_id", "fecha_aceptacion", "caudal_fuente", "caudal_disponible",
+                                           "caudal_otorgado", "num_usuarios"],
+                          "opcionales": [],
+                          "campos": [{"campo": "fecha_aceptacion", "tipo": "fecha",
+                                      "etiqueta": "Fecha del concepto (firma)", "obligatorio": true},
+                                     {"campo": "caudal_fuente", "tipo": "decimal",
+                                      "etiqueta": "Caudal fuente (L/s)", "obligatorio": true},
+                                     {"...": "caudal_disponible, caudal_otorgado (decimal), num_usuarios (entero)"}]},
                "...": "resto de campos de nodo"},
   "requerimiento": {"codigo": "requerimiento", "ambito": "etapa3",
                     "datos": {"radicado_oficio_entrada": null, "fecha_oficio_entrada": null,
@@ -751,7 +765,9 @@ Misma información que `etapas` en `GET /recurso/expedientes/{id}`. `data`:
 no está habilitada), `encargado` / `tecnico` (`{id, nombre}`), `datos`, `proceso`
 (resumen de B o `null`), `acto` (forma de `GET /actos/administrativos/{id}` sin
 notificables, con las `acciones_disponibles` del acto), `anexos`, `acciones_disponibles`.
-Los nodos de concepto traen `tipo`; los de requerimiento, `ambito`.
+Los nodos de concepto traen `tipo` y `campos` (definición de los datos que pide ese
+tipo de concepto, ver C.4 «Campos del concepto»; viene aunque el concepto no exista,
+para el cargue directo); los de requerimiento, `ambito`.
 
 - `etapa_actual`: la etapa MÁS avanzada que existe en el orden del plan
   (`admite < concepto < requerimiento < decision < memorias < obras`), o `null`.
@@ -806,6 +822,26 @@ caudal_fuente?, caudal_disponible?, caudal_otorgado?, num_usuarios?, cumple?}`. 
 `TODO(negocio)`); `memorias` / `subsanacion`: `cumple`; `obras` / `obras_segundo`: `cumple` +
 `fecha_visita_tecnica` (la diligencia el técnico). Los campos que no aplican al tipo se ignoran.
 
+**Campos del concepto** (una sola fuente: `CAMPOS_CONCEPTO` / `definicion_campos_concepto`
+en `services/etapas.py`). Vienen en `campos` del nodo de concepto del árbol (C.2) y de
+`GET /etapas/conceptos/{id}`; el front arma con ellos el formulario de versión final, el
+de Mis informes y el del cargue directo (no guarda copia):
+
+```json
+{"obligatorios": ["file_id", "fecha_aceptacion", "cumple", "fecha_visita_tecnica"],
+ "opcionales": [],
+ "campos": [{"campo": "fecha_aceptacion", "tipo": "fecha", "etiqueta": "Fecha del concepto (firma)", "obligatorio": true},
+            {"campo": "cumple", "tipo": "si_no", "etiqueta": "¿Cumple?", "obligatorio": true},
+            {"campo": "fecha_visita_tecnica", "tipo": "fecha", "etiqueta": "Fecha de visita técnica", "obligatorio": true}]}
+```
+
+`obligatorios` / `opcionales` incluyen `file_id` (PDF firmado); `campos` son solo los
+datos (sin el archivo), en orden de pantalla. `tipo`: `fecha` | `decimal` | `entero` | `si_no`.
+
+El técnico elegido (`tecnico_id` de `.../tecnico`, también cuando lo elige super gestión)
+debe tener `recurso_tecnico` → si no, `400` "El usuario elegido no tiene el permiso de
+técnico (recurso_tecnico) (V3)".
+
 Condición para seleccionar técnico: `adicional` tras la respuesta del usuario al
 requerimiento; `memorias` tras el radicado de planos; `subsanacion` tras la subsanación;
 `obras` tras el informe; `obras_segundo` tras el nuevo informe.
@@ -824,7 +860,8 @@ llama `GET /etapas/conceptos/{etapa_ref_id}`:
             "caudal_disponible": null, "caudal_otorgado": null, "num_usuarios": null,
             "cumple": null, "doc_concepto_tecnico_id": null},
   "campos": {"obligatorios": ["file_id", "fecha_aceptacion", "caudal_fuente", "caudal_disponible",
-                              "caudal_otorgado", "num_usuarios"], "opcionales": []},
+                              "caudal_otorgado", "num_usuarios"], "opcionales": [],
+             "campos": [{"campo": "fecha_aceptacion", "tipo": "fecha", "...": "ver «Campos del concepto»"}]},
   "proceso": {"proceso_id": 21, "estado_proceso": {"codigo": "aprobado_firma", "...": "..."}, "...": "resumen de B"},
   "acciones_disponibles": ["cargar_version_final"]
 }}
@@ -896,8 +933,10 @@ proceso de revisión abierto. `encargado_acto_id` es **opcional** (el front lo e
 (NULL; expedientes antiguos): no se crea proceso de revisión, el árbol no ofrece
 "Asignarme" sobre esa fila y solo super gestión gestiona su acto. Al actualizar, si no
 llega se conserva el actual; si llega otro y la etapa no tiene acto, el proceso
-abierto pasa a su nombre. Como el resto del cargue, no se valida el permiso del
-abogado. (`acto_admite`/`requerimiento`/`decision` admiten NULL: desviación del DBML,
+abierto pasa a su nombre. **La persona elegida sí se valida** (aunque el resto del
+cargue omita §6): `encargado_acto_id` debe tener `recurso_gestionar` y `tecnico_id` /
+`tecnico_encargado_id`, `recurso_tecnico`; si no → `400` ("El usuario elegido no tiene el
+permiso de ..."). Solo se valida cuando el valor cambia respecto al que ya tenía la fila. (`acto_admite`/`requerimiento`/`decision` admiten NULL: desviación del DBML,
 DISENO_TECNICO §2.)
 
 | Ruta | Body |

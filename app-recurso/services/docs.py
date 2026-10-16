@@ -23,14 +23,21 @@ def _error(e: Exception) -> Dict[str, Any]:
 
 
 async def increment_file_usage(file_ids: List[int]) -> Dict[str, Any]:
-    """Incrementa numero_usos al asociar archivos a un recurso."""
+    """Incrementa numero_usos al asociar archivos a un recurso. Si funciona,
+    lo anota en el registro de la petición (``services.usos_archivos``) para
+    compensarlo si la operación termina en error antes del commit."""
+    from services.usos_archivos import anotar_suma
+
     if not file_ids:
         return {"ok": False, "message": "No file_ids provided"}
     try:
-        return (await files_client.increment_usage(file_ids)).model_dump(exclude_none=True)
+        resultado = (await files_client.increment_usage(file_ids)).model_dump(exclude_none=True)
     except Exception as e:
         logger.error(f"Error incrementing file usage for files {file_ids}: {e}")
         return _error(e)
+    if resultado.get("ok"):
+        anotar_suma(file_ids)
+    return resultado
 
 
 async def decrement_file_usage(file_ids: List[int]) -> Dict[str, Any]:

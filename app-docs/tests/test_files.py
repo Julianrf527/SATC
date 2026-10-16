@@ -89,7 +89,7 @@ async def test_download_gateway_sin_permiso_403(client, perms, make_file_hash, s
 @pytest.mark.parametrize("permiso", [
     "sancionatorio_gestionar", "sancionatorio_consultar", "infraccion_gestionar",
     "infraccion_consultar", "infraccion_informes_subir", "infraccion_informes_revisar",
-    "infraccion_asignar_informes", "infraccion_cargue", "documento_crear", "documento_revisar",
+    "infraccion_asignar_informes", "infraccion_super_gestion", "documento_crear", "documento_revisar",
 ])
 async def test_download_gateway_con_permiso_de_modulo_ok(client, perms, make_file_hash, stub_minio, permiso):
     fh = await make_file_hash()

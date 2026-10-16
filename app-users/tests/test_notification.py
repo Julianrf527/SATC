@@ -103,3 +103,38 @@ async def test_delete_linked_solo_ajenas_404(client, make_rol, make_usuario, mak
     await make_notificacion(usuario_id=otro.id, id_vinculada="EXP-88")
     resp = await client.delete("/notification/linked/EXP-88", headers=gateway_headers(yo.id, rol.id))
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_add_id_vinculada_largo_422(client, make_rol, make_usuario):
+    # notificacion.id_vinculada es varchar(20): antes un valor más largo daba 500.
+    rol = await make_rol("operador")
+    u = await make_usuario(rol_id=rol.id)
+    resp = await client.post("/notification/add", headers=service_headers(), json={
+        "mensaje": "hola", "id_vinculada": "x" * 21, "tipo": "alerta", "usuario_id": u.id,
+    })
+    assert resp.status_code == 422
+    assert "20 caracteres" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_add_tipo_largo_422(client, make_rol, make_usuario):
+    # notificacion.tipo es varchar(15): antes un valor más largo daba 500.
+    rol = await make_rol("operador")
+    u = await make_usuario(rol_id=rol.id)
+    resp = await client.post("/notification/add", headers=service_headers(), json={
+        "mensaje": "hola", "id_vinculada": "EXP-9", "tipo": "x" * 16, "usuario_id": u.id,
+    })
+    assert resp.status_code == 422
+    assert "15 caracteres" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_add_largos_limite_201(client, make_rol, make_usuario):
+    # Justo en el límite de las columnas (20 y 15) se acepta.
+    rol = await make_rol("operador")
+    u = await make_usuario(rol_id=rol.id)
+    resp = await client.post("/notification/add", headers=service_headers(), json={
+        "mensaje": "hola", "id_vinculada": "x" * 20, "tipo": "y" * 15, "usuario_id": u.id,
+    })
+    assert resp.status_code == 201

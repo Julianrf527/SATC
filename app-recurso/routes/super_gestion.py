@@ -19,8 +19,10 @@ Semántica común (todos ``POST``, body JSON, ``version`` opcional):
   front lo elige de ``GET /etapas/abogados``). Si no llega al crear la fila,
   la etapa queda SIN encargado (NULL, expedientes viejos): no se crea proceso
   de revisión y solo super gestión gestiona su acto. Al actualizar, si no
-  llega se conserva el que había. Como el resto del cargue directo, no se
-  valida el permiso del abogado (§2.1).
+  llega se conserva el que había. La persona elegida SÍ se valida (aunque el
+  resto del cargue directo omita §6): el abogado debe tener
+  ``recurso_gestionar`` y el técnico (``tecnico_id`` / ``tecnico_encargado_id``)
+  ``recurso_tecnico``; si no → 400. Solo se valida cuando el valor cambia.
 - Todos los archivos deben ser PDF ya subidos a app-docs.
 - Si la fila queda con encargado (abogado/técnico) y SIN documento final, su
   proceso de revisión queda alineado: se crea en ``pendiente_carga`` si no
@@ -76,6 +78,8 @@ from services.etapas import (
     crear_concepto,
     crear_proceso_etapa,
     enlazar_hijo,
+    exigir_abogado,
+    exigir_tecnico,
     liberar_archivos,
     ok,
     preparar_acto,
@@ -245,6 +249,11 @@ async def _inicio(request: Request, db: AsyncSession, expediente_id: int):
     return usuario, exp, e, Cargue(db, usuario)
 
 
+async def _abogado_elegido(body, fila) -> None:
+    """El abogado elegido (``encargado_acto_id``) tiene ``recurso_gestionar``."""
+    await exigir_abogado(getattr(body, "encargado_acto_id", None), getattr(fila, "encargado_acto_id", None))
+
+
 async def _sincronizar_proceso(
     db: AsyncSession, usuario: Usuario, exp, fila, *, etapa_tipo: str, tipo_documento: str,
     encargado_id: Optional[int], terminada: bool, avisos: Avisos,
@@ -289,6 +298,8 @@ async def super_admite(request: Request, expediente_id: int, body: AdmiteSuper,
     usuario, exp, e, c = await _inicio(request, db, expediente_id)
     fila = e.admite
     _version(fila, body.version)
+    await _abogado_elegido(body, fila)
+    await exigir_tecnico(body.tecnico_id, e.concepto2.tecnico_encargado_id if e.concepto2 else None)
     if fila is None:
         fila = ActoAdmite(expediente_id=exp.id, encargado_acto_id=body.encargado_acto_id)
         await _guardar_nueva(db, fila)
@@ -329,6 +340,7 @@ async def super_concepto(request: Request, expediente_id: int, tipo: str, body: 
     avisos = Avisos()
     concepto = e.concepto(tipo)
     _version(concepto, body.version)
+    await exigir_tecnico(body.tecnico_encargado_id, concepto.tecnico_encargado_id if concepto else None)
     if concepto is None:
         if body.tecnico_encargado_id is None:
             raise HTTPException(status_code=400, detail="Para crear el concepto falta: técnico encargado")
@@ -370,6 +382,7 @@ async def super_requerimiento(request: Request, expediente_id: int, ambito: str,
         raise HTTPException(status_code=400, detail="La respuesta del usuario solo aplica al requerimiento de la etapa 3")
     req = e.requerimiento(ambito)
     _version(req, body.version)
+    await _abogado_elegido(body, req)
     if req is None:
         encargado = body.encargado_acto_id  # None: sin encargado (cargue histórico)
         if ambito == "etapa3":
@@ -405,6 +418,7 @@ async def super_decision(request: Request, expediente_id: int, body: DecisionSup
     usuario, exp, e, c = await _inicio(request, db, expediente_id)
     fila = e.decision
     _version(fila, body.version)
+    await _abogado_elegido(body, fila)
     if fila is None:
         fila = Decision(expediente_id=exp.id, encargado_acto_id=body.encargado_acto_id)
         await _guardar_nueva(db, fila)
@@ -430,6 +444,7 @@ async def super_recurso(request: Request, expediente_id: int, body: RecursoSuper
         raise HTTPException(status_code=400, detail="Primero debe existir la decisión")
     fila = e.recurso
     _version(fila, body.version)
+    await _abogado_elegido(body, fila)
     nueva = fila is None
     if nueva:
         _obligatorios(body, RADICADO, "el recurso de reposición")
@@ -457,6 +472,7 @@ async def super_memorias(request: Request, expediente_id: int, body: RadicadoAct
     usuario, exp, e, c = await _inicio(request, db, expediente_id)
     fila = e.memorias
     _version(fila, body.version)
+    await _abogado_elegido(body, fila)
     nueva = fila is None
     if nueva:
         _obligatorios(body, RADICADO, "las memorias de cálculo")
@@ -522,6 +538,7 @@ async def super_obras(request: Request, expediente_id: int, body: RadicadoActoSu
     usuario, exp, e, c = await _inicio(request, db, expediente_id)
     fila = e.obras
     _version(fila, body.version)
+    await _abogado_elegido(body, fila)
     informe, _ = await _informe(db, c, e.informe_obras, body, "el recibo de obras (informe del usuario)")
     if fila is None:
         fila = ReciboSatisfaccionObras(expediente_id=exp.id, informe_usuario_id=informe.id,

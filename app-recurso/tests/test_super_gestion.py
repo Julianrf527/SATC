@@ -44,9 +44,9 @@ async def test_cargue_historico_completo_salta_validaciones(client, rv_permisos,
     assert proc.activo is False
     # Acto otra vez → 409 (se corrige por /actos)
     await post(client, f"/super-gestion/{exp_id}/admite", S, {"acto": acto(stubs)}, esperado=409)
-    # Concepto de memorias (técnico sin permiso de técnico: se omite V3) + requerimiento hijo + acto
+    # Concepto de memorias (sin revisión: se omite §6, pero el técnico debe ser técnico) + requerimiento hijo + acto
     await post(client, f"/super-gestion/{exp_id}/conceptos/memorias", S,
-               {"tecnico_encargado_id": 88, "fecha_aceptacion": "2015-07-01", "cumple": True,
+               {"tecnico_encargado_id": TECNICO, "fecha_aceptacion": "2015-07-01", "cumple": True,
                 "file_id": stubs.files.registrar()})
     await post(client, f"/super-gestion/{exp_id}/requerimientos/memorias", S, {"acto": acto(stubs)})
     await post(client, f"/super-gestion/{exp_id}/memorias/subsanacion", S,
@@ -199,3 +199,64 @@ async def test_listar_abogados(client, rv_permisos):
     ids = {u["id"] for u in r.json()["data"]}
     assert {ABOGADO, ABOGADO2} <= ids and TECNICO not in ids
     assert (await client.get("/etapas/abogados", headers=headers(LECTOR))).status_code == 403
+
+
+# ─── 5.2: la persona elegida debe tener el permiso del rol ──────────────────
+
+SIN_PERMISO = 88  # usuario sin recurso_gestionar ni recurso_tecnico
+
+
+async def test_super_abogado_elegido_sin_permiso(client, rv_permisos, expediente, db_session):
+    """El abogado elegido en el cargue directo debe tener recurso_gestionar."""
+    exp_id = expediente.id
+    S = SUPER_G
+    r = await post(client, f"/super-gestion/{exp_id}/decision", S, {"encargado_acto_id": SIN_PERMISO}, esperado=400)
+    assert "recurso_gestionar" in r.json()["detail"]
+    assert await db_session.scalar(select(Decision).where(Decision.expediente_id == exp_id)) is None
+    for url in ("admite", "requerimientos/etapa3"):
+        await post(client, f"/super-gestion/{exp_id}/{url}", S, {"encargado_acto_id": TECNICO}, esperado=400)
+    await post(client, f"/super-gestion/{exp_id}/memorias", S,
+               {"radicado": "1995ER9", "fecha_radicado": "2015-06-01", "file_id": rv_permisos.files.registrar(),
+                "encargado_acto_id": SIN_PERMISO}, esperado=400)
+    # Con permiso: ok. Al reasignar a alguien sin permiso → 400 y se conserva el anterior.
+    await post(client, f"/super-gestion/{exp_id}/decision", S, {"encargado_acto_id": ABOGADO})
+    await post(client, f"/super-gestion/{exp_id}/decision", S, {"encargado_acto_id": SIN_PERMISO}, esperado=400)
+    d = await db_session.scalar(select(Decision).where(Decision.expediente_id == exp_id))
+    assert d.encargado_acto_id == ABOGADO
+    # Si el valor no cambia no se revalida (el abogado pudo perder el permiso después).
+    rv_permisos.permisos.quitar(ABOGADO)
+    await post(client, f"/super-gestion/{exp_id}/decision", S, {"encargado_acto_id": ABOGADO, "decision": "NEGADA"})
+
+
+async def test_super_tecnico_elegido_sin_permiso(client, rv_permisos, expediente, db_session):
+    """El técnico elegido (auto admite y conceptos) debe tener recurso_tecnico."""
+    exp_id = expediente.id
+    S = SUPER_G
+    r = await post(client, f"/super-gestion/{exp_id}/admite", S, {"tecnico_id": SIN_PERMISO}, esperado=400)
+    assert "recurso_tecnico" in r.json()["detail"]
+    await post(client, f"/super-gestion/{exp_id}/conceptos/etapa2", S,
+               {"tecnico_encargado_id": ABOGADO}, esperado=400)
+    assert await db_session.scalar(select(ConceptoTecnico.id)) is None
+    await post(client, f"/super-gestion/{exp_id}/admite", S, {"tecnico_id": TECNICO})
+    concepto = await db_session.scalar(select(ConceptoTecnico).where(ConceptoTecnico.expediente_id == exp_id))
+    assert concepto.tecnico_encargado_id == TECNICO
+    # Cambiar el técnico de un concepto existente por alguien sin permiso → 400
+    await post(client, f"/super-gestion/{exp_id}/admite", S, {"tecnico_id": SIN_PERMISO}, esperado=400)
+    await post(client, f"/super-gestion/{exp_id}/conceptos/etapa2", S,
+               {"tecnico_encargado_id": SIN_PERMISO}, esperado=400)
+    await db_session.refresh(concepto)
+    assert concepto.tecnico_encargado_id == TECNICO
+
+
+async def test_seleccionar_tecnico_super_valida_permiso(client, rv_permisos, expediente, db_session):
+    """"Seleccionar técnico" (conceptos adicional/memorias/obras) valida V3 también
+    cuando lo hace super gestión."""
+    exp_id = expediente.id
+    await post(client, f"/super-gestion/{exp_id}/memorias", SUPER_G,
+               {"radicado": "1995ER8", "fecha_radicado": "2015-06-01", "file_id": rv_permisos.files.registrar()})
+    url = f"/etapas/{exp_id}/conceptos/memorias/tecnico"
+    r = await post(client, url, SUPER_G, {"tecnico_id": SIN_PERMISO}, esperado=400)
+    assert "recurso_tecnico" in r.json()["detail"]
+    await post(client, url, SUPER_G, {"tecnico_id": ABOGADO}, esperado=400)
+    assert await db_session.scalar(select(ConceptoTecnico.id)) is None
+    await post(client, url, SUPER_G, {"tecnico_id": TECNICO})

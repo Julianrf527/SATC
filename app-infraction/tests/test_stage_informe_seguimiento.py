@@ -1,5 +1,5 @@
 """
-El rol de cargue manual (infraccion_cargue) no debe esperar a que venza el
+El rol de cargue manual (infraccion_super_gestion) no debe esperar a que venza el
 término real del Auto de Requerimiento para poder crear la etapa de
 Seguimiento — necesario para cargar expedientes históricos sin esperar días.
 """

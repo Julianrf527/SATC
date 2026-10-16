@@ -30,7 +30,9 @@ from core.permission import Permission
 from db.deps import get_db_managed
 from services.concurrencia import bloquear_expediente
 from services.etapas import (
+    CAMPOS_CONCEPTO,
     ETIQUETAS_CONCEPTO,
+    NOMBRES_CAMPO,
     PADRES_CONCEPTO,
     TIPOS_CONCEPTO,
     TecnicoIn,
@@ -39,6 +41,7 @@ from services.etapas import (
     cargar_estado,
     crear_concepto,
     datos_fila,
+    definicion_campos_concepto,
     exigir,
     exigir_encargado,
     ok,
@@ -53,25 +56,7 @@ logger = logging.getLogger(__name__)
 
 PADRES = PADRES_CONCEPTO
 
-CAUDALES = ("caudal_fuente", "caudal_disponible", "caudal_otorgado", "num_usuarios")
-# Campos que el técnico diligencia por tipo (además de fecha_aceptacion) y los obligatorios.
-# TODO(negocio): plan §4-Etapa 2 — confirmar si los 4 datos de caudal son suficientes.
-# TODO(negocio): el concepto adicional es "igual al de la etapa 2 pero sin visita"; sus
-# caudales quedan opcionales porque el plan no dice si se vuelven a registrar.
-CAMPOS = {
-    "etapa2": (CAUDALES, CAUDALES),
-    "adicional": (CAUDALES, ()),
-    "memorias": (("cumple",), ("cumple",)),
-    "subsanacion": (("cumple",), ("cumple",)),
-    "obras": (("cumple", "fecha_visita_tecnica"), ("cumple", "fecha_visita_tecnica")),
-    "obras_segundo": (("cumple", "fecha_visita_tecnica"), ("cumple", "fecha_visita_tecnica")),
-}
-
-NOMBRES_CAMPO = {
-    "caudal_fuente": "caudal fuente", "caudal_disponible": "caudal disponible",
-    "caudal_otorgado": "caudal otorgado", "num_usuarios": "número de usuarios",
-    "cumple": "cumple / no cumple", "fecha_visita_tecnica": "fecha de visita técnica",
-}
+# Los campos de cada tipo de concepto viven en services/etapas.py (CAMPOS_CONCEPTO).
 
 
 class ConceptoFinalIn(BaseModel):
@@ -139,7 +124,7 @@ async def seleccionar_tecnico(
     avisos = Avisos()
     concepto, proceso = await crear_concepto(
         db, tipo=tipo, tecnico_id=body.tecnico_id, expediente_id=exp.id, usuario=usuario, avisos=avisos,
-        padre=padre, columna=columna, validar_tecnico=not usuario.super_gestion,
+        padre=padre, columna=columna,  # V3 también para super gestión: el elegido debe ser técnico
     )
     await auditar(db, usuario, exp, "SELECCIONAR_TECNICO", f"{ETIQUETAS_CONCEPTO[tipo]}: técnico seleccionado",
                   {"tipo": tipo, "tecnico_id": body.tecnico_id, "concepto_id": concepto.id}, request)
@@ -150,7 +135,7 @@ async def seleccionar_tecnico(
 
 
 async def _cargar_final(db: AsyncSession, request: Request, usuario, exp, concepto, tipo: str, body: ConceptoFinalIn):
-    permitidos, obligatorios = CAMPOS[tipo]
+    permitidos, obligatorios = CAMPOS_CONCEPTO[tipo]
     faltan = [NOMBRES_CAMPO[c] for c in obligatorios if getattr(body, c) is None]
     if faltan:
         raise HTTPException(status_code=400, detail=f"Faltan datos del concepto: {', '.join(faltan)}")
@@ -204,7 +189,6 @@ async def obtener_concepto(request: Request, concepto_id: int, db: AsyncSession 
     resumen = await resumen_proceso(db, proceso, usuario.user_id)
     nombres = await get_user_info([concepto.tecnico_encargado_id])
     tecnico = nombres.get(concepto.tecnico_encargado_id) or {}
-    permitidos, obligatorios = CAMPOS[tipo]
     acciones = []
     if proceso is not None and proceso.activo and concepto.tecnico_encargado_id == usuario.user_id:
         if proceso.estado in ("pendiente_carga", "rechazado"):
@@ -222,8 +206,7 @@ async def obtener_concepto(request: Request, concepto_id: int, db: AsyncSession 
             "caudal_otorgado": concepto.caudal_otorgado, "num_usuarios": concepto.num_usuarios,
             "cumple": concepto.cumple, "doc_concepto_tecnico_id": concepto.doc_concepto_tecnico_id,
         },
-        "campos": {"obligatorios": ["file_id", "fecha_aceptacion", *obligatorios],
-                   "opcionales": [c for c in permitidos if c not in obligatorios]},
+        "campos": definicion_campos_concepto(tipo),
         "proceso": resumen if proceso is not None else None,
         "acciones_disponibles": acciones,
     }

@@ -232,6 +232,7 @@ function EditUserForm({ formId, user, rolList, isSubmitting, setIsSubmitting, on
           type="email"
           className={`input w-full ${errors.email ? "input-error" : ""}`}
           value={email}
+          maxLength={100}
           onChange={(e) => setEmail(e.target.value)}
           disabled={isSubmitting}
         />

@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 ROL_NOMBRE_MAX = 20
 PERMISO_NOMBRE_MAX = 40
 PERMISO_MENU_PATH_MAX = 50
+PERMISO_DESCRIPCION_MAX = 200
 
 class RolCreate(BaseModel):
     # El frontend envía {"nombre", "permisos"}; internamente el campo se llama
@@ -59,6 +60,16 @@ class PerCreate(BaseModel):
     # Largos = columnas permiso.nombre (varchar(40)) y permiso.menu_path (varchar(50)).
     name: str = Field(..., max_length=PERMISO_NOMBRE_MAX)
     menu_path: str = Field(..., max_length=PERMISO_MENU_PATH_MAX)
+    # Obligatoria ("Desbloquea X. Sirve para Y."); columna permiso.descripcion varchar(200).
+    descripcion: str = Field(..., min_length=1, max_length=PERMISO_DESCRIPCION_MAX)
+
+    @field_validator("descripcion")
+    @classmethod
+    def _descripcion_no_vacia(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("La descripción del permiso es obligatoria")
+        return v
 
 class Permission(BaseModel):
     permission_name: str
@@ -73,12 +84,29 @@ from utils.permission_crud import (
     get_user_rol_avaliable,
     get_permissions_by_rol_id,
 )
+from utils.permission_dependencies import (
+    dependencias_faltantes,
+    mensaje_dependencias_faltantes,
+    requeridos_por_permiso,
+    roles_que_incumplen,
+)
 
 
 async def _get_user_perm_names(rol_id: int, db: AsyncSession) -> set[str]:
     """Obtiene nombres de permisos del rol desde BD."""
     perms = await get_permissions_by_rol_id(rol_id, db)
     return {p["name"] for p in perms}
+
+
+async def _exigir_dependencias(permiso_ids: list[int], db: AsyncSession) -> None:
+    """422 si el set de permisos del rol deja algún permiso sin sus requeridos.
+
+    Solo se exige al guardar: los roles que ya incumplen siguen funcionando
+    (login y verificación de permisos no miran permiso_requiere).
+    """
+    faltantes = await dependencias_faltantes(permiso_ids, db)
+    if faltantes:
+        raise HTTPException(status_code=422, detail=mensaje_dependencias_faltantes(faltantes))
 
 
 # ---------- ENDPOINTS ----------
@@ -119,7 +147,42 @@ async def cargar_permisos(
 
     permission = await get_permissions_by_rol_id(token_data["rol_id"], db)
 
+    # Campos añadidos (retrocompatible) para la pantalla de roles: descripción
+    # corta y nombres de los permisos que cada uno exige en el mismo rol.
+    ids = [p["id"] for p in permission]
+    descripciones = {}
+    if ids:
+        rows = await db.execute(select(Permiso.id, Permiso.descripcion).where(Permiso.id.in_(ids)))
+        descripciones = {pid: desc for pid, desc in rows.all()}
+    requeridos = await requeridos_por_permiso(ids, db)
+    for p in permission:
+        p["descripcion"] = descripciones.get(p["id"])
+        p["requiere"] = requeridos.get(p["id"], [])
+
     return JSONResponse(content={"ok": True, "data": permission}, status_code=200)
+
+
+@router.get("/dependencias-incumplidas")
+async def roles_con_dependencias_incumplidas(
+    request: Request,
+    db: AsyncSession = Depends(get_db_managed),
+    ):
+    """Reporte de solo lectura: roles que hoy tienen un permiso sin sus requeridos.
+
+    No corrige nada; sirve para que el administrador los ajuste a mano desde la
+    pantalla de roles (que no deja guardar un rol que incumpla).
+    """
+    token_data = verify_gateway_token(request)
+    user_permission_names = await _get_user_perm_names(token_data["rol_id"], db)
+
+    if PERMISO_ROL not in user_permission_names:
+        raise HTTPException(
+            status_code=403,
+            detail="No tiene permiso para ver los roles y permisos"
+        )
+
+    data = await roles_que_incumplen(db)
+    return JSONResponse(content={"ok": True, "data": data}, status_code=200)
 
 @router.get("/role-permissions")
 async def cargar_permiso_y_roles(
@@ -162,6 +225,8 @@ async def agregar_rol(
             status_code=403,
             detail=f"No puede asignar permisos que no posee."
         )
+
+    await _exigir_dependencias(rol.permission, db)
 
     stmr = select(Rol).where(Rol.nombre == rol.nombre)
     result = await db.execute(stmr)
@@ -241,6 +306,8 @@ async def actualizar_rol(
     existing_rol = result.scalar_one_or_none()
     if not existing_rol:
         raise HTTPException(status_code=404, detail="El rol no existe")
+
+    await _exigir_dependencias(data.permission, db)
 
     stmr_permisos = select(RolPermiso.permiso_id).where(RolPermiso.rol_id == rol_id)
     result_permisos = await db.execute(stmr_permisos)
@@ -405,7 +472,7 @@ async def agregar_permiso(
 
     stmt = (
         insert(Permiso)
-        .values(nombre = permission.name, menu_path = permission.menu_path)
+        .values(nombre=permission.name, menu_path=permission.menu_path, descripcion=permission.descripcion)
         .returning(Permiso.id)
     )
     permiso_id = await db.scalar(stmt)
@@ -418,6 +485,7 @@ async def agregar_permiso(
         "id": permiso_id,
         "nombre": permission.name,
         "menu_path": permission.menu_path,
+        "descripcion": permission.descripcion,
     }
 
     audit_result = await insert_auditoria(
@@ -481,7 +549,8 @@ async def actualizar_permiso(
         .where(Permiso.id == permiso_id)
         .values(
             nombre=permission.name,
-            menu_path=permission.menu_path
+            menu_path=permission.menu_path,
+            descripcion=permission.descripcion,
         )
     )
     await db.execute(stmt)
@@ -490,12 +559,14 @@ async def actualizar_permiso(
         "id": permiso_existente.id,
         "nombre": permiso_existente.nombre,
         "menu_path": permiso_existente.menu_path,
+        "descripcion": permiso_existente.descripcion,
     }
 
     datos_nuevos = {
         "id": permiso_id,
         "nombre": permission.name,
         "menu_path": permission.menu_path,
+        "descripcion": permission.descripcion,
     }
 
     audit_result = await insert_auditoria(

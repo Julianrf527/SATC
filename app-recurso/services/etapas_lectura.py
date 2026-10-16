@@ -32,7 +32,13 @@ from services.actos import (
     serializar_comunicacion,
     serializar_notificacion,
 )
-from services.etapas import ETIQUETAS_CONCEPTO, ETIQUETAS_REQUERIMIENTO, Estado, cargar_estado
+from services.etapas import (
+    ETIQUETAS_CONCEPTO,
+    ETIQUETAS_REQUERIMIENTO,
+    Estado,
+    cargar_estado,
+    definicion_campos_concepto,
+)
 from services.expediente_involucrados import serializar_vinculos
 from services.revision_documentos import (
     APROBADO_FIRMA,
@@ -219,6 +225,8 @@ class _Lector:
         c = self.e.concepto(tipo)
         n = self.base(f"concepto_{tipo}", ETIQUETAS_CONCEPTO[tipo], "concepto_tecnico", c)
         n["tipo"] = tipo
+        # Campos que pide el concepto (formularios del front: versión final y cargue directo).
+        n["campos"] = definicion_campos_concepto(tipo)
         if c is None:
             self.bloquear(n, motivo)
             if n["habilitada"] and puede_seleccionar and tipo != "etapa2":

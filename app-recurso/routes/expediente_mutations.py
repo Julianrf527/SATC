@@ -191,8 +191,8 @@ async def editar_expediente(
         if not inc.get("ok"):
             await db.rollback()
             raise HTTPException(status_code=502, detail="No se pudo registrar el uso del comprobante de pago")
-        # TODO(técnico): si el commit falla tras este +1 el uso queda inflado
-        # (bajo impacto: solo impide que el cleanup borre el archivo).
+        # Si el commit falla tras este +1, get_db_managed lo compensa
+        # (services/usos_archivos.py).
 
     await db.commit()
 

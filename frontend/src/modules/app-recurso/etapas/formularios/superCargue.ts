@@ -1,13 +1,13 @@
 // Cargue directo de super gestión (C.9): documento final + datos de la etapa,
 // sin asignación, revisión ni validaciones §6. Qué secciones lleva cada nodo y
 // cómo se arma el body (solo campos con valor: el backend actualiza los no nulos).
-import type { ResultadoRecurso, TipoConcepto, TipoDecision } from "../../types";
+import type { CamposConcepto, ResultadoRecurso, TipoDecision } from "../../types";
 import type { RefNodo } from "../nodos";
 import { type ClaseActo, esPdf, fechaValida, numeradoParaEnviar, numeradoValido } from "./comunes";
 import {
   bodyConceptoFinal,
-  camposConcepto,
   conceptoFinalInicial,
+  soloOpcionales,
   validarCamposConcepto,
   type ConceptoFinalForm,
 } from "./conceptoFinal";
@@ -24,7 +24,8 @@ export type SeccionesSuper = {
   docsAdmite: boolean;
   /** Técnico y fecha de visita del auto admite (con técnico nace el concepto de la etapa 2). */
   tecnicoVisita: boolean;
-  concepto: TipoConcepto | null;
+  /** Nodo de concepto: definición de sus campos (backend); `null` si no aplica. */
+  concepto: CamposConcepto | null;
   decision: boolean;
   resultado: boolean;
   /** Respuesta del usuario al requerimiento de la etapa 3. */
@@ -53,13 +54,16 @@ const NINGUNA: SeccionesSuper = {
   encargado: false,
 };
 
-export function seccionesSuper(ref: RefNodo, tieneActo: boolean): SeccionesSuper {
+const SIN_CAMPOS: CamposConcepto = { obligatorios: [], opcionales: [], campos: [] };
+
+/** `camposConcepto`: en nodos de concepto, la definición de campos que trae el nodo del árbol. */
+export function seccionesSuper(ref: RefNodo, tieneActo: boolean, camposConcepto?: CamposConcepto): SeccionesSuper {
   const acto = !tieneActo;
   switch (ref.clase) {
     case "admite":
       return { ...NINGUNA, acto, docsAdmite: true, tecnicoVisita: true, encargado: true };
     case "concepto":
-      return { ...NINGUNA, concepto: ref.tipo };
+      return { ...NINGUNA, concepto: camposConcepto ?? SIN_CAMPOS };
     case "requerimiento":
       return { ...NINGUNA, acto, respuesta: ref.ambito === "etapa3", encargado: true };
     case "decision":
@@ -182,7 +186,7 @@ export function validarSuper(s: SeccionesSuper, f: SuperCargueForm, existe: bool
   if (s.concepto) {
     if (!existe && !f.tecnico_encargado_id) return "Seleccione el técnico encargado del concepto";
     if (f.concepto.archivo && !esPdf(f.concepto.archivo)) return "El concepto firmado debe ser PDF";
-    const error = validarCamposConcepto(f.concepto, { obligatorios: [], opcionales: todosCampos(s.concepto) });
+    const error = validarCamposConcepto(f.concepto, soloOpcionales(s.concepto));
     if (error) return error;
   }
   if (s.decision && f.decision === "OTORGADA" && f.requiere_memorias === null && !existe) {
@@ -190,11 +194,6 @@ export function validarSuper(s: SeccionesSuper, f: SuperCargueForm, existe: bool
   }
   return null;
 }
-
-const todosCampos = (tipo: TipoConcepto) => {
-  const c = camposConcepto(tipo);
-  return [...c.obligatorios, ...c.opcionales].filter((x) => x !== "file_id");
-};
 
 /** Body del POST de super gestión. `ids`: file_id de cada archivo subido (clave de `archivosSuper`). */
 export function bodySuper(
@@ -238,8 +237,7 @@ export function bodySuper(
   }
   if (s.concepto) {
     poner("tecnico_encargado_id", f.tecnico_encargado_id);
-    const campos = { obligatorios: [], opcionales: todosCampos(s.concepto) };
-    const { file_id: _sinArchivo, ...datos } = bodyConceptoFinal(f.concepto, campos, 0);
+    const { file_id: _sinArchivo, ...datos } = bodyConceptoFinal(f.concepto, soloOpcionales(s.concepto), 0);
     void _sinArchivo;
     Object.entries(datos).forEach(([k, v]) => poner(k, v));
     poner("file_id", ids.concepto);

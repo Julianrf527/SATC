@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { ACTO_FINAL_VACIO, bodyActoFinal, validarActoFinal } from "./actoFinal";
 import { decimal, entero, numeradoParaEnviar, numeradoValido } from "./comunes";
+import type { CamposConcepto } from "../../types";
 import {
   bodyConceptoFinal,
-  camposConcepto,
   camposVisibles,
   conceptoFinalInicial,
+  soloOpcionales,
+  validarCamposConcepto,
   validarConceptoFinal,
 } from "./conceptoFinal";
 import { bodyRadicado, bodyRespuestaRequerimiento, validarRadicado } from "./radicado";
@@ -72,26 +74,56 @@ describe("acto final", () => {
 });
 
 describe("concepto final (C.4)", () => {
-  it("campos por tipo como el backend", () => {
-    expect(camposVisibles(camposConcepto("etapa2"))).toEqual([
+  // Definiciones tal como las manda el backend (`definicion_campos_concepto`).
+  const ETAPA2: CamposConcepto = {
+    obligatorios: ["file_id", "fecha_aceptacion", "caudal_fuente", "caudal_disponible", "caudal_otorgado", "num_usuarios"],
+    opcionales: [],
+    campos: [
+      { campo: "fecha_aceptacion", tipo: "fecha", etiqueta: "Fecha del concepto (firma)", obligatorio: true },
+      { campo: "caudal_fuente", tipo: "decimal", etiqueta: "Caudal fuente (L/s)", obligatorio: true },
+      { campo: "caudal_disponible", tipo: "decimal", etiqueta: "Caudal disponible (L/s)", obligatorio: true },
+      { campo: "caudal_otorgado", tipo: "decimal", etiqueta: "Caudal otorgado (L/s)", obligatorio: true },
+      { campo: "num_usuarios", tipo: "entero", etiqueta: "Número de usuarios", obligatorio: true },
+    ],
+  };
+  const MEMORIAS: CamposConcepto = {
+    obligatorios: ["file_id", "fecha_aceptacion", "cumple"],
+    opcionales: [],
+    campos: [
+      { campo: "fecha_aceptacion", tipo: "fecha", etiqueta: "Fecha del concepto (firma)", obligatorio: true },
+      { campo: "cumple", tipo: "si_no", etiqueta: "¿Cumple?", obligatorio: true },
+    ],
+  };
+  const ADICIONAL: CamposConcepto = {
+    obligatorios: ["file_id", "fecha_aceptacion"],
+    opcionales: ["caudal_fuente"],
+    campos: [
+      { campo: "fecha_aceptacion", tipo: "fecha", etiqueta: "Fecha del concepto (firma)", obligatorio: true },
+      { campo: "caudal_fuente", tipo: "decimal", etiqueta: "Caudal fuente (L/s)", obligatorio: false },
+    ],
+  };
+
+  it("muestra los campos que manda el backend, en su orden, e ignora los desconocidos", () => {
+    expect(camposVisibles(ETAPA2).map((c) => c.campo)).toEqual([
       "fecha_aceptacion",
       "caudal_fuente",
       "caudal_disponible",
       "caudal_otorgado",
       "num_usuarios",
     ]);
-    expect(camposConcepto("adicional").obligatorios).toEqual(["file_id", "fecha_aceptacion"]);
-    expect(camposConcepto("memorias").obligatorios).toContain("cumple");
-    expect(camposConcepto("obras_segundo").obligatorios).toEqual(["file_id", "fecha_aceptacion", "cumple", "fecha_visita_tecnica"]);
+    const conDesconocido: CamposConcepto = {
+      ...MEMORIAS,
+      campos: [...MEMORIAS.campos, { campo: "otro", tipo: "decimal", etiqueta: "Otro", obligatorio: true }],
+    };
+    expect(camposVisibles(conDesconocido).map((c) => c.campo)).toEqual(["fecha_aceptacion", "cumple"]);
   });
 
-  it("valida obligatorios y arma el body solo con campos del tipo", () => {
-    const campos = camposConcepto("etapa2");
+  it("valida obligatorios con la etiqueta del backend y arma el body según el tipo", () => {
     const f = { ...conceptoFinalInicial({ fecha_visita_tecnica: "2026-05-02" }), archivo: pdf(), fecha_aceptacion: "2026-05-20" };
-    expect(validarConceptoFinal(f, campos)).toMatch(/Caudal fuente/);
+    expect(validarConceptoFinal(f, ETAPA2)).toBe("Complete: Caudal fuente (L/s)");
     const lleno = { ...f, caudal_fuente: "10,5", caudal_disponible: "8", caudal_otorgado: "1.2", num_usuarios: "3" };
-    expect(validarConceptoFinal(lleno, campos)).toBeNull();
-    expect(bodyConceptoFinal(lleno, campos, 400)).toEqual({
+    expect(validarConceptoFinal(lleno, ETAPA2)).toBeNull();
+    expect(bodyConceptoFinal(lleno, ETAPA2, 400)).toEqual({
       file_id: 400,
       fecha_aceptacion: "2026-05-20",
       caudal_fuente: 10.5,
@@ -99,19 +131,29 @@ describe("concepto final (C.4)", () => {
       caudal_otorgado: 1.2,
       num_usuarios: 3,
     });
+    // "entero" no acepta decimales.
+    expect(validarConceptoFinal({ ...lleno, num_usuarios: "2.5" }, ETAPA2)).toBe("Valor inválido: Número de usuarios");
   });
 
-  it("cumple obligatorio en memorias; valores inválidos se rechazan", () => {
-    const campos = camposConcepto("memorias");
+  it("si_no obligatorio en memorias; opcionales vacíos se omiten e inválidos se rechazan", () => {
     const f = { ...conceptoFinalInicial(), archivo: pdf(), fecha_aceptacion: "2026-05-20" };
-    expect(validarConceptoFinal(f, campos)).toMatch(/Cumple/);
-    expect(bodyConceptoFinal({ ...f, cumple: false }, campos, 1)).toEqual({
+    expect(validarConceptoFinal(f, MEMORIAS)).toBe("Complete: ¿Cumple?");
+    expect(bodyConceptoFinal({ ...f, cumple: false }, MEMORIAS, 1)).toEqual({
       file_id: 1,
       fecha_aceptacion: "2026-05-20",
       cumple: false,
     });
-    const adicional = camposConcepto("adicional");
-    expect(validarConceptoFinal({ ...f, caudal_fuente: "abc" }, adicional)).toMatch(/inválido/);
+    expect(validarConceptoFinal(f, ADICIONAL)).toBeNull();
+    expect(bodyConceptoFinal(f, ADICIONAL, 2)).toEqual({ file_id: 2, fecha_aceptacion: "2026-05-20" });
+    expect(validarConceptoFinal({ ...f, caudal_fuente: "abc" }, ADICIONAL)).toMatch(/inválido/);
+  });
+
+  it("soloOpcionales (cargue directo): nada es obligatorio", () => {
+    const o = soloOpcionales(ETAPA2);
+    expect(o.obligatorios).toEqual([]);
+    expect(o.opcionales).not.toContain("file_id");
+    expect(o.campos.every((c) => !c.obligatorio)).toBe(true);
+    expect(validarCamposConcepto(conceptoFinalInicial(), o)).toBeNull();
   });
 
   it("toma los datos que ya tiene el concepto", () => {

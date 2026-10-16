@@ -1,7 +1,18 @@
 import { describe, expect, it } from "vitest";
+import type { CamposConcepto } from "../../types";
 import { archivosSuper, bodySuper, seccionesSuper, SUPER_VACIO, superVacio, validarSuper } from "./superCargue";
 
 const pdf = () => new File(["%PDF"], "doc.pdf", { type: "application/pdf" });
+
+// Definición que trae el nodo de concepto del árbol (backend).
+const CAMPOS_ETAPA2: CamposConcepto = {
+  obligatorios: ["file_id", "fecha_aceptacion", "caudal_fuente"],
+  opcionales: [],
+  campos: [
+    { campo: "fecha_aceptacion", tipo: "fecha", etiqueta: "Fecha del concepto (firma)", obligatorio: true },
+    { campo: "caudal_fuente", tipo: "decimal", etiqueta: "Caudal fuente (L/s)", obligatorio: true },
+  ],
+};
 
 describe("seccionesSuper (C.9)", () => {
   it("cada nodo lleva sus secciones", () => {
@@ -57,7 +68,8 @@ describe("validarSuper / bodySuper", () => {
   });
 
   it("concepto: datos numéricos convertidos y file_id del concepto", () => {
-    const s = seccionesSuper({ clase: "concepto", tipo: "etapa2" }, false);
+    const s = seccionesSuper({ clase: "concepto", tipo: "etapa2" }, false, CAMPOS_ETAPA2);
+    expect(s.concepto).toBe(CAMPOS_ETAPA2);
     const f = {
       ...SUPER_VACIO,
       tecnico_encargado_id: 4 as const,
@@ -69,6 +81,11 @@ describe("validarSuper / bodySuper", () => {
       caudal_fuente: 1.5,
       file_id: 8,
     });
+    // En el cargue directo todo es opcional aunque el backend lo marque obligatorio.
+    expect(validarSuper(s, { ...SUPER_VACIO, tecnico_encargado_id: 4 }, false)).toBeNull();
+    expect(validarSuper(s, { ...f, concepto: { ...f.concepto, caudal_fuente: "x" } }, false)).toBe(
+      "Valor inválido: Caudal fuente (L/s)",
+    );
   });
 
   it("abogado encargado: opcional, solo en etapas con encargado", () => {

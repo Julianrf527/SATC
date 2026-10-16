@@ -3,6 +3,7 @@ import {
   formatPermissionName,
   type PermissionCategory,
 } from "./permissionCategories";
+import type { EstadoPermiso } from "./useRoleForm";
 
 type Props = {
   categories: PermissionCategory[];
@@ -14,6 +15,9 @@ type Props = {
   onToggleCategory: (prefix: string) => void;
   onToggleCategoryPermissions: (prefix: string) => void;
   onTogglePermission: (permissionId: number) => void;
+  getEstadoPermiso: (permission: Permiso) => EstadoPermiso;
+  avisoCascada: string | null;
+  onCerrarAvisoCascada: () => void;
 };
 
 export default function PermissionSelector({
@@ -26,6 +30,9 @@ export default function PermissionSelector({
   onToggleCategory,
   onToggleCategoryPermissions,
   onTogglePermission,
+  getEstadoPermiso,
+  avisoCascada,
+  onCerrarAvisoCascada,
 }: Props) {
   return (
     <div className="xl:w-2/3 flex-1 min-h-0 flex flex-col">
@@ -78,6 +85,20 @@ export default function PermissionSelector({
           </div>
 
           <div className="divider my-2"></div>
+
+          {avisoCascada && (
+            <div role="status" className="alert alert-info alert-soft py-2 mb-3 text-sm">
+              <span className="flex-1">{avisoCascada}</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs"
+                aria-label="Cerrar aviso"
+                onClick={onCerrarAvisoCascada}
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* Categorías de permisos */}
           <div className="space-y-4 overflow-y-auto flex-1 min-h-0">
@@ -133,34 +154,55 @@ export default function PermissionSelector({
                   </div>
                   <div className="collapse-content">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                      {categoryPerms.map((permission) => (
-                        <label
-                          key={permission.id}
-                          className="flex items-center gap-3 p-3 bg-base-100 rounded-lg hover:bg-base-300 cursor-pointer transition-colors border border-base-300"
-                        >
-                          <input
-                            type="checkbox"
-                            className="checkbox checkbox-success checkbox-sm"
-                            checked={selectedPermissions.includes(
-                              permission.id,
-                            )}
-                            onChange={() => onTogglePermission(permission.id)}
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium text-sm">
-                              {formatPermissionName(
-                                permission.nombre,
-                                category.prefix,
+                      {categoryPerms.map((permission) => {
+                        const { bloqueado, faltan } = getEstadoPermiso(permission);
+                        const marcado = selectedPermissions.includes(permission.id);
+                        return (
+                          <label
+                            key={permission.id}
+                            title={permission.menu_path || undefined}
+                            className={`flex items-start gap-3 p-3 bg-base-100 rounded-lg transition-colors border border-base-300 ${
+                              bloqueado
+                                ? "opacity-60 cursor-not-allowed"
+                                : "hover:bg-base-300 cursor-pointer"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-success checkbox-sm mt-0.5"
+                              checked={marcado}
+                              disabled={bloqueado}
+                              onChange={() => onTogglePermission(permission.id)}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm">
+                                {formatPermissionName(
+                                  permission.nombre,
+                                  category.prefix,
+                                )}
+                              </div>
+                              {permission.descripcion ? (
+                                <div className="text-xs text-base-content/60 leading-snug">
+                                  {permission.descripcion}
+                                </div>
+                              ) : (
+                                permission.menu_path && (
+                                  <div className="text-xs text-base-content/60">
+                                    {permission.menu_path}
+                                  </div>
+                                )
+                              )}
+                              {faltan.length > 0 && (
+                                <div
+                                  className={`text-xs mt-1 ${marcado ? "text-error" : "text-warning"}`}
+                                >
+                                  Requiere: {faltan.join(", ")}
+                                </div>
                               )}
                             </div>
-                            {permission.menu_path && (
-                              <div className="text-xs text-base-content/60">
-                                {permission.menu_path}
-                              </div>
-                            )}
-                          </div>
-                        </label>
-                      ))}
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

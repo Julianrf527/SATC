@@ -1,646 +1,466 @@
 # MANUAL DE PERMISOS — SISTEMA SATC
 
-**Sistema de Apoyo Técnico Corpochivor**  
-**Versión:** develop  
-**Fecha:** 16 de junio de 2026  
-**Audiencia:** Administradores del sistema, coordinadores, soporte técnico
+**Sistema de Administración de Trámites de Corpochivor**
+**Actualizado:** 16 de octubre de 2026
+**Audiencia:** administradores del sistema, coordinadores y soporte técnico
+
+> Este manual describe los permisos tal como están definidos hoy en el sistema.
+> La lista oficial de permisos, sus descripciones y sus dependencias vive en
+> `app-users/db/permission_catalog.py` (ver sección 10).
 
 ---
 
-## 1. INTRODUCCIÓN
+## 1. CÓMO FUNCIONAN LOS PERMISOS Y LOS ROLES
 
-El sistema SATC implementa un modelo de control de acceso basado en permisos (PBAC — Permission-Based Access Control). Cada usuario tiene un **rol**, y cada rol tiene una lista de **permisos** asignados. Los permisos controlan simultáneamente dos cosas:
+- Un **permiso** abre una pantalla del menú, habilita acciones en el servidor, o
+  ambas cosas. Algunos permisos no tienen pantalla propia: solo habilitan acciones
+  (por ejemplo, revisar documentos o hacer cargue histórico).
+- Un **rol** es un conjunto de permisos con un nombre (por ejemplo, "Abogado
+  infracciones"). Cada usuario tiene **un** rol; al cambiar los permisos de un
+  rol, cambian para todos los usuarios que lo tienen.
+- El control es doble: aunque alguien escriba a mano la dirección de una
+  pantalla, si no tiene el permiso el sistema lo devuelve al inicio, y el servidor
+  rechaza la operación (error 403 "sin permisos").
 
-1. **Visibilidad en la interfaz:** qué categorías y pestañas aparecen en el menú lateral
-2. **Acceso a la API:** qué operaciones puede ejecutar en el servidor
+### 1.1 Reglas de la pantalla "Roles y permisos"
 
-No existe forma de saltarse este control: aunque un usuario conociera la URL directa de una función, el backend rechaza la solicitud con HTTP 403 si no tiene el permiso correspondiente.
+- Un administrador **solo puede otorgar los permisos que su propio rol tiene**.
+  La pantalla solo le muestra esos permisos y el servidor rechaza cualquier otro.
+- Solo ve (y por tanto solo puede editar) los roles cuyos permisos tiene él
+  mismo, y no puede eliminar un rol con permisos que no posee.
+- Un rol **no se puede eliminar** mientras tenga usuarios asignados.
+- Cada permiso muestra su **descripción** ("Desbloquea X. Sirve para Y."). La
+  descripción es obligatoria (máximo 200 caracteres) y se puede editar en la
+  pantalla de permisos.
+- El nombre del rol admite máximo 20 caracteres.
 
-### 1.1 Cómo funciona técnicamente
+### 1.2 Cuándo se ven reflejados los cambios
 
-El token de sesión incluye la lista completa de permisos del usuario. El API Gateway inyecta esta lista en cada solicitud al microservicio. El microservicio verifica el permiso antes de ejecutar cualquier operación sensible. En el frontend, el componente `RequirePermission` redirige a inicio (`/`) si el usuario navega a una ruta para la que no tiene permiso.
-
----
-
-## 2. CATÁLOGO COMPLETO DE PERMISOS
-
-El sistema tiene **21 permisos** organizados en 6 categorías. Los permisos marcados con 🔇 no generan elemento de menú — actúan únicamente en el backend.
-
-| #   | Nombre del permiso            | Categoría      | Ruta de menú                |
-| --- | ----------------------------- | -------------- | --------------------------- |
-| 1   | `admin_roles_y_permisos`                 | Administración | `/user/role`                |
-| 2   | `admin_registrar_usuarios`        | Administración | `/user/add`                 |
-| 3   | `admin_gestionar_usuarios`    | Administración | `/user/manage`              |
-| 4   | `expediente_gestionar`        | Expedientes    | `/file/manage`              |
-| 5   | `expediente_consultar`        | Expedientes    | `/file/consult`             |
-| 6   | `expediente_alertas`          | Expedientes    | `/file/alerts`              |
-| 7   | `expediente_asignar`          | Expedientes    | `/file/assign_manage`       |
-| 8   | `infraccion_gestionar`        | Infracciones   | `/infraction/manage`        |
-| 9   | `infraccion_consultar`        | Infracciones   | `/infraction/consult`       |
-| 10  | `infraccion_alertas`          | Infracciones   | `/infraction/alerts`        |
-| 11  | `infraccion_asignar`          | Infracciones   | `/infraction/assign_manage` |
-| 12  | `infraccion_asignar_informes` | Infracciones   | `/infraction/reports`       |
-| 13  | `documento_gestionar`         | Documentos     | `/document/manage`          |
-| 14  | `documento_crear` 🔇          | Documentos     | _(sin menú)_                |
-| 15  | `documento_revisar` 🔇        | Documentos     | _(sin menú)_                |
-| 16  | `involucrado_gestionar`       | Involucrados   | `/involved/manage`          |
-| 17  | `auditoria_usuarios`          | Auditoría      | `/audit/users`              |
-| 18  | `auditoria_expedientes`       | Auditoría      | `/audit/files`              |
-| 19  | `auditoria_involucrados`      | Auditoría      | `/audit/involved`           |
-| 20  | `auditoria_infracciones`      | Auditoría      | `/audit/infractions`        |
-| 21  | `subir_informes` 🔇           | _(backend)_    | _(sin menú)_                |
+- Los servicios consultan los permisos del usuario en la base de datos y los
+  guardan en memoria unos minutos (hasta 5). Un permiso quitado o agregado puede
+  tardar ese tiempo en aplicarse en todos los módulos.
+- El menú lateral se arma al cargar la aplicación. Después de cambiar un rol o
+  el rol de un usuario, conviene que el usuario recargue la página o cierre
+  sesión y vuelva a ingresar.
+- El sistema permite una sola sesión activa por usuario: al iniciar sesión en
+  otro equipo, la sesión anterior deja de ser válida.
 
 ---
 
-## 3. MENÚ LATERAL — COMPORTAMIENTO DINÁMICO
+## 2. MENÚ LATERAL DINÁMICO
 
-El menú lateral del sistema es completamente dinámico. Se construye en tiempo real a partir de los permisos del usuario autenticado. Si un usuario no tiene ningún permiso de una categoría, esa categoría no aparece en el menú.
+El menú lateral se construye con los permisos del usuario. Cada permiso
+pertenece a una **categoría** según el inicio de su nombre, y la categoría solo
+aparece si el usuario tiene al menos un permiso de ella **con pantalla**.
 
-### 3.1 Categorías del menú
+| Categoría del menú       | Permisos cuyo nombre empieza por |
+| ------------------------ | -------------------------------- |
+| Administración           | `admin_`                         |
+| Sancionatorio            | `sancionatorio_`                 |
+| Infracciones             | `infraccion_`                    |
+| Concesiones de Aguas     | `recurso_`                       |
+| Documentos               | `documento_`                     |
+| Involucrados             | `involucrado_`                   |
+| Auditoría                | `auditoria_`                     |
 
-| Categoría          | Ícono                | Se muestra cuando...                                                                                                                                        |
-| ------------------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Administración** | Libreta de contactos | El usuario tiene al menos uno de: `admin_roles_y_permisos`, `admin_registrar_usuarios`, `admin_gestionar_usuarios`                                                         |
-| **Expedientes**    | Archivo              | El usuario tiene al menos uno de: `expediente_gestionar`, `expediente_consultar`, `expediente_alertas`, `expediente_asignar`                                |
-| **Infracciones**   | Martillo             | El usuario tiene al menos uno de: `infraccion_gestionar`, `infraccion_consultar`, `infraccion_alertas`, `infraccion_asignar`, `infraccion_asignar_informes` |
-| **Documentos**     | Libro                | El usuario tiene `documento_gestionar`                                                                                                                      |
-| **Involucrados**   | Círculo de usuario   | El usuario tiene `involucrado_gestionar`                                                                                                                    |
-| **Auditoría**      | Calendario           | El usuario tiene al menos uno de: `auditoria_usuarios`, `auditoria_expedientes`, `auditoria_involucrados`, `auditoria_infracciones`                         |
+Detalles del armado:
 
-### 3.2 Orden de subelementos dentro de cada categoría
-
-**Expedientes:** Gestionar → Consultar → Alertas → Asignar  
-**Infracciones:** Gestionar → Consultar → Alertas → Asignar → Asignar Informes
-
----
-
-## 4. DESCRIPCIÓN DETALLADA DE CADA PERMISO
-
----
-
-### CATEGORÍA: ADMINISTRACIÓN
-
----
-
-#### `admin_roles_y_permisos` — Administración de roles y permisos
-
-**Ruta:** `/user/role`  
-**Microservicio:** `app-users`
-
-**Qué desbloquea:**
-
-- **Pestaña "Roles"** en el menú de Administración
-- Ver la lista completa de roles existentes en el sistema
-- Crear nuevos roles con nombre personalizado
-- Editar roles existentes (cambiar nombre)
-- Asignar y quitar permisos a un rol usando el formulario de asignación
-- Eliminar roles (siempre que no tengan usuarios asignados)
-- Ver qué permisos tiene cada rol
-
-**Restricciones:**
-
-- No puede crear o modificar usuarios directamente
-- Los cambios en permisos de un rol afectan a todos los usuarios que tengan ese rol asignado
+- Los permisos **sin ruta de menú** (marcados "—" en el catálogo) no generan
+  entrada en el menú.
+- **Infracciones:** `infraccion_informes_subir` e `infraccion_informes_revisar`
+  llevan a la misma pantalla y se muestran como una sola entrada, **Mis informes**.
+- **Concesiones de Aguas:** todos los permisos de revisor y el de técnico llevan
+  a **Mis informes**, que aparece una sola vez. Quien tiene `recurso_gestionar`
+  también ve Mis informes (allí suben sus documentos los abogados).
+- Orden de las entradas: Gestionar → Consultar → Alertas → Asignar → Asignar
+  informes → Mis informes (según lo que tenga cada usuario).
 
 ---
 
-#### `admin_registrar_usuarios` — Creación de usuarios
+## 3. CATÁLOGO COMPLETO DE PERMISOS
 
-**Ruta:** `/user/add`  
-**Microservicio:** `app-users`
+El sistema tiene **32 permisos** en 7 categorías. La descripción es la misma que
+ve el administrador en la pantalla de roles.
 
-**Qué desbloquea:**
+### 3.1 Administración
 
-- **Pestaña "Agregar usuario"** en el menú de Administración
-- Formulario para registrar un nuevo usuario en el sistema
-- Campos disponibles: número de documento, nombre completo, correo electrónico, contraseña inicial, rol asignado
-- El nuevo usuario queda activo inmediatamente
+| Permiso                    | Ruta de menú    | Descripción |
+| -------------------------- | --------------- | ----------- |
+| `admin_roles_y_permisos`   | `/user/role`    | Desbloquea la pantalla Roles y permisos. Sirve para crear, editar y eliminar roles y permisos (solo puede otorgar permisos que su propio rol tenga). |
+| `admin_registrar_usuarios` | `/user/add`     | Desbloquea la pantalla Registrar usuario. Sirve para crear cuentas de usuario y asignarles un rol. |
+| `admin_gestionar_usuarios` | `/user/manage`  | Desbloquea la pantalla Gestionar usuarios. Sirve para editar datos, cambiar el rol y activar o desactivar usuarios. |
 
-**Restricciones:**
+Notas: los usuarios no se eliminan, se desactivan. Al registrar o editar un
+usuario, los nombres admiten máximo 20 caracteres y el correo máximo 100. Al
+asignar un rol aplica la misma regla: no se puede dar un rol con permisos que el
+administrador no tenga.
 
-- Solo puede asignar roles que ya existen — no puede crear roles desde aquí
-- No puede ver ni editar usuarios ya creados (eso requiere `admin_gestionar_usuarios`)
+### 3.2 Sancionatorio
 
----
+| Permiso                   | Ruta de menú           | Descripción |
+| ------------------------- | ---------------------- | ----------- |
+| `sancionatorio_gestionar` | `/file/manage`         | Desbloquea la pantalla Gestionar de sancionatorio. Sirve para crear y editar expedientes y diligenciar las etapas a su cargo. |
+| `sancionatorio_consultar` | `/file/consult`        | Desbloquea la pantalla Consulta de sancionatorio. Sirve para ver cualquier expediente en solo lectura y descargarlo. |
+| `sancionatorio_alertas`   | `/file/alerts`         | Desbloquea la pestaña Alertas de sancionatorio. Sirve para ver los vencimientos de sus expedientes o de todos. |
+| `sancionatorio_asignar`   | `/file/assign_manage`  | Desbloquea la pantalla Asignar de sancionatorio. Sirve para asignar o cambiar el abogado responsable de un expediente. |
 
-#### `admin_gestionar_usuarios` — Gestión de usuarios existentes
+Solo aparecen como abogados asignables los usuarios con `sancionatorio_gestionar`.
 
-**Ruta:** `/user/manage`  
-**Microservicio:** `app-users`
+### 3.3 Infracciones
 
-**Qué desbloquea:**
+| Permiso                       | Ruta de menú                 | Descripción |
+| ----------------------------- | ---------------------------- | ----------- |
+| `infraccion_gestionar`        | `/infraction/manage`         | Desbloquea la pantalla Gestionar de infracciones. Sirve para crear y editar expedientes y diligenciar las etapas a su cargo. |
+| `infraccion_consultar`        | `/infraction/consult`        | Desbloquea la pantalla Consulta de infracciones. Sirve para ver cualquier expediente en solo lectura y descargarlo. |
+| `infraccion_alertas`          | `/infraction/alerts`         | Desbloquea la pestaña Alertas de infracciones. Sirve para ver los vencimientos de sus expedientes o de todos. |
+| `infraccion_asignar`          | `/infraction/assign_manage`  | Desbloquea la pantalla Asignar de infracciones. Sirve para asignar o cambiar el encargado responsable de un expediente. |
+| `infraccion_asignar_informes` | `/infraction/reports`        | Desbloquea la pantalla Informes de infracciones. Sirve para asignar cada informe técnico a un profesional y a un revisor. |
+| `infraccion_informes_subir`   | `/infraction/my-reports`     | Desbloquea Mis informes de infracciones. Sirve para subir los informes técnicos que le asignaron como profesional. |
+| `infraccion_informes_revisar` | `/infraction/my-reports`     | Desbloquea Mis informes de infracciones. Sirve para revisar (aprobar o devolver) los informes técnicos que le asignaron como revisor. |
+| `infraccion_super_gestion`    | —                            | Desbloquea el cargue manual de informes técnicos. Sirve para cargar informes históricos o manuales sin pasar por el flujo de revisión. |
 
-- **Pestaña "Gestionar usuarios"** en el menú de Administración
-- Ver la lista completa de usuarios del sistema con su estado (activo/inactivo)
-- Buscar usuarios por nombre, documento o correo
-- Editar datos de un usuario (nombre, correo, rol)
-- Activar o desactivar usuarios (bloquear acceso sin eliminar)
-- Cambiar el rol de un usuario
+Solo aparecen como encargados asignables los usuarios con `infraccion_gestionar`.
+En la pantalla Informes solo se pueden elegir como profesional usuarios con
+`infraccion_informes_subir` y como revisor usuarios con `infraccion_informes_revisar`.
 
-**Restricciones:**
+### 3.4 Concesiones de Aguas
 
-- No puede eliminar usuarios de forma permanente (solo desactivar)
-- No puede crear usuarios nuevos (eso requiere `admin_registrar_usuarios`)
+| Permiso                         | Ruta de menú           | Descripción |
+| ------------------------------- | ---------------------- | ----------- |
+| `recurso_gestionar`             | `/recurso/manage`      | Desbloquea la pantalla Gestionar de concesiones. Sirve para crear y editar expedientes, asignarse procesos y proyectar los documentos de cada etapa. |
+| `recurso_consultar`             | `/recurso/consult`     | Desbloquea la pantalla Consulta de concesiones. Sirve para ver cualquier expediente en solo lectura y descargarlo completo. |
+| `recurso_super_gestion`         | —                      | Desbloquea el cargue histórico de concesiones. Sirve para cargar directamente cualquier etapa de expedientes viejos sin revisión ni asignación. |
+| `recurso_lider_juridico`        | `/recurso/my-reports`  | Desbloquea Mis informes de concesiones como líder jurídico. Sirve para revisar los actos administrativos en el primer paso de su cadena. |
+| `recurso_lider_proyecto`        | `/recurso/my-reports`  | Desbloquea Mis informes de concesiones como líder del proyecto. Sirve para revisar tras el líder jurídico o técnico/SIG y aprobar para firma. |
+| `recurso_asesora_subdireccion`  | `/recurso/my-reports`  | Desbloquea Mis informes de concesiones como asesora de subdirección. Sirve para revisar la decisión y el acto del recurso con el líder del proyecto. |
+| `recurso_lider_tecnico`         | `/recurso/my-reports`  | Desbloquea Mis informes de concesiones como líder técnico. Sirve para revisar los conceptos técnicos. |
+| `recurso_sig`                   | `/recurso/my-reports`  | Desbloquea Mis informes de concesiones como SIG. Sirve para revisar el concepto técnico de la etapa 2 junto con el líder técnico. |
+| `recurso_tecnico`               | `/recurso/my-reports`  | Desbloquea Mis informes de concesiones como técnico. Sirve para que el abogado lo elija como técnico y cargar su concepto técnico. |
 
----
+Detalle en la sección 6.
 
-### CATEGORÍA: EXPEDIENTES (Proceso sancionatorio)
+### 3.5 Documentos (flujo genérico de revisión)
 
----
+| Permiso               | Ruta de menú        | Descripción |
+| --------------------- | ------------------- | ----------- |
+| `documento_gestionar` | `/document/manage`  | Desbloquea el módulo de Documentos. Sirve para ver y gestionar los documentos del flujo genérico de revisión. |
+| `documento_crear`     | —                   | Desbloquea la creación en el módulo de Documentos. Sirve para cargar documentos y sus nuevas versiones en el flujo genérico de revisión. |
+| `documento_revisar`   | —                   | Desbloquea la revisión en el módulo de Documentos. Sirve para aprobar o devolver documentos en el flujo genérico de revisión. |
 
-#### `expediente_gestionar` — Gestión completa de expedientes sancionatorios
+Solo pueden elegirse como revisores de un documento los usuarios con
+`documento_revisar`. Este módulo es independiente de los informes técnicos de
+Infracciones y de los documentos de Concesiones de Aguas, que tienen su propio
+flujo de revisión dentro de cada módulo.
 
-**Ruta:** `/file/manage`  
-**Microservicio:** `app-sanctioning`
+### 3.6 Involucrados
 
-**Qué desbloquea:**
+| Permiso                 | Ruta de menú        | Descripción |
+| ----------------------- | ------------------- | ----------- |
+| `involucrado_gestionar` | `/involved/manage`  | Desbloquea el módulo de Involucrados. Sirve para registrar y editar las personas naturales o jurídicas vinculadas a los expedientes. |
 
-- **Pestaña "Gestionar"** en el menú de Expedientes
-- Lista completa de todos los expedientes sancionatorios del sistema con filtros
-- Crear un nuevo expediente sancionatorio (radicado, fecha, datos del caso)
-- Ver el detalle completo del expediente: datos generales, quejoso, recursos afectados, involucrados, etapas procesales, actos administrativos, comunicaciones
-- Editar datos del expediente (cuando el usuario es el **encargado asignado**)
-- Registrar etapas procesales:
-  - Indagación preliminar
-  - Medida preventiva
-  - Inicio del proceso sancionatorio
-  - Formulación de cargos
-  - Apertura/cierre de etapa probatoria
-  - Decisión de fondo
-  - Ejecución de la sanción
-  - Cesación
-- Crear y editar actos administrativos
-- Registrar comunicaciones y notificaciones
-- Descargar el PDF unificado del expediente
-- Aparece como **opción disponible para ser asignado como encargado** cuando un usuario con `expediente_asignar` hace una asignación
+### 3.7 Auditoría (solo lectura)
 
-**Restricciones importantes:**
-
-- Las operaciones de **escritura** (editar, crear etapas, actos) solo funcionan si el usuario es el **abogado responsable (encargado)** del expediente. Ver un expediente de otro abogado es posible, modificarlo no.
-- Requiere ser asignado como encargado por alguien con `expediente_asignar`
-
----
-
-#### `expediente_consultar` — Consulta de expedientes sancionatorios (solo lectura)
-
-**Ruta:** `/file/consult`  
-**Microservicio:** `app-sanctioning`
-
-**Qué desbloquea:**
-
-- **Pestaña "Consultar"** en el menú de Expedientes
-- Lista de todos los expedientes con filtros (radicado, fecha, estado, encargado)
-- Ver el detalle completo de cualquier expediente en modo solo lectura
-- Ver todas las etapas, actos, comunicaciones y documentos adjuntos
-- Descargar el PDF del expediente
-
-**Restricciones:**
-
-- **No puede crear, editar ni registrar ninguna etapa o acto**
-- Solo lectura de toda la información
-- Diferencia con `expediente_gestionar`: este permiso no da acceso a formularios de edición
+| Permiso                  | Ruta de menú          | Descripción |
+| ------------------------ | --------------------- | ----------- |
+| `auditoria_usuarios`     | `/audit/users`        | Desbloquea la auditoría de usuarios. Sirve para consultar el historial de cambios en usuarios, roles y permisos. |
+| `auditoria_expedientes`  | `/audit/files`        | Desbloquea la auditoría de sancionatorio. Sirve para consultar el historial de cambios en los expedientes sancionatorios. |
+| `auditoria_involucrados` | `/audit/involved`     | Desbloquea la auditoría de involucrados. Sirve para consultar el historial de cambios en los involucrados. |
+| `auditoria_infracciones` | `/audit/infractions`  | Desbloquea la auditoría de infracciones. Sirve para consultar el historial de cambios en los expedientes de infracción. |
 
 ---
 
-#### `expediente_alertas` — Alertas de expedientes
+## 4. DEPENDENCIAS OBLIGATORIAS ENTRE PERMISOS
 
-**Ruta:** `/file/alerts`  
-**Microservicio:** `app-sanctioning`
+Algunos permisos **exigen** tener otro en el mismo rol. La dependencia va en un
+solo sentido: tener el permiso requerido no obliga a tener el dependiente.
 
-**Qué desbloquea:**
+| Si el rol tiene...               | ...debe tener también    |
+| -------------------------------- | ------------------------ |
+| `sancionatorio_alertas`          | `sancionatorio_consultar` |
+| `sancionatorio_asignar`          | `sancionatorio_consultar` |
+| `infraccion_alertas`             | `infraccion_consultar`    |
+| `infraccion_asignar`             | `infraccion_consultar`    |
+| `infraccion_asignar_informes`    | `infraccion_consultar`    |
+| `infraccion_informes_subir`      | `infraccion_consultar`    |
+| `infraccion_informes_revisar`    | `infraccion_consultar`    |
+| `infraccion_super_gestion`       | `infraccion_gestionar`    |
+| `documento_crear`                | `documento_gestionar`     |
+| `documento_revisar`              | `documento_gestionar`     |
+| `recurso_super_gestion`          | `recurso_gestionar`       |
+| `recurso_tecnico`                | `recurso_consultar`       |
+| `recurso_lider_juridico`         | `recurso_consultar`       |
+| `recurso_lider_proyecto`         | `recurso_consultar`       |
+| `recurso_asesora_subdireccion`   | `recurso_consultar`       |
+| `recurso_lider_tecnico`          | `recurso_consultar`       |
+| `recurso_sig`                    | `recurso_consultar`       |
 
-- **Pestaña "Alertas"** en el menú de Expedientes
-- Panel de alertas automáticas calculadas sobre los expedientes
-- Ver expedientes próximos a vencer términos procesales
-- Ver expedientes con términos ya vencidos
-- Indicadores de urgencia por colores según criticidad del vencimiento
+### 4.1 Comportamiento de la pantalla de roles
 
-**Restricciones:**
+- Un permiso dependiente aparece **bloqueado** (no se puede marcar) mientras no
+  esté marcado el permiso que requiere; debajo se indica "Requiere: …".
+- Al **desmarcar** un permiso requerido, se desmarcan automáticamente los
+  permisos que dependen de él, y la pantalla avisa cuáles se quitaron.
+- El botón "Todos" de una categoría marca primero los requeridos y luego sus
+  dependientes; los que exigen un permiso de otra categoría que no esté marcado
+  quedan sin marcar.
+- Si un rol (por ejemplo, uno creado antes de existir estas reglas) tiene un
+  permiso sin su requerido, la pantalla lo lista y **no deja guardar** hasta
+  corregirlo.
 
-- Solo lectura — no puede tomar acciones desde esta pantalla
-- Las alertas se calculan automáticamente según las fechas del proceso
+### 4.2 Validación en el servidor
 
----
-
-#### `expediente_asignar` — Asignación de encargados en expedientes
-
-**Ruta:** `/file/assign_manage`  
-**Microservicio:** `app-sanctioning`
-
-**Qué desbloquea:**
-
-- **Pestaña "Asignar"** en el menú de Expedientes
-- Ver todos los expedientes con su encargado actual
-- Cambiar el encargado de un expediente individual
-- **Asignación masiva (bulk):** seleccionar múltiples expedientes y cambiar su encargado con una sola acción
-- Ver la lista de usuarios disponibles para ser encargados (usuarios con `expediente_gestionar`)
-
-**Restricciones:**
-
-- Solo puede asignar como encargados a usuarios que tienen `expediente_gestionar`
-- No puede ver ni editar el contenido de los expedientes desde esta vista
-
----
-
-### CATEGORÍA: INFRACCIONES
-
----
-
-#### `infraccion_gestionar` — Gestión completa de infracciones
-
-**Ruta:** `/infraction/manage`  
-**Microservicio:** `app-infraction`
-
-**Qué desbloquea:**
-
-- **Pestaña "Gestionar"** en el menú de Infracciones
-- Lista completa de todos los expedientes de infracción con filtros
-- Crear un nuevo expediente de infracción
-- Ver el detalle completo del expediente de infracción
-- Registrar y editar etapas:
-  - Respuesta al emplazamiento
-  - Medida preventiva
-  - Acto de cierre
-- Registrar actos administrativos de infracción
-- Subir documentos y archivos relacionados al expediente
-- Descargar el PDF unificado del expediente
-- Aparece como **opción disponible para ser asignado como encargado** cuando un usuario con `infraccion_asignar` hace una asignación
-- Ver los involucrados asociados al expediente
-
-**Restricciones:**
-
-- Las operaciones de escritura solo están disponibles si el usuario es el encargado del expediente
-- No puede gestionar el flujo de informes técnicos (eso requiere `infraccion_asignar_informes`)
+- Al crear o editar un rol, el servidor **rechaza** el guardado si no cumple las
+  dependencias e indica qué falta (por ejemplo: «infraccion_alertas» requiere
+  «infraccion_consultar»).
+- Los roles que ya existían y no cumplen **siguen funcionando** igual; solo se
+  exige la regla cuando se vuelven a guardar.
+- Para conocer esos roles hay un reporte de solo lectura (para soporte técnico,
+  no tiene pantalla): `GET /users/role/dependencias-incumplidas`, que exige
+  `admin_roles_y_permisos` y lista cada rol con los permisos que le faltan.
+  Además, al arrancar, app-users deja esos roles anotados en su log.
 
 ---
 
-#### `infraccion_consultar` — Consulta de infracciones (solo lectura)
+## 5. REGLAS DE ALCANCE: QUÉ EXPEDIENTES VE Y MODIFICA CADA USUARIO
 
-**Ruta:** `/infraction/consult`  
-**Microservicio:** `app-infraction`
+### 5.1 Sancionatorio e Infracciones
 
-**Qué desbloquea:**
+- **Consultar** (`sancionatorio_consultar` / `infraccion_consultar`): ve
+  **cualquier** expediente, en solo lectura, y lo puede descargar.
+- **Gestionar** (`sancionatorio_gestionar` / `infraccion_gestionar`): solo
+  modifica (y, sin permiso de consulta, solo ve) los expedientes de los que es
+  **abogado responsable / encargado**. Para ver expedientes ajenos necesita
+  también el permiso de consultar.
+- **Asignar**: cambia el responsable de los expedientes; solo puede elegir
+  usuarios con el permiso de gestionar del mismo módulo.
 
-- **Pestaña "Consultar"** en el menú de Infracciones
-- Lista de todos los expedientes de infracción en modo lectura
-- Ver el detalle completo de cualquier expediente de infracción
-- Consultar los informes técnicos asociados (VISITA, CONCEPTO, etc.)
-- Descargar el PDF del expediente (sin necesidad de ser el encargado)
+### 5.2 Pestaña Alertas (Sancionatorio e Infracciones)
 
-**Restricciones:**
+- La pestaña se abre con el permiso de alertas del módulo
+  (`sancionatorio_alertas` / `infraccion_alertas`), que a su vez exige el de
+  consultar.
+- Tiene un filtro **"Mis expedientes / Todos"**:
+  - **Mis expedientes** (por defecto): vencimientos de los expedientes de los que
+    el usuario es responsable.
+  - **Todos**: vencimientos de todos los expedientes. El servidor solo lo
+    entrega a quien tiene el permiso de alertas del módulo.
+- Cada alerta enlaza a **Gestionar** si el usuario es el responsable de ese
+  expediente, o a **Consultar** si no lo es. En la vista "Todos" cada alerta se
+  marca como "Mío" u "Otro responsable".
 
-- Solo lectura — sin acceso a formularios de edición ni registro de etapas
+### 5.3 Concesiones de Aguas
 
----
-
-#### `infraccion_alertas` — Alertas de infracciones
-
-**Ruta:** `/infraction/alerts`  
-**Microservicio:** `app-infraction`
-
-**Qué desbloquea:**
-
-- **Pestaña "Alertas"** en el menú de Infracciones
-- Panel de alertas de vencimiento de términos para expedientes de infracción
-- Indicadores de urgencia con fechas límite
-
----
-
-#### `infraccion_asignar` — Asignación de encargados en infracciones
-
-**Ruta:** `/infraction/assign_manage`  
-**Microservicio:** `app-infraction`
-
-**Qué desbloquea:**
-
-- **Pestaña "Asignar"** en el menú de Infracciones
-- Ver todos los expedientes de infracción con su encargado actual
-- Cambiar el encargado de un expediente individual
-- **Asignación masiva (bulk):** múltiples expedientes, un solo encargado nuevo
-- Lista de usuarios disponibles para asignar (usuarios con `infraccion_gestionar`)
+- **Consultar** (`recurso_consultar`): ve cualquier expediente en solo lectura y
+  descarga el expediente completo. Gestionar y super gestión también pueden
+  consultar.
+- **Gestionar** (`recurso_gestionar`): crea y edita la información base de los
+  expedientes. En cada etapa, el abogado usa **"Asignarme para diligenciar"** y
+  desde ese momento solo él (el encargado) gestiona el documento de esa etapa.
+- Los permisos de revisor y de técnico solo dan acceso a **Mis informes** y a la
+  consulta (por eso exigen `recurso_consultar`).
 
 ---
 
-#### `infraccion_asignar_informes` — Gestión del flujo de informes técnicos
+## 6. CONCESIONES DE AGUAS: ROLES DE REVISIÓN
 
-**Ruta:** `/infraction/reports`  
-**Microservicio:** `app-infraction`
+Los documentos que se proyectan en Concesiones de Aguas pasan por una **cadena
+de revisión** según el tipo de documento. Cada paso lo deben revisar **todas**
+las personas del paso (en cualquier orden) antes de avanzar al siguiente. El
+sistema envía cada documento a quienes tengan el permiso de revisor del paso
+pendiente y se les muestra en **Mis informes**.
 
-**Qué desbloquea:**
+| Documento | Lo sube | Paso 1 | Paso 2 |
+| --------- | ------- | ------ | ------ |
+| Auto que admite, requerimiento, acto que aprueba las memorias | Abogado encargado | Líder jurídico | Líder del proyecto |
+| Decisión, acto que resuelve el recurso | Abogado encargado | Líder jurídico | Líder del proyecto **y** asesora de subdirección |
+| Acto que reconoce al tercero interviniente, acto que aprueba las obras | Abogado encargado | Líder jurídico | Líder del proyecto |
+| Concepto técnico (etapa 2) | Técnico seleccionado | Líder técnico **y** SIG | Líder del proyecto |
+| Concepto adicional, de memorias, de subsanación, de obras y segundo de obras | Técnico seleccionado | Líder técnico | — |
 
-- **Pestaña "Asignar Informes"** en el menú de Infracciones
-- Ver la lista de expedientes que requieren un informe técnico
-- Ver los profesionales disponibles para recibir la asignación (usuarios con `subir_informes`)
-- Asignar un informe técnico (VISITA, CONCEPTO, etc.) a un profesional específico
-- Reasignar o cancelar una asignación existente
-- Ver el estado de cada informe: pendiente, en proceso, entregado
-- Confirmar la recepción del informe entregado por el profesional
+> Las cadenas del acto que reconoce al tercero y del acto que aprueba las obras
+> son **provisionales** (pendientes de confirmar con el área jurídica).
 
-**Relación con `subir_informes`:** Este permiso es el del coordinador que **asigna**. El profesional que **sube** el informe tiene `subir_informes`. Son dos roles distintos en el mismo flujo.
+Reglas del flujo:
 
----
+1. Si un revisor **devuelve** el documento, el encargado sube una nueva versión.
+   Quien devolvió no vuelve a revisar: al subir la corrección, el documento sigue
+   con el siguiente revisor pendiente.
+2. Al completar el último paso queda **aprobado para firma**. La siguiente
+   versión que sube el encargado (en PDF) es la firmada y queda aprobada
+   automáticamente.
+3. La **subdirectora firma en físico y no tiene rol en el sistema**.
+4. Un usuario con dos permisos de revisor del mismo paso revisa una vez por cada
+   permiso.
 
-### CATEGORÍA: DOCUMENTOS
+Otros roles:
 
-Los documentos tienen un modelo de tres permisos que forman un flujo de trabajo. Un usuario puede tener uno, dos, o los tres simultáneamente.
-
----
-
-#### `documento_gestionar` — Acceso al módulo de documentos
-
-**Ruta:** `/document/manage`  
-**Microservicio:** `app-docs`
-
-**Qué desbloquea:**
-
-- **Categoría "Documentos"** visible en el menú lateral
-- Acceso a la página de documentos
-
-**Importante:** Este permiso solo controla la visibilidad del menú y la entrada a la página. Las acciones reales dentro del módulo (listar, crear, revisar) requieren `documento_crear` o `documento_revisar`. Un usuario con solo `documento_gestionar` y ninguno de los otros dos verá la página pero recibirá error 403 al intentar cargar la lista de documentos.
-
-**Recomendación:** Asignar siempre junto con `documento_crear` o `documento_revisar`.
-
----
-
-#### `documento_crear` 🔇 — Creación y carga de documentos
-
-**Ruta de menú:** _(ninguna — permiso de backend)_  
-**Microservicio:** `app-docs`
-
-**Qué desbloquea:**
-
-- Crear un nuevo documento en el sistema
-- Completar formulario con nombre, descripción y archivo adjunto
-- Cargar el archivo a MinIO con verificación antivirus (ClamAV)
-- Seleccionar revisores para el documento (de la lista de usuarios con `documento_revisar`)
-- Ver todos los documentos propios y su estado de revisión
-- Subir nuevas versiones de un documento que fue devuelto
-- Recibir notificaciones cuando un revisor aprueba o devuelve el documento
-
-**Flujo típico:**
-
-1. Crea el documento y lo sube → estado: **En revisión**
-2. Revisor lo aprueba → estado: **Aprobado** (notificación al creador)
-3. Revisor lo devuelve → estado: **Devuelto** (notificación al creador)
-4. Creador sube nueva versión → vuelve a **En revisión**
+- **Técnico** (`recurso_tecnico`): solo los usuarios con este permiso aparecen
+  cuando el abogado elige el técnico encargado de un concepto técnico. El técnico
+  sube su concepto desde Mis informes.
+- **Abogado** (`recurso_gestionar`): proyecta y sube los actos de las etapas que
+  se asignó, y los ve en Mis informes.
 
 ---
 
-#### `documento_revisar` 🔇 — Revisión y aprobación de documentos
+## 7. SUPER GESTIÓN (CARGUE HISTÓRICO)
 
-**Ruta de menú:** _(ninguna — permiso de backend)_  
-**Microservicio:** `app-docs`
+Son permisos especiales para cargar expedientes viejos, cuyos documentos ya
+fueron aprobados en su momento. Se recomienda otorgarlos a muy pocas personas.
 
-**Qué desbloquea:**
+### 7.1 Infracciones — `infraccion_super_gestion`
 
-- Aparecer en la lista de revisores disponibles al crear un documento
-- Ver todos los documentos asignados para revisión
-- Descargar el archivo del documento para revisarlo
-- Aprobar un documento (cambia estado a **Aprobado**)
-- Devolver un documento con comentarios (cambia estado a **Devuelto**)
-- Recibir notificaciones cuando se asigna un documento para revisión
-- Ver el historial de versiones y revisiones anteriores
+(Antes se llamaba `infraccion_cargue`; el cambio de nombre conservó los roles
+que lo tenían.) Exige `infraccion_gestionar`. Permite:
 
----
+- Cargar informes técnicos de forma **manual** (históricos), sin pasar por el
+  flujo de asignación y revisión, eligiendo de forma opcional profesional y
+  revisor.
+- Cambiar el modo de cargue de un informe (manual o por flujo). Antes de
+  confirmar, el sistema muestra qué etapas posteriores del expediente se
+  borrarían.
+- Diligenciar la matriz de un informe cargado en modo manual.
+- Crear el informe de seguimiento sin esperar a que venza el término del
+  concepto técnico.
 
-### CATEGORÍA: INVOLUCRADOS
+### 7.2 Concesiones de Aguas — `recurso_super_gestion`
 
----
-
-#### `involucrado_gestionar` — Gestión de involucrados
-
-**Ruta:** `/involved/manage`  
-**Microservicio:** `app-involved`
-
-**Qué desbloquea:**
-
-- **Categoría "Involucrados"** en el menú lateral con pestaña "Gestionar"
-- Ver la lista completa de personas involucradas registradas en el sistema
-- Buscar una persona por tipo de documento (CC, CE, NIT) y número
-- Crear un nuevo registro de persona involucrada
-- Ver el historial de en qué expedientes aparece una persona
-- Editar datos de una persona (actualizar información de contacto)
+Exige `recurso_gestionar`. Permite cargar directamente **cualquier etapa** de un
+expediente con su documento final y sus datos, **omitiendo** la revisión, el
+"Asignarme para diligenciar" y las validaciones de negocio. Las reglas de la
+base de datos sí se aplican (campos obligatorios, datos repetidos). Todos los
+archivos deben ser PDF.
 
 ---
 
-### CATEGORÍA: AUDITORÍA
+## 8. FLUJOS DE TRABAJO Y PERMISOS NECESARIOS
 
-Los permisos de auditoría son de **solo lectura** — ninguno permite modificar datos. Son registros históricos de actividad generados automáticamente por el sistema.
-
----
-
-#### `auditoria_usuarios` — Logs de actividad de usuarios
-
-**Ruta:** `/audit/users`  
-**Microservicio:** `app-users`
-
-**Qué desbloquea:**
-
-- **Subelemento "Usuarios"** en la categoría Auditoría
-- Ver el registro de todas las acciones de administración de usuarios: logins, cambios de contraseña, creación/edición de usuarios, cambios de roles
-- Filtrar por usuario, tipo de evento y rango de fechas
-- Ver IP de origen de cada acción
-
----
-
-#### `auditoria_expedientes` — Logs de expedientes sancionatorios
-
-**Ruta:** `/audit/files`  
-**Microservicio:** `app-sanctioning`
-
-**Qué desbloquea:**
-
-- **Subelemento "Expedientes"** en la categoría Auditoría
-- Ver el registro completo de todas las acciones sobre expedientes sancionatorios: creación, edición, cambio de encargado, registro de etapas, descargas
-- Filtrar por expediente (radicado), usuario, tipo de acción y fechas
-- Datos anteriores y nuevos en cada modificación (historial de cambios)
-
----
-
-#### `auditoria_involucrados` — Logs de involucrados
-
-**Ruta:** `/audit/involved`  
-**Microservicio:** `app-involved`
-
-**Qué desbloquea:**
-
-- **Subelemento "Involucrados"** en la categoría Auditoría
-- Registro de creación y modificaciones de registros de personas involucradas
-
----
-
-#### `auditoria_infracciones` — Logs de expedientes de infracción
-
-**Ruta:** `/audit/infractions`  
-**Microservicio:** `app-infraction`
-
-**Qué desbloquea:**
-
-- **Subelemento "Infracciones"** en la categoría Auditoría
-- Registro completo de acciones sobre expedientes de infracción: creación, edición, asignaciones, subida de informes, cambio de encargado
-- Historial de datos antes y después de cada modificación
-
----
-
-### PERMISO ESPECIAL (Backend)
-
----
-
-#### `subir_informes` 🔇 — Profesional que sube informes técnicos
-
-**Ruta de menú:** _(ninguna)_  
-**Microservicio:** `app-infraction`
-
-**Qué desbloquea:**
-
-- El usuario **aparece en la lista de profesionales disponibles** cuando alguien con `infraccion_asignar_informes` va a asignar un informe técnico
-- Recibir una asignación de informe técnico (VISITA, CONCEPTO TÉCNICO, etc.)
-- Ver los informes técnicos asignados pendientes de entrega
-- Subir el archivo del informe técnico completado
-- Recibir notificaciones de nuevas asignaciones
-
-**Este permiso no genera ninguna pestaña en el menú.** El profesional que lo tiene accede al sistema normalmente y ve sus asignaciones dentro de la vista de infracción, o recibe la notificación directamente.
-
----
-
-## 5. FLUJOS DE TRABAJO Y PERMISOS NECESARIOS
-
-### 5.1 Flujo sancionatorio completo
+### 8.1 Sancionatorio
 
 ```
-Coordinador (expediente_asignar)
-    └─ Asigna expediente a →  Abogado (expediente_gestionar)
-                                  └─ Registra etapas, actos, comunicaciones
-                                  └─ Descarga PDF del expediente
-
-Consultor (expediente_consultar)
-    └─ Solo puede leer — sin editar nada
-
-Jefe de área (auditoria_expedientes)
-    └─ Ve todos los cambios históricos del expediente
+Coordinador (sancionatorio_asignar + sancionatorio_consultar)
+    └─ Asigna el expediente a → Abogado (sancionatorio_gestionar)
+                                   └─ Diligencia las etapas de sus expedientes
+Consulta (sancionatorio_consultar)
+    └─ Ve y descarga cualquier expediente, sin modificar
 ```
 
-### 5.2 Flujo de infracciones con informes técnicos
+### 8.2 Infracciones con informes técnicos
 
 ```
-Coordinador de infracciones (infraccion_asignar + infraccion_asignar_informes)
-    ├─ Asigna expediente a Abogado → (infraccion_gestionar)
-    └─ Asigna informe técnico a Profesional → (subir_informes)
-
-Abogado (infraccion_gestionar)
-    └─ Gestiona el expediente, registra etapas
-
-Profesional técnico (subir_informes)
-    └─ Recibe asignación → sube informe técnico completado
-
-Consultor (infraccion_consultar)
-    └─ Solo lectura: consulta expedientes e informes técnicos
+Coordinador (infraccion_asignar + infraccion_asignar_informes + infraccion_consultar)
+    ├─ Asigna el expediente a → Abogado (infraccion_gestionar)
+    └─ Asigna cada informe técnico a:
+          ├─ Profesional (infraccion_informes_subir + infraccion_consultar) → lo sube en Mis informes
+          └─ Revisor    (infraccion_informes_revisar + infraccion_consultar) → lo aprueba o lo devuelve
 ```
 
-### 5.3 Flujo de documentos
+### 8.3 Concesiones de Aguas
 
 ```
-Creador (documento_gestionar + documento_crear)
-    └─ Crea documento → Asigna revisores → Espera aprobación
-    └─ Si es devuelto: sube nueva versión
-
-Revisor (documento_gestionar + documento_revisar)
-    └─ Recibe notificación → Descarga → Aprueba o Devuelve con comentarios
-
-Nota: documento_gestionar es necesario en ambos roles para ver el módulo.
+Abogado (recurso_gestionar) → "Asignarme" en la etapa → proyecta el acto
+    └─ Revisión: líder jurídico → líder del proyecto (+ asesora en decisión/recurso)
+    └─ Aprobado para firma → firma física → el abogado sube la versión firmada
+Abogado elige técnico (recurso_tecnico) → el técnico sube el concepto
+    └─ Revisión: líder técnico (+ SIG y líder del proyecto en la etapa 2)
 ```
 
-### 5.4 Administrador completo del sistema
+### 8.4 Documentos (flujo genérico)
 
-Un administrador que necesite acceso total requiere los 21 permisos. La forma correcta es crear un rol "admin" con todos los permisos asignados (así está configurado por defecto en el seed del sistema).
+```
+Creador (documento_gestionar + documento_crear) → carga el documento y elige revisores
+Revisor (documento_gestionar + documento_revisar) → aprueba o devuelve
+```
 
 ---
 
-## 6. PERFILES DE ROL SUGERIDOS
+## 9. PERFILES DE ROL SUGERIDOS
 
-Los siguientes perfiles son ejemplos de configuraciones típicas para distintos cargos.
+Ejemplos coherentes con las dependencias de la sección 4. Ajústelos al cargo
+real de cada persona.
 
-### Rol: Abogado sancionatorio
+### Abogado sancionatorio
+`sancionatorio_gestionar`, `sancionatorio_consultar`, `sancionatorio_alertas`,
+`involucrado_gestionar`
 
-| Permiso                 | Incluir |
-| ----------------------- | ------- |
-| `expediente_gestionar`  | ✅      |
-| `expediente_consultar`  | ✅      |
-| `expediente_alertas`    | ✅      |
-| `involucrado_gestionar` | ✅      |
-| `documento_gestionar`   | ✅      |
-| `documento_crear`       | ✅      |
+### Abogado infracciones
+`infraccion_gestionar`, `infraccion_consultar`, `infraccion_alertas`,
+`involucrado_gestionar`
 
-### Rol: Abogado lider sancionatorio
+### Abogado de Concesiones de Aguas
+`recurso_gestionar`, `recurso_consultar`, `involucrado_gestionar`
 
-| Permiso                 | Incluir |
-| ----------------------- | ------- |
-| `expediente_gestionar`  | ✅      |
-| `expediente_consultar`  | ✅      |
-| `expediente_alertas`    | ✅      |
-| `expediente_asignar`    | ✅      |
-| `auditoria_expedientes` | ✅      |
-| `documento_gestionar`   | ✅      |
-| `documento_crear`       | ✅      |
+### Solo consulta
+`sancionatorio_consultar`, `infraccion_consultar`, `recurso_consultar`
+(según los módulos que deba ver)
 
-### Rol: Lider Tecnico
+### Gerente / supervisor (alertas de todos los expedientes)
+`sancionatorio_consultar`, `sancionatorio_alertas`, `sancionatorio_asignar`,
+`infraccion_consultar`, `infraccion_alertas`, `infraccion_asignar`,
+`infraccion_asignar_informes`, `auditoria_expedientes`, `auditoria_infracciones`
 
-| Permiso                | Incluir |
-| ---------------------- | ------- |
-| `infraccion_consultar` | ✅      |
-| `subir_informes`       | ✅      |
+Con el permiso de alertas puede usar el filtro "Todos"; si no es responsable de
+un expediente, la alerta lo lleva a Consultar.
 
-### Rol: Abogado infracciones
+### Técnico de infracciones (sube informes)
+`infraccion_consultar`, `infraccion_informes_subir`
 
-| Permiso                       | Incluir |
-| ----------------------------- | ------- |
-| `infraccion_gestionar`        | ✅      |
-| `infraccion_consultar`        | ✅      |
-| `infraccion_alertas`          | ✅      |
-| `infraccion_asignar`          | ✅      |
-| `infraccion_asignar_informes` | ✅      |
-| `auditoria_infracciones`      | ✅      |
-| `documento_gestionar` | ✅      |
-| `documento_crear`             | ✅      |
+### Revisor de informes técnicos de infracciones
+`infraccion_consultar`, `infraccion_informes_revisar`
 
-### Rol: Revisor de documentos
+### Técnico de Concesiones de Aguas
+`recurso_consultar`, `recurso_tecnico`
 
-| Permiso               | Incluir |
-| --------------------- | ------- |
-| `documento_gestionar` | ✅      |
-| `documento_revisar`   | ✅      |
+### Revisores de Concesiones de Aguas
+Siempre `recurso_consultar` más el permiso del cargo:
 
-### Rol: Administrador
+| Cargo                     | Permiso adicional               |
+| ------------------------- | ------------------------------- |
+| Líder jurídico            | `recurso_lider_juridico`        |
+| Líder del proyecto        | `recurso_lider_proyecto`        |
+| Asesora de subdirección   | `recurso_asesora_subdireccion`  |
+| Líder técnico             | `recurso_lider_tecnico`         |
+| SIG                       | `recurso_sig`                   |
 
-Todos los 21 permisos. Rol creado automáticamente por el sistema al iniciar.
+### Cargue histórico
+- Infracciones: `infraccion_gestionar`, `infraccion_consultar`, `infraccion_super_gestion`
+- Concesiones: `recurso_gestionar`, `recurso_consultar`, `recurso_super_gestion`
 
-### Rol: Solo consulta (auditor externo)
+### Documentos
+- Creador: `documento_gestionar`, `documento_crear`
+- Revisor: `documento_gestionar`, `documento_revisar`
 
-| Permiso                  | Incluir |
-| ------------------------ | ------- |
-| `expediente_consultar`   | ✅      |
-| `infraccion_consultar`   | ✅      |
+### Administrador
+Los 32 permisos. El sistema crea el rol `admin` con todos los permisos al
+instalarse por primera vez, y cada permiso nuevo del catálogo se agrega
+automáticamente a los roles que ya tenían todos los permisos.
 
 ---
 
-## 7. NOTAS TÉCNICAS IMPORTANTES
+## 10. NOTA PARA EL EQUIPO TÉCNICO: SINCRONIZACIÓN DEL CATÁLOGO
 
-### 7.1 Permisos sin menú (`documento_crear`, `documento_revisar`, `subir_informes`)
-
-Estos tres permisos no tienen `menu_path` definido, por lo que el componente `Slider.tsx` los filtra y nunca genera una entrada de menú para ellos. Actúan exclusivamente en el backend controlando qué operaciones de API puede ejecutar el usuario.
-
-### 7.2 Doble capa de protección en expediente_gestionar
-
-El permiso `expediente_gestionar` otorga acceso a la vista de gestión, pero las operaciones de escritura tienen una verificación adicional: el backend comprueba que `abogado_responsable_id == user_id`. Esto significa que un abogado con `expediente_gestionar` puede ver todos los expedientes pero solo puede modificar los que tiene asignados. Esta verificación existe en `app-sanctioning` (función `_get_expediente_con_permiso`) y en `app-infraction`.
-
-### 7.3 Efectos de revocar un permiso
-
-Al quitar un permiso de un rol, el cambio es efectivo en la siguiente solicitud del usuario — no requiere que el usuario cierre sesión. Esto se debe a que el backend valida permisos contra la base de datos en tiempo real (no los lee del token).
-
-### 7.4 Sesión única por usuario
-
-El sistema permite únicamente una sesión activa por cuenta. Si un usuario inicia sesión desde un segundo dispositivo, la sesión anterior queda inválida automáticamente. Esto es un mecanismo de seguridad gestionado por Redis.
+- Los permisos se definen en `app-users/db/permission_catalog.py`:
+  `PERMISOS` (nombre, ruta de menú y descripción), `DEPENDENCIAS` y `RENOMBRES`.
+- Cada vez que arranca app-users se sincroniza el catálogo con la base de datos
+  (`db/permission_sync.py`), sin SQL manual en la VM:
+  - Crea los permisos nuevos y los otorga a los roles que tenían todos los
+    permisos (superadministradores).
+  - Llena la ruta de menú y la descripción **solo si están vacías**: lo editado
+    desde la pantalla de permisos no se pisa. Cambiar una descripción en el
+    catálogo no modifica la que ya existe en la base.
+  - Aplica los **renombres** sobre la misma fila, así los roles conservan el
+    permiso (ejemplo: `infraccion_cargue` → `infraccion_super_gestion`).
+  - Deja la tabla de dependencias igual a `DEPENDENCIAS`.
+  - Nunca borra permisos ni corrige roles; solo informa en el log los que
+    incumplen dependencias.
+- La descripción es obligatoria (máx. 200 caracteres) y editable desde la
+  pantalla de permisos.
+- Los servicios validan los permisos **por su nombre**. No cambie el nombre ni
+  elimine desde la pantalla un permiso del catálogo: el servicio dejaría de
+  reconocerlo y, al reiniciar app-users, el permiso del catálogo se volvería a
+  crear. Los cambios de nombre se hacen agregándolos a `RENOMBRES`.
 
 ---
 
-_Documento generado a partir del análisis del código fuente de los microservicios `app-users`, `app-sanctioning`, `app-infraction`, `app-docs`, `app-involved` y el frontend React del sistema SATC._
+_Documento elaborado a partir del código fuente de `app-users`,
+`app-sancionatoria`, `app-infraction`, `app-recurso`, `app-docs`, `app-involved`
+y el frontend del sistema SATC (octubre de 2026)._

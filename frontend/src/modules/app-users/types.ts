@@ -7,6 +7,10 @@ export type Permiso = {
   id: number;
   nombre: string;
   menu_path: string;
+  /** Texto corto obligatorio "Desbloquea X. Sirve para Y.". */
+  descripcion?: string | null;
+  /** Nombres de los permisos que este exige en el mismo rol (vienen del backend). */
+  requiere?: string[];
 };
 
 export type Rol = {

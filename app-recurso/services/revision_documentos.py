@@ -81,6 +81,7 @@ from db.models.documento_proceso import (
 import services.docs as docs_svc
 import services.notification as notif_svc
 import services.users as users_svc
+from services.usos_archivos import FilesConRegistro
 
 logger = logging.getLogger(__name__)
 
@@ -577,7 +578,9 @@ async def _motivo_sin_turno(flujo: FlujoDocumento, ctx: Contexto, mios: frozense
 
 def servicio() -> ServicioDocumento:
     # files_client se resuelve en cada llamada para que los tests puedan sustituirlo.
-    return ServicioDocumento(MODELOS_DOCUMENTO, FLUJO, files=docs_svc.files_client)
+    # FilesConRegistro: las sumas de uso del servicio compartido (versiones y
+    # adjuntos) se compensan si la petición falla (services/usos_archivos.py).
+    return ServicioDocumento(MODELOS_DOCUMENTO, FLUJO, files=FilesConRegistro(docs_svc.files_client))
 
 
 def http_error(e: ReviewError) -> HTTPException:

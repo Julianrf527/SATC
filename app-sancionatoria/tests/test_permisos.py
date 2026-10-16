@@ -340,10 +340,10 @@ def alerta_fija(monkeypatch):
     es_responsable, no de las reglas de plazos (services/alertas.py)."""
     import routes.expediente_alertas as alertas_mod
 
-    async def _calcular(radicado, db, fecha_hoy):
-        return {"x": {"tipo": "x", "semaforo": {"estado": "verde"}}}
+    async def _calcular(expediente_ids, db, fecha_hoy):
+        return {i: {"x": {"tipo": "x", "semaforo": {"estado": "verde"}}} for i in expediente_ids}
 
-    monkeypatch.setattr(alertas_mod, "calcular_alertas_expediente", _calcular)
+    monkeypatch.setattr(alertas_mod, "calcular_alertas_expedientes", _calcular)
 
 
 class TestAlertasAlcance:
@@ -392,3 +392,52 @@ class TestAlertasAlcance:
         permisos({ALERTAS})
         resp = await api.get("/expediente/alerts/all?alcance=otro", headers=gateway_headers(5))
         assert resp.status_code == 422
+
+
+# ── Asignar encargado: la persona elegida debe tener sancionatorio_gestionar ──
+
+@pytest.fixture
+def encargado_mod(monkeypatch):
+    """Permisos por usuario en routes.expediente_encargado (usa services.users
+    directamente) y sin llamadas a app-users."""
+    import routes.expediente_encargado as mod
+
+    permisos_por_usuario: dict[int, set[str]] = {}
+
+    async def _verify(user_id, permission):
+        return permission in permisos_por_usuario.get(user_id, set())
+
+    async def _info(ids):
+        return {}
+
+    async def _notif(**_k):
+        return {"ok": True, "message": ""}
+
+    monkeypatch.setattr(mod, "verify_permission", _verify)
+    monkeypatch.setattr(mod, "get_user_info", _info)
+    monkeypatch.setattr(mod, "create_user_notification", _notif)
+    return permisos_por_usuario
+
+
+class TestEncargadoElegido:
+    async def test_individual_sin_permiso_400(self, api, make_expediente, encargado_mod):
+        encargado_mod.update({5: {ASIGNAR}, 7: set()})
+        exp = await make_expediente(encargado_id=None)
+        resp = await api.patch(f"/expediente/{exp.id}/charge/7", headers=gateway_headers(5))
+        assert resp.status_code == 400
+        assert "sancionatorio_gestionar" in resp.json()["detail"]
+
+    async def test_individual_con_permiso_y_quitar(self, api, make_expediente, encargado_mod):
+        encargado_mod.update({5: {ASIGNAR}, 7: {GESTIONAR}})
+        exp = await make_expediente(encargado_id=None)
+        resp = await api.patch(f"/expediente/{exp.id}/charge/7", headers=gateway_headers(5))
+        assert resp.status_code == 200, resp.text
+        resp = await api.patch(f"/expediente/{exp.id}/charge/0", headers=gateway_headers(5))
+        assert resp.status_code == 200, resp.text
+
+    async def test_masivo_sin_permiso_400(self, api, make_expediente, encargado_mod):
+        encargado_mod.update({5: {ASIGNAR}, 7: set()})
+        exp = await make_expediente(encargado_id=None)
+        resp = await api.patch("/expediente/charge/bulk", headers=gateway_headers(5),
+                               json={"expediente_id": [exp.id], "encargado_id": 7})
+        assert resp.status_code == 400

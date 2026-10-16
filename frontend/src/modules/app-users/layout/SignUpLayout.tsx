@@ -222,6 +222,7 @@ export default function SignUpLayout({ setToast }: Props) {
                     type="email"
                     required
                     inputRef={emailRef}
+                    maxLength={100}
                   />
                 </div>
               </div>

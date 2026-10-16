@@ -32,15 +32,17 @@ export type GuardarPermisoVars = {
   id?: string;
   name: string;
   menu_path: string;
+  /** Obligatoria: "Desbloquea X. Sirve para Y." (máx. 200). */
+  descripcion: string;
 };
 
 export function useSavePermissionMutation() {
   const invalidar = useInvalidarPermisos();
   return useMutation({
-    mutationFn: ({ id, name, menu_path }: GuardarPermisoVars) =>
+    mutationFn: ({ id, name, menu_path, descripcion }: GuardarPermisoVars) =>
       apiRequest(
         id ? USERS_ENDPOINTS.PERMISSION_UPDATE(id) : USERS_ENDPOINTS.PERMISSION_ADD,
-        { method: id ? "PUT" : "POST", ...jsonBody({ name, menu_path }) },
+        { method: id ? "PUT" : "POST", ...jsonBody({ name, menu_path, descripcion }) },
       ),
     onSuccess: invalidar,
   });

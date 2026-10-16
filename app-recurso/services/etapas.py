@@ -76,7 +76,8 @@ logger = logging.getLogger(__name__)
 MSG_NO_ENCARGADO = "Solo el encargado de este proceso puede gestionarlo (V2)"
 MSG_YA_TIENE_ACTO = "Esta etapa ya tiene su acto administrativo firmado y numerado"
 MSG_SIN_PROCESO = "La etapa no tiene un proceso de revisión vigente. Recarga"
-MSG_NO_TECNICO = "El usuario seleccionado no tiene el permiso de técnico (recurso_tecnico) (V3)"
+MSG_NO_TECNICO = "El usuario elegido no tiene el permiso de técnico (recurso_tecnico) (V3)"
+MSG_NO_ABOGADO = "El usuario elegido no tiene el permiso de abogado (recurso_gestionar)"
 MSG_SOLO_TECNICO = "Solo el técnico seleccionado puede cargar este concepto (V3)"
 
 # ───────────────────────────────────────────────────────── catálogos de C
@@ -108,6 +109,68 @@ PADRES_CONCEPTO: dict[str, tuple[str, str]] = {
     "obras": ("obras", "concepto_tecnico_id"),
     "obras_segundo": ("obras", "concepto_tecnico_segundo_id"),
 }
+
+# ─── Campos que el técnico diligencia en cada concepto (UNA sola fuente) ───
+# La usan la validación de "Cargar versión final" (routes/etapa_concepto.py),
+# GET /etapas/conceptos/{id} (Mis informes) y el nodo de concepto del árbol
+# GET /etapas/{exp} (services/etapas_lectura.py). El front arma sus formularios
+# con ``definicion_campos_concepto`` y no guarda copia.
+# TODO(negocio): plan §4-Etapa 2 — confirmar si los 4 datos de caudal son suficientes.
+# TODO(negocio): el concepto adicional es "igual al de la etapa 2 pero sin visita"; sus
+# caudales quedan opcionales porque el plan no dice si se vuelven a registrar.
+CAUDALES = ("caudal_fuente", "caudal_disponible", "caudal_otorgado", "num_usuarios")
+
+# tipo de concepto → (campos permitidos, obligatorios), además de file_id y fecha_aceptacion.
+CAMPOS_CONCEPTO: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+    "etapa2": (CAUDALES, CAUDALES),
+    "adicional": (CAUDALES, ()),
+    "memorias": (("cumple",), ("cumple",)),
+    "subsanacion": (("cumple",), ("cumple",)),
+    "obras": (("cumple", "fecha_visita_tecnica"), ("cumple", "fecha_visita_tecnica")),
+    "obras_segundo": (("cumple", "fecha_visita_tecnica"), ("cumple", "fecha_visita_tecnica")),
+}
+
+# campo → (tipo de dato para el formulario, etiqueta). Tipos: fecha | decimal | entero | si_no.
+DEF_CAMPO_CONCEPTO: dict[str, tuple[str, str]] = {
+    "fecha_aceptacion": ("fecha", "Fecha del concepto (firma)"),
+    "fecha_visita_tecnica": ("fecha", "Fecha de visita técnica"),
+    "caudal_fuente": ("decimal", "Caudal fuente (L/s)"),
+    "caudal_disponible": ("decimal", "Caudal disponible (L/s)"),
+    "caudal_otorgado": ("decimal", "Caudal otorgado (L/s)"),
+    "num_usuarios": ("entero", "Número de usuarios"),
+    "cumple": ("si_no", "¿Cumple?"),
+}
+
+# Nombres en los mensajes de error ("Faltan datos del concepto: ...").
+NOMBRES_CAMPO = {
+    "caudal_fuente": "caudal fuente", "caudal_disponible": "caudal disponible",
+    "caudal_otorgado": "caudal otorgado", "num_usuarios": "número de usuarios",
+    "cumple": "cumple / no cumple", "fecha_visita_tecnica": "fecha de visita técnica",
+}
+
+
+def definicion_campos_concepto(tipo: str) -> dict:
+    """Definición de los campos del concepto ``tipo`` para el front::
+
+        {"obligatorios": ["file_id", "fecha_aceptacion", ...],
+         "opcionales": [...],
+         "campos": [{"campo", "tipo", "etiqueta", "obligatorio"}, ...]}
+
+    ``obligatorios``/``opcionales`` incluyen ``file_id`` (el PDF firmado);
+    ``campos`` son solo los datos (sin el archivo), en orden de pantalla."""
+    permitidos, obligatorios = CAMPOS_CONCEPTO[tipo]
+    datos = ("fecha_aceptacion", *permitidos)
+    oblig = {"fecha_aceptacion", *obligatorios}
+    return {
+        "obligatorios": ["file_id", "fecha_aceptacion", *obligatorios],
+        "opcionales": [c for c in permitidos if c not in obligatorios],
+        "campos": [
+            {"campo": c, "tipo": DEF_CAMPO_CONCEPTO[c][0], "etiqueta": DEF_CAMPO_CONCEPTO[c][1],
+             "obligatorio": c in oblig}
+            for c in datos
+        ],
+    }
+
 
 # Ámbitos del requerimiento: etapa 3 (directa) o sub-proceso de memorias/obras.
 AMBITOS_REQUERIMIENTO = ("etapa3", "memorias", "obras")
@@ -382,6 +445,23 @@ async def es_tecnico(user_id: int) -> bool:
     return await users_svc.verify_permission(user_id, Permission.TECNICO)
 
 
+async def exigir_tecnico(user_id: Optional[int], actual: Optional[int] = None) -> None:
+    """La persona ELEGIDA como técnico encargado tiene ``recurso_tecnico``
+    (mismo criterio que ``GET /etapas/tecnicos``). 400 si no; fail-closed (si
+    app-users falla, se rechaza). ``actual``: valor que ya tenía la fila (no se
+    revalida si no cambia). Aplica también a super gestión: elegir a alguien sin
+    el permiso lo dejaría a cargo sin poder trabajar."""
+    if user_id and user_id != actual and not await es_tecnico(user_id):
+        raise HTTPException(status_code=400, detail=MSG_NO_TECNICO)
+
+
+async def exigir_abogado(user_id: Optional[int], actual: Optional[int] = None) -> None:
+    """La persona ELEGIDA como abogado encargado tiene ``recurso_gestionar``
+    (mismo criterio que ``GET /etapas/abogados``). Igual que ``exigir_tecnico``."""
+    if user_id and user_id != actual and not await users_svc.verify_permission(user_id, Permission.MANAGE):
+        raise HTTPException(status_code=400, detail=MSG_NO_ABOGADO)
+
+
 # ─────────────────────────────────────────────────────────── asignación
 
 async def crear_proceso_etapa(
@@ -475,9 +555,11 @@ async def crear_concepto(
 ) -> tuple[ConceptoTecnico, Optional[DocumentoProceso]]:
     """Selección del técnico (V3): crea la fila ``concepto_tecnico`` (etapa 2
     con ``expediente_id``; sub-procesos con NULL enlazados al padre) y su
-    proceso con el técnico como encargado."""
-    if validar_tecnico and not await es_tecnico(tecnico_id):
-        raise HTTPException(status_code=400, detail=MSG_NO_TECNICO)
+    proceso con el técnico como encargado. ``validar_tecnico=False`` solo
+    cuando quien llama YA validó el permiso (``exigir_tecnico``) antes de tocar
+    app-docs."""
+    if validar_tecnico:
+        await exigir_tecnico(tecnico_id)
     concepto = ConceptoTecnico(
         expediente_id=expediente_id if tipo == "etapa2" else None,
         tecnico_encargado_id=tecnico_id,
@@ -559,9 +641,8 @@ async def cargar_concepto_final(
     await db.flush()
     # Uso propio de la columna doc_concepto_tecnico_id (además del de la versión),
     # como crear_acto: si super gestión lo reemplaza luego, la versión sigue
-    # contando y el cleanup de app-docs no lo borra.
-    # TODO(técnico): si algo falla después de este +1 y antes del commit el uso
-    # queda inflado (bajo impacto: solo impide borrar el archivo).
+    # contando y el cleanup de app-docs no lo borra. Si la operación falla
+    # después de este +1, get_db_managed lo compensa (services/usos_archivos.py).
     await _incrementar([file_id])
 
 

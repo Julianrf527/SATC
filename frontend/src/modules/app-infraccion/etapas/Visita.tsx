@@ -5,7 +5,7 @@ import MatrizRecursosAfectadosModal from "../modal/MatrizRecursosAfectadosModal"
 import type { InformeTecnico } from "../types";
 import MatrizRecursosAfectadosView from "./MatrizRecursosAfectadosView";
 
-const PERMISO_CARGUE = "infraccion_cargue";
+const PERMISO_CARGUE = "infraccion_super_gestion";
 const STAGE_NAME = "Visita Técnica";
 
 type Props = {
