@@ -308,3 +308,51 @@ class TestEstadoExpedienteCascade:
 
     def test_nada_aplica_devuelve_none(self):
         assert _evaluar_uno(**self._base_kwargs()) is None
+
+
+class TestPersonaElegidaConPermiso:
+    """5.2: la persona elegida (profesional / revisor) debe tener el permiso con
+    que la pantalla AsignarInformes arma sus listas (GET /informes/usuarios-*)."""
+
+    @staticmethod
+    def _solo(monkeypatch, negado: str):
+        async def _verify(user_id, permission):
+            return permission != negado
+
+        monkeypatch.setattr(reports_mod, "verify_permission", _verify)
+
+    async def test_asignar_profesional_sin_permiso_400(self, client, make_expediente, make_informe, monkeypatch):
+        self._solo(monkeypatch, Permission.UPLOAD_REPORTS)
+        exp = await make_expediente(abogado_responsable_id=7)
+        informe = await make_informe(exp.id)
+        resp = await client.post(
+            f"/informes/{informe.id}/asignar",
+            json={"profesional_id": 10, "revisor_id": 20},
+            headers=gateway_headers(1),
+        )
+        assert resp.status_code == 400
+        assert "infraccion_informes_subir" in resp.json()["detail"]
+
+    async def test_cargue_manual_profesional_sin_permiso_400(self, client, make_expediente, make_informe, monkeypatch):
+        self._solo(monkeypatch, Permission.UPLOAD_REPORTS)
+        exp = await make_expediente(abogado_responsable_id=7)
+        informe = await make_informe(exp.id, modo="MANUAL")
+        resp = await client.post(
+            f"/informes/{informe.id}/cargue-manual",
+            json={"file_id": 123, "fecha_recibido": "2024-01-01", "fecha_aceptacion": "2024-01-02",
+                  "profesional_id": 10},
+            headers=gateway_headers(1),
+        )
+        assert resp.status_code == 400
+
+    async def test_cargue_manual_revisor_sin_permiso_400(self, client, make_expediente, make_informe, monkeypatch):
+        self._solo(monkeypatch, Permission.REVIEW_REPORTS)
+        exp = await make_expediente(abogado_responsable_id=7)
+        informe = await make_informe(exp.id, modo="MANUAL")
+        resp = await client.post(
+            f"/informes/{informe.id}/cargue-manual",
+            json={"file_id": 123, "fecha_recibido": "2024-01-01", "fecha_aceptacion": "2024-01-02",
+                  "revisor_id": 20},
+            headers=gateway_headers(1),
+        )
+        assert resp.status_code == 400

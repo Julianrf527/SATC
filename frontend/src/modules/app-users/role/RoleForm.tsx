@@ -21,6 +21,10 @@ export default function RoleForm({ permisoList = [], setToast }: Props) {
     searchTerm,
     setSearchTerm,
     isSubmitting,
+    incumplimientos,
+    getEstadoPermiso,
+    avisoCascada,
+    cerrarAvisoCascada,
     confirmationModal,
     categories,
     expandedCategories,
@@ -53,6 +57,7 @@ export default function RoleForm({ permisoList = [], setToast }: Props) {
           onSubmit={handleSubmit}
           onDelete={handleDelete}
           onClear={handleClear}
+          incumplimientos={incumplimientos}
         />
 
         {/* Panel de permisos */}
@@ -66,6 +71,9 @@ export default function RoleForm({ permisoList = [], setToast }: Props) {
           onToggleCategory={toggleCategory}
           onToggleCategoryPermissions={toggleCategoryPermissions}
           onTogglePermission={togglePermission}
+          getEstadoPermiso={getEstadoPermiso}
+          avisoCascada={avisoCascada}
+          onCerrarAvisoCascada={cerrarAvisoCascada}
         />
       </div>
 

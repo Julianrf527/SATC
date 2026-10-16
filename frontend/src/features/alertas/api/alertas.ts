@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@shared/lib/api";
-import type { AlertasExpedienteResponse, AlertasTodasResponse, SetToast } from "../types";
+import type { AlertasExpedienteResponse, AlertasPaginadasResponse, SetToast } from "../types";
+import { urlAlertasPaginadas, type FiltrosAlertas } from "../alertasPaginacion";
 import { alertasKeys } from "./queryKeys";
 
 /** Alertas de un expediente (endpoint inyectado por el módulo). */
@@ -13,11 +14,16 @@ export function useAlertasExpedienteQuery(endpoint: string) {
   });
 }
 
-/** Alertas de todos los expedientes del servicio. */
-export function useAlertasTodasQuery(endpoint: string) {
+/**
+ * Una página de las alertas de todos los expedientes del servicio, con los
+ * filtros resueltos en el servidor. Mientras carga otra página o filtro se
+ * conserva la anterior (sin parpadeo de la tabla).
+ */
+export function useAlertasPaginadasQuery(endpoint: string, filtros: FiltrosAlertas) {
   return useQuery({
-    queryKey: alertasKeys.todas(endpoint),
-    queryFn: () => apiRequest<AlertasTodasResponse>(endpoint),
+    queryKey: alertasKeys.pagina(endpoint, filtros),
+    queryFn: () => apiRequest<AlertasPaginadasResponse>(urlAlertasPaginadas(endpoint, filtros)),
+    placeholderData: keepPreviousData,
   });
 }
 

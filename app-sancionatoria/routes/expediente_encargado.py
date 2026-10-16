@@ -18,6 +18,16 @@ router = APIRouter()
 ASSIGN_PERMISSION = Permission.ASSIGN_PERMISSION
 logger = logging.getLogger(__name__)
 
+MSG_SIN_PERMISO_ABOGADO = "El usuario elegido no tiene el permiso de abogado (sancionatorio_gestionar)"
+
+
+async def _exigir_abogado(encargado_id: int) -> None:
+    """El encargado elegido debe poder gestionar: es el mismo criterio con que
+    la pantalla lista a los abogados (get_users_by_permission(FILE_MANAGE)).
+    0 = quitar el encargado (no se valida)."""
+    if encargado_id and not await verify_permission(encargado_id, Permission.FILE_MANAGE):
+        raise HTTPException(status_code=400, detail=MSG_SIN_PERMISO_ABOGADO)
+
 
 class BulkEncargadoRequest(BaseModel):
     expediente_id: List[int]
@@ -36,6 +46,7 @@ async def actualizar_encargado_de_expediente(
 
     if not await verify_permission(user_id, ASSIGN_PERMISSION):
         raise HTTPException(status_code=403, detail="No cuenta con permisos")
+    await _exigir_abogado(encargado_id)
 
     stmt_check = select(Expediente).where(Expediente.id == expediente_id)
     res_check = await db.execute(stmt_check)
@@ -116,6 +127,7 @@ async def actualizar_encargado_bulk(
     expediente_ids = list(dict.fromkeys(data.expediente_id or []))
     if not expediente_ids:
         raise HTTPException(status_code=400, detail="Debe enviar al menos un expediente_id")
+    await _exigir_abogado(data.encargado_id)
 
     new_value = None if data.encargado_id == 0 else data.encargado_id
     updated = []

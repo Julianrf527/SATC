@@ -1,21 +1,23 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CustomSelect from "@shared/ui/form/CustomSelect";
-import type { Alerta, EstadoSemaforo, SetToast } from "./types";
-import { TIPO_LABELS, URGENCIA_ORDER, formatFechaCorta } from "./alertasConfig";
-import { useAlertasTodasQuery, useErrorToast } from "./api/alertas";
+import type { EstadoSemaforo, SetToast } from "./types";
+import { TIPO_LABELS, formatFechaCorta } from "./alertasConfig";
+import { useAlertasPaginadasQuery, useErrorToast } from "./api/alertas";
 import {
   ALCANCE_OPCIONES,
   destinoAlerta,
-  endpointConAlcance,
   type AlcanceAlertas,
   type RutasAlertas,
 } from "./alertasAlcance";
-
-type AlertaFlat = {
-  radicado: string;
-  alertaKey: string;
-} & Alerta;
+import {
+  ALERTAS_POR_PAGINA,
+  DEBOUNCE_RADICADO_MS,
+  TODOS,
+  paginasVisibles,
+  textoMostrando,
+  type FiltrosAlertas,
+} from "./alertasPaginacion";
 
 type Props = {
   alertsAllEndpoint: string;
@@ -24,6 +26,9 @@ type Props = {
   processName: string;
   setToast: SetToast;
 };
+
+const SIN_ESTADISTICAS: Record<EstadoSemaforo, number> = { verde: 0, amarillo: 0, rojo: 0, vencido: 0 };
+const SIN_ALERTAS: never[] = [];
 
 const SEMAFORO_BADGE: Record<EstadoSemaforo, { cls: string; label: string; emoji: string }> = {
   verde:    { cls: "badge-success", label: "Verde",    emoji: "🟢" },
@@ -47,59 +52,70 @@ export default function AlertasExpediente({
 }: Props) {
   const navigate = useNavigate();
   const [alcance, setAlcance] = useState<AlcanceAlertas>("mios");
-  const { data, isPending: isLoading, error } = useAlertasTodasQuery(
-    endpointConAlcance(alertsAllEndpoint, alcance),
-  );
-  useErrorToast(error, setToast, "Error al cargar alertas");
   const [radicadoFilter, setRadicadoFilter] = useState("");
-  const [estadoFilter, setEstadoFilter] = useState("all");
-  const [tipoFilter, setTipoFilter] = useState("all");
+  // Radicado que se consulta: el tecleado, tras DEBOUNCE_RADICADO_MS sin cambios.
+  const [radicadoConsulta, setRadicadoConsulta] = useState("");
+  const [estadoFilter, setEstadoFilter] = useState<FiltrosAlertas["estado"]>(TODOS);
+  const [tipoFilter, setTipoFilter] = useState<string>(TODOS);
   const [page, setPage] = useState(1);
-  const rowsPerPage = 10;
 
-  const alertasFlat = useMemo<AlertaFlat[]>(() => {
-    if (!data) return [];
-    const flat: AlertaFlat[] = [];
-    Object.entries(data.alertas).forEach(([radicado, alertasExp]) => {
-      Object.entries(alertasExp).forEach(([alertaKey, alerta]) => {
-        flat.push({ radicado, alertaKey, ...alerta });
-      });
-    });
-    return flat;
-  }, [data]);
+  useEffect(() => {
+    if (radicadoFilter === radicadoConsulta) return;
+    const timeoutId = setTimeout(() => {
+      setRadicadoConsulta(radicadoFilter);
+      setPage(1);
+    }, DEBOUNCE_RADICADO_MS);
+    return () => clearTimeout(timeoutId);
+  }, [radicadoFilter, radicadoConsulta]);
 
-  const tiposUnicos = useMemo(() => Array.from(new Set(alertasFlat.map((a) => a.tipo))).sort(), [alertasFlat]);
+  // Paginación y filtros en el servidor (los filtros van en la query key).
+  const { data, isPending: isLoading, isPlaceholderData, error } = useAlertasPaginadasQuery(alertsAllEndpoint, {
+    alcance,
+    page,
+    limit: ALERTAS_POR_PAGINA,
+    radicado: radicadoConsulta,
+    estado: estadoFilter,
+    tipo: tipoFilter,
+  });
+  useErrorToast(error, setToast, "Error al cargar alertas");
 
-  const alertasFiltradas = useMemo(() => {
-    const rad = radicadoFilter.trim().toLowerCase();
-    return alertasFlat
-      .filter((a) => {
-        const mRad = rad ? a.radicado.toLowerCase().includes(rad) : true;
-        const mEst = estadoFilter === "all" || a.semaforo.estado === estadoFilter;
-        const mTip = tipoFilter === "all" || a.tipo === tipoFilter;
-        return mRad && mEst && mTip;
-      })
-      .sort((a, b) => {
-        const diff = URGENCIA_ORDER[a.semaforo.urgencia] - URGENCIA_ORDER[b.semaforo.urgencia];
-        return diff !== 0 ? diff : b.semaforo.porcentaje_avance - a.semaforo.porcentaje_avance;
-      });
-  }, [alertasFlat, radicadoFilter, estadoFilter, tipoFilter]);
+  const alertas = data?.alertas ?? SIN_ALERTAS;
+  const total = data?.total ?? 0;
+  const totalPagesServidor = data?.total_pages ?? 0;
+  const totalPages = paginasVisibles(totalPagesServidor);
+  const tiposUnicos = data?.tipos_disponibles ?? SIN_ALERTAS;
+  const stats = data?.estadisticas_semaforo ?? SIN_ESTADISTICAS;
+  const totalSinFiltros = stats.verde + stats.amarillo + stats.rojo + stats.vencido;
 
-  const totalPages = Math.max(1, Math.ceil(alertasFiltradas.length / rowsPerPage));
-  const paginatedData = alertasFiltradas.slice((page - 1) * rowsPerPage, page * rowsPerPage);
+  // Si la página quedó fuera de rango (se resolvieron alertas), ir a la última.
+  useEffect(() => {
+    if (!isPlaceholderData && totalPagesServidor > 0 && page > totalPagesServidor) setPage(totalPagesServidor);
+  }, [isPlaceholderData, totalPagesServidor, page]);
 
-  useEffect(() => setPage(1), [radicadoFilter, estadoFilter, tipoFilter, alcance]);
+  // Cambiar alcance o un filtro vuelve a la página 1.
+  const cambiarAlcance = (valor: AlcanceAlertas) => {
+    setAlcance(valor);
+    setPage(1);
+  };
+  const cambiarEstado = (valor: string) => {
+    setEstadoFilter(valor as FiltrosAlertas["estado"]);
+    setPage(1);
+  };
+  const cambiarTipo = (valor: string) => {
+    setTipoFilter(valor);
+    setPage(1);
+  };
 
   const formatFecha = (f: string) => formatFechaCorta(f, true);
 
-  const hayFiltrosActivos = !!radicadoFilter.trim() || estadoFilter !== "all" || tipoFilter !== "all";
+  const hayFiltrosActivos = !!radicadoFilter.trim() || estadoFilter !== TODOS || tipoFilter !== TODOS;
   const limpiarFiltros = () => {
     setRadicadoFilter("");
-    setEstadoFilter("all");
-    setTipoFilter("all");
+    setRadicadoConsulta("");
+    setEstadoFilter(TODOS);
+    setTipoFilter(TODOS);
+    setPage(1);
   };
-
-  const stats = data?.estadisticas_semaforo ?? { verde: 0, amarillo: 0, rojo: 0, vencido: 0 };
 
   return (
     <>
@@ -156,7 +172,7 @@ export default function AlertasExpediente({
                         type="button"
                         aria-pressed={alcance === value}
                         className={`join-item btn btn-sm flex-1 ${alcance === value ? "btn-warning" : "btn-ghost border-base-300"}`}
-                        onClick={() => setAlcance(value)}
+                        onClick={() => cambiarAlcance(value)}
                       >
                         {label}
                       </button>
@@ -176,7 +192,7 @@ export default function AlertasExpediente({
                     className="select-sm"
                     hidePlaceholderOption
                     value={estadoFilter}
-                    onChange={setEstadoFilter}
+                    onChange={cambiarEstado}
                     options={[
                       { value: "all", label: "Todos los estados" },
                       { value: "verde", label: "🟢 Verde" },
@@ -192,7 +208,7 @@ export default function AlertasExpediente({
                     className="select-sm"
                     hidePlaceholderOption
                     value={tipoFilter}
-                    onChange={setTipoFilter}
+                    onChange={cambiarTipo}
                     options={[
                       { value: "all", label: "Todos los tipos" },
                       ...tiposUnicos.map((t) => ({ value: t, label: TIPO_LABELS[t] ?? t })),
@@ -221,7 +237,10 @@ export default function AlertasExpediente({
               ) : (
                 <>
                   {/* Tabla */}
-                  <div className="overflow-x-auto border border-base-300 rounded-lg">
+                  <div
+                    className={`overflow-x-auto border border-base-300 rounded-lg transition-opacity ${isPlaceholderData ? "opacity-60" : ""}`}
+                    aria-busy={isPlaceholderData}
+                  >
                     <table className="table table-sm w-full">
                       <thead className="bg-base-200">
                         <tr>
@@ -235,7 +254,7 @@ export default function AlertasExpediente({
                         </tr>
                       </thead>
                       <tbody>
-                        {paginatedData.length === 0 ? (
+                        {alertas.length === 0 ? (
                           <tr>
                             <td colSpan={7} className="text-center py-10">
                               <div className="flex flex-col items-center gap-2">
@@ -244,17 +263,17 @@ export default function AlertasExpediente({
                                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 <span className="text-base-content/60 font-medium">
-                                  {alertasFlat.length === 0 ? "¡Todo al día! Sin alertas." : "Sin resultados con los filtros aplicados"}
+                                  {totalSinFiltros === 0 ? "¡Todo al día! Sin alertas." : "Sin resultados con los filtros aplicados"}
                                 </span>
                               </div>
                             </td>
                           </tr>
                         ) : (
-                          paginatedData.map((alerta, idx) => {
+                          alertas.map((alerta) => {
                             const badge = SEMAFORO_BADGE[alerta.semaforo.estado];
                             const destino = destinoAlerta(alerta, rutas);
                             return (
-                              <tr key={`${alerta.radicado}-${alerta.alertaKey}-${idx}`} className="hover">
+                              <tr key={`${alerta.radicado}-${alerta.clave}`} className="hover">
                                 <td>
                                   <div className="flex flex-col items-center gap-0.5">
                                     <span className={`badge ${badge.cls} badge-sm text-white gap-1`}>
@@ -345,13 +364,13 @@ export default function AlertasExpediente({
                   {/* Paginación (mismo formato que asignar encargados) */}
                   <div className="flex justify-between items-center pt-4 border-t border-base-300 mt-4">
                     <div className="text-sm text-base-content/60">
-                      Mostrando {paginatedData.length} de {alertasFiltradas.length} alerta{alertasFiltradas.length !== 1 ? "s" : ""}
+                      {textoMostrando(alertas.length, total)}
                     </div>
                     <div className="join">
                       <button
                         className="join-item btn btn-sm"
                         aria-label="Página anterior"
-                        disabled={page === 1 || alertasFiltradas.length === 0}
+                        disabled={page === 1 || total === 0}
                         onClick={() => setPage(page - 1)}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -359,12 +378,12 @@ export default function AlertasExpediente({
                         </svg>
                       </button>
                       <button className="join-item btn btn-sm no-animation">
-                        Página {alertasFiltradas.length === 0 ? 0 : page} de {totalPages}
+                        Página {total === 0 ? 0 : page} de {totalPages}
                       </button>
                       <button
                         className="join-item btn btn-sm"
                         aria-label="Página siguiente"
-                        disabled={page >= totalPages || alertasFiltradas.length === 0}
+                        disabled={page >= totalPages || total === 0}
                         onClick={() => setPage(page + 1)}
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

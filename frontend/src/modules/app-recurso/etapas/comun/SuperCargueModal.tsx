@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { DatabaseZap } from "lucide-react";
-import type { SetToast } from "../../types";
+import type { CamposConcepto, SetToast } from "../../types";
 import { urlSuperCargue, type RefNodo } from "../nodos";
 import {
   archivosSuper,
@@ -24,6 +24,8 @@ type Props = {
   version: number | null;
   tieneActo: boolean;
   actuales?: Partial<Record<"radicado" | "oficio" | "fijacion" | "constancia" | "concepto" | "respuesta", number | null>>;
+  /** Nodos de concepto: definición de sus campos (del árbol, backend). */
+  camposConcepto?: CamposConcepto;
   setToast: SetToast;
   onClose: () => void;
 };
@@ -41,10 +43,11 @@ export default function SuperCargueModal({
   version,
   tieneActo,
   actuales = {},
+  camposConcepto,
   setToast,
   onClose,
 }: Props) {
-  const s = seccionesSuper(refNodo, tieneActo);
+  const s = seccionesSuper(refNodo, tieneActo, camposConcepto);
   const [form, setForm] = useState<SuperCargueForm>(SUPER_VACIO);
   const [error, setError] = useState<string | null>(null);
   const { ejecutar, ocupado } = useEscritura(expedienteId, setToast);

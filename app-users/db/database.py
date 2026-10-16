@@ -75,6 +75,10 @@ async def init_db(max_retries: int = 8, base_delay: float = 1.5):
                 await conn.execute(text("SELECT pg_advisory_lock(815123002)"))
                 try:
                     await conn.run_sync(models.Base.metadata.create_all, checkfirst=True)
+                    # Columnas nuevas en tablas existentes (create_all no las agrega).
+                    # Debe ir antes del seed: select(Permiso) ya incluye `descripcion`.
+                    from .permission_sync import asegurar_esquema_permisos
+                    await asegurar_esquema_permisos(conn)
                     await _sync_sequences(conn)
                 finally:
                     await conn.execute(text("SELECT pg_advisory_unlock(815123002)"))

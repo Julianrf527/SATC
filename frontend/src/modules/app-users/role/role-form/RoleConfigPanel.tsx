@@ -16,6 +16,8 @@ type Props = {
   onSubmit: () => void;
   onDelete: () => void;
   onClear: () => void;
+  /** Permisos marcados sin sus requeridos: se listan y bloquean el guardado. */
+  incumplimientos: { permiso: string; faltan: string[] }[];
 };
 
 export default function RoleConfigPanel({
@@ -32,6 +34,7 @@ export default function RoleConfigPanel({
   onSubmit,
   onDelete,
   onClear,
+  incumplimientos,
 }: Props) {
   return (
     <div className="xl:w-1/3 flex-none overflow-y-auto h-full">
@@ -152,6 +155,26 @@ export default function RoleConfigPanel({
             </div>
           </div>
 
+          {incumplimientos.length > 0 && (
+            <div role="alert" className="alert alert-warning alert-soft text-sm items-start mb-2">
+              <div>
+                <p className="font-semibold">
+                  El rol no cumple las dependencias de permisos
+                </p>
+                <ul className="list-disc ml-4 mt-1">
+                  {incumplimientos.map((i) => (
+                    <li key={i.permiso}>
+                      {i.permiso} requiere {i.faltan.join(", ")}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1">
+                  Marque lo que falta o desmarque esos permisos para poder guardar.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Botones de acción: siempre al fondo del panel */}
           <div className="flex flex-col gap-2 mt-auto pt-4">
             <button
@@ -161,7 +184,7 @@ export default function RoleConfigPanel({
                   : "bg-green-600 text-white hover:bg-green-700 border-0"
               } w-full`}
               onClick={onSubmit}
-              disabled={isSubmitting}
+              disabled={isSubmitting || incumplimientos.length > 0}
             >
               {isSubmitting ? (
                 <span className="loading loading-spinner"></span>

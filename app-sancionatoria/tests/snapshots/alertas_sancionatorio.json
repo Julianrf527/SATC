@@ -1,0 +1,2026 @@
+{
+ "todas_todos": {
+  "ok": true,
+  "alcance": "todos",
+  "alertas": {
+   "CAR-0001": {
+    "alerta1": {
+     "tipo": "inicio_sancionatorio",
+     "etapa": "INDAGACION PRELIMINAR",
+     "accion_requerida": "Iniciar proceso sancionatorio",
+     "plazo_legal": "6 meses",
+     "msg": "Debe iniciar proceso sancionatorio. Han transcurrido 134 días desde la indagación.",
+     "fecha_inicio": "2025-11-02",
+     "fecha_limite": "2026-05-02",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#EF4444",
+      "porcentaje_avance": 74.03,
+      "urgencia": "alta",
+      "dias_transcurridos": 134,
+      "dias_restantes": 47,
+      "dias_totales": 181,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0003": {
+    "alerta1": {
+     "tipo": "inicio_sancionatorio",
+     "etapa": "INDAGACION PRELIMINAR",
+     "accion_requerida": "Iniciar proceso sancionatorio",
+     "plazo_legal": "6 meses",
+     "msg": "Debe iniciar proceso sancionatorio. Han transcurrido 227 días desde la indagación.",
+     "fecha_inicio": "2025-08-01",
+     "fecha_limite": "2026-02-01",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 227,
+      "dias_restantes": 0,
+      "dias_totales": 184,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0004": {
+    "alerta1": {
+     "tipo": "inicio_sancionatorio",
+     "etapa": "INDAGACION PRELIMINAR",
+     "accion_requerida": "Iniciar proceso sancionatorio",
+     "plazo_legal": "6 meses",
+     "msg": "Debe iniciar proceso sancionatorio. Han transcurrido 15 días desde la indagación.",
+     "fecha_inicio": "2026-03-01",
+     "fecha_limite": "2026-09-01",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#10B981",
+      "porcentaje_avance": 8.15,
+      "urgencia": "baja",
+      "dias_transcurridos": 15,
+      "dias_restantes": 169,
+      "dias_totales": 184,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0005": {
+    "alerta2": {
+     "tipo": "decision_fondo",
+     "etapa": "FORMULACION DE CARGOS",
+     "accion_requerida": "Crear etapa decisión de fondo con acto administrativo",
+     "plazo_legal": "80 días laborales",
+     "msg": "Debe emitir decisión de fondo. Han transcurrido 30 días laborales.",
+     "fecha_notificacion": "2026-02-02",
+     "fecha_limite": "2026-06-01",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#F59E0B",
+      "porcentaje_avance": 37.5,
+      "urgencia": "media",
+      "dias_transcurridos": 30,
+      "dias_restantes": 50,
+      "dias_totales": 80,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "alerta3": {
+     "tipo": "presentacion_descargos",
+     "etapa": "FORMULACION DE CARGOS",
+     "accion_requerida": "Presentar descargos",
+     "plazo_legal": "10 días laborales",
+     "msg": "Debe presentar descargos. Han transcurrido 30 días laborales.",
+     "fecha_notificacion": "2026-02-02",
+     "fecha_limite": "2026-02-16",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 30,
+      "dias_restantes": 0,
+      "dias_totales": 10,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0006": {
+    "alerta6": {
+     "tipo": "presentacion_recurso",
+     "etapa": "DECISION DE FONDO",
+     "accion_requerida": "Presentar recurso",
+     "plazo_legal": "10 días laborales",
+     "msg": "Puede presentar recurso. Han transcurrido 7 días laborales.",
+     "fecha_notificacion": "2026-03-05",
+     "fecha_limite": "2026-03-19",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#EF4444",
+      "porcentaje_avance": 70.0,
+      "urgencia": "alta",
+      "dias_transcurridos": 7,
+      "dias_restantes": 3,
+      "dias_totales": 10,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0010": {
+    "alerta2": {
+     "tipo": "decision_fondo",
+     "etapa": "FORMULACION DE CARGOS",
+     "accion_requerida": "Crear etapa decisión de fondo con acto administrativo",
+     "plazo_legal": "80 días laborales",
+     "msg": "Debe emitir decisión de fondo. Han transcurrido 111 días laborales.",
+     "fecha_notificacion": "2025-10-01",
+     "fecha_limite": "2026-01-30",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 111,
+      "dias_restantes": 0,
+      "dias_totales": 80,
+      "esta_vencido": true
+     },
+     "es_responsable": false
+    },
+    "alerta3": {
+     "tipo": "presentacion_descargos",
+     "etapa": "FORMULACION DE CARGOS",
+     "accion_requerida": "Presentar descargos",
+     "plazo_legal": "10 días laborales",
+     "msg": "Debe presentar descargos. Han transcurrido 111 días laborales.",
+     "fecha_notificacion": "2025-10-01",
+     "fecha_limite": "2025-10-16",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 111,
+      "dias_restantes": 0,
+      "dias_totales": 10,
+      "esta_vencido": true
+     },
+     "es_responsable": false
+    }
+   },
+   "CAR-0011": {
+    "alerta4": {
+     "tipo": "informe_tecnico",
+     "etapa": "APERTURA ETAPA PROBATORIA",
+     "accion_requerida": "Presentar informe técnico",
+     "plazo_legal": "30 días laborales",
+     "msg": "Debe presentar informe técnico. Han transcurrido 39 días laborales.",
+     "fecha_notificacion": "2026-01-20",
+     "fecha_limite": "2026-03-03",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 39,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0013": {
+    "alerta5": {
+     "tipo": "alegato_conclusion",
+     "etapa": "CIERRE ETAPA PROBATORIA",
+     "accion_requerida": "Presentar alegato de conclusión",
+     "plazo_legal": "10 días laborales",
+     "msg": "Debe presentar alegato de conclusión. Han transcurrido 4 días laborales.",
+     "fecha_notificacion": "2026-03-10",
+     "fecha_limite": "2026-03-25",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#F59E0B",
+      "porcentaje_avance": 40.0,
+      "urgencia": "media",
+      "dias_transcurridos": 4,
+      "dias_restantes": 6,
+      "dias_totales": 10,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0015": {
+    "alerta6": {
+     "tipo": "resolucion_recurso",
+     "etapa": "PROBATORIA DE RECURSO",
+     "accion_requerida": "Notificar decisión del recurso",
+     "plazo_legal": "1 año",
+     "msg": "Debe notificar decisión del recurso. Han transcurrido 288 días.",
+     "fecha_presentacion": "2025-06-01",
+     "fecha_limite": "2026-06-01",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#EF4444",
+      "porcentaje_avance": 78.9,
+      "urgencia": "alta",
+      "dias_transcurridos": 288,
+      "dias_restantes": 77,
+      "dias_totales": 365,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0016": {
+    "alerta6": {
+     "tipo": "resolucion_recurso",
+     "etapa": "PROBATORIA DE RECURSO",
+     "accion_requerida": "Notificar decisión del recurso",
+     "plazo_legal": "1 año",
+     "msg": "Debe notificar decisión del recurso. Han transcurrido 470 días.",
+     "fecha_presentacion": "2024-12-01",
+     "fecha_limite": "2025-12-01",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 470,
+      "dias_restantes": 0,
+      "dias_totales": 365,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0018": {
+    "alerta6": {
+     "tipo": "notificacion_recurso",
+     "etapa": "DECISION DE FONDO",
+     "accion_requerida": "Notificar acto administrativo de recurso",
+     "plazo_legal": "1 año",
+     "msg": "Debe notificar el acto de recurso. Han transcurrido 196 días.",
+     "fecha_presentacion": "2025-09-01",
+     "fecha_limite": "2026-09-01",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#F59E0B",
+      "porcentaje_avance": 53.7,
+      "urgencia": "media",
+      "dias_transcurridos": 196,
+      "dias_restantes": 169,
+      "dias_totales": 365,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0021": {
+    "alerta_constancia_1": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "DETALLE MEDIDA PREVENTIVA",
+     "involucrado_nombre": "Nombre10 Apellido10",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 44 días restantes para completar la notificación desde la constancia de citación (2026-03-10).",
+     "fecha_constancia": "2026-03-10",
+     "fecha_limite": "2026-04-29",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#10B981",
+      "porcentaje_avance": 12.0,
+      "urgencia": "baja",
+      "dias_transcurridos": 6,
+      "dias_restantes": 44,
+      "dias_totales": 50,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "alerta_constancia_2": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "DETALLE MEDIDA PREVENTIVA",
+     "involucrado_nombre": "",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 7 días restantes para completar la notificación desde la constancia de citación (2026-02-01).",
+     "fecha_constancia": "2026-02-01",
+     "fecha_limite": "2026-03-23",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#EF4444",
+      "porcentaje_avance": 86.0,
+      "urgencia": "alta",
+      "dias_transcurridos": 43,
+      "dias_restantes": 7,
+      "dias_totales": 50,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "alerta_constancia_3": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "DETALLE MEDIDA PREVENTIVA",
+     "involucrado_nombre": "",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 26 días restantes para completar la notificación desde la constancia de citación (2026-02-20).",
+     "fecha_constancia": "2026-02-20",
+     "fecha_limite": "2026-04-11",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#F59E0B",
+      "porcentaje_avance": 48.0,
+      "urgencia": "media",
+      "dias_transcurridos": 24,
+      "dias_restantes": 26,
+      "dias_totales": 50,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "alerta_constancia_4": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "DETALLE MEDIDA PREVENTIVA",
+     "involucrado_nombre": "Nombre11 Apellido11",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 0 días restantes para completar la notificación desde la constancia de citación (2026-01-20).",
+     "fecha_constancia": "2026-01-20",
+     "fecha_limite": "2026-03-11",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 55,
+      "dias_restantes": 0,
+      "dias_totales": 50,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    },
+    "alerta_constancia_5": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "INICIO PROCESO SANCIONATORIO",
+     "involucrado_nombre": "Nombre10 Apellido10",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 49 días restantes para completar la notificación desde la constancia de citación (2026-03-15).",
+     "fecha_constancia": "2026-03-15",
+     "fecha_limite": "2026-05-04",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#10B981",
+      "porcentaje_avance": 2.0,
+      "urgencia": "baja",
+      "dias_transcurridos": 1,
+      "dias_restantes": 49,
+      "dias_totales": 50,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0022": {
+    "alerta5": {
+     "tipo": "alegato_conclusion",
+     "etapa": "CIERRE ETAPA PROBATORIA",
+     "accion_requerida": "Presentar alegato de conclusión",
+     "plazo_legal": "10 días laborales",
+     "msg": "Debe presentar alegato de conclusión. Han transcurrido 45 días laborales.",
+     "fecha_notificacion": "2026-01-10",
+     "fecha_limite": "2026-01-26",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 45,
+      "dias_restantes": 0,
+      "dias_totales": 10,
+      "esta_vencido": true
+     },
+     "es_responsable": false
+    },
+    "alerta_constancia_1": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "CIERRE ETAPA PROBATORIA",
+     "involucrado_nombre": "Nombre15 Apellido15",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 0 días restantes para completar la notificación desde la constancia de citación (2025-12-01).",
+     "fecha_constancia": "2025-12-01",
+     "fecha_limite": "2026-01-20",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 105,
+      "dias_restantes": 0,
+      "dias_totales": 50,
+      "esta_vencido": true
+     },
+     "es_responsable": false
+    }
+   }
+  },
+  "total_expedientes": 23,
+  "expedientes_con_alertas": 13,
+  "estadisticas_semaforo": {
+   "verde": 3,
+   "amarillo": 4,
+   "rojo": 4,
+   "vencido": 9
+  }
+ },
+ "todas_mios": {
+  "ok": true,
+  "alcance": "mios",
+  "alertas": {
+   "CAR-0001": {
+    "alerta1": {
+     "tipo": "inicio_sancionatorio",
+     "etapa": "INDAGACION PRELIMINAR",
+     "accion_requerida": "Iniciar proceso sancionatorio",
+     "plazo_legal": "6 meses",
+     "msg": "Debe iniciar proceso sancionatorio. Han transcurrido 134 días desde la indagación.",
+     "fecha_inicio": "2025-11-02",
+     "fecha_limite": "2026-05-02",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#EF4444",
+      "porcentaje_avance": 74.03,
+      "urgencia": "alta",
+      "dias_transcurridos": 134,
+      "dias_restantes": 47,
+      "dias_totales": 181,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0003": {
+    "alerta1": {
+     "tipo": "inicio_sancionatorio",
+     "etapa": "INDAGACION PRELIMINAR",
+     "accion_requerida": "Iniciar proceso sancionatorio",
+     "plazo_legal": "6 meses",
+     "msg": "Debe iniciar proceso sancionatorio. Han transcurrido 227 días desde la indagación.",
+     "fecha_inicio": "2025-08-01",
+     "fecha_limite": "2026-02-01",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 227,
+      "dias_restantes": 0,
+      "dias_totales": 184,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0004": {
+    "alerta1": {
+     "tipo": "inicio_sancionatorio",
+     "etapa": "INDAGACION PRELIMINAR",
+     "accion_requerida": "Iniciar proceso sancionatorio",
+     "plazo_legal": "6 meses",
+     "msg": "Debe iniciar proceso sancionatorio. Han transcurrido 15 días desde la indagación.",
+     "fecha_inicio": "2026-03-01",
+     "fecha_limite": "2026-09-01",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#10B981",
+      "porcentaje_avance": 8.15,
+      "urgencia": "baja",
+      "dias_transcurridos": 15,
+      "dias_restantes": 169,
+      "dias_totales": 184,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0005": {
+    "alerta2": {
+     "tipo": "decision_fondo",
+     "etapa": "FORMULACION DE CARGOS",
+     "accion_requerida": "Crear etapa decisión de fondo con acto administrativo",
+     "plazo_legal": "80 días laborales",
+     "msg": "Debe emitir decisión de fondo. Han transcurrido 30 días laborales.",
+     "fecha_notificacion": "2026-02-02",
+     "fecha_limite": "2026-06-01",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#F59E0B",
+      "porcentaje_avance": 37.5,
+      "urgencia": "media",
+      "dias_transcurridos": 30,
+      "dias_restantes": 50,
+      "dias_totales": 80,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "alerta3": {
+     "tipo": "presentacion_descargos",
+     "etapa": "FORMULACION DE CARGOS",
+     "accion_requerida": "Presentar descargos",
+     "plazo_legal": "10 días laborales",
+     "msg": "Debe presentar descargos. Han transcurrido 30 días laborales.",
+     "fecha_notificacion": "2026-02-02",
+     "fecha_limite": "2026-02-16",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 30,
+      "dias_restantes": 0,
+      "dias_totales": 10,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0006": {
+    "alerta6": {
+     "tipo": "presentacion_recurso",
+     "etapa": "DECISION DE FONDO",
+     "accion_requerida": "Presentar recurso",
+     "plazo_legal": "10 días laborales",
+     "msg": "Puede presentar recurso. Han transcurrido 7 días laborales.",
+     "fecha_notificacion": "2026-03-05",
+     "fecha_limite": "2026-03-19",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#EF4444",
+      "porcentaje_avance": 70.0,
+      "urgencia": "alta",
+      "dias_transcurridos": 7,
+      "dias_restantes": 3,
+      "dias_totales": 10,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0011": {
+    "alerta4": {
+     "tipo": "informe_tecnico",
+     "etapa": "APERTURA ETAPA PROBATORIA",
+     "accion_requerida": "Presentar informe técnico",
+     "plazo_legal": "30 días laborales",
+     "msg": "Debe presentar informe técnico. Han transcurrido 39 días laborales.",
+     "fecha_notificacion": "2026-01-20",
+     "fecha_limite": "2026-03-03",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 39,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0013": {
+    "alerta5": {
+     "tipo": "alegato_conclusion",
+     "etapa": "CIERRE ETAPA PROBATORIA",
+     "accion_requerida": "Presentar alegato de conclusión",
+     "plazo_legal": "10 días laborales",
+     "msg": "Debe presentar alegato de conclusión. Han transcurrido 4 días laborales.",
+     "fecha_notificacion": "2026-03-10",
+     "fecha_limite": "2026-03-25",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#F59E0B",
+      "porcentaje_avance": 40.0,
+      "urgencia": "media",
+      "dias_transcurridos": 4,
+      "dias_restantes": 6,
+      "dias_totales": 10,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0015": {
+    "alerta6": {
+     "tipo": "resolucion_recurso",
+     "etapa": "PROBATORIA DE RECURSO",
+     "accion_requerida": "Notificar decisión del recurso",
+     "plazo_legal": "1 año",
+     "msg": "Debe notificar decisión del recurso. Han transcurrido 288 días.",
+     "fecha_presentacion": "2025-06-01",
+     "fecha_limite": "2026-06-01",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#EF4444",
+      "porcentaje_avance": 78.9,
+      "urgencia": "alta",
+      "dias_transcurridos": 288,
+      "dias_restantes": 77,
+      "dias_totales": 365,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0016": {
+    "alerta6": {
+     "tipo": "resolucion_recurso",
+     "etapa": "PROBATORIA DE RECURSO",
+     "accion_requerida": "Notificar decisión del recurso",
+     "plazo_legal": "1 año",
+     "msg": "Debe notificar decisión del recurso. Han transcurrido 470 días.",
+     "fecha_presentacion": "2024-12-01",
+     "fecha_limite": "2025-12-01",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 470,
+      "dias_restantes": 0,
+      "dias_totales": 365,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0018": {
+    "alerta6": {
+     "tipo": "notificacion_recurso",
+     "etapa": "DECISION DE FONDO",
+     "accion_requerida": "Notificar acto administrativo de recurso",
+     "plazo_legal": "1 año",
+     "msg": "Debe notificar el acto de recurso. Han transcurrido 196 días.",
+     "fecha_presentacion": "2025-09-01",
+     "fecha_limite": "2026-09-01",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#F59E0B",
+      "porcentaje_avance": 53.7,
+      "urgencia": "media",
+      "dias_transcurridos": 196,
+      "dias_restantes": 169,
+      "dias_totales": 365,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0021": {
+    "alerta_constancia_1": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "DETALLE MEDIDA PREVENTIVA",
+     "involucrado_nombre": "Nombre10 Apellido10",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 44 días restantes para completar la notificación desde la constancia de citación (2026-03-10).",
+     "fecha_constancia": "2026-03-10",
+     "fecha_limite": "2026-04-29",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#10B981",
+      "porcentaje_avance": 12.0,
+      "urgencia": "baja",
+      "dias_transcurridos": 6,
+      "dias_restantes": 44,
+      "dias_totales": 50,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "alerta_constancia_2": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "DETALLE MEDIDA PREVENTIVA",
+     "involucrado_nombre": "",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 7 días restantes para completar la notificación desde la constancia de citación (2026-02-01).",
+     "fecha_constancia": "2026-02-01",
+     "fecha_limite": "2026-03-23",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#EF4444",
+      "porcentaje_avance": 86.0,
+      "urgencia": "alta",
+      "dias_transcurridos": 43,
+      "dias_restantes": 7,
+      "dias_totales": 50,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "alerta_constancia_3": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "DETALLE MEDIDA PREVENTIVA",
+     "involucrado_nombre": "",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 26 días restantes para completar la notificación desde la constancia de citación (2026-02-20).",
+     "fecha_constancia": "2026-02-20",
+     "fecha_limite": "2026-04-11",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#F59E0B",
+      "porcentaje_avance": 48.0,
+      "urgencia": "media",
+      "dias_transcurridos": 24,
+      "dias_restantes": 26,
+      "dias_totales": 50,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "alerta_constancia_4": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "DETALLE MEDIDA PREVENTIVA",
+     "involucrado_nombre": "Nombre11 Apellido11",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 0 días restantes para completar la notificación desde la constancia de citación (2026-01-20).",
+     "fecha_constancia": "2026-01-20",
+     "fecha_limite": "2026-03-11",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 55,
+      "dias_restantes": 0,
+      "dias_totales": 50,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    },
+    "alerta_constancia_5": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "INICIO PROCESO SANCIONATORIO",
+     "involucrado_nombre": "Nombre10 Apellido10",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 49 días restantes para completar la notificación desde la constancia de citación (2026-03-15).",
+     "fecha_constancia": "2026-03-15",
+     "fecha_limite": "2026-05-04",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#10B981",
+      "porcentaje_avance": 2.0,
+      "urgencia": "baja",
+      "dias_transcurridos": 1,
+      "dias_restantes": 49,
+      "dias_totales": 50,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   }
+  },
+  "total_expedientes": 21,
+  "expedientes_con_alertas": 11,
+  "estadisticas_semaforo": {
+   "verde": 3,
+   "amarillo": 4,
+   "rojo": 4,
+   "vencido": 5
+  }
+ },
+ "todas_mios_9": {
+  "ok": true,
+  "alcance": "mios",
+  "alertas": {
+   "CAR-0010": {
+    "alerta2": {
+     "tipo": "decision_fondo",
+     "etapa": "FORMULACION DE CARGOS",
+     "accion_requerida": "Crear etapa decisión de fondo con acto administrativo",
+     "plazo_legal": "80 días laborales",
+     "msg": "Debe emitir decisión de fondo. Han transcurrido 111 días laborales.",
+     "fecha_notificacion": "2025-10-01",
+     "fecha_limite": "2026-01-30",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 111,
+      "dias_restantes": 0,
+      "dias_totales": 80,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    },
+    "alerta3": {
+     "tipo": "presentacion_descargos",
+     "etapa": "FORMULACION DE CARGOS",
+     "accion_requerida": "Presentar descargos",
+     "plazo_legal": "10 días laborales",
+     "msg": "Debe presentar descargos. Han transcurrido 111 días laborales.",
+     "fecha_notificacion": "2025-10-01",
+     "fecha_limite": "2025-10-16",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 111,
+      "dias_restantes": 0,
+      "dias_totales": 10,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0022": {
+    "alerta5": {
+     "tipo": "alegato_conclusion",
+     "etapa": "CIERRE ETAPA PROBATORIA",
+     "accion_requerida": "Presentar alegato de conclusión",
+     "plazo_legal": "10 días laborales",
+     "msg": "Debe presentar alegato de conclusión. Han transcurrido 45 días laborales.",
+     "fecha_notificacion": "2026-01-10",
+     "fecha_limite": "2026-01-26",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 45,
+      "dias_restantes": 0,
+      "dias_totales": 10,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    },
+    "alerta_constancia_1": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "CIERRE ETAPA PROBATORIA",
+     "involucrado_nombre": "Nombre15 Apellido15",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 0 días restantes para completar la notificación desde la constancia de citación (2025-12-01).",
+     "fecha_constancia": "2025-12-01",
+     "fecha_limite": "2026-01-20",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 105,
+      "dias_restantes": 0,
+      "dias_totales": 50,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   }
+  },
+  "total_expedientes": 2,
+  "expedientes_con_alertas": 2,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 4
+  }
+ },
+ "todas_mios_50": {
+  "ok": true,
+  "alcance": "mios",
+  "alertas": {},
+  "total_expedientes": 0,
+  "expedientes_con_alertas": 0
+ },
+ "expediente_1": {
+  "ok": true,
+  "radicado": "CAR-0001",
+  "alertas": {
+   "alerta1": {
+    "tipo": "inicio_sancionatorio",
+    "etapa": "INDAGACION PRELIMINAR",
+    "accion_requerida": "Iniciar proceso sancionatorio",
+    "plazo_legal": "6 meses",
+    "msg": "Debe iniciar proceso sancionatorio. Han transcurrido 134 días desde la indagación.",
+    "fecha_inicio": "2025-11-02",
+    "fecha_limite": "2026-05-02",
+    "semaforo": {
+     "estado": "rojo",
+     "color_hex": "#EF4444",
+     "porcentaje_avance": 74.03,
+     "urgencia": "alta",
+     "dias_transcurridos": 134,
+     "dias_restantes": 47,
+     "dias_totales": 181,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 1,
+   "vencido": 0
+  }
+ },
+ "expediente_2": {
+  "ok": true,
+  "radicado": "CAR-0002",
+  "alertas": {},
+  "total_alertas": 0,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_3": {
+  "ok": true,
+  "radicado": "CAR-0003",
+  "alertas": {
+   "alerta1": {
+    "tipo": "inicio_sancionatorio",
+    "etapa": "INDAGACION PRELIMINAR",
+    "accion_requerida": "Iniciar proceso sancionatorio",
+    "plazo_legal": "6 meses",
+    "msg": "Debe iniciar proceso sancionatorio. Han transcurrido 227 días desde la indagación.",
+    "fecha_inicio": "2025-08-01",
+    "fecha_limite": "2026-02-01",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#7F1D1D",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 227,
+     "dias_restantes": 0,
+     "dias_totales": 184,
+     "esta_vencido": true
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 1
+  }
+ },
+ "expediente_4": {
+  "ok": true,
+  "radicado": "CAR-0004",
+  "alertas": {
+   "alerta1": {
+    "tipo": "inicio_sancionatorio",
+    "etapa": "INDAGACION PRELIMINAR",
+    "accion_requerida": "Iniciar proceso sancionatorio",
+    "plazo_legal": "6 meses",
+    "msg": "Debe iniciar proceso sancionatorio. Han transcurrido 15 días desde la indagación.",
+    "fecha_inicio": "2026-03-01",
+    "fecha_limite": "2026-09-01",
+    "semaforo": {
+     "estado": "verde",
+     "color_hex": "#10B981",
+     "porcentaje_avance": 8.15,
+     "urgencia": "baja",
+     "dias_transcurridos": 15,
+     "dias_restantes": 169,
+     "dias_totales": 184,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 1,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_5": {
+  "ok": true,
+  "radicado": "CAR-0005",
+  "alertas": {
+   "alerta2": {
+    "tipo": "decision_fondo",
+    "etapa": "FORMULACION DE CARGOS",
+    "accion_requerida": "Crear etapa decisión de fondo con acto administrativo",
+    "plazo_legal": "80 días laborales",
+    "msg": "Debe emitir decisión de fondo. Han transcurrido 30 días laborales.",
+    "fecha_notificacion": "2026-02-02",
+    "fecha_limite": "2026-06-01",
+    "semaforo": {
+     "estado": "amarillo",
+     "color_hex": "#F59E0B",
+     "porcentaje_avance": 37.5,
+     "urgencia": "media",
+     "dias_transcurridos": 30,
+     "dias_restantes": 50,
+     "dias_totales": 80,
+     "esta_vencido": false
+    }
+   },
+   "alerta3": {
+    "tipo": "presentacion_descargos",
+    "etapa": "FORMULACION DE CARGOS",
+    "accion_requerida": "Presentar descargos",
+    "plazo_legal": "10 días laborales",
+    "msg": "Debe presentar descargos. Han transcurrido 30 días laborales.",
+    "fecha_notificacion": "2026-02-02",
+    "fecha_limite": "2026-02-16",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#7F1D1D",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 30,
+     "dias_restantes": 0,
+     "dias_totales": 10,
+     "esta_vencido": true
+    }
+   }
+  },
+  "total_alertas": 2,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 1,
+   "rojo": 0,
+   "vencido": 1
+  }
+ },
+ "expediente_6": {
+  "ok": true,
+  "radicado": "CAR-0006",
+  "alertas": {
+   "alerta6": {
+    "tipo": "presentacion_recurso",
+    "etapa": "DECISION DE FONDO",
+    "accion_requerida": "Presentar recurso",
+    "plazo_legal": "10 días laborales",
+    "msg": "Puede presentar recurso. Han transcurrido 7 días laborales.",
+    "fecha_notificacion": "2026-03-05",
+    "fecha_limite": "2026-03-19",
+    "semaforo": {
+     "estado": "rojo",
+     "color_hex": "#EF4444",
+     "porcentaje_avance": 70.0,
+     "urgencia": "alta",
+     "dias_transcurridos": 7,
+     "dias_restantes": 3,
+     "dias_totales": 10,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 1,
+   "vencido": 0
+  }
+ },
+ "expediente_7": {
+  "ok": true,
+  "radicado": "CAR-0007",
+  "alertas": {},
+  "total_alertas": 0,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_8": {
+  "ok": true,
+  "radicado": "CAR-0008",
+  "alertas": {},
+  "total_alertas": 0,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_9": {
+  "ok": true,
+  "radicado": "CAR-0009",
+  "alertas": {},
+  "total_alertas": 0,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_10": {
+  "ok": true,
+  "radicado": "CAR-0010",
+  "alertas": {
+   "alerta2": {
+    "tipo": "decision_fondo",
+    "etapa": "FORMULACION DE CARGOS",
+    "accion_requerida": "Crear etapa decisión de fondo con acto administrativo",
+    "plazo_legal": "80 días laborales",
+    "msg": "Debe emitir decisión de fondo. Han transcurrido 111 días laborales.",
+    "fecha_notificacion": "2025-10-01",
+    "fecha_limite": "2026-01-30",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#7F1D1D",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 111,
+     "dias_restantes": 0,
+     "dias_totales": 80,
+     "esta_vencido": true
+    }
+   },
+   "alerta3": {
+    "tipo": "presentacion_descargos",
+    "etapa": "FORMULACION DE CARGOS",
+    "accion_requerida": "Presentar descargos",
+    "plazo_legal": "10 días laborales",
+    "msg": "Debe presentar descargos. Han transcurrido 111 días laborales.",
+    "fecha_notificacion": "2025-10-01",
+    "fecha_limite": "2025-10-16",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#7F1D1D",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 111,
+     "dias_restantes": 0,
+     "dias_totales": 10,
+     "esta_vencido": true
+    }
+   }
+  },
+  "total_alertas": 2,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 2
+  }
+ },
+ "expediente_11": {
+  "ok": true,
+  "radicado": "CAR-0011",
+  "alertas": {
+   "alerta4": {
+    "tipo": "informe_tecnico",
+    "etapa": "APERTURA ETAPA PROBATORIA",
+    "accion_requerida": "Presentar informe técnico",
+    "plazo_legal": "30 días laborales",
+    "msg": "Debe presentar informe técnico. Han transcurrido 39 días laborales.",
+    "fecha_notificacion": "2026-01-20",
+    "fecha_limite": "2026-03-03",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#7F1D1D",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 39,
+     "dias_restantes": 0,
+     "dias_totales": 30,
+     "esta_vencido": true
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 1
+  }
+ },
+ "expediente_12": {
+  "ok": true,
+  "radicado": "CAR-0012",
+  "alertas": {},
+  "total_alertas": 0,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_13": {
+  "ok": true,
+  "radicado": "CAR-0013",
+  "alertas": {
+   "alerta5": {
+    "tipo": "alegato_conclusion",
+    "etapa": "CIERRE ETAPA PROBATORIA",
+    "accion_requerida": "Presentar alegato de conclusión",
+    "plazo_legal": "10 días laborales",
+    "msg": "Debe presentar alegato de conclusión. Han transcurrido 4 días laborales.",
+    "fecha_notificacion": "2026-03-10",
+    "fecha_limite": "2026-03-25",
+    "semaforo": {
+     "estado": "amarillo",
+     "color_hex": "#F59E0B",
+     "porcentaje_avance": 40.0,
+     "urgencia": "media",
+     "dias_transcurridos": 4,
+     "dias_restantes": 6,
+     "dias_totales": 10,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 1,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_14": {
+  "ok": true,
+  "radicado": "CAR-0014",
+  "alertas": {},
+  "total_alertas": 0,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_15": {
+  "ok": true,
+  "radicado": "CAR-0015",
+  "alertas": {
+   "alerta6": {
+    "tipo": "resolucion_recurso",
+    "etapa": "PROBATORIA DE RECURSO",
+    "accion_requerida": "Notificar decisión del recurso",
+    "plazo_legal": "1 año",
+    "msg": "Debe notificar decisión del recurso. Han transcurrido 288 días.",
+    "fecha_presentacion": "2025-06-01",
+    "fecha_limite": "2026-06-01",
+    "semaforo": {
+     "estado": "rojo",
+     "color_hex": "#EF4444",
+     "porcentaje_avance": 78.9,
+     "urgencia": "alta",
+     "dias_transcurridos": 288,
+     "dias_restantes": 77,
+     "dias_totales": 365,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 1,
+   "vencido": 0
+  }
+ },
+ "expediente_16": {
+  "ok": true,
+  "radicado": "CAR-0016",
+  "alertas": {
+   "alerta6": {
+    "tipo": "resolucion_recurso",
+    "etapa": "PROBATORIA DE RECURSO",
+    "accion_requerida": "Notificar decisión del recurso",
+    "plazo_legal": "1 año",
+    "msg": "Debe notificar decisión del recurso. Han transcurrido 470 días.",
+    "fecha_presentacion": "2024-12-01",
+    "fecha_limite": "2025-12-01",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#7F1D1D",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 470,
+     "dias_restantes": 0,
+     "dias_totales": 365,
+     "esta_vencido": true
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 1
+  }
+ },
+ "expediente_17": {
+  "ok": true,
+  "radicado": "CAR-0017",
+  "alertas": {},
+  "total_alertas": 0,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_18": {
+  "ok": true,
+  "radicado": "CAR-0018",
+  "alertas": {
+   "alerta6": {
+    "tipo": "notificacion_recurso",
+    "etapa": "DECISION DE FONDO",
+    "accion_requerida": "Notificar acto administrativo de recurso",
+    "plazo_legal": "1 año",
+    "msg": "Debe notificar el acto de recurso. Han transcurrido 196 días.",
+    "fecha_presentacion": "2025-09-01",
+    "fecha_limite": "2026-09-01",
+    "semaforo": {
+     "estado": "amarillo",
+     "color_hex": "#F59E0B",
+     "porcentaje_avance": 53.7,
+     "urgencia": "media",
+     "dias_transcurridos": 196,
+     "dias_restantes": 169,
+     "dias_totales": 365,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 1,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_19": {
+  "ok": true,
+  "radicado": "CAR-0019",
+  "alertas": {},
+  "total_alertas": 0,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_20": {
+  "ok": true,
+  "radicado": "CAR-0020",
+  "alertas": {},
+  "total_alertas": 0,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_21": {
+  "ok": true,
+  "radicado": "CAR-0021",
+  "alertas": {
+   "alerta_constancia_1": {
+    "tipo": "constancia_citacion_pendiente",
+    "etapa": "DETALLE MEDIDA PREVENTIVA",
+    "involucrado_nombre": "Nombre10 Apellido10",
+    "accion_requerida": "Completar notificación como exitosa",
+    "plazo_legal": "50 días calendario",
+    "msg": "Hay 44 días restantes para completar la notificación desde la constancia de citación (2026-03-10).",
+    "fecha_constancia": "2026-03-10",
+    "fecha_limite": "2026-04-29",
+    "semaforo": {
+     "estado": "verde",
+     "color_hex": "#10B981",
+     "porcentaje_avance": 12.0,
+     "urgencia": "baja",
+     "dias_transcurridos": 6,
+     "dias_restantes": 44,
+     "dias_totales": 50,
+     "esta_vencido": false
+    }
+   },
+   "alerta_constancia_2": {
+    "tipo": "constancia_citacion_pendiente",
+    "etapa": "DETALLE MEDIDA PREVENTIVA",
+    "involucrado_nombre": "",
+    "accion_requerida": "Completar notificación como exitosa",
+    "plazo_legal": "50 días calendario",
+    "msg": "Hay 7 días restantes para completar la notificación desde la constancia de citación (2026-02-01).",
+    "fecha_constancia": "2026-02-01",
+    "fecha_limite": "2026-03-23",
+    "semaforo": {
+     "estado": "rojo",
+     "color_hex": "#EF4444",
+     "porcentaje_avance": 86.0,
+     "urgencia": "alta",
+     "dias_transcurridos": 43,
+     "dias_restantes": 7,
+     "dias_totales": 50,
+     "esta_vencido": false
+    }
+   },
+   "alerta_constancia_3": {
+    "tipo": "constancia_citacion_pendiente",
+    "etapa": "DETALLE MEDIDA PREVENTIVA",
+    "involucrado_nombre": "",
+    "accion_requerida": "Completar notificación como exitosa",
+    "plazo_legal": "50 días calendario",
+    "msg": "Hay 26 días restantes para completar la notificación desde la constancia de citación (2026-02-20).",
+    "fecha_constancia": "2026-02-20",
+    "fecha_limite": "2026-04-11",
+    "semaforo": {
+     "estado": "amarillo",
+     "color_hex": "#F59E0B",
+     "porcentaje_avance": 48.0,
+     "urgencia": "media",
+     "dias_transcurridos": 24,
+     "dias_restantes": 26,
+     "dias_totales": 50,
+     "esta_vencido": false
+    }
+   },
+   "alerta_constancia_4": {
+    "tipo": "constancia_citacion_pendiente",
+    "etapa": "DETALLE MEDIDA PREVENTIVA",
+    "involucrado_nombre": "Nombre11 Apellido11",
+    "accion_requerida": "Completar notificación como exitosa",
+    "plazo_legal": "50 días calendario",
+    "msg": "Hay 0 días restantes para completar la notificación desde la constancia de citación (2026-01-20).",
+    "fecha_constancia": "2026-01-20",
+    "fecha_limite": "2026-03-11",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#7F1D1D",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 55,
+     "dias_restantes": 0,
+     "dias_totales": 50,
+     "esta_vencido": true
+    }
+   },
+   "alerta_constancia_5": {
+    "tipo": "constancia_citacion_pendiente",
+    "etapa": "INICIO PROCESO SANCIONATORIO",
+    "involucrado_nombre": "Nombre10 Apellido10",
+    "accion_requerida": "Completar notificación como exitosa",
+    "plazo_legal": "50 días calendario",
+    "msg": "Hay 49 días restantes para completar la notificación desde la constancia de citación (2026-03-15).",
+    "fecha_constancia": "2026-03-15",
+    "fecha_limite": "2026-05-04",
+    "semaforo": {
+     "estado": "verde",
+     "color_hex": "#10B981",
+     "porcentaje_avance": 2.0,
+     "urgencia": "baja",
+     "dias_transcurridos": 1,
+     "dias_restantes": 49,
+     "dias_totales": 50,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 5,
+  "estadisticas_semaforo": {
+   "verde": 2,
+   "amarillo": 1,
+   "rojo": 1,
+   "vencido": 1
+  }
+ },
+ "expediente_22": {
+  "ok": true,
+  "radicado": "CAR-0022",
+  "alertas": {
+   "alerta5": {
+    "tipo": "alegato_conclusion",
+    "etapa": "CIERRE ETAPA PROBATORIA",
+    "accion_requerida": "Presentar alegato de conclusión",
+    "plazo_legal": "10 días laborales",
+    "msg": "Debe presentar alegato de conclusión. Han transcurrido 45 días laborales.",
+    "fecha_notificacion": "2026-01-10",
+    "fecha_limite": "2026-01-26",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#7F1D1D",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 45,
+     "dias_restantes": 0,
+     "dias_totales": 10,
+     "esta_vencido": true
+    }
+   },
+   "alerta_constancia_1": {
+    "tipo": "constancia_citacion_pendiente",
+    "etapa": "CIERRE ETAPA PROBATORIA",
+    "involucrado_nombre": "Nombre15 Apellido15",
+    "accion_requerida": "Completar notificación como exitosa",
+    "plazo_legal": "50 días calendario",
+    "msg": "Hay 0 días restantes para completar la notificación desde la constancia de citación (2025-12-01).",
+    "fecha_constancia": "2025-12-01",
+    "fecha_limite": "2026-01-20",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#7F1D1D",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 105,
+     "dias_restantes": 0,
+     "dias_totales": 50,
+     "esta_vencido": true
+    }
+   }
+  },
+  "total_alertas": 2,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 2
+  }
+ },
+ "expediente_23": {
+  "ok": true,
+  "radicado": "CAR-0023",
+  "alertas": {},
+  "total_alertas": 0,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "reporte_semanal_5": {
+  "alertas": {
+   "CAR-0001": {
+    "alerta1": {
+     "tipo": "inicio_sancionatorio",
+     "etapa": "INDAGACION PRELIMINAR",
+     "accion_requerida": "Iniciar proceso sancionatorio",
+     "plazo_legal": "6 meses",
+     "msg": "Debe iniciar proceso sancionatorio. Han transcurrido 134 días desde la indagación.",
+     "fecha_inicio": "2025-11-02",
+     "fecha_limite": "2026-05-02",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#EF4444",
+      "porcentaje_avance": 74.03,
+      "urgencia": "alta",
+      "dias_transcurridos": 134,
+      "dias_restantes": 47,
+      "dias_totales": 181,
+      "esta_vencido": false
+     }
+    }
+   },
+   "CAR-0003": {
+    "alerta1": {
+     "tipo": "inicio_sancionatorio",
+     "etapa": "INDAGACION PRELIMINAR",
+     "accion_requerida": "Iniciar proceso sancionatorio",
+     "plazo_legal": "6 meses",
+     "msg": "Debe iniciar proceso sancionatorio. Han transcurrido 227 días desde la indagación.",
+     "fecha_inicio": "2025-08-01",
+     "fecha_limite": "2026-02-01",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 227,
+      "dias_restantes": 0,
+      "dias_totales": 184,
+      "esta_vencido": true
+     }
+    }
+   },
+   "CAR-0004": {
+    "alerta1": {
+     "tipo": "inicio_sancionatorio",
+     "etapa": "INDAGACION PRELIMINAR",
+     "accion_requerida": "Iniciar proceso sancionatorio",
+     "plazo_legal": "6 meses",
+     "msg": "Debe iniciar proceso sancionatorio. Han transcurrido 15 días desde la indagación.",
+     "fecha_inicio": "2026-03-01",
+     "fecha_limite": "2026-09-01",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#10B981",
+      "porcentaje_avance": 8.15,
+      "urgencia": "baja",
+      "dias_transcurridos": 15,
+      "dias_restantes": 169,
+      "dias_totales": 184,
+      "esta_vencido": false
+     }
+    }
+   },
+   "CAR-0005": {
+    "alerta2": {
+     "tipo": "decision_fondo",
+     "etapa": "FORMULACION DE CARGOS",
+     "accion_requerida": "Crear etapa decisión de fondo con acto administrativo",
+     "plazo_legal": "80 días laborales",
+     "msg": "Debe emitir decisión de fondo. Han transcurrido 30 días laborales.",
+     "fecha_notificacion": "2026-02-02",
+     "fecha_limite": "2026-06-01",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#F59E0B",
+      "porcentaje_avance": 37.5,
+      "urgencia": "media",
+      "dias_transcurridos": 30,
+      "dias_restantes": 50,
+      "dias_totales": 80,
+      "esta_vencido": false
+     }
+    },
+    "alerta3": {
+     "tipo": "presentacion_descargos",
+     "etapa": "FORMULACION DE CARGOS",
+     "accion_requerida": "Presentar descargos",
+     "plazo_legal": "10 días laborales",
+     "msg": "Debe presentar descargos. Han transcurrido 30 días laborales.",
+     "fecha_notificacion": "2026-02-02",
+     "fecha_limite": "2026-02-16",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 30,
+      "dias_restantes": 0,
+      "dias_totales": 10,
+      "esta_vencido": true
+     }
+    }
+   },
+   "CAR-0006": {
+    "alerta6": {
+     "tipo": "presentacion_recurso",
+     "etapa": "DECISION DE FONDO",
+     "accion_requerida": "Presentar recurso",
+     "plazo_legal": "10 días laborales",
+     "msg": "Puede presentar recurso. Han transcurrido 7 días laborales.",
+     "fecha_notificacion": "2026-03-05",
+     "fecha_limite": "2026-03-19",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#EF4444",
+      "porcentaje_avance": 70.0,
+      "urgencia": "alta",
+      "dias_transcurridos": 7,
+      "dias_restantes": 3,
+      "dias_totales": 10,
+      "esta_vencido": false
+     }
+    }
+   },
+   "CAR-0011": {
+    "alerta4": {
+     "tipo": "informe_tecnico",
+     "etapa": "APERTURA ETAPA PROBATORIA",
+     "accion_requerida": "Presentar informe técnico",
+     "plazo_legal": "30 días laborales",
+     "msg": "Debe presentar informe técnico. Han transcurrido 39 días laborales.",
+     "fecha_notificacion": "2026-01-20",
+     "fecha_limite": "2026-03-03",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 39,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     }
+    }
+   },
+   "CAR-0013": {
+    "alerta5": {
+     "tipo": "alegato_conclusion",
+     "etapa": "CIERRE ETAPA PROBATORIA",
+     "accion_requerida": "Presentar alegato de conclusión",
+     "plazo_legal": "10 días laborales",
+     "msg": "Debe presentar alegato de conclusión. Han transcurrido 4 días laborales.",
+     "fecha_notificacion": "2026-03-10",
+     "fecha_limite": "2026-03-25",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#F59E0B",
+      "porcentaje_avance": 40.0,
+      "urgencia": "media",
+      "dias_transcurridos": 4,
+      "dias_restantes": 6,
+      "dias_totales": 10,
+      "esta_vencido": false
+     }
+    }
+   },
+   "CAR-0015": {
+    "alerta6": {
+     "tipo": "resolucion_recurso",
+     "etapa": "PROBATORIA DE RECURSO",
+     "accion_requerida": "Notificar decisión del recurso",
+     "plazo_legal": "1 año",
+     "msg": "Debe notificar decisión del recurso. Han transcurrido 288 días.",
+     "fecha_presentacion": "2025-06-01",
+     "fecha_limite": "2026-06-01",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#EF4444",
+      "porcentaje_avance": 78.9,
+      "urgencia": "alta",
+      "dias_transcurridos": 288,
+      "dias_restantes": 77,
+      "dias_totales": 365,
+      "esta_vencido": false
+     }
+    }
+   },
+   "CAR-0016": {
+    "alerta6": {
+     "tipo": "resolucion_recurso",
+     "etapa": "PROBATORIA DE RECURSO",
+     "accion_requerida": "Notificar decisión del recurso",
+     "plazo_legal": "1 año",
+     "msg": "Debe notificar decisión del recurso. Han transcurrido 470 días.",
+     "fecha_presentacion": "2024-12-01",
+     "fecha_limite": "2025-12-01",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 470,
+      "dias_restantes": 0,
+      "dias_totales": 365,
+      "esta_vencido": true
+     }
+    }
+   },
+   "CAR-0018": {
+    "alerta6": {
+     "tipo": "notificacion_recurso",
+     "etapa": "DECISION DE FONDO",
+     "accion_requerida": "Notificar acto administrativo de recurso",
+     "plazo_legal": "1 año",
+     "msg": "Debe notificar el acto de recurso. Han transcurrido 196 días.",
+     "fecha_presentacion": "2025-09-01",
+     "fecha_limite": "2026-09-01",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#F59E0B",
+      "porcentaje_avance": 53.7,
+      "urgencia": "media",
+      "dias_transcurridos": 196,
+      "dias_restantes": 169,
+      "dias_totales": 365,
+      "esta_vencido": false
+     }
+    }
+   },
+   "CAR-0021": {
+    "alerta_constancia_1": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "DETALLE MEDIDA PREVENTIVA",
+     "involucrado_nombre": "Nombre10 Apellido10",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 44 días restantes para completar la notificación desde la constancia de citación (2026-03-10).",
+     "fecha_constancia": "2026-03-10",
+     "fecha_limite": "2026-04-29",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#10B981",
+      "porcentaje_avance": 12.0,
+      "urgencia": "baja",
+      "dias_transcurridos": 6,
+      "dias_restantes": 44,
+      "dias_totales": 50,
+      "esta_vencido": false
+     }
+    },
+    "alerta_constancia_2": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "DETALLE MEDIDA PREVENTIVA",
+     "involucrado_nombre": "",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 7 días restantes para completar la notificación desde la constancia de citación (2026-02-01).",
+     "fecha_constancia": "2026-02-01",
+     "fecha_limite": "2026-03-23",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#EF4444",
+      "porcentaje_avance": 86.0,
+      "urgencia": "alta",
+      "dias_transcurridos": 43,
+      "dias_restantes": 7,
+      "dias_totales": 50,
+      "esta_vencido": false
+     }
+    },
+    "alerta_constancia_3": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "DETALLE MEDIDA PREVENTIVA",
+     "involucrado_nombre": "",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 26 días restantes para completar la notificación desde la constancia de citación (2026-02-20).",
+     "fecha_constancia": "2026-02-20",
+     "fecha_limite": "2026-04-11",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#F59E0B",
+      "porcentaje_avance": 48.0,
+      "urgencia": "media",
+      "dias_transcurridos": 24,
+      "dias_restantes": 26,
+      "dias_totales": 50,
+      "esta_vencido": false
+     }
+    },
+    "alerta_constancia_4": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "DETALLE MEDIDA PREVENTIVA",
+     "involucrado_nombre": "Nombre11 Apellido11",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 0 días restantes para completar la notificación desde la constancia de citación (2026-01-20).",
+     "fecha_constancia": "2026-01-20",
+     "fecha_limite": "2026-03-11",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 55,
+      "dias_restantes": 0,
+      "dias_totales": 50,
+      "esta_vencido": true
+     }
+    },
+    "alerta_constancia_5": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "INICIO PROCESO SANCIONATORIO",
+     "involucrado_nombre": "Nombre10 Apellido10",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 49 días restantes para completar la notificación desde la constancia de citación (2026-03-15).",
+     "fecha_constancia": "2026-03-15",
+     "fecha_limite": "2026-05-04",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#10B981",
+      "porcentaje_avance": 2.0,
+      "urgencia": "baja",
+      "dias_transcurridos": 1,
+      "dias_restantes": 49,
+      "dias_totales": 50,
+      "esta_vencido": false
+     }
+    }
+   }
+  },
+  "total_expedientes": 21,
+  "expedientes_con_alertas": 11,
+  "estadisticas_semaforo": {
+   "verde": 3,
+   "amarillo": 4,
+   "rojo": 4,
+   "vencido": 5
+  }
+ },
+ "reporte_semanal_9": {
+  "alertas": {
+   "CAR-0010": {
+    "alerta2": {
+     "tipo": "decision_fondo",
+     "etapa": "FORMULACION DE CARGOS",
+     "accion_requerida": "Crear etapa decisión de fondo con acto administrativo",
+     "plazo_legal": "80 días laborales",
+     "msg": "Debe emitir decisión de fondo. Han transcurrido 111 días laborales.",
+     "fecha_notificacion": "2025-10-01",
+     "fecha_limite": "2026-01-30",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 111,
+      "dias_restantes": 0,
+      "dias_totales": 80,
+      "esta_vencido": true
+     }
+    },
+    "alerta3": {
+     "tipo": "presentacion_descargos",
+     "etapa": "FORMULACION DE CARGOS",
+     "accion_requerida": "Presentar descargos",
+     "plazo_legal": "10 días laborales",
+     "msg": "Debe presentar descargos. Han transcurrido 111 días laborales.",
+     "fecha_notificacion": "2025-10-01",
+     "fecha_limite": "2025-10-16",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 111,
+      "dias_restantes": 0,
+      "dias_totales": 10,
+      "esta_vencido": true
+     }
+    }
+   },
+   "CAR-0022": {
+    "alerta5": {
+     "tipo": "alegato_conclusion",
+     "etapa": "CIERRE ETAPA PROBATORIA",
+     "accion_requerida": "Presentar alegato de conclusión",
+     "plazo_legal": "10 días laborales",
+     "msg": "Debe presentar alegato de conclusión. Han transcurrido 45 días laborales.",
+     "fecha_notificacion": "2026-01-10",
+     "fecha_limite": "2026-01-26",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 45,
+      "dias_restantes": 0,
+      "dias_totales": 10,
+      "esta_vencido": true
+     }
+    },
+    "alerta_constancia_1": {
+     "tipo": "constancia_citacion_pendiente",
+     "etapa": "CIERRE ETAPA PROBATORIA",
+     "involucrado_nombre": "Nombre15 Apellido15",
+     "accion_requerida": "Completar notificación como exitosa",
+     "plazo_legal": "50 días calendario",
+     "msg": "Hay 0 días restantes para completar la notificación desde la constancia de citación (2025-12-01).",
+     "fecha_constancia": "2025-12-01",
+     "fecha_limite": "2026-01-20",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#7F1D1D",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 105,
+      "dias_restantes": 0,
+      "dias_totales": 50,
+      "esta_vencido": true
+     }
+    }
+   }
+  },
+  "total_expedientes": 2,
+  "expedientes_con_alertas": 2,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 4
+  }
+ }
+}

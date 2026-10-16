@@ -69,6 +69,17 @@ def normalize_radicados_asociados(radicados: List[str]) -> List[str]:
     return normalized
 
 
+MSG_ENCARGADO_SIN_PERMISO = "El usuario elegido no tiene el permiso de abogado (infraccion_gestionar)"
+
+
+async def _validar_encargado_elegido(encargado_id: int | None) -> None:
+    """El abogado elegido como responsable tiene ``infraccion_gestionar``: el
+    mismo criterio con que la pantalla arma su lista (``usuarios_disponibles``
+    de ``GET /expedientes``). Fail-closed. ``None``/0 (quitar encargado) no se valida."""
+    if encargado_id and not await verify_permission(encargado_id, FILE_MANAGE):
+        raise HTTPException(status_code=400, detail=MSG_ENCARGADO_SIN_PERMISO)
+
+
 @router.post("/denunciantes")
 async def crear_quejoso(
     request: Request,
@@ -494,6 +505,9 @@ async def agregar_expediente(
 
     if not await verify_permission(user_id, FILE_MANAGE):
         raise HTTPException(status_code=403, detail="No cuenta con permisos")
+    # La pantalla envía al propio usuario (ya validado arriba); otro id debe ser abogado.
+    if expediente.abogado_responsable_id != user_id:
+        await _validar_encargado_elegido(expediente.abogado_responsable_id)
 
     # Validar radicado duplicado
     duplicado = await db.execute(
@@ -629,6 +643,7 @@ async def actualizar_encargado_de_expediente(
 
     if not await verify_permission(user_id, ASSIGN_PERMISSION):
         raise HTTPException(status_code=403, detail="No cuenta con permisos")
+    await _validar_encargado_elegido(encargado_id)
 
     # Obtener datos anteriores
     stmt_check = select(Expediente).where(Expediente.id == expediente_id)
@@ -700,7 +715,7 @@ async def actualizar_encargado_de_expediente(
             mensaje=f"Expediente {expediente.radicado}\nTe han asignado este expediente de infracción",
             # El frontend selecciona el expediente por radicado (ver notificationTypes.ts).
             id_vinculada=expediente.radicado,
-            tipo="expediente_infraccion",
+            tipo="exp_infraccion",  # <= 15 caracteres: columna notificacion.tipo de app-users
             usuario_id=encargado_id
         )
         
@@ -733,6 +748,7 @@ async def actualizar_encargado_bulk(
         raise HTTPException(status_code=400, detail="Debe enviar al menos un expediente_id")
 
     new_value = None if data.encargado_id == 0 else data.encargado_id
+    await _validar_encargado_elegido(new_value)
     updated = []
 
     # Cargar expedientes existentes en una sola consulta.
@@ -793,7 +809,7 @@ async def actualizar_encargado_bulk(
             await create_notification(
                 mensaje=f"Expediente {expediente_actualizado['radicado']}\nTe han asignado este expediente de infracción",
                 id_vinculada=expediente_actualizado['radicado'],
-                tipo="expediente_infraccion",
+                tipo="exp_infraccion",  # <= 15 caracteres: columna notificacion.tipo de app-users
                 usuario_id=new_value
             )
 

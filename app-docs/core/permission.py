@@ -18,7 +18,7 @@ PERMISOS_ARCHIVOS: tuple[str, ...] = (
     "infraccion_informes_subir",
     "infraccion_informes_revisar",
     "infraccion_asignar_informes",
-    "infraccion_cargue",
+    "infraccion_super_gestion",
     "documento_crear",
     "documento_revisar",
     "documento_gestionar",

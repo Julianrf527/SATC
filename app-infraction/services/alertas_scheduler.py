@@ -11,7 +11,7 @@ import logging
 #DB MODELS Y PERMISOS
 from db.models.expediente import Expediente
 from services.users import get_users_by_permission, users_client
-from routes.file_alerts import _calcular_alertas_expediente_infraccion
+from services.alertas import calcular_alertas_expedientes
 from core.permission import Permission
 
 load_dotenv()
@@ -31,7 +31,7 @@ async def obtener_alertas_usuario(user_id: int, db: AsyncSession) -> dict:
     try:
         stmt = select(Expediente.id, Expediente.radicado).where(
             Expediente.abogado_responsable_id == user_id
-        )
+        ).order_by(Expediente.id)
         result = await db.execute(stmt)
         expedientes = result.all()
 
@@ -41,8 +41,9 @@ async def obtener_alertas_usuario(user_id: int, db: AsyncSession) -> dict:
         alertas_totales = {}
         fecha_hoy = date.today()
 
+        por_expediente = await calcular_alertas_expedientes([e[0] for e in expedientes], db, fecha_hoy)
         for expediente_id, radicado in expedientes:
-            alertas = await _calcular_alertas_expediente_infraccion(expediente_id, db, fecha_hoy)
+            alertas = por_expediente.get(expediente_id)
             if alertas:
                 alertas_totales[radicado] = alertas
 

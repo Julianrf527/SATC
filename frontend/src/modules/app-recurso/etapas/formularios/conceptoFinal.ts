@@ -1,55 +1,12 @@
 // "Cargar versión final" de un concepto técnico (`ConceptoFinal`, C.4).
-import type { DatosConcepto, TipoConcepto } from "../../types";
+// Qué datos pide cada tipo de concepto (obligatorio, tipo, etiqueta) NO vive
+// aquí: llega del backend en `campos` (nodo de concepto del árbol y
+// GET /etapas/conceptos/{id}). Este módulo solo guarda el estado del
+// formulario, valida y arma el body según esa definición.
+import type { CampoConceptoDef, CamposConcepto, DatosConcepto } from "../../types";
 import { decimal, entero, esPdf, fechaValida } from "./comunes";
 
-export type CampoConcepto =
-  | "file_id"
-  | "fecha_aceptacion"
-  | "fecha_visita_tecnica"
-  | "caudal_fuente"
-  | "caudal_disponible"
-  | "caudal_otorgado"
-  | "num_usuarios"
-  | "cumple";
-
-/** Campos de datos del formulario (todo menos el archivo). */
-export type CampoDatoConcepto = Exclude<CampoConcepto, "file_id">;
-
-export type CamposConcepto = { obligatorios: string[]; opcionales: string[] };
-
-const CAUDALES = ["caudal_fuente", "caudal_disponible", "caudal_otorgado", "num_usuarios"];
-
-/**
- * Campos por tipo (C.4). En Mis informes el backend los manda en `campos`
- * (GET /etapas/conceptos/{id}); en el árbol no, así que se usa esta tabla,
- * que replica la del backend.
- */
-export function camposConcepto(tipo: TipoConcepto): CamposConcepto {
-  const base = ["file_id", "fecha_aceptacion"];
-  switch (tipo) {
-    case "etapa2":
-      return { obligatorios: [...base, ...CAUDALES], opcionales: [] };
-    case "adicional":
-      return { obligatorios: base, opcionales: CAUDALES };
-    case "memorias":
-    case "subsanacion":
-      return { obligatorios: [...base, "cumple"], opcionales: [] };
-    case "obras":
-    case "obras_segundo":
-      return { obligatorios: [...base, "cumple", "fecha_visita_tecnica"], opcionales: [] };
-  }
-}
-
-export const ETIQUETAS_CAMPO_CONCEPTO: Record<CampoConcepto, string> = {
-  file_id: "Concepto firmado (PDF)",
-  fecha_aceptacion: "Fecha del concepto (firma)",
-  fecha_visita_tecnica: "Fecha de visita técnica",
-  caudal_fuente: "Caudal fuente (L/s)",
-  caudal_disponible: "Caudal disponible (L/s)",
-  caudal_otorgado: "Caudal otorgado (L/s)",
-  num_usuarios: "Número de usuarios",
-  cumple: "¿Cumple?",
-};
+export type { CamposConcepto } from "../../types";
 
 export type ConceptoFinalForm = {
   archivo: File | null;
@@ -61,6 +18,12 @@ export type ConceptoFinalForm = {
   num_usuarios: string;
   cumple: boolean | null;
 };
+
+/** Datos del formulario (todo menos el archivo): columnas del concepto que se pueden diligenciar. */
+export type CampoDatoConcepto = Exclude<keyof ConceptoFinalForm, "archivo">;
+
+/** Definición de un campo que el formulario sabe guardar. */
+export type CampoVisible = CampoConceptoDef & { campo: CampoDatoConcepto };
 
 const texto = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
 
@@ -78,29 +41,52 @@ export function conceptoFinalInicial(datos?: Partial<DatosConcepto> | null): Con
   };
 }
 
-/** Campos del formulario que se muestran (obligatorios + opcionales, sin el archivo). */
-export function camposVisibles(campos: CamposConcepto): CampoDatoConcepto[] {
-  return [...campos.obligatorios, ...campos.opcionales].filter(
-    (c): c is CampoDatoConcepto => c !== "file_id" && c in ETIQUETAS_CAMPO_CONCEPTO,
-  );
+const CLAVES_FORM = new Set<string>(Object.keys(conceptoFinalInicial()).filter((k) => k !== "archivo"));
+
+/** Campos del backend que se muestran (sin el archivo), en su orden. Ignora los que el formulario no conoce. */
+export function camposVisibles(campos: CamposConcepto): CampoVisible[] {
+  return campos.campos.filter((c): c is CampoVisible => CLAVES_FORM.has(c.campo));
 }
 
-function valorCampo(f: ConceptoFinalForm, campo: CampoDatoConcepto): unknown {
-  switch (campo) {
-    case "fecha_aceptacion":
-    case "fecha_visita_tecnica":
-      return fechaValida(f[campo]) ? f[campo] : null;
-    case "num_usuarios":
-      return entero(f.num_usuarios);
-    case "cumple":
-      return f.cumple;
-    default:
-      return decimal(f[campo]);
+/** La misma definición con todo opcional (cargue directo de super gestión: se envía solo lo diligenciado). */
+export function soloOpcionales(campos: CamposConcepto): CamposConcepto {
+  return {
+    obligatorios: [],
+    opcionales: [...campos.obligatorios, ...campos.opcionales].filter((c) => c !== "file_id"),
+    campos: campos.campos.map((c) => ({ ...c, obligatorio: false })),
+  };
+}
+
+/** Valor de texto del campo (fechas y números se guardan como texto en el formulario). */
+export function textoCampo(f: ConceptoFinalForm, campo: CampoDatoConcepto): string {
+  const v = f[campo];
+  return typeof v === "string" ? v : "";
+}
+
+/** Valor sí/no del campo. */
+export function siNoCampo(f: ConceptoFinalForm, campo: CampoDatoConcepto): boolean | null {
+  const v = f[campo];
+  return typeof v === "boolean" ? v : null;
+}
+
+/** Valor listo para enviar según el tipo del backend, o `null` si está vacío o es inválido. */
+function valorCampo(f: ConceptoFinalForm, def: CampoVisible): unknown {
+  switch (def.tipo) {
+    case "fecha": {
+      const v = textoCampo(f, def.campo);
+      return fechaValida(v) ? v : null;
+    }
+    case "entero":
+      return entero(textoCampo(f, def.campo));
+    case "decimal":
+      return decimal(textoCampo(f, def.campo));
+    case "si_no":
+      return siNoCampo(f, def.campo);
   }
 }
 
-const vacio = (f: ConceptoFinalForm, campo: CampoDatoConcepto) =>
-  campo === "cumple" ? f.cumple === null : !f[campo].trim();
+const vacio = (f: ConceptoFinalForm, def: CampoVisible) =>
+  def.tipo === "si_no" ? siNoCampo(f, def.campo) === null : !textoCampo(f, def.campo).trim();
 
 export function validarConceptoFinal(f: ConceptoFinalForm, campos: CamposConcepto): string | null {
   if (!f.archivo) return "Adjunte el concepto firmado (PDF)";
@@ -110,13 +96,12 @@ export function validarConceptoFinal(f: ConceptoFinalForm, campos: CamposConcept
 
 /** Valida los datos del concepto (sin el archivo): obligatorios con valor y formatos. */
 export function validarCamposConcepto(f: ConceptoFinalForm, campos: CamposConcepto): string | null {
-  for (const campo of camposVisibles(campos)) {
-    const obligatorio = campos.obligatorios.includes(campo);
-    if (vacio(f, campo)) {
-      if (obligatorio) return `Complete: ${ETIQUETAS_CAMPO_CONCEPTO[campo]}`;
+  for (const def of camposVisibles(campos)) {
+    if (vacio(f, def)) {
+      if (def.obligatorio) return `Complete: ${def.etiqueta}`;
       continue;
     }
-    if (valorCampo(f, campo) === null) return `Valor inválido: ${ETIQUETAS_CAMPO_CONCEPTO[campo]}`;
+    if (valorCampo(f, def) === null) return `Valor inválido: ${def.etiqueta}`;
   }
   return null;
 }
@@ -124,9 +109,9 @@ export function validarCamposConcepto(f: ConceptoFinalForm, campos: CamposConcep
 /** Body de `.../version-final` del concepto: solo los campos del tipo con valor. */
 export function bodyConceptoFinal(f: ConceptoFinalForm, campos: CamposConcepto, fileId: number): Record<string, unknown> {
   const body: Record<string, unknown> = { file_id: fileId };
-  for (const campo of camposVisibles(campos)) {
-    const v = valorCampo(f, campo);
-    if (v !== null) body[campo] = v;
+  for (const def of camposVisibles(campos)) {
+    const v = valorCampo(f, def);
+    if (v !== null) body[def.campo] = v;
   }
   return body;
 }

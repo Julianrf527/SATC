@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { OPCIONES_DECISION, OPCIONES_RESULTADO } from "../formularios/actoFinal";
 import { OPCIONES_CLASE_ACTO } from "../formularios/comunes";
-import { camposConcepto } from "../formularios/conceptoFinal";
+import { soloOpcionales } from "../formularios/conceptoFinal";
 import { MAX_RADICADO, type RadicadoForm } from "../formularios/radicado";
 import type { SeccionesSuper, SuperCargueForm } from "../formularios/superCargue";
 import { CampoFecha, CampoOpciones, CampoPdf, CampoSiNo, CampoTexto } from "./campos/Campos";
@@ -111,7 +111,7 @@ export default function SuperCargueCampos({ s, form, cambiar, existe, actuales }
           <CamposConcepto
             form={form.concepto}
             onChange={(c) => cambiar({ concepto: { ...form.concepto, ...c } })}
-            campos={{ obligatorios: [], opcionales: camposConcepto(s.concepto).obligatorios.concat(camposConcepto(s.concepto).opcionales) }}
+            campos={soloOpcionales(s.concepto)}
           />
         </Seccion>
       )}

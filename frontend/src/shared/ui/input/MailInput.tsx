@@ -2,8 +2,10 @@ type Props = {
   title?: string;
   value: string;  
   onChange: (value: string) => void;
+  /** Por defecto 100 = columna usuario.correo (app-users). */
+  maxLength?: number;
 };
-export default function MailInput({ title, value, onChange }: Props) {
+export default function MailInput({ title, value, onChange, maxLength = 100 }: Props) {
   return (
     <>
     <label className="block mb-2">{title}</label>
@@ -29,6 +31,7 @@ export default function MailInput({ title, value, onChange }: Props) {
           placeholder="mail@site.com"
           required
           value={value}
+          maxLength={maxLength}
           onChange={(e) => onChange(e.target.value)}
         />
       </label>

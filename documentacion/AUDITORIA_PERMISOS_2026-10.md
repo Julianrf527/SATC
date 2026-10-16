@@ -51,7 +51,7 @@ GROUP BY r.id, r.nombre ORDER BY r.id;
 | /document/manage | documento_gestionar | /audit/involved | auditoria_involucrados |
 | | | /audit/infractions | auditoria_infracciones |
 
-En los componentes, el único control por botón es `infraccion_cargue` (`CargueManualInforme.tsx`, `Visita.tsx`).
+En los componentes, el único control por botón es `infraccion_super_gestion` (`CargueManualInforme.tsx`, `Visita.tsx`).
 
 ---
 
@@ -278,10 +278,10 @@ Permisos de la pantalla: gestión `sancionatorio_gestionar`, consulta `sancionat
 | GET /etapas/cierre/{id} | GW | **ninguno** | DetalleInfraccion | **ALTO (A25)** |
 | POST /etapas/cierre/{id} | GW | encargado | /infraction/manage | MEDIO (M9) |
 | GET /etapas/migracion/medida/{radicado} | GW | **ninguno** | sancionatorio /file/manage | **ALTO (A26)** |
-| GET /informes/disponibles | GW | infraccion_cargue | cargue manual | OK |
+| GET /informes/disponibles | GW | infraccion_super_gestion | cargue manual | OK |
 | GET /informes | GW | infraccion_asignar_informes | /infraction/reports | OK |
 | POST/PUT /informes/{id}/asignar | GW | infraccion_asignar_informes | /infraction/reports | OK |
-| PUT /informes/{id}/cambiar-modo, POST /cargue-manual | GW | infraccion_cargue | etapa Visita | OK |
+| PUT /informes/{id}/cambiar-modo, POST /cargue-manual | GW | infraccion_super_gestion | etapa Visita | OK |
 | GET /informes/mios | GW | informes_subir \| informes_revisar | /infraction/my-reports | OK |
 | GET/PUT /informes/{id}/recursos | GW | asignado, asignador o encargado / matriz | modales | OK |
 | /revision-informes/* (6) | GW | `FLUJO.puede_ver` (profesional, revisor, asignador) | Mis informes | OK *(en edición por otro agente)* |

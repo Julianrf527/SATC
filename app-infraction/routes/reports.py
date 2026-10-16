@@ -691,7 +691,7 @@ async def _validar_permiso_matriz(informe: InformeTecnico, user_id: int) -> None
     if informe.profesional_asignado_id == user_id:
         return
 
-    # El rol de cargue manual (infraccion_cargue) puede diligenciar la matriz
+    # El rol de cargue manual (infraccion_super_gestion) puede diligenciar la matriz
     # directamente desde la etapa del expediente, pero solo si el informe
     # también se cargó en modo manual — si fue por flujo, solo el profesional
     # asignado la diligencia (desde "Mis Informes").

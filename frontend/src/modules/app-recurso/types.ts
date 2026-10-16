@@ -291,7 +291,20 @@ export type DatosRadicado = {
 // Los nodos sin `datos` propios (actos de aprobación) llegan con `{}`.
 type SinDatos = Record<string, never>;
 
-export type NodoConcepto = NodoEtapa<DatosConcepto | SinDatos> & { tipo: TipoConcepto };
+/** Tipo de dato de un campo del concepto (cómo se pinta y se convierte). */
+export type TipoCampoConcepto = "fecha" | "decimal" | "entero" | "si_no";
+
+/** Un dato que pide el concepto (backend: `definicion_campos_concepto`, API.md C.4). */
+export type CampoConceptoDef = { campo: string; tipo: TipoCampoConcepto; etiqueta: string; obligatorio: boolean };
+
+/**
+ * Campos que pide un tipo de concepto. `obligatorios` / `opcionales` incluyen
+ * `file_id` (el PDF firmado); `campos` son solo los datos, en orden de pantalla.
+ * Una sola fuente: el backend (nodo de concepto del árbol y GET /etapas/conceptos/{id}).
+ */
+export type CamposConcepto = { obligatorios: string[]; opcionales: string[]; campos: CampoConceptoDef[] };
+
+export type NodoConcepto = NodoEtapa<DatosConcepto | SinDatos> & { tipo: TipoConcepto; campos: CamposConcepto };
 export type NodoRequerimiento<D = SinDatos> = NodoEtapa<D> & { ambito: AmbitoRequerimiento };
 export type NodoAdmite = NodoEtapa<DatosAdmite>;
 export type NodoRequerimientoEtapa3 = NodoRequerimiento<DatosRespuestaRequerimiento> & {
@@ -363,7 +376,7 @@ export type ConceptoParaTecnico = {
   expediente: { id: number; expediente: string; radicado: string; nombre_predio: string; nombre_fuente: string };
   tecnico: PersonaRef;
   datos: DatosConcepto;
-  campos: { obligatorios: string[]; opcionales: string[] };
+  campos: CamposConcepto;
   proceso: ResumenProceso | null;
   acciones_disponibles: AccionEtapa[];
 };

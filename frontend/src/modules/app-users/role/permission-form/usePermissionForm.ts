@@ -8,6 +8,9 @@ import { apiErrorMessage } from "../../api/errors";
 import { useConfirmacion } from "../useConfirmacion";
 import { generateCategories } from "../role-form/permissionCategories";
 
+/** Largo de la columna permiso.descripcion (varchar(200)). */
+export const DESCRIPCION_MAX = 200;
+
 export type GrupoPermisos = {
   key: string;
   name: string;
@@ -25,6 +28,7 @@ export function usePermissionForm(permisoList: Permiso[], setToast: SetToast) {
   const [selectedPermissionId, setSelectedPermissionId] = useState<string>("");
   const [permissionName, setPermissionName] = useState("");
   const [menuPath, setMenuPath] = useState("");
+  const [descripcion, setDescripcion] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const { confirmacion, pedirConfirmacion, cerrarConfirmacion } = useConfirmacion();
 
@@ -35,6 +39,7 @@ export function usePermissionForm(permisoList: Permiso[], setToast: SetToast) {
   const handleClear = () => {
     setPermissionName("");
     setMenuPath("");
+    setDescripcion("");
     setSelectedPermissionId("");
   };
 
@@ -49,6 +54,7 @@ export function usePermissionForm(permisoList: Permiso[], setToast: SetToast) {
     const permission = permisoList.find((p) => p.id === Number(permissionId));
     setPermissionName(permission?.nombre ?? "");
     setMenuPath(permission?.menu_path ?? "");
+    setDescripcion(permission?.descripcion ?? "");
   };
 
   /** Botón de editar de la lista: pasa a modo edición con ese permiso cargado. */
@@ -65,6 +71,7 @@ export function usePermissionForm(permisoList: Permiso[], setToast: SetToast) {
         id: mode === "create" ? undefined : selectedPermissionId,
         name: permissionName,
         menu_path: menuPath,
+        descripcion: descripcion.trim(),
       },
       {
         onSuccess: () => {
@@ -88,6 +95,20 @@ export function usePermissionForm(permisoList: Permiso[], setToast: SetToast) {
   const handleSubmit = () => {
     if (!permissionName.trim()) {
       setToast({ id: Date.now(), message: "El nombre del permiso es obligatorio", type: "error" });
+      return;
+    }
+
+    if (!descripcion.trim()) {
+      setToast({ id: Date.now(), message: "La descripción del permiso es obligatoria", type: "error" });
+      return;
+    }
+
+    if (descripcion.trim().length > DESCRIPCION_MAX) {
+      setToast({
+        id: Date.now(),
+        message: `La descripción no puede exceder ${DESCRIPCION_MAX} caracteres`,
+        type: "error",
+      });
       return;
     }
 
@@ -156,6 +177,8 @@ export function usePermissionForm(permisoList: Permiso[], setToast: SetToast) {
     setPermissionName,
     menuPath,
     setMenuPath,
+    descripcion,
+    setDescripcion,
     searchTerm,
     setSearchTerm,
     isSubmitting,

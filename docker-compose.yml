@@ -362,13 +362,18 @@ services:
   # OBJECT STORAGE - MinIO
   # ==========================================
   minio:
-    image: minio/minio:latest
+    # MinIO Inc. dejó de publicar la imagen comunitaria (oct 2025). Se usa el
+    # fork comunitario pgsty/minio (mismo código, licencia AGPLv3) fijado a una
+    # versión exacta para que nunca se actualice solo. Probado con una copia de
+    # los datos de la VM: 48/48 documentos idénticos (16/10/2026). Copia de la
+    # imagen original en backups/minio-20261016/.
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z@sha256:b6bfe7239bfc83fb90d31612d9704d86039dd714f7904b3f1ad68f211e602372
     container_name: satc-minio
     deploy:
       resources:
         limits:
           cpus: "2.0"
-          memory: 192M
+          memory: 256M
         reservations:
           cpus: "1.0"
           memory: 96M
@@ -471,7 +476,7 @@ services:
       resources:
         limits:
           cpus: "1.0"
-          memory: 128M
+          memory: 64M
         reservations:
           cpus: "0.5"
           memory: 64M
@@ -516,7 +521,7 @@ services:
       resources:
         limits:
           cpus: "2.0" # 4 workers Gunicorn (consolida 2 rÃ©plicas Ã— 2 workers)
-          memory: 600M # Cubre uso real pico con --preload
+          memory: 450M # Cubre uso real pico con --preload
         reservations:
           cpus: "1.0"
           memory: 200M
@@ -653,7 +658,7 @@ services:
       resources:
         limits:
           cpus: "0.5" # Reducido de 1.0 (1 worker)
-          memory: 128M # Optimizado segÃºn uso real: 89MB pico
+          memory: 256M # Optimizado segÃºn uso real: 89MB pico
         reservations:
           cpus: "0.25"
           memory: 64M
@@ -905,10 +910,10 @@ services:
       resources:
         limits:
           cpus: "4.0" # 6 workers Gunicorn (consolida 3 — 2 workers)
-          memory: 900M # Cubre uso real pico con --preload
+          memory: 384M # Cubre uso real pico con --preload
         reservations:
           cpus: "2.0"
-          memory: 450M
+          memory: 256M
     environment:
       # JWT
       SECRET_KEY_GATEWAY: ${SECRET_KEY_GATEWAY}

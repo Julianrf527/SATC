@@ -1,5 +1,22 @@
 from datetime import  date, timedelta
+from functools import lru_cache
 import holidays
+
+
+@lru_cache(maxsize=None)
+def _festivos_anio(anio: int) -> frozenset:
+    """Festivos de Colombia de un año, calculados una sola vez por proceso.
+
+    Equivale al ``holidays.Colombia(years=...)`` que antes se creaba en cada
+    llamada: ese objeto se expande solo al año de la fecha consultada, así que
+    el resultado no depende del rango de años con que se creaba.
+    """
+    return frozenset(holidays.Colombia(years=anio).keys())
+
+
+def es_dia_laboral(d: date) -> bool:
+    """Lunes a viernes que no sea festivo en Colombia."""
+    return d.weekday() < 5 and d not in _festivos_anio(d.year)
 
 
 def calcular_dias_laborales(fecha_inicio: date, fecha_fin: date) -> int:
@@ -11,13 +28,11 @@ def calcular_dias_laborales(fecha_inicio: date, fecha_fin: date) -> int:
     if fecha_inicio >= fecha_fin:
         return 0
     
-    co_holidays = holidays.Colombia(years=range(fecha_inicio.year, fecha_fin.year + 1))
-    
     dias_laborales = 0
     fecha_actual = fecha_inicio + timedelta(days=1)  # Comenzar desde el día siguiente
     
     while fecha_actual <= fecha_fin:
-        if fecha_actual.weekday() < 5 and fecha_actual not in co_holidays:
+        if es_dia_laboral(fecha_actual):
             dias_laborales += 1
         fecha_actual += timedelta(days=1)
     
@@ -29,15 +44,13 @@ def obtener_fecha_despues_dias_laborales(fecha_inicio: date, dias_laborales: int
     fecha_inicio: fecha de inicio (se incluye en el conteo)
     dias_laborales: número de días laborales a sumar
     """
-    co_holidays = holidays.Colombia(years=range(fecha_inicio.year, fecha_inicio.year + 1))
-    
     fecha_actual = fecha_inicio
     dias_sumados = 0
     
     while dias_sumados < dias_laborales:
         fecha_actual += timedelta(days=1)
         
-        if fecha_actual.weekday() < 5 and fecha_actual not in co_holidays:
+        if es_dia_laboral(fecha_actual):
             dias_sumados += 1
             
     return fecha_actual

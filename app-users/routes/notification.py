@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, insert
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from zoneinfo import ZoneInfo
 import logging
 import asyncio
@@ -15,11 +15,32 @@ from db.models.notificacion import Notificacion
 
 router = APIRouter()
 
+# Largos de las columnas notificacion.id_vinculada (varchar(20)) y
+# notificacion.tipo (varchar(15)) en db/models/notificacion.py.
+ID_VINCULADA_MAX = 20
+TIPO_MAX = 15
+
 class NotificacionRequest(BaseModel):
     mensaje: str
     id_vinculada: str
     tipo: str
     usuario_id: int
+
+    # Sin esto un valor más largo llegaba a la BD y respondía 500 en vez de 422.
+    # Se mide sin espacios laterales porque así se guarda (ver crear_notificacion).
+    @field_validator("id_vinculada")
+    @classmethod
+    def _largo_id_vinculada(cls, v: str) -> str:
+        if len(v.strip()) > ID_VINCULADA_MAX:
+            raise ValueError(f"El id_vinculada no puede exceder {ID_VINCULADA_MAX} caracteres")
+        return v
+
+    @field_validator("tipo")
+    @classmethod
+    def _largo_tipo(cls, v: str) -> str:
+        if len(v.strip()) > TIPO_MAX:
+            raise ValueError(f"El tipo no puede exceder {TIPO_MAX} caracteres")
+        return v
 
 logging.basicConfig(
     level=logging.INFO,

@@ -1,0 +1,1507 @@
+{
+ "todas_todos": {
+  "ok": true,
+  "alcance": "todos",
+  "alertas": {
+   "CAR-0001": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-13",
+     "fecha_limite": "2026-04-08",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 11.5,
+      "urgencia": "baja",
+      "dias_transcurridos": 3,
+      "dias_restantes": 23,
+      "dias_totales": 26,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0002": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-03",
+     "fecha_limite": "2026-03-25",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 59.1,
+      "urgencia": "media",
+      "dias_transcurridos": 13,
+      "dias_restantes": 9,
+      "dias_totales": 22,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0003": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-02-20",
+     "fecha_limite": "2026-03-13",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 24,
+      "dias_restantes": 0,
+      "dias_totales": 21,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0004": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2025-12-22",
+     "fecha_limite": "2026-01-15",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 84,
+      "dias_restantes": 0,
+      "dias_totales": 24,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0005": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-04",
+     "fecha_limite": "2026-03-26",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 54.5,
+      "urgencia": "media",
+      "dias_transcurridos": 12,
+      "dias_restantes": 10,
+      "dias_totales": 22,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0006": {
+    "concepto_constancia_1": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2026-03-05 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2026-03-05",
+     "fecha_limite": "2026-03-27",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 50.0,
+      "urgencia": "media",
+      "dias_transcurridos": 11,
+      "dias_restantes": 11,
+      "dias_totales": 22,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "concepto_constancia_2": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2026-02-10 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2026-02-10",
+     "fecha_limite": "2026-03-03",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 34,
+      "dias_restantes": 0,
+      "dias_totales": 21,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    },
+    "concepto_constancia_6": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2026-02-27 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2026-02-27",
+     "fecha_limite": "2026-03-20",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#ef4444",
+      "porcentaje_avance": 81.0,
+      "urgencia": "alta",
+      "dias_transcurridos": 17,
+      "dias_restantes": 4,
+      "dias_totales": 21,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "concepto_termino": {
+     "tipo": "concepto_termino",
+     "etapa": "Concepto",
+     "accion_requerida": "El término de 10 días hábiles del concepto técnico está en curso",
+     "plazo_legal": "10 días hábiles desde notificación del concepto",
+     "msg": "Término de 10 días hábiles vence el 2026-03-25",
+     "fecha_inicio": "2026-03-11",
+     "fecha_limite": "2026-03-25",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 35.7,
+      "urgencia": "baja",
+      "dias_transcurridos": 5,
+      "dias_restantes": 9,
+      "dias_totales": 14,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0007": {
+    "concepto_termino": {
+     "tipo": "concepto_termino",
+     "etapa": "Concepto",
+     "accion_requerida": "El término de 30 días hábiles del concepto técnico está en curso",
+     "plazo_legal": "30 días hábiles desde notificación del concepto",
+     "msg": "Término de 30 días hábiles vence el 2026-03-17",
+     "fecha_inicio": "2026-02-02",
+     "fecha_limite": "2026-03-17",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#ef4444",
+      "porcentaje_avance": 97.7,
+      "urgencia": "alta",
+      "dias_transcurridos": 42,
+      "dias_restantes": 1,
+      "dias_totales": 43,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0009": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-09",
+     "fecha_limite": "2026-03-31",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 31.8,
+      "urgencia": "baja",
+      "dias_transcurridos": 7,
+      "dias_restantes": 15,
+      "dias_totales": 22,
+      "esta_vencido": false
+     },
+     "es_responsable": false
+    }
+   },
+   "CAR-0010": {
+    "concepto_termino": {
+     "tipo": "concepto_termino",
+     "etapa": "Concepto",
+     "accion_requerida": "El término de 5 días hábiles del concepto técnico está en curso",
+     "plazo_legal": "5 días hábiles desde notificación del concepto",
+     "msg": "Término de 5 días hábiles vence el 2026-03-10",
+     "fecha_inicio": "2026-03-03",
+     "fecha_limite": "2026-03-10",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 13,
+      "dias_restantes": 0,
+      "dias_totales": 7,
+      "esta_vencido": true
+     },
+     "es_responsable": false
+    }
+   },
+   "CAR-0011": {
+    "concepto_constancia_8": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2026-03-12 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2026-03-12",
+     "fecha_limite": "2026-04-07",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 15.4,
+      "urgencia": "baja",
+      "dias_transcurridos": 4,
+      "dias_restantes": 22,
+      "dias_totales": 26,
+      "esta_vencido": false
+     },
+     "es_responsable": false
+    }
+   },
+   "CAR-0012": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-02-28",
+     "fecha_limite": "2026-03-20",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#ef4444",
+      "porcentaje_avance": 80.0,
+      "urgencia": "alta",
+      "dias_transcurridos": 16,
+      "dias_restantes": 4,
+      "dias_totales": 20,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "concepto_constancia_9": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2025-12-30",
+     "fecha_limite": "2026-01-22",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 76,
+      "dias_restantes": 0,
+      "dias_totales": 23,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    },
+    "concepto_termino": {
+     "tipo": "concepto_termino",
+     "etapa": "Concepto",
+     "accion_requerida": "El término de 15 días hábiles del concepto técnico está en curso",
+     "plazo_legal": "15 días hábiles desde notificación del concepto",
+     "msg": "Término de 15 días hábiles vence el 2026-04-08",
+     "fecha_inicio": "2026-03-18",
+     "fecha_limite": "2026-04-08",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 0.0,
+      "urgencia": "baja",
+      "dias_transcurridos": 0,
+      "dias_restantes": 23,
+      "dias_totales": 21,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   }
+  },
+  "total_expedientes": 12,
+  "expedientes_con_alertas": 11,
+  "estadisticas_semaforo": {
+   "verde": 5,
+   "amarillo": 3,
+   "rojo": 3,
+   "vencido": 5
+  }
+ },
+ "todas_mios": {
+  "ok": true,
+  "alcance": "mios",
+  "alertas": {
+   "CAR-0001": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-13",
+     "fecha_limite": "2026-04-08",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 11.5,
+      "urgencia": "baja",
+      "dias_transcurridos": 3,
+      "dias_restantes": 23,
+      "dias_totales": 26,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0002": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-03",
+     "fecha_limite": "2026-03-25",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 59.1,
+      "urgencia": "media",
+      "dias_transcurridos": 13,
+      "dias_restantes": 9,
+      "dias_totales": 22,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0003": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-02-20",
+     "fecha_limite": "2026-03-13",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 24,
+      "dias_restantes": 0,
+      "dias_totales": 21,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0004": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2025-12-22",
+     "fecha_limite": "2026-01-15",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 84,
+      "dias_restantes": 0,
+      "dias_totales": 24,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0005": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-04",
+     "fecha_limite": "2026-03-26",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 54.5,
+      "urgencia": "media",
+      "dias_transcurridos": 12,
+      "dias_restantes": 10,
+      "dias_totales": 22,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0006": {
+    "concepto_constancia_1": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2026-03-05 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2026-03-05",
+     "fecha_limite": "2026-03-27",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 50.0,
+      "urgencia": "media",
+      "dias_transcurridos": 11,
+      "dias_restantes": 11,
+      "dias_totales": 22,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "concepto_constancia_2": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2026-02-10 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2026-02-10",
+     "fecha_limite": "2026-03-03",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 34,
+      "dias_restantes": 0,
+      "dias_totales": 21,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    },
+    "concepto_constancia_6": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2026-02-27 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2026-02-27",
+     "fecha_limite": "2026-03-20",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#ef4444",
+      "porcentaje_avance": 81.0,
+      "urgencia": "alta",
+      "dias_transcurridos": 17,
+      "dias_restantes": 4,
+      "dias_totales": 21,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "concepto_termino": {
+     "tipo": "concepto_termino",
+     "etapa": "Concepto",
+     "accion_requerida": "El término de 10 días hábiles del concepto técnico está en curso",
+     "plazo_legal": "10 días hábiles desde notificación del concepto",
+     "msg": "Término de 10 días hábiles vence el 2026-03-25",
+     "fecha_inicio": "2026-03-11",
+     "fecha_limite": "2026-03-25",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 35.7,
+      "urgencia": "baja",
+      "dias_transcurridos": 5,
+      "dias_restantes": 9,
+      "dias_totales": 14,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0007": {
+    "concepto_termino": {
+     "tipo": "concepto_termino",
+     "etapa": "Concepto",
+     "accion_requerida": "El término de 30 días hábiles del concepto técnico está en curso",
+     "plazo_legal": "30 días hábiles desde notificación del concepto",
+     "msg": "Término de 30 días hábiles vence el 2026-03-17",
+     "fecha_inicio": "2026-02-02",
+     "fecha_limite": "2026-03-17",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#ef4444",
+      "porcentaje_avance": 97.7,
+      "urgencia": "alta",
+      "dias_transcurridos": 42,
+      "dias_restantes": 1,
+      "dias_totales": 43,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0012": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-02-28",
+     "fecha_limite": "2026-03-20",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#ef4444",
+      "porcentaje_avance": 80.0,
+      "urgencia": "alta",
+      "dias_transcurridos": 16,
+      "dias_restantes": 4,
+      "dias_totales": 20,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    },
+    "concepto_constancia_9": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2025-12-30",
+     "fecha_limite": "2026-01-22",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 76,
+      "dias_restantes": 0,
+      "dias_totales": 23,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    },
+    "concepto_termino": {
+     "tipo": "concepto_termino",
+     "etapa": "Concepto",
+     "accion_requerida": "El término de 15 días hábiles del concepto técnico está en curso",
+     "plazo_legal": "15 días hábiles desde notificación del concepto",
+     "msg": "Término de 15 días hábiles vence el 2026-04-08",
+     "fecha_inicio": "2026-03-18",
+     "fecha_limite": "2026-04-08",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 0.0,
+      "urgencia": "baja",
+      "dias_transcurridos": 0,
+      "dias_restantes": 23,
+      "dias_totales": 21,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   }
+  },
+  "total_expedientes": 9,
+  "expedientes_con_alertas": 8,
+  "estadisticas_semaforo": {
+   "verde": 3,
+   "amarillo": 3,
+   "rojo": 3,
+   "vencido": 4
+  }
+ },
+ "todas_mios_8": {
+  "ok": true,
+  "alcance": "mios",
+  "alertas": {
+   "CAR-0009": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-09",
+     "fecha_limite": "2026-03-31",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 31.8,
+      "urgencia": "baja",
+      "dias_transcurridos": 7,
+      "dias_restantes": 15,
+      "dias_totales": 22,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0011": {
+    "concepto_constancia_8": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2026-03-12 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2026-03-12",
+     "fecha_limite": "2026-04-07",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 15.4,
+      "urgencia": "baja",
+      "dias_transcurridos": 4,
+      "dias_restantes": 22,
+      "dias_totales": 26,
+      "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   }
+  },
+  "total_expedientes": 2,
+  "expedientes_con_alertas": 2,
+  "estadisticas_semaforo": {
+   "verde": 2,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "todas_mios_50": {
+  "ok": true,
+  "alcance": "mios",
+  "alertas": {},
+  "total_expedientes": 0,
+  "expedientes_con_alertas": 0,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_1": {
+  "ok": true,
+  "radicado": "CAR-0001",
+  "alertas": {
+   "respuesta_plazo": {
+    "tipo": "respuesta_plazo",
+    "etapa": "Respuesta",
+    "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "plazo_legal": "15 días hábiles desde la creación del expediente",
+    "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "fecha_inicio": "2026-03-13",
+    "fecha_limite": "2026-04-08",
+    "semaforo": {
+     "estado": "verde",
+     "color_hex": "#22c55e",
+     "porcentaje_avance": 11.5,
+     "urgencia": "baja",
+     "dias_transcurridos": 3,
+     "dias_restantes": 23,
+     "dias_totales": 26,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 1,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_2": {
+  "ok": true,
+  "radicado": "CAR-0002",
+  "alertas": {
+   "respuesta_plazo": {
+    "tipo": "respuesta_plazo",
+    "etapa": "Respuesta",
+    "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "plazo_legal": "15 días hábiles desde la creación del expediente",
+    "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "fecha_inicio": "2026-03-03",
+    "fecha_limite": "2026-03-25",
+    "semaforo": {
+     "estado": "amarillo",
+     "color_hex": "#f59e0b",
+     "porcentaje_avance": 59.1,
+     "urgencia": "media",
+     "dias_transcurridos": 13,
+     "dias_restantes": 9,
+     "dias_totales": 22,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 1,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_3": {
+  "ok": true,
+  "radicado": "CAR-0003",
+  "alertas": {
+   "respuesta_plazo": {
+    "tipo": "respuesta_plazo",
+    "etapa": "Respuesta",
+    "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "plazo_legal": "15 días hábiles desde la creación del expediente",
+    "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "fecha_inicio": "2026-02-20",
+    "fecha_limite": "2026-03-13",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#1f2937",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 24,
+     "dias_restantes": 0,
+     "dias_totales": 21,
+     "esta_vencido": true
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 1
+  }
+ },
+ "expediente_4": {
+  "ok": true,
+  "radicado": "CAR-0004",
+  "alertas": {
+   "respuesta_plazo": {
+    "tipo": "respuesta_plazo",
+    "etapa": "Respuesta",
+    "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "plazo_legal": "15 días hábiles desde la creación del expediente",
+    "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "fecha_inicio": "2025-12-22",
+    "fecha_limite": "2026-01-15",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#1f2937",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 84,
+     "dias_restantes": 0,
+     "dias_totales": 24,
+     "esta_vencido": true
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 1
+  }
+ },
+ "expediente_5": {
+  "ok": true,
+  "radicado": "CAR-0005",
+  "alertas": {
+   "respuesta_plazo": {
+    "tipo": "respuesta_plazo",
+    "etapa": "Respuesta",
+    "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "plazo_legal": "15 días hábiles desde la creación del expediente",
+    "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "fecha_inicio": "2026-03-04",
+    "fecha_limite": "2026-03-26",
+    "semaforo": {
+     "estado": "amarillo",
+     "color_hex": "#f59e0b",
+     "porcentaje_avance": 54.5,
+     "urgencia": "media",
+     "dias_transcurridos": 12,
+     "dias_restantes": 10,
+     "dias_totales": 22,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 1,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_6": {
+  "ok": true,
+  "radicado": "CAR-0006",
+  "alertas": {
+   "concepto_constancia_1": {
+    "tipo": "concepto_constancia",
+    "etapa": "Concepto",
+    "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+    "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+    "msg": "15 días hábiles desde constancia del 2026-03-05 para notificar o cambiar a comunicación",
+    "fecha_inicio": "2026-03-05",
+    "fecha_limite": "2026-03-27",
+    "semaforo": {
+     "estado": "amarillo",
+     "color_hex": "#f59e0b",
+     "porcentaje_avance": 50.0,
+     "urgencia": "media",
+     "dias_transcurridos": 11,
+     "dias_restantes": 11,
+     "dias_totales": 22,
+     "esta_vencido": false
+    }
+   },
+   "concepto_constancia_2": {
+    "tipo": "concepto_constancia",
+    "etapa": "Concepto",
+    "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+    "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+    "msg": "15 días hábiles desde constancia del 2026-02-10 para notificar o cambiar a comunicación",
+    "fecha_inicio": "2026-02-10",
+    "fecha_limite": "2026-03-03",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#1f2937",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 34,
+     "dias_restantes": 0,
+     "dias_totales": 21,
+     "esta_vencido": true
+    }
+   },
+   "concepto_constancia_6": {
+    "tipo": "concepto_constancia",
+    "etapa": "Concepto",
+    "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+    "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+    "msg": "15 días hábiles desde constancia del 2026-02-27 para notificar o cambiar a comunicación",
+    "fecha_inicio": "2026-02-27",
+    "fecha_limite": "2026-03-20",
+    "semaforo": {
+     "estado": "rojo",
+     "color_hex": "#ef4444",
+     "porcentaje_avance": 81.0,
+     "urgencia": "alta",
+     "dias_transcurridos": 17,
+     "dias_restantes": 4,
+     "dias_totales": 21,
+     "esta_vencido": false
+    }
+   },
+   "concepto_termino": {
+    "tipo": "concepto_termino",
+    "etapa": "Concepto",
+    "accion_requerida": "El término de 10 días hábiles del concepto técnico está en curso",
+    "plazo_legal": "10 días hábiles desde notificación del concepto",
+    "msg": "Término de 10 días hábiles vence el 2026-03-25",
+    "fecha_inicio": "2026-03-11",
+    "fecha_limite": "2026-03-25",
+    "semaforo": {
+     "estado": "verde",
+     "color_hex": "#22c55e",
+     "porcentaje_avance": 35.7,
+     "urgencia": "baja",
+     "dias_transcurridos": 5,
+     "dias_restantes": 9,
+     "dias_totales": 14,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 4,
+  "estadisticas_semaforo": {
+   "verde": 1,
+   "amarillo": 1,
+   "rojo": 1,
+   "vencido": 1
+  }
+ },
+ "expediente_7": {
+  "ok": true,
+  "radicado": "CAR-0007",
+  "alertas": {
+   "concepto_termino": {
+    "tipo": "concepto_termino",
+    "etapa": "Concepto",
+    "accion_requerida": "El término de 30 días hábiles del concepto técnico está en curso",
+    "plazo_legal": "30 días hábiles desde notificación del concepto",
+    "msg": "Término de 30 días hábiles vence el 2026-03-17",
+    "fecha_inicio": "2026-02-02",
+    "fecha_limite": "2026-03-17",
+    "semaforo": {
+     "estado": "rojo",
+     "color_hex": "#ef4444",
+     "porcentaje_avance": 97.7,
+     "urgencia": "alta",
+     "dias_transcurridos": 42,
+     "dias_restantes": 1,
+     "dias_totales": 43,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 1,
+   "vencido": 0
+  }
+ },
+ "expediente_8": {
+  "ok": true,
+  "radicado": "CAR-0008",
+  "alertas": {},
+  "total_alertas": 0,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_9": {
+  "ok": true,
+  "radicado": "CAR-0009",
+  "alertas": {
+   "respuesta_plazo": {
+    "tipo": "respuesta_plazo",
+    "etapa": "Respuesta",
+    "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "plazo_legal": "15 días hábiles desde la creación del expediente",
+    "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "fecha_inicio": "2026-03-09",
+    "fecha_limite": "2026-03-31",
+    "semaforo": {
+     "estado": "verde",
+     "color_hex": "#22c55e",
+     "porcentaje_avance": 31.8,
+     "urgencia": "baja",
+     "dias_transcurridos": 7,
+     "dias_restantes": 15,
+     "dias_totales": 22,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 1,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_10": {
+  "ok": true,
+  "radicado": "CAR-0010",
+  "alertas": {
+   "concepto_termino": {
+    "tipo": "concepto_termino",
+    "etapa": "Concepto",
+    "accion_requerida": "El término de 5 días hábiles del concepto técnico está en curso",
+    "plazo_legal": "5 días hábiles desde notificación del concepto",
+    "msg": "Término de 5 días hábiles vence el 2026-03-10",
+    "fecha_inicio": "2026-03-03",
+    "fecha_limite": "2026-03-10",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#1f2937",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 13,
+     "dias_restantes": 0,
+     "dias_totales": 7,
+     "esta_vencido": true
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 1
+  }
+ },
+ "expediente_11": {
+  "ok": true,
+  "radicado": "CAR-0011",
+  "alertas": {
+   "concepto_constancia_8": {
+    "tipo": "concepto_constancia",
+    "etapa": "Concepto",
+    "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+    "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+    "msg": "15 días hábiles desde constancia del 2026-03-12 para notificar o cambiar a comunicación",
+    "fecha_inicio": "2026-03-12",
+    "fecha_limite": "2026-04-07",
+    "semaforo": {
+     "estado": "verde",
+     "color_hex": "#22c55e",
+     "porcentaje_avance": 15.4,
+     "urgencia": "baja",
+     "dias_transcurridos": 4,
+     "dias_restantes": 22,
+     "dias_totales": 26,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 1,
+  "estadisticas_semaforo": {
+   "verde": 1,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ },
+ "expediente_12": {
+  "ok": true,
+  "radicado": "CAR-0012",
+  "alertas": {
+   "respuesta_plazo": {
+    "tipo": "respuesta_plazo",
+    "etapa": "Respuesta",
+    "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "plazo_legal": "15 días hábiles desde la creación del expediente",
+    "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+    "fecha_inicio": "2026-02-28",
+    "fecha_limite": "2026-03-20",
+    "semaforo": {
+     "estado": "rojo",
+     "color_hex": "#ef4444",
+     "porcentaje_avance": 80.0,
+     "urgencia": "alta",
+     "dias_transcurridos": 16,
+     "dias_restantes": 4,
+     "dias_totales": 20,
+     "esta_vencido": false
+    }
+   },
+   "concepto_constancia_9": {
+    "tipo": "concepto_constancia",
+    "etapa": "Concepto",
+    "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+    "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+    "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar o cambiar a comunicación",
+    "fecha_inicio": "2025-12-30",
+    "fecha_limite": "2026-01-22",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#1f2937",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 76,
+     "dias_restantes": 0,
+     "dias_totales": 23,
+     "esta_vencido": true
+    }
+   },
+   "concepto_termino": {
+    "tipo": "concepto_termino",
+    "etapa": "Concepto",
+    "accion_requerida": "El término de 15 días hábiles del concepto técnico está en curso",
+    "plazo_legal": "15 días hábiles desde notificación del concepto",
+    "msg": "Término de 15 días hábiles vence el 2026-04-08",
+    "fecha_inicio": "2026-03-18",
+    "fecha_limite": "2026-04-08",
+    "semaforo": {
+     "estado": "verde",
+     "color_hex": "#22c55e",
+     "porcentaje_avance": 0.0,
+     "urgencia": "baja",
+     "dias_transcurridos": 0,
+     "dias_restantes": 23,
+     "dias_totales": 21,
+     "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 3,
+  "estadisticas_semaforo": {
+   "verde": 1,
+   "amarillo": 0,
+   "rojo": 1,
+   "vencido": 1
+  }
+ },
+ "reporte_semanal_7": {
+  "alertas": {
+   "CAR-0001": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-13",
+     "fecha_limite": "2026-04-08",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 11.5,
+      "urgencia": "baja",
+      "dias_transcurridos": 3,
+      "dias_restantes": 23,
+      "dias_totales": 26,
+      "esta_vencido": false
+     }
+    }
+   },
+   "CAR-0002": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-03",
+     "fecha_limite": "2026-03-25",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 59.1,
+      "urgencia": "media",
+      "dias_transcurridos": 13,
+      "dias_restantes": 9,
+      "dias_totales": 22,
+      "esta_vencido": false
+     }
+    }
+   },
+   "CAR-0003": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-02-20",
+     "fecha_limite": "2026-03-13",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 24,
+      "dias_restantes": 0,
+      "dias_totales": 21,
+      "esta_vencido": true
+     }
+    }
+   },
+   "CAR-0004": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2025-12-22",
+     "fecha_limite": "2026-01-15",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 84,
+      "dias_restantes": 0,
+      "dias_totales": 24,
+      "esta_vencido": true
+     }
+    }
+   },
+   "CAR-0005": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-04",
+     "fecha_limite": "2026-03-26",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 54.5,
+      "urgencia": "media",
+      "dias_transcurridos": 12,
+      "dias_restantes": 10,
+      "dias_totales": 22,
+      "esta_vencido": false
+     }
+    }
+   },
+   "CAR-0006": {
+    "concepto_constancia_1": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2026-03-05 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2026-03-05",
+     "fecha_limite": "2026-03-27",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 50.0,
+      "urgencia": "media",
+      "dias_transcurridos": 11,
+      "dias_restantes": 11,
+      "dias_totales": 22,
+      "esta_vencido": false
+     }
+    },
+    "concepto_constancia_2": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2026-02-10 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2026-02-10",
+     "fecha_limite": "2026-03-03",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 34,
+      "dias_restantes": 0,
+      "dias_totales": 21,
+      "esta_vencido": true
+     }
+    },
+    "concepto_constancia_6": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2026-02-27 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2026-02-27",
+     "fecha_limite": "2026-03-20",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#ef4444",
+      "porcentaje_avance": 81.0,
+      "urgencia": "alta",
+      "dias_transcurridos": 17,
+      "dias_restantes": 4,
+      "dias_totales": 21,
+      "esta_vencido": false
+     }
+    },
+    "concepto_termino": {
+     "tipo": "concepto_termino",
+     "etapa": "Concepto",
+     "accion_requerida": "El término de 10 días hábiles del concepto técnico está en curso",
+     "plazo_legal": "10 días hábiles desde notificación del concepto",
+     "msg": "Término de 10 días hábiles vence el 2026-03-25",
+     "fecha_inicio": "2026-03-11",
+     "fecha_limite": "2026-03-25",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 35.7,
+      "urgencia": "baja",
+      "dias_transcurridos": 5,
+      "dias_restantes": 9,
+      "dias_totales": 14,
+      "esta_vencido": false
+     }
+    }
+   },
+   "CAR-0007": {
+    "concepto_termino": {
+     "tipo": "concepto_termino",
+     "etapa": "Concepto",
+     "accion_requerida": "El término de 30 días hábiles del concepto técnico está en curso",
+     "plazo_legal": "30 días hábiles desde notificación del concepto",
+     "msg": "Término de 30 días hábiles vence el 2026-03-17",
+     "fecha_inicio": "2026-02-02",
+     "fecha_limite": "2026-03-17",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#ef4444",
+      "porcentaje_avance": 97.7,
+      "urgencia": "alta",
+      "dias_transcurridos": 42,
+      "dias_restantes": 1,
+      "dias_totales": 43,
+      "esta_vencido": false
+     }
+    }
+   },
+   "CAR-0012": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-02-28",
+     "fecha_limite": "2026-03-20",
+     "semaforo": {
+      "estado": "rojo",
+      "color_hex": "#ef4444",
+      "porcentaje_avance": 80.0,
+      "urgencia": "alta",
+      "dias_transcurridos": 16,
+      "dias_restantes": 4,
+      "dias_totales": 20,
+      "esta_vencido": false
+     }
+    },
+    "concepto_constancia_9": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2025-12-30",
+     "fecha_limite": "2026-01-22",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 76,
+      "dias_restantes": 0,
+      "dias_totales": 23,
+      "esta_vencido": true
+     }
+    },
+    "concepto_termino": {
+     "tipo": "concepto_termino",
+     "etapa": "Concepto",
+     "accion_requerida": "El término de 15 días hábiles del concepto técnico está en curso",
+     "plazo_legal": "15 días hábiles desde notificación del concepto",
+     "msg": "Término de 15 días hábiles vence el 2026-04-08",
+     "fecha_inicio": "2026-03-18",
+     "fecha_limite": "2026-04-08",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 0.0,
+      "urgencia": "baja",
+      "dias_transcurridos": 0,
+      "dias_restantes": 23,
+      "dias_totales": 21,
+      "esta_vencido": false
+     }
+    }
+   }
+  },
+  "total_expedientes": 9,
+  "expedientes_con_alertas": 8,
+  "estadisticas_semaforo": {
+   "verde": 3,
+   "amarillo": 3,
+   "rojo": 3,
+   "vencido": 4
+  }
+ },
+ "reporte_semanal_8": {
+  "alertas": {
+   "CAR-0009": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-09",
+     "fecha_limite": "2026-03-31",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 31.8,
+      "urgencia": "baja",
+      "dias_transcurridos": 7,
+      "dias_restantes": 15,
+      "dias_totales": 22,
+      "esta_vencido": false
+     }
+    }
+   },
+   "CAR-0011": {
+    "concepto_constancia_8": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2026-03-12 para notificar o cambiar a comunicación",
+     "fecha_inicio": "2026-03-12",
+     "fecha_limite": "2026-04-07",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 15.4,
+      "urgencia": "baja",
+      "dias_transcurridos": 4,
+      "dias_restantes": 22,
+      "dias_totales": 26,
+      "esta_vencido": false
+     }
+    }
+   }
+  },
+  "total_expedientes": 2,
+  "expedientes_con_alertas": 2,
+  "estadisticas_semaforo": {
+   "verde": 2,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 0
+  }
+ }
+}

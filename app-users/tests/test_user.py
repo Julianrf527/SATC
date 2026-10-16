@@ -303,3 +303,42 @@ async def test_all_auditor_403(client, make_permiso, make_rol, make_usuario):
     u = await make_usuario(rol_id=rol.id)
     resp = await client.get("/user/all", headers=gateway_headers(u.id, rol.id))
     assert resp.status_code == 403
+
+
+# usuario.correo es varchar(100); EmailStr admite ~254 y antes daba 500.
+CORREO_LARGO = "a" * 40 + "@" + "b" * 56 + ".com"  # 101 caracteres, formato válido
+
+
+@pytest.mark.asyncio
+async def test_register_correo_largo_422(client, make_permiso, make_rol, make_usuario):
+    rol, _ = await _rol_admin(make_permiso, make_rol)
+    admin = await make_usuario(rol_id=rol.id)
+    resp = await client.post("/user/register", headers=gateway_headers(admin.id, rol.id), json={
+        "first_name": "Ana", "lastname": "Perez", "document": 555112,
+        "email": CORREO_LARGO, "rol": rol.id,
+    })
+    assert resp.status_code == 422
+    assert "100 caracteres" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_admin_update_correo_largo_422(client, make_permiso, make_rol, make_usuario):
+    rol, _ = await _rol_admin(make_permiso, make_rol)
+    admin = await make_usuario(rol_id=rol.id)
+    objetivo = await make_usuario(rol_id=rol.id, numero_documento=444555, correo="obj.largo@test.com")
+    resp = await client.patch(f"/user/{objetivo.id}", headers=gateway_headers(admin.id, rol.id), json={
+        "email": CORREO_LARGO,
+    })
+    assert resp.status_code == 422
+    assert "100 caracteres" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_update_perfil_correo_largo_422(client, make_rol, make_usuario):
+    rol = await make_rol("operador")
+    u = await make_usuario(rol_id=rol.id)
+    resp = await client.put("/user/update-user", headers=gateway_headers(u.id, rol.id), json={
+        "first_name": "Ana", "lastname": "Perez", "correo": CORREO_LARGO,
+    })
+    assert resp.status_code == 422
+    assert "100 caracteres" in resp.text

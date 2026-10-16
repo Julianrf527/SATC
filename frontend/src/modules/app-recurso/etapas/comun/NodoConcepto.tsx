@@ -3,7 +3,6 @@ import { CalendarDays, CheckCircle, Droplets, FileText, Gauge, User, Users, XCir
 import { formatDate } from "@shared/lib/format";
 import { EstadoBadge } from "@shared/ui";
 import type { DatosConcepto, NodoConcepto as Nodo } from "../../types";
-import { camposConcepto } from "../formularios/conceptoFinal";
 import { accionesNodo, urlSeleccionarTecnico, urlVersionFinal } from "../nodos";
 import type { EntornoEtapa } from "../tipos";
 import { BotonSuperCargue, BotonVersionFinal } from "./BotonesNodo";
@@ -38,8 +37,8 @@ export default function NodoConcepto({ entorno, nodo, anidada, pendiente, childr
   const urlTecnico = urlSeleccionarTecnico(expediente.id, nodo.tipo);
   const urlFinal = urlVersionFinal(expediente.id, ref);
   const d = (nodo.existe ? nodo.datos : {}) as Partial<DatosConcepto>;
-  const campos = camposConcepto(nodo.tipo);
-  const muestra = (c: string) => campos.obligatorios.includes(c) || campos.opcionales.includes(c);
+  const campos = nodo.campos;
+  const muestra = (c: string) => campos.campos.some((x) => x.campo === c);
   const cargado = !!d.doc_concepto_tecnico_id;
 
   const estado = cargado ? (
@@ -75,6 +74,7 @@ export default function NodoConcepto({ entorno, nodo, anidada, pendiente, childr
               version={nodo.version}
               tieneActo={false}
               actuales={{ concepto: d.doc_concepto_tecnico_id ?? null }}
+              camposConcepto={campos}
               setToast={setToast}
             />
           )}
@@ -165,7 +165,7 @@ export default function NodoConcepto({ entorno, nodo, anidada, pendiente, childr
         <ConceptoFinalModal
           expedienteId={expediente.id}
           url={urlFinal}
-          tipo={nodo.tipo}
+          campos={campos}
           titulo={nodo.etiqueta}
           datos={d}
           setToast={setToast}

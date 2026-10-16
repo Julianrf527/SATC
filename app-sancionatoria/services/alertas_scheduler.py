@@ -10,7 +10,7 @@ import logging
 
 from db.models.expediente import Expediente
 from services.users import get_users_by_permission, users_client
-from services.alertas import calcular_alertas_expediente
+from services.alertas import calcular_alertas_expedientes
 from core.permission import Permission
 
 load_dotenv()
@@ -26,9 +26,13 @@ async def obtener_alertas_usuario(user_id: int, db: AsyncSession) -> dict:
     ninguna: el scheduler usa ese None para no mandar un email vacío.
     """
     try:
-        stmt = select(Expediente.radicado).where(Expediente.encargado_id == user_id)
+        stmt = (
+            select(Expediente.id, Expediente.radicado)
+            .where(Expediente.encargado_id == user_id)
+            .order_by(Expediente.id)
+        )
         result = await db.execute(stmt)
-        expedientes = result.scalars().all()
+        expedientes = result.all()
 
         if not expedientes:
             return None  
@@ -36,8 +40,9 @@ async def obtener_alertas_usuario(user_id: int, db: AsyncSession) -> dict:
         alertas_totales = {}
         fecha_hoy = date.today()
 
-        for radicado in expedientes:
-            alertas = await calcular_alertas_expediente(radicado, db, fecha_hoy)
+        por_expediente = await calcular_alertas_expedientes([e.id for e in expedientes], db, fecha_hoy)
+        for expediente_id, radicado in expedientes:
+            alertas = por_expediente.get(expediente_id)
             if alertas:
                 alertas_totales[radicado] = alertas
 

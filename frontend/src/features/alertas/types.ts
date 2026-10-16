@@ -30,7 +30,7 @@ export type AlertasExpedienteResponse = {
   alertas?: Record<string, Alerta>;
 };
 
-/** Respuesta del endpoint de alertas de todos los expedientes. */
+/** Respuesta clásica (sin `page`) del endpoint de alertas de todos los expedientes. */
 export type AlertasTodasResponse = {
   ok: boolean;
   alcance?: "mios" | "todos";
@@ -38,6 +38,32 @@ export type AlertasTodasResponse = {
   total_expedientes: number;
   expedientes_con_alertas: number;
   estadisticas_semaforo: Record<EstadoSemaforo, number>;
+};
+
+/** Una alerta de la lista paginada (con su expediente y clave). */
+export type AlertaPaginada = Alerta & {
+  radicado: string;
+  clave: string;
+  es_responsable: boolean;
+};
+
+/** Respuesta del endpoint de alertas de todos los expedientes con `page`. */
+export type AlertasPaginadasResponse = {
+  ok: boolean;
+  alcance: "mios" | "todos";
+  /** Solo la página pedida, ordenada por urgencia y % de avance. */
+  alertas: AlertaPaginada[];
+  /** Alertas tras los filtros (todas las páginas). */
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  total_expedientes: number;
+  expedientes_con_alertas: number;
+  /** Del alcance completo, sin filtros de radicado/estado/tipo. */
+  estadisticas_semaforo: Record<EstadoSemaforo, number>;
+  /** Tipos de alerta del alcance completo (para el selector). */
+  tipos_disponibles: string[];
 };
 
 export type SetToast = (toast: {

@@ -41,35 +41,42 @@ const colorPalette = [
   "badge-accent",
 ];
 
+// Mapeo de nombres especiales (el resto se capitaliza desde el prefijo).
+const nameMap: { [key: string]: string } = {
+  admin_: "Administración",
+  expediente_: "Expedientes",
+  sancionatorio_: "Sancionatorio",
+  documento_: "Documentos",
+  auditoria_: "Auditoría",
+  infraccion_: "Infracciones",
+  infracciones_: "Infracciones",
+  recurso_: "Concesiones de aguas",
+  involucrado_: "Involucrados",
+  multas_: "Multas",
+  usuarios_: "Usuarios",
+  reportes_: "Reportes",
+};
+
+const prefixOf = (nombre: string) => nombre.split("_")[0] + "_";
+
+const categoryName = (prefix: string) => {
+  const rawName = prefix.replace(/_/g, "");
+  return nameMap[prefix] || rawName.charAt(0).toUpperCase() + rawName.slice(1);
+};
+
 export const generateCategories = (
   permissions: Permiso[],
 ): PermissionCategory[] => {
   const prefixes = new Set<string>();
 
   permissions.forEach((perm) => {
-    const prefix = perm.nombre.split("_")[0] + "_";
+    const prefix = prefixOf(perm.nombre);
     if (prefix !== "_") prefixes.add(prefix);
   });
 
-  // Mapeo de nombres especiales
-  const nameMap: { [key: string]: string } = {
-    admin_: "Administración",
-    expediente_: "Expedientes",
-    sancionatorio_: "Sancionatorio",
-    documento_: "Documentos",
-    auditoria_: "Auditoría",
-    infracciones_: "Infracciones",
-    multas_: "Multas",
-    usuarios_: "Usuarios",
-    reportes_: "Reportes",
-  };
-
   // Convertir prefijos a categorías
   return Array.from(prefixes).map((prefix, index) => {
-    // Usar nameMap si existe, si no, capitalizar el prefijo de forma limpia
-    const rawName = prefix.replace(/_/g, "");
-    const name =
-      nameMap[prefix] || rawName.charAt(0).toUpperCase() + rawName.slice(1);
+    const name = categoryName(prefix);
 
     return {
       name,
@@ -85,4 +92,10 @@ export const formatPermissionName = (name: string, prefix: string) => {
     .replace(prefix, "")
     .replace(/_/g, " ")
     .replace(/\b\w/g, (l) => l.toUpperCase());
+};
+
+/** Nombre legible con su categoría, p. ej. "Consultar (Infracciones)". */
+export const permissionLabel = (nombre: string) => {
+  const prefix = prefixOf(nombre);
+  return `${formatPermissionName(nombre, prefix)} (${categoryName(prefix)})`;
 };

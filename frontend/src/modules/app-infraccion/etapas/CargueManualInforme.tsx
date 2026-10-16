@@ -9,7 +9,7 @@ import { useCambiarModoMutation, useImpactoCambioModoQuery } from "../api/inform
 import CargueManualForm from "../informe-tecnico/CargueManualForm";
 import type { InformeTecnico, ModoInforme } from "../types";
 
-const PERMISO_CARGUE = "infraccion_cargue";
+const PERMISO_CARGUE = "infraccion_super_gestion";
 
 type Props = {
   informe: InformeTecnico;
@@ -19,7 +19,7 @@ type Props = {
 
 /**
  * Modo de cargue del informe (FLUJO ↔ MANUAL) y, en MANUAL, el cargue directo.
- * Solo para quien tiene `infraccion_cargue`. Tras cada cambio las mutaciones
+ * Solo para quien tiene `infraccion_super_gestion`. Tras cada cambio las mutaciones
  * invalidan la etapa y los listados de informes.
  *
  * Cambiar el modo borra en cascada las etapas posteriores del expediente

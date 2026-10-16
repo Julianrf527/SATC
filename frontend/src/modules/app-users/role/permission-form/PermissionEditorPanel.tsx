@@ -1,5 +1,6 @@
 import CustomSelect from "@shared/ui/form/CustomSelect";
 import type { Permiso } from "../../types";
+import { DESCRIPCION_MAX } from "./usePermissionForm";
 
 type Props = {
   mode: "create" | "edit";
@@ -11,6 +12,8 @@ type Props = {
   onPermissionNameChange: (name: string) => void;
   menuPath: string;
   onMenuPathChange: (path: string) => void;
+  descripcion: string;
+  onDescripcionChange: (descripcion: string) => void;
   isSubmitting: boolean;
   onSubmit: () => void;
   onDelete: () => void;
@@ -28,6 +31,8 @@ export default function PermissionEditorPanel({
   onPermissionNameChange,
   menuPath,
   onMenuPathChange,
+  descripcion,
+  onDescripcionChange,
   isSubmitting,
   onSubmit,
   onDelete,
@@ -149,6 +154,32 @@ export default function PermissionEditorPanel({
             <label className="label">
               <span className="text-xs text-base-content/60">
                 Dejar vacío si el permiso no tiene ruta propia
+              </span>
+            </label>
+          </div>
+
+          {/* Descripción (obligatoria) */}
+          <div className="flex flex-col mb-4">
+            <label className="label">
+              <span className="text-sm text-base-content font-semibold">
+                Descripción
+              </span>
+              <span className="text-xs text-error">*</span>
+            </label>
+            <textarea
+              placeholder="Ej: Desbloquea la pantalla Consulta. Sirve para ver cualquier expediente en solo lectura."
+              className="textarea w-full focus:border-info"
+              rows={3}
+              maxLength={DESCRIPCION_MAX}
+              value={descripcion}
+              onChange={(e) => onDescripcionChange(e.target.value)}
+            />
+            <label className="label">
+              <span className="text-xs text-base-content/60">
+                Formato: "Desbloquea X. Sirve para Y."
+              </span>
+              <span className="text-xs text-base-content/60">
+                {descripcion.length}/{DESCRIPCION_MAX}
               </span>
             </label>
           </div>

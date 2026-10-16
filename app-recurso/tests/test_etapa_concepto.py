@@ -139,3 +139,48 @@ async def test_etapa_padre_de_requerimientos(db_session, crear_expediente):
     assert ctx[3]["etapa_padre"] == "decision" and ctx[3]["sub_proceso"] == "recurso"
     assert ctx[4]["etapa_padre"] == "requerimiento"
     await db_session.rollback()
+
+
+# ─── 5.3: una sola definición de los campos de cada concepto ────────────────
+
+def test_definicion_campos_concepto_forma():
+    from services.etapas import CAMPOS_CONCEPTO, TIPOS_CONCEPTO, definicion_campos_concepto
+
+    assert set(CAMPOS_CONCEPTO) == set(TIPOS_CONCEPTO)
+    d = definicion_campos_concepto("etapa2")
+    assert d["obligatorios"] == ["file_id", "fecha_aceptacion", "caudal_fuente", "caudal_disponible",
+                                 "caudal_otorgado", "num_usuarios"]
+    assert d["opcionales"] == []
+    assert [c["campo"] for c in d["campos"]] == ["fecha_aceptacion", "caudal_fuente", "caudal_disponible",
+                                                 "caudal_otorgado", "num_usuarios"]
+    assert d["campos"][0] == {"campo": "fecha_aceptacion", "tipo": "fecha",
+                              "etiqueta": "Fecha del concepto (firma)", "obligatorio": True}
+    assert {c["campo"]: c["tipo"] for c in d["campos"]}["num_usuarios"] == "entero"
+    adicional = definicion_campos_concepto("adicional")
+    assert adicional["obligatorios"] == ["file_id", "fecha_aceptacion"]
+    assert all(not c["obligatorio"] for c in adicional["campos"] if c["campo"] != "fecha_aceptacion")
+    obras = definicion_campos_concepto("obras_segundo")
+    assert {c["campo"]: (c["tipo"], c["obligatorio"]) for c in obras["campos"]} == {
+        "fecha_aceptacion": ("fecha", True), "cumple": ("si_no", True), "fecha_visita_tecnica": ("fecha", True)}
+    for tipo in TIPOS_CONCEPTO:
+        for c in definicion_campos_concepto(tipo)["campos"]:
+            assert set(c) == {"campo", "tipo", "etiqueta", "obligatorio"}
+            assert c["tipo"] in ("fecha", "decimal", "entero", "si_no") and c["etiqueta"]
+
+
+async def test_arbol_y_concepto_por_id_traen_la_misma_definicion(client, rv_permisos, expediente):
+    from services.etapas import definicion_campos_concepto
+
+    stubs = rv_permisos
+    exp_id = expediente.id
+    arbol = await etapas(client, exp_id)
+    # Aunque el concepto no exista (cargue directo), el nodo trae su definición.
+    assert arbol["concepto"]["existe"] is False
+    assert arbol["concepto"]["campos"] == definicion_campos_concepto("etapa2")
+    assert arbol["memorias"]["concepto"]["campos"] == definicion_campos_concepto("memorias")
+    await admite_firmado(client, stubs, exp_id)
+    arbol = await etapas(client, exp_id)
+    cid = arbol["concepto"]["id"]
+    r = await client.get(f"/etapas/conceptos/{cid}", headers=headers(TECNICO))
+    assert r.status_code == 200, r.text
+    assert r.json()["data"]["campos"] == arbol["concepto"]["campos"]

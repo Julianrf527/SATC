@@ -209,3 +209,42 @@ async def test_update_rol_nombre_largo_422(client, make_permiso, make_rol, make_
         "nombre": "z" * 25, "permisos": [p.id],
     })
     assert resp.status_code == 422
+
+
+
+# ── Descripción obligatoria por permiso ──────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_crear_permiso_exige_descripcion(client, make_permiso, make_rol, make_usuario):
+    p = await make_permiso(PERMISO_ROL)
+    rol = await make_rol("admin", [p])
+    u = await make_usuario(rol_id=rol.id)
+    h = gateway_headers(u.id, rol.id)
+    for body in ({"name": "prueba_sin_desc", "menu_path": ""},
+                 {"name": "prueba_sin_desc", "menu_path": "", "descripcion": "   "},
+                 {"name": "prueba_sin_desc", "menu_path": "", "descripcion": "x" * 201}):
+        resp = await client.post("/role/permission/add", json=body, headers=h)
+        assert resp.status_code == 422, resp.text
+    resp = await client.post("/role/permission/add", headers=h, json={
+        "name": "prueba_con_desc", "menu_path": "", "descripcion": "  Desbloquea X. Sirve para Y.  "})
+    assert resp.status_code == 201, resp.text
+    lista = (await client.get("/role/permissions", headers=h)).json()["data"]
+    creado = next(x for x in lista if x["name"] == "prueba_con_desc")
+    assert creado["descripcion"] == "Desbloquea X. Sirve para Y."
+
+
+@pytest.mark.asyncio
+async def test_editar_permiso_cambia_descripcion(client, make_permiso, make_rol, make_usuario):
+    p = await make_permiso(PERMISO_ROL)
+    otro = await make_permiso("prueba_editable", "", descripcion="Original.")
+    rol = await make_rol("admin", [p, otro])
+    u = await make_usuario(rol_id=rol.id)
+    h = gateway_headers(u.id, rol.id)
+    resp = await client.put(f"/role/permission/update/{otro.id}", headers=h,
+                            json={"name": "prueba_editable", "menu_path": ""})
+    assert resp.status_code == 422
+    resp = await client.put(f"/role/permission/update/{otro.id}", headers=h,
+                            json={"name": "prueba_editable", "menu_path": "", "descripcion": "Nueva descripción."})
+    assert resp.status_code == 200, resp.text
+    lista = (await client.get("/role/permissions", headers=h)).json()["data"]
+    assert next(x for x in lista if x["name"] == "prueba_editable")["descripcion"] == "Nueva descripción."
