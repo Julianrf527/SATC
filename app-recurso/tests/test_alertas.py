@@ -115,7 +115,8 @@ async def test_flujo_auto_admite_y_concepto(client, stubs, expediente):
 
     # Versión final del concepto → sin alertas del concepto.
     await _aprobar_pasos(client, cpid, TECNICO)
-    body = {"file_id": stubs.files.registrar(), "fecha_aceptacion": visita.isoformat(), **CAUDALES}
+    body = {"file_id": stubs.files.registrar(), "fecha_aceptacion": visita.isoformat(), **CAUDALES,
+            "accion": "REQUIERE"}
     await post(client, f"/etapas/{exp_id}/conceptos/etapa2/version-final", TECNICO, body)
     assert await _del_expediente(client, exp_id) == {}
 

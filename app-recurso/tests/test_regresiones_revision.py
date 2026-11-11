@@ -40,7 +40,7 @@ async def test_super_reasigna_tecnico_actualiza_proceso(client, rv_permisos, exp
     # El técnico anterior ya no proyecta; el nuevo sí, hasta la versión final.
     assert (await subir(client, pid, user=TECNICO)).status_code == 403
     await aprobar_para_firma(client, pid, NUEVO)
-    body = {"file_id": stubs.files.registrar(), "fecha_aceptacion": "2026-05-20", **CAUDALES}
+    body = {"file_id": stubs.files.registrar(), "fecha_aceptacion": "2026-05-20", **CAUDALES, "accion": "REQUIERE"}
     url = f"/etapas/{exp_id}/conceptos/etapa2/version-final"
     await post(client, url, TECNICO, body, esperado=403)
     await post(client, url, NUEVO, body)

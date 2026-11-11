@@ -35,6 +35,12 @@ class UsoAgua(str, enum.Enum):
     OTRO = "OTRO"
 
 
+class AccionConcepto(str, enum.Enum):
+    """Qué sigue tras el concepto técnico de la etapa 2."""
+    DECIDE = "DECIDE"
+    REQUIERE = "REQUIERE"
+
+
 class TipoDecision(str, enum.Enum):
     OTORGADA = "OTORGADA"
     NEGADA = "NEGADA"

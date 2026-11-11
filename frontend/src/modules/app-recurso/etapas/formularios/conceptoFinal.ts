@@ -17,6 +17,8 @@ export type ConceptoFinalForm = {
   caudal_otorgado: string;
   num_usuarios: string;
   cumple: boolean | null;
+  /** Campo `opciones` (etapa 2: DECIDE / REQUIERE); "" sin elegir. */
+  accion: string;
 };
 
 /** Datos del formulario (todo menos el archivo): columnas del concepto que se pueden diligenciar. */
@@ -38,6 +40,7 @@ export function conceptoFinalInicial(datos?: Partial<DatosConcepto> | null): Con
     caudal_otorgado: texto(datos?.caudal_otorgado),
     num_usuarios: texto(datos?.num_usuarios),
     cumple: datos?.cumple ?? null,
+    accion: datos?.accion ?? "",
   };
 }
 
@@ -82,6 +85,10 @@ function valorCampo(f: ConceptoFinalForm, def: CampoVisible): unknown {
       return decimal(textoCampo(f, def.campo));
     case "si_no":
       return siNoCampo(f, def.campo);
+    case "opciones": {
+      const v = textoCampo(f, def.campo);
+      return def.opciones?.some((o) => o.valor === v) ? v : null;
+    }
   }
 }
 

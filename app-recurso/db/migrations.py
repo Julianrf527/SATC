@@ -15,6 +15,11 @@ Cambios:
      pasa a admitir NULL (desviación del DBML, ver DISENO_TECNICO.md): el
      cargue histórico de super gestión puede dejar la etapa sin abogado
      encargado. El flujo normal ("Asignarme") siempre lo llena.
+  4. ``concepto_tecnico.accion`` (VARCHAR(10), NULL, CHECK DECIDE/REQUIERE):
+     acción del concepto de la etapa 2. Los conceptos de etapa 2 ya cargados
+     y sin acción se completan una vez: REQUIERE si el expediente tiene
+     requerimiento (etapa 3); si no, DECIDE si tiene decisión; si no tiene
+     ninguno de los dos, REQUIERE.
 
 Corre en la transacción de ``init_db`` con ``pg_advisory_xact_lock`` para que
 varios workers de Gunicorn arrancando a la vez no ejecuten el DDL en paralelo.
@@ -44,6 +49,24 @@ _DDL = (
     "ALTER TABLE acto_admite ALTER COLUMN encargado_acto_id DROP NOT NULL",
     "ALTER TABLE requerimiento ALTER COLUMN encargado_acto_id DROP NOT NULL",
     "ALTER TABLE decision ALTER COLUMN encargado_acto_id DROP NOT NULL",
+    "ALTER TABLE concepto_tecnico ADD COLUMN IF NOT EXISTS accion VARCHAR(10)",
+    """
+    DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_concepto_tecnico_accion') THEN
+            ALTER TABLE concepto_tecnico
+                ADD CONSTRAINT ck_concepto_tecnico_accion CHECK (accion IN ('DECIDE', 'REQUIERE'));
+        END IF;
+    END $$
+    """,
+    # Idempotente: solo toca conceptos de etapa 2 cargados que aún no tienen acción.
+    """
+    UPDATE concepto_tecnico c SET accion = CASE
+        WHEN EXISTS (SELECT 1 FROM requerimiento r WHERE r.expediente_id = c.expediente_id) THEN 'REQUIERE'
+        WHEN EXISTS (SELECT 1 FROM decision d WHERE d.expediente_id = c.expediente_id) THEN 'DECIDE'
+        ELSE 'REQUIERE'
+    END
+    WHERE c.expediente_id IS NOT NULL AND c.doc_concepto_tecnico_id IS NOT NULL AND c.accion IS NULL
+    """,
 )
 
 

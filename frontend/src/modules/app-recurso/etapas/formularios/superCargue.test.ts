@@ -112,3 +112,45 @@ describe("validarSuper / bodySuper", () => {
     expect(superVacio({ version: 2, radicado: "X" })).toBe(false);
   });
 });
+
+describe("acción del concepto de la etapa 2 en el cargue directo", () => {
+  const CON_ACCION: CamposConcepto = {
+    ...CAMPOS_ETAPA2,
+    campos: [
+      ...CAMPOS_ETAPA2.campos,
+      {
+        campo: "accion",
+        tipo: "opciones",
+        etiqueta: "Acción",
+        obligatorio: true,
+        opciones: [
+          { valor: "DECIDE", etiqueta: "Decide" },
+          { valor: "REQUIERE", etiqueta: "Requiere" },
+        ],
+      },
+    ],
+  };
+  const AVISO = "La etapa de requerimiento ya está creada…";
+
+  it("pasar a Decide con requerimiento exige confirmar y envía la confirmación", () => {
+    const s = seccionesSuper({ clase: "concepto", tipo: "etapa2" }, false, CON_ACCION, AVISO);
+    const f = { ...SUPER_VACIO, concepto: { ...SUPER_VACIO.concepto, accion: "DECIDE" } };
+    expect(validarSuper(s, f, true)).toMatch(/eliminará la etapa de requerimiento/);
+    const ok = { ...f, confirmar_eliminar_requerimiento: true };
+    expect(validarSuper(s, ok, true)).toBeNull();
+    expect(bodySuper(s, ok, {}, 3)).toEqual({ version: 3, accion: "DECIDE", confirmar_eliminar_requerimiento: true });
+  });
+
+  it("sin requerimiento (sin aviso) o con Requiere no pide confirmación", () => {
+    const sinAviso = seccionesSuper({ clase: "concepto", tipo: "etapa2" }, false, CON_ACCION);
+    const decide = { ...SUPER_VACIO, concepto: { ...SUPER_VACIO.concepto, accion: "DECIDE" } };
+    expect(validarSuper(sinAviso, decide, true)).toBeNull();
+    expect(bodySuper(sinAviso, decide, {}, 3)).toEqual({ version: 3, accion: "DECIDE" });
+    const conAviso = seccionesSuper({ clase: "concepto", tipo: "etapa2" }, false, CON_ACCION, AVISO);
+    const requiere = { ...SUPER_VACIO, concepto: { ...SUPER_VACIO.concepto, accion: "REQUIERE" } };
+    expect(validarSuper(conAviso, requiere, true)).toBeNull();
+    // Valor fuera de las opciones del backend: inválido.
+    const otra = { ...SUPER_VACIO, concepto: { ...SUPER_VACIO.concepto, accion: "OTRA" } };
+    expect(validarSuper(conAviso, otra, true)).toBe("Valor inválido: Acción");
+  });
+});

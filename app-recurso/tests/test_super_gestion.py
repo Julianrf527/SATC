@@ -39,7 +39,7 @@ async def test_cargue_historico_completo_salta_validaciones(client, rv_permisos,
     assert proc.activo
     # Concepto cargado directo: cierra el proceso abierto
     await post(client, f"/super-gestion/{exp_id}/conceptos/etapa2", S,
-               {"fecha_aceptacion": "2015-03-10", **CAUDALES, "file_id": stubs.files.registrar()})
+               {"fecha_aceptacion": "2015-03-10", **CAUDALES, "accion": "DECIDE", "file_id": stubs.files.registrar()})
     await db_session.refresh(proc)
     assert proc.activo is False
     # Acto otra vez → 409 (se corrige por /actos)

@@ -20,7 +20,7 @@ async def test_concepto_etapa2(client, rv_permisos, expediente, db_session):
     assert nodo["existe"] and "subir_version" in nodo["acciones_disponibles"]
     await aprobar_para_firma(client, nodo["proceso"]["proceso_id"], TECNICO)
     url = f"/etapas/{exp_id}/conceptos/etapa2/version-final"
-    body = {"file_id": stubs.files.registrar(), "fecha_aceptacion": "2026-05-20", **CAUDALES}
+    body = {"file_id": stubs.files.registrar(), "fecha_aceptacion": "2026-05-20", **CAUDALES, "accion": "REQUIERE"}
     # Solo el técnico seleccionado (V3): un abogado sin recurso_tecnico → 403; otro técnico → 403
     await post(client, url, ABOGADO, body, esperado=403)
     rv_permisos.permisos.dar(77, Permission.TECNICO)
@@ -105,7 +105,7 @@ async def test_tecnico_sin_gestionar_desde_mis_informes(client, rv_permisos, exp
     await aprobar_para_firma(client, fila["proceso_id"], TECNICO)
     d = (await client.get(f"/etapas/conceptos/{concepto_id}", headers=headers(TECNICO))).json()["data"]
     assert d["acciones_disponibles"] == ["cargar_version_final"]
-    body = {"file_id": stubs.files.registrar(), "fecha_aceptacion": "2026-05-20", **CAUDALES}
+    body = {"file_id": stubs.files.registrar(), "fecha_aceptacion": "2026-05-20", **CAUDALES, "accion": "REQUIERE"}
     await post(client, f"/etapas/conceptos/{concepto_id}/version-final", 77, body, esperado=403)
     data = (await post(client, f"/etapas/conceptos/{concepto_id}/version-final", TECNICO, body)).json()["data"]
     assert data["tipo"] == "etapa2" and data["doc_concepto_tecnico_id"] == body["file_id"]
@@ -149,10 +149,10 @@ def test_definicion_campos_concepto_forma():
     assert set(CAMPOS_CONCEPTO) == set(TIPOS_CONCEPTO)
     d = definicion_campos_concepto("etapa2")
     assert d["obligatorios"] == ["file_id", "fecha_aceptacion", "caudal_fuente", "caudal_disponible",
-                                 "caudal_otorgado", "num_usuarios"]
+                                 "caudal_otorgado", "num_usuarios", "accion"]
     assert d["opcionales"] == []
     assert [c["campo"] for c in d["campos"]] == ["fecha_aceptacion", "caudal_fuente", "caudal_disponible",
-                                                 "caudal_otorgado", "num_usuarios"]
+                                                 "caudal_otorgado", "num_usuarios", "accion"]
     assert d["campos"][0] == {"campo": "fecha_aceptacion", "tipo": "fecha",
                               "etiqueta": "Fecha del concepto (firma)", "obligatorio": True}
     assert {c["campo"]: c["tipo"] for c in d["campos"]}["num_usuarios"] == "entero"
@@ -164,8 +164,12 @@ def test_definicion_campos_concepto_forma():
         "fecha_aceptacion": ("fecha", True), "cumple": ("si_no", True), "fecha_visita_tecnica": ("fecha", True)}
     for tipo in TIPOS_CONCEPTO:
         for c in definicion_campos_concepto(tipo)["campos"]:
-            assert set(c) == {"campo", "tipo", "etiqueta", "obligatorio"}
-            assert c["tipo"] in ("fecha", "decimal", "entero", "si_no") and c["etiqueta"]
+            assert set(c) - {"opciones"} == {"campo", "tipo", "etiqueta", "obligatorio"}
+            assert c["tipo"] in ("fecha", "decimal", "entero", "si_no", "opciones") and c["etiqueta"]
+            assert ("opciones" in c) == (c["tipo"] == "opciones")
+    accion = definicion_campos_concepto("etapa2")["campos"][-1]
+    assert accion["campo"] == "accion" and accion["obligatorio"] is True
+    assert accion["opciones"] == [{"valor": "DECIDE", "etiqueta": "Decide"}, {"valor": "REQUIERE", "etiqueta": "Requiere"}]
 
 
 async def test_arbol_y_concepto_por_id_traen_la_misma_definicion(client, rv_permisos, expediente):

@@ -26,6 +26,8 @@ type Props = {
   actuales?: Partial<Record<"radicado" | "oficio" | "fijacion" | "constancia" | "concepto" | "respuesta", number | null>>;
   /** Nodos de concepto: definición de sus campos (del árbol, backend). */
   camposConcepto?: CamposConcepto;
+  /** Concepto de la etapa 2: qué se elimina si pasa a «Decide» (backend, `aviso_cambio_decide`). */
+  avisoDecide?: string | null;
   setToast: SetToast;
   onClose: () => void;
 };
@@ -44,10 +46,11 @@ export default function SuperCargueModal({
   tieneActo,
   actuales = {},
   camposConcepto,
+  avisoDecide,
   setToast,
   onClose,
 }: Props) {
-  const s = seccionesSuper(refNodo, tieneActo, camposConcepto);
+  const s = seccionesSuper(refNodo, tieneActo, camposConcepto, avisoDecide);
   const [form, setForm] = useState<SuperCargueForm>(SUPER_VACIO);
   const [error, setError] = useState<string | null>(null);
   const { ejecutar, ocupado } = useEscritura(expedienteId, setToast);
