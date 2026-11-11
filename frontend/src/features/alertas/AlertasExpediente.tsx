@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CustomSelect from "@shared/ui/form/CustomSelect";
-import type { EstadoSemaforo, SetToast } from "./types";
+import type { AlertaPaginada, EstadoSemaforo, SetToast } from "./types";
 import { TIPO_LABELS, formatFechaCorta } from "./alertasConfig";
 import { useAlertasPaginadasQuery, useErrorToast } from "./api/alertas";
 import {
@@ -25,7 +25,15 @@ type Props = {
   rutas: RutasAlertas;
   processName: string;
   setToast: SetToast;
+  /**
+   * `location.state` con el que se abre el expediente de una alerta. Por
+   * defecto `{ radicadoToSelect }` (sancionatorio/infraction); recurso abre
+   * por id y pestaña.
+   */
+  estadoNavegacion?: (alerta: AlertaPaginada) => Record<string, unknown>;
 };
+
+const porRadicado = (alerta: AlertaPaginada) => ({ radicadoToSelect: alerta.radicado });
 
 const SIN_ESTADISTICAS: Record<EstadoSemaforo, number> = { verde: 0, amarillo: 0, rojo: 0, vencido: 0 };
 const SIN_ALERTAS: never[] = [];
@@ -49,6 +57,7 @@ export default function AlertasExpediente({
   rutas,
   processName,
   setToast,
+  estadoNavegacion = porRadicado,
 }: Props) {
   const navigate = useNavigate();
   const [alcance, setAlcance] = useState<AlcanceAlertas>("mios");
@@ -341,7 +350,7 @@ export default function AlertasExpediente({
                                       ? "Expediente a su cargo"
                                       : "Expediente de otro responsable (solo lectura)"}
                                     onClick={() => navigate(destino.ruta, {
-                                      state: { radicadoToSelect: alerta.radicado, timestamp: Date.now() }
+                                      state: { ...estadoNavegacion(alerta), timestamp: Date.now() }
                                     })}
                                   >
                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

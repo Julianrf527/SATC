@@ -23,6 +23,8 @@ export type Alerta = {
   semaforo: Semaforo;
   /** Solo en "todas las alertas": el usuario es el responsable del expediente. */
   es_responsable?: boolean;
+  /** app-recurso: expediente de la alerta (para abrirlo al navegar). */
+  expediente_id?: number;
 };
 
 /** Respuesta del endpoint de alertas de un expediente. */

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Pencil } from "lucide-react";
+import { Alertas } from "@features/alertas";
+import { API_CONFIG } from "@shared/lib/api";
 import type { EtapaProps } from "../tipos";
 import SolicitantesExpediente from "../involucrados/SolicitantesExpediente";
 import TerceroInterviniente from "../tercero-interviniente/TerceroInterviniente";
@@ -59,6 +61,13 @@ export default function InformacionBase({ expediente, etapas, catalogos, setToas
         catalogos={catalogos}
         setToast={setToast}
         isEditable={isEditable}
+      />
+
+      {/* Alertas de vencimiento: en gestión y en consulta (solo lectura). */}
+      <Alertas
+        expedienteId={expediente.id}
+        alertEndpoint={API_CONFIG.ENDPOINTS.RECURSO_ALERTAS(expediente.id)}
+        setToast={setToast}
       />
     </div>
   );

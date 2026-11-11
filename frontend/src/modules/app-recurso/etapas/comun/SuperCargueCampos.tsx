@@ -5,6 +5,7 @@ import { soloOpcionales } from "../formularios/conceptoFinal";
 import { MAX_RADICADO, type RadicadoForm } from "../formularios/radicado";
 import type { SeccionesSuper, SuperCargueForm } from "../formularios/superCargue";
 import { CampoFecha, CampoOpciones, CampoPdf, CampoSiNo, CampoTexto } from "./campos/Campos";
+import AvisoFechaVisita from "./AvisoFechaVisita";
 import CampoAbogado from "./campos/CampoAbogado";
 import CampoTecnico from "./campos/CampoTecnico";
 import CamposConcepto from "./campos/CamposConcepto";
@@ -164,6 +165,8 @@ export default function SuperCargueCampos({ s, form, cambiar, existe, actuales }
               permitirFutura
             />
           </div>
+          {/* Con una sola fecha en el formulario, el backend avisa al guardar con la guardada. */}
+          <AvisoFechaVisita fechaNumerado={form.acto.fecha_numerado} fechaVisita={form.fecha_visita_tecnica} />
         </Seccion>
       )}
 

@@ -24,6 +24,7 @@ from routes import (
     tercero_interviniente,
     documentos_anexos,
     super_gestion,
+    alertas,
 )
 
 app = FastAPI()
@@ -78,6 +79,7 @@ app.include_router(etapa_obras.router, prefix="/etapas", tags=["Etapa 6 - Recibo
 app.include_router(tercero_interviniente.router, prefix="/terceros", tags=["Tercero interviniente"])
 app.include_router(documentos_anexos.router, prefix="/documentos-anexos", tags=["Documentos anexos"])
 app.include_router(super_gestion.router, prefix="/super-gestion", tags=["Super gestión"])
+app.include_router(alertas.router, prefix="/alertas", tags=["Alertas"])
 
 
 @app.get("/health")
