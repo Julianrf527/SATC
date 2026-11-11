@@ -1,5 +1,10 @@
 import { useRef, useState, type FormEvent } from "react";
 import { apiCall, API_CONFIG } from "@shared/lib/api";
+import {
+  generateDocumentFileName,
+  uploadFileToDocuments,
+  validateFile,
+} from "@shared/lib/fileUpload";
 import CustomDateInput from "@shared/ui/form/CustomDateInput";
 import { Campo } from "@shared/ui/form/Campo";
 import type { Municipio, ModeloGenerico } from "@shared/types/common";
@@ -66,6 +71,8 @@ export default function NuevoExpediente({
   const [showQuejosoModal, setShowQuejosoModal] = useState(false);
   const [radicadosAsociados, setRadicadosAsociados] = useState<string[]>([""]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // PDF "Radicado inicial": el expediente nace con este documento.
+  const [archivoRadicadoInicial, setArchivoRadicadoInicial] = useState<File | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   const resetForm = () => {
@@ -77,6 +84,7 @@ export default function NuevoExpediente({
     setExpandedRecursos([]);
     setQuejosoSeleccionado([]);
     setRadicadosAsociados([""]);
+    setArchivoRadicadoInicial(null);
     setErrorMsg("");
   };
 
@@ -117,6 +125,7 @@ export default function NuevoExpediente({
     if (recursosSeleccionados.length === 0) return "Seleccione al menos un recurso afectado";
     if (tiposSeleccionados.length === 0) return "Seleccione al menos un tipo de afectación";
     if (quejosoSeleccionado.length === 0) return "Seleccione al menos un quejoso";
+    if (!archivoRadicadoInicial) return "Adjunte el radicado inicial (PDF)";
     return null;
   };
 
@@ -145,9 +154,30 @@ export default function NuevoExpediente({
 
     setIsSubmitting(true);
     try {
+      // Primero se sube el PDF; el backend lo valida y lo asocia al crear el
+      // expediente en la misma transacción (no queda un expediente sin él).
+      let radicadoInicialFileId: number;
+      try {
+        radicadoInicialFileId = await uploadFileToDocuments(
+          archivoRadicadoInicial!,
+          generateDocumentFileName(
+            "RADICADO_INICIAL",
+            String(payload.radicado ?? ""),
+            new Date().toISOString().split("T")[0],
+          ),
+        );
+      } catch (err) {
+        setErrorMsg(
+          `No se pudo cargar el radicado inicial: ${
+            (err instanceof Error && err.message) || "error desconocido"
+          }`,
+        );
+        return;
+      }
+
       const res = await apiCall(API_CONFIG.ENDPOINTS.INFRACTION_ADD, {
         method: "POST",
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, radicado_inicial_file_id: radicadoInicialFileId }),
       });
       if (!res.ok) {
         setErrorMsg(res.detail || "Error al registrar el expediente");
@@ -244,6 +274,36 @@ export default function NuevoExpediente({
           max={new Date().toISOString().split("T")[0]}
           disabled={isSubmitting}
         />
+      </Campo>
+
+      <Campo
+        etiqueta="Radicado inicial *"
+        htmlFor="nuevo-radicado-inicial"
+        ayuda="Solo PDF, máximo 10 MB. Es el primer documento del expediente completo."
+      >
+        <input
+          id="nuevo-radicado-inicial"
+          type="file"
+          accept="application/pdf"
+          className="file-input w-full"
+          disabled={isSubmitting}
+          onChange={(e) => {
+            const archivo = e.target.files?.[0] ?? null;
+            if (archivo) {
+              const validacion = validateFile(archivo, ["application/pdf"]);
+              if (!validacion.isValid) {
+                setToast({ id: Date.now(), message: validacion.error ?? "Archivo no válido", type: "error" });
+                e.target.value = "";
+                setArchivoRadicadoInicial(null);
+                return;
+              }
+            }
+            setArchivoRadicadoInicial(archivo);
+          }}
+        />
+        {archivoRadicadoInicial && (
+          <p className="mt-1 text-sm text-success">Se adjuntará: {archivoRadicadoInicial.name}</p>
+        )}
       </Campo>
 
       <QuejososField

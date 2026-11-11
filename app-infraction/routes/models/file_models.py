@@ -13,6 +13,9 @@ class ExpedienteSchema(BaseModel):
     quejosos_ids: List[int]
     recursos_ids: List[int]
     radicados_asociados: List[str]
+    # Solo al crear: PDF "Radicado inicial" ya subido a app-docs (/files/upload).
+    # La edición de datos básicos no lo usa (tiene su propio endpoint).
+    radicado_inicial_file_id: Optional[int] = None
 
 class RadicadoInicialSchema(BaseModel):
     """file_id de un PDF ya subido a app-docs (/files/upload)."""

@@ -516,6 +516,16 @@ async def agregar_expediente(
     if duplicado.scalar_one_or_none() is not None:
         raise HTTPException(status_code=400, detail="El radicado ya existe")
 
+    # Radicado inicial (opcional en la API; la pantalla de alta lo exige).
+    # Mismas validaciones que PUT /{id}/radicado-inicial: debe ser PDF.
+    radicado_inicial_id = expediente.radicado_inicial_file_id
+    if radicado_inicial_id is not None:
+        file_info = await get_file_info(radicado_inicial_id)
+        if not file_info.get("ok"):
+            raise HTTPException(status_code=400, detail="No se encontró el archivo del radicado inicial")
+        if file_info["data"].get("content_type") != "application/pdf":
+            raise HTTPException(status_code=400, detail="El radicado inicial debe cargarse en PDF")
+
     # Crear expediente
     nuevo_expediente = Expediente(
         radicado=expediente.radicado,
@@ -524,6 +534,7 @@ async def agregar_expediente(
         abogado_responsable_id=expediente.abogado_responsable_id,
         direccion=expediente.direccion,
         descripcion=expediente.descripcion,
+        radicado_inicial_file_id=radicado_inicial_id,
     )
     db.add(nuevo_expediente)
     await db.flush()
@@ -616,12 +627,21 @@ async def agregar_expediente(
             "tipos_afectacion": list(tipos_audit),
             "quejosos": quejosos_audit,
             "radicados_asociados": radicados_normalizados,
+            "radicado_inicial_file_id": radicado_inicial_id,
         }
     )
 
     if not audit_result["ok"]:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
+
+    # Uso del archivo antes del commit: si no se puede registrar, no se crea
+    # el expediente (igual que al adjuntarlo después).
+    if radicado_inicial_id is not None:
+        inc = await increment_file_usage([radicado_inicial_id])
+        if not inc.get("ok"):
+            await db.rollback()
+            raise HTTPException(status_code=502, detail="No se pudo registrar el uso del archivo")
 
     await db.commit()
 
