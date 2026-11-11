@@ -20,10 +20,11 @@ con las marcas de rol); ``rol`` es el rol principal (encargado primero).
 
 Paginación como el listado de informes de infraction (``page``, ``limit`` →
 ``total``, ``page``, ``limit``, ``total_pages``). Los ``conteos`` y ``total``
-son sobre todo el conjunto filtrado, no sobre la página. El rol y "requiere mi
-acción" dependen de las revisiones por paso, así que se calculan en memoria
-sobre los procesos candidatos (columnas de la tabla de procesos + UNA consulta
-de revisiones); expedientes y etapa padre se leen solo para la página.
+son sobre todo el conjunto filtrado, no sobre la página. Filtro, conteos, orden
+y paginación se resuelven en SQL (``_puedo_revisar_sql`` traduce las cadenas de
+revisión a condiciones por paso/permiso): solo se cargan los procesos de la
+página, así el costo no crece con el histórico del usuario. Resúmenes,
+expedientes y etapa padre se leen solo para la página.
 
 Cualquier usuario autenticado puede consultarla (ve solo lo suyo). Los permisos
 del usuario se resuelven UNA vez por petición (cache de services.users).
@@ -35,7 +36,7 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, case, exists, false, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.acceso import usuario_actual
@@ -48,6 +49,7 @@ from services.revision_documentos import (
     APROBADO_FIRMA,
     CADENAS,
     EN_REVISION,
+    ESTADOS_POR_SUBIR,
     FINALIZADO,
     FLUJO,
     PENDIENTE_CARGA,
@@ -114,6 +116,31 @@ def _fila(
     }
 
 
+def _puedo_revisar_sql(mios: frozenset[str], tipos: list[str]):
+    """Condición SQL equivalente a ``puedo_revisar`` de ``_resumen``: proceso
+    vigente en revisión cuyo paso actual pide un permiso mío que aún no revisó
+    en ese paso. Una rama por (tipo, paso, permiso) de las cadenas (pocas)."""
+    ramas = []
+    for tipo in tipos:
+        for paso, permisos in enumerate(CADENAS[tipo].pasos):
+            for permiso in permisos:
+                if permiso not in mios:
+                    continue
+                ya_reviso = exists().where(
+                    DocumentoProcesoRevision.proceso_id == DocumentoProceso.id,
+                    DocumentoProcesoRevision.paso == paso,
+                    DocumentoProcesoRevision.permiso == permiso,
+                )
+                ramas.append(and_(
+                    DocumentoProceso.tipo_documento == tipo,
+                    func.coalesce(DocumentoProceso.paso_actual, 0) == paso,
+                    ~ya_reviso,
+                ))
+    if not ramas:
+        return false()
+    return and_(DocumentoProceso.activo.is_(True), DocumentoProceso.estado == EN_REVISION, or_(*ramas))
+
+
 @router.get("", status_code=200)
 async def mis_documentos(
     request: Request,
@@ -140,29 +167,44 @@ async def mis_documentos(
             select(Expediente.id).where(or_(Expediente.radicado.ilike(patron), Expediente.expediente.ilike(patron)))
         ))
 
-    # Una consulta: procesos donde soy encargado y/o candidatos a revisor
-    # (tipo de cadena con algún permiso mío y: ya revisé o está en revisión).
     ver_encargado = rol in (None, ENCARGADO)
     tipos_revisor = [t for t, c in CADENAS.items() if c.permisos & mios] if rol in (None, REVISOR) else []
     revisados_por_mi = (
         select(DocumentoProcesoRevision.proceso_id).where(DocumentoProcesoRevision.revisor_id == user_id)
     )
-    condiciones = []
-    if ver_encargado:
-        condiciones.append(DocumentoProceso.creador_id == user_id)
-    if tipos_revisor:
-        condiciones.append(and_(
-            DocumentoProceso.tipo_documento.in_(tipos_revisor),
-            or_(
-                and_(DocumentoProceso.activo.is_(True), DocumentoProceso.estado == EN_REVISION),
-                DocumentoProceso.id.in_(revisados_por_mi),
-            ),
-        ))
-    procesos: list[DocumentoProceso] = []
-    if condiciones:
-        procesos = list((await db.execute(
-            select(DocumentoProceso).where(*filtros, or_(*condiciones))
-        )).scalars().all())
+
+    soy_encargado = DocumentoProceso.creador_id == user_id if ver_encargado else false()
+    puedo_revisar = _puedo_revisar_sql(mios, tipos_revisor)
+    soy_revisor = (
+        and_(DocumentoProceso.tipo_documento.in_(tipos_revisor),
+             or_(DocumentoProceso.id.in_(revisados_por_mi), puedo_revisar))
+        if tipos_revisor else false()
+    )
+    # Misma regla que _fila: acción de encargado (vigente y por subir) o de revisor.
+    requiere = or_(
+        and_(soy_encargado, DocumentoProceso.activo.is_(True), DocumentoProceso.estado.in_(ESTADOS_POR_SUBIR)),
+        puedo_revisar,
+    )
+    base = [*filtros, or_(soy_encargado, soy_revisor)]
+
+    total_todos, con_accion = (await db.execute(
+        select(func.count(DocumentoProceso.id), func.count(DocumentoProceso.id).filter(requiere)).where(*base)
+    )).one()
+    conteos = {"total": total_todos, "requieren_accion": con_accion}
+    if solo_accion:
+        base.append(requiere)
+    total = con_accion if solo_accion else total_todos
+
+    # Primero lo que requiere acción; luego lo más reciente.
+    procesos: list[DocumentoProceso] = list((await db.execute(
+        select(DocumentoProceso).where(*base)
+        .order_by(
+            case((requiere, 0), else_=1),
+            DocumentoProceso.fecha_ultima_actualizacion.desc().nulls_last(),
+            DocumentoProceso.id.desc(),
+        )
+        .offset((page - 1) * limit).limit(limit)
+    )).scalars().all())
 
     participe: set[int] = set()
     if tipos_revisor and procesos:
@@ -171,26 +213,15 @@ async def mis_documentos(
         )).scalars().all())
 
     resumenes = await resumenes_procesos(db, procesos, user_id, mios)
-    seleccion: list[tuple[DocumentoProceso, list[str]]] = []
+    pagina: list[tuple[DocumentoProceso, dict]] = []
     for p in procesos:
         roles = []
         if ver_encargado and p.creador_id == user_id:
             roles.append(ENCARGADO)
         if p.tipo_documento in tipos_revisor and (p.id in participe or resumenes[p.id]["puedo_revisar"]):
             roles.append(REVISOR)
-        if roles:
-            seleccion.append((p, roles))
-
-    # Rol y acción (sin datos de expediente aún) para ordenar, filtrar y contar.
-    filas = [(p, _fila(p, None, resumenes[p.id], roles, {})) for p, roles in seleccion]
-    # Primero lo que requiere acción; luego lo más reciente.
-    filas.sort(key=lambda t: (t[1]["fecha_ultima_actualizacion"] or "", t[1]["proceso_id"]), reverse=True)
-    filas.sort(key=lambda t: not t[1]["requiere_mi_accion"])
-    conteos = {"total": len(filas), "requieren_accion": sum(f["requiere_mi_accion"] for _, f in filas)}
-    if solo_accion:
-        filas = [t for t in filas if t[1]["requiere_mi_accion"]]
-    total = len(filas)
-    pagina = filas[(page - 1) * limit: page * limit]
+        if roles:  # siempre, salvo carrera entre las dos consultas
+            pagina.append((p, _fila(p, None, resumenes[p.id], roles, {})))
 
     exp_ids = {p.expediente_id for p, _ in pagina}
     expedientes: dict[int, tuple[str, str]] = {}

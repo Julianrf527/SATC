@@ -328,12 +328,16 @@ async def revisar_proceso(
     tiene_adjunto = adjunto is not None and bool(adjunto.filename)
 
     try:
-        await _bloquear(db, proceso_id)
-        ctx = await svc.contexto(db, proceso_id, para_actualizar=True)
-        acc = FLUJO.acciones.get(accion)
         ref = None
         if tiene_adjunto:
-            # Validar ANTES de subir para no dejar huérfanos en app-docs.
+            # Pre-validación SIN bloqueo (no subir archivos que se rechazarían) y
+            # subida a app-docs FUERA del bloqueo del expediente: la subida
+            # (hasta 50 MB + antivirus) no frena las demás escrituras del
+            # expediente. Tras bloquear, ``svc.revisar`` revalida todo con el
+            # estado fresco (populate_existing); si cambió en la subida, el
+            # archivo queda sin usos y lo limpia app-docs.
+            ctx = await svc.contexto(db, proceso_id)
+            acc = FLUJO.acciones.get(accion)
             if not await FLUJO.permisos_usuario(ctx, user_id):
                 raise PermisoDenegado("No tienes un permiso de revisor para este documento")
             if not await FLUJO.puede_revisar(ctx, user_id):
@@ -345,13 +349,18 @@ async def revisar_proceso(
                     status_code=400,
                     detail=f"Formato no permitido. Permitidos: {', '.join(acc.adjunto_extensiones)}",
                 )
+            await db.rollback()  # cierra la transacción de lectura durante la subida
             ref = await subir_a_docs(adjunto)
 
+        await _bloquear(db, proceso_id)
         res = await svc.revisar(db, proceso_id, user_id=user_id, accion=accion, comentario=comentario, adjunto=ref)
         proceso: DocumentoProceso = res.proceso
         avisos = Avisos()
         await avisos_tras_revision(db, avisos, res)
         await db.commit()
+    except ProcesoNoEncontrado:
+        await db.rollback()
+        raise HTTPException(status_code=403, detail="No tienes acceso a este documento")
     except ReviewError as e:
         await db.rollback()
         raise http_error(e)
@@ -375,6 +384,24 @@ async def revisar_proceso(
 
 # ══════════════════════════════════════════════════════════ subir versión
 
+async def _validar_subida(ctx, user_id: int, archivo: UploadFile) -> None:
+    """Reglas para subir una versión (primera o corrección) sobre ``ctx``."""
+    p: DocumentoProceso = ctx.proceso
+    if not await FLUJO.puede_subir_version(ctx, user_id):
+        raise PermisoDenegado("Solo el encargado puede subir versiones de este documento")
+    if not p.activo:
+        raise Conflicto("Este proceso de revisión ya no está vigente. Recarga")
+    if p.estado == APROBADO_FIRMA:
+        raise Conflicto(MOTIVO_VERSION_FINAL)
+    if not FLUJO.subida_permitida_en(p):
+        raise Conflicto(
+            f"En el estado actual ({FLUJO.estado_info(p.estado).etiqueta}) no se puede subir una nueva versión"
+        )
+    extensiones = FLUJO.extensiones_subida(p)
+    if not (archivo.filename or "").lower().endswith(tuple(extensiones)):
+        raise HTTPException(status_code=400, detail=f"Formato no permitido. Permitidos: {', '.join(extensiones)}")
+
+
 @router.post("/{proceso_id}/versiones", status_code=200)
 async def subir_version(
     request: Request,
@@ -389,29 +416,26 @@ async def subir_version(
     svc = servicio()
 
     try:
-        await _bloquear(db, proceso_id)
-        ctx = await svc.contexto(db, proceso_id, para_actualizar=True)
-        p: DocumentoProceso = ctx.proceso
-        if not await FLUJO.puede_subir_version(ctx, user_id):
-            raise PermisoDenegado("Solo el encargado puede subir versiones de este documento")
-        if not p.activo:
-            raise Conflicto("Este proceso de revisión ya no está vigente. Recarga")
-        if p.estado == APROBADO_FIRMA:
-            raise Conflicto(MOTIVO_VERSION_FINAL)
-        if not FLUJO.subida_permitida_en(p):
-            raise Conflicto(
-                f"En el estado actual ({FLUJO.estado_info(p.estado).etiqueta}) no se puede subir una nueva versión"
-            )
-        extensiones = FLUJO.extensiones_subida(p)
-        if not (archivo.filename or "").lower().endswith(tuple(extensiones)):
-            raise HTTPException(status_code=400, detail=f"Formato no permitido. Permitidos: {', '.join(extensiones)}")
+        # Pre-validación SIN bloqueo y subida a app-docs FUERA del bloqueo del
+        # expediente (ver revisar_proceso). Tras bloquear se revalida con el
+        # estado fresco: si cambió durante la subida → 409 y el archivo queda
+        # sin usos (lo limpia app-docs).
+        ctx = await svc.contexto(db, proceso_id)
+        await _validar_subida(ctx, user_id, archivo)
+        await db.rollback()  # cierra la transacción de lectura durante la subida
         ref = await subir_a_docs(archivo)
 
+        await _bloquear(db, proceso_id)
+        ctx = await svc.contexto(db, proceso_id, para_actualizar=True)
+        await _validar_subida(ctx, user_id, archivo)
         res = await svc.subir_version(db, proceso_id, user_id=user_id, archivo=ref, comentario=comentario)
         proceso: DocumentoProceso = res.proceso
         avisos = Avisos()
         await avisos_tras_version(db, avisos, res)
         await db.commit()
+    except ProcesoNoEncontrado:
+        await db.rollback()
+        raise HTTPException(status_code=403, detail="No tienes acceso a este documento")
     except ReviewError as e:
         await db.rollback()
         raise http_error(e)
