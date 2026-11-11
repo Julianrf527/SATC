@@ -2,8 +2,8 @@
 
 **Sistema:** SATC (Sistema de Administración de Trámites de Corpochivor)
 **Documento:** Arquitectura Técnica y Diseño del Sistema  
-**Versión:** 2.1  
-**Fecha:** 18 de junio de 2026  
+**Versión:** 2.2  
+**Fecha:** 19 de octubre de 2026  
 **Autor:** Julian David Rodriguez Fernandez
 
 ---
@@ -33,8 +33,9 @@ El Sistema SATC (Sistema de Administración de Trámites de Corpochivor) es una 
 - **Capacidad:** Optimizado para 30 usuarios simultáneos, validado hasta 100
 - **Disponibilidad:** 99.9% con servicios críticos replicados
 - **Tecnología:** Python/FastAPI, PostgreSQL, Redis, MinIO
-- **Deployment:** Docker Compose con orquestación de 17 contenedores
-- **Recursos:** 3.0 GB RAM, 4 vCPUs recomendados
+- **Deployment:** Docker Compose con orquestación de 19 contenedores (octubre 2026: se agregan `app-recurso` y `postgres-recurso`)
+- **Microservicios de dominio:** 6 (usuarios, sancionatorio, documentos, involucrados, infracciones y Concesiones de Aguas)
+- **Recursos:** 3.0 GB RAM, 4 vCPUs recomendados (dimensionamiento validado en junio 2026 con 5 microservicios; ver nota en [Distribución de Recursos por Contenedor](#distribución-de-recursos-por-contenedor))
 
 ### Métricas de Performance Validadas
 
@@ -50,6 +51,12 @@ El Sistema SATC (Sistema de Administración de Trámites de Corpochivor) es una 
 ## Visión General de la Arquitectura
 
 ### Diagramas del Sistema
+
+> **Diagramas pendientes de actualizar (octubre 2026).** Las tres imágenes de esta sección y el mapa de puertos
+> (`assets/*.jpg`) corresponden a junio de 2026: muestran 5 microservicios y 5 bases PostgreSQL. **No incluyen**
+> el microservicio `app-recurso` (puerto 8006), su base `recurso_db` en `postgres-recurso`, la ruta `/recurso` del
+> gateway ni su conexión con app-users, app-docs y app-involved. El mapa de puertos tampoco refleja el puerto interno
+> 8080 de nginx. Mientras se actualizan, la fuente vigente son las tablas de este documento.
 
 #### Diagrama CYC (Componentes y Conectores)
 
@@ -139,16 +146,119 @@ Organiza el sistema en 5 tiers:
 | **app-sanctioning** | Expedientes sancionatorios | Gestión del ciclo sancionatorio, reglas de negocio | PostgreSQL `expedientes_db` |
 | **app-docs** | Documentos | Versionamiento, metadatos, integración con MinIO/ClamAV | PostgreSQL `documentos_db` + MinIO |
 | **app-involved** | Involucrados | Gestión de entidades relacionadas a expedientes | PostgreSQL `involucrados_db` |
-| **app-infraction** | Infracciones | Catálogo y operación de infracciones | PostgreSQL `infracciones_db` |
+| **app-infraction** | Infracciones | Catálogo y operación de infracciones; flujo propio de revisión de informes técnicos | PostgreSQL `infracciones_db` |
+| **app-recurso** | Concesiones de Aguas Superficiales | Expedientes de concesión, etapas, actos, comunicaciones y notificaciones; flujo propio de revisión de documentos | PostgreSQL `recurso_db` |
 
 ### Servicios de Infraestructura Compartida
 
 - **Redis:** caché y sesiones de usuario (sesión única por usuario).
-- **MinIO:** almacenamiento de objetos para documentos (Files).
+- **MinIO:** almacenamiento de objetos para documentos (Files). Imagen comunitaria `pgsty/minio` fijada por versión y digest (ver [Storage](#storage)).
 - **ClamAV:** análisis antivirus previo a persistencia (puerto 3310).
 - **PostgreSQL por servicio:** aislamiento de datos y evolución independiente.
-- **MailHog:** servicio de captura de correos para desarrollo/testing (no envía emails reales).
-- **Backup service:** cronjob que respalda todas las bases de datos periódicamente.
+- **MailHog:** servicio de captura de correos para desarrollo/testing (no envía emails reales). No está incluido en el `docker-compose.yml` vigente.
+- **Backup service:** cronjob que respalda todas las bases de datos periódicamente (incluida `recurso_db`, script `scripts/backup-all.sh`) y MinIO.
+
+### Microservicio app-recurso (Concesiones de Aguas Superficiales) — octubre 2026
+
+Microservicio hermano de sancionatorio e infracciones para el trámite de concesiones de aguas superficiales. Sigue el mismo
+stack (Python/FastAPI, Gunicorn con 4 workers Uvicorn, SQLAlchemy asíncrono) y el patrón *database per service*.
+
+| Elemento | Valor |
+| --- | --- |
+| Carpeta / servicio compose | `app-recurso/` · servicio `app-recurso` (contenedor `satc-app-recurso`) |
+| Puerto interno | **8006** (healthcheck `GET /health`) |
+| Base de datos | `recurso_db` en el servicio `postgres-recurso` (contenedor `satc-postgres-recurso`, volumen `postgres-recurso-data`), sin puerto al host |
+| Identidad entre servicios | `recurso-service`, con secreto propio `RECURSO_SERVICE_SECRET` |
+| Ruta del gateway | prefijo **`/recurso`** → `http://app-recurso:8006` (`RECURSO_ROUTE`) |
+| Rutas SPA | `/recurso/manage` (Gestionar), `/recurso/consult` (Consulta), `/recurso/my-reports` (Mis informes); nginx las envía al frontend |
+| Permisos | `recurso_*` (9 permisos; ver `MANUAL_PERMISOS_SATC.md`) |
+| Límites | 2.0 CPU / 450 MB (reserva 1.0 CPU / 225 MB) |
+
+**Dependencias con otros servicios** (llamadas directas, no a través del gateway, con `X-Service-Token` de `recurso-service`):
+
+- **app-users** (`USER_SERVICE_URL`): verificación de permisos de los usuarios, datos de funcionarios (abogados, técnicos,
+  revisores) y notificaciones internas (tipo `recurso_doc`). app-users acepta a `recurso-service` como caller.
+- **app-docs** (`DOCS_SERVICE_URL`): almacenamiento de los archivos (cargue, hash, antivirus). app-recurso solo guarda el
+  identificador del archivo y lleva el conteo de usos (`numero_usos`). app-docs acepta los permisos `recurso_*` para
+  subir y descargar archivos y acepta a `recurso-service` como caller.
+- **app-involved** (`INVOLVED_SERVICE_URL`, por defecto `http://app-involved:8004`): solicitantes, terceros intervinientes y
+  representantes legales; app-recurso guarda solo sus ids. app-involved acepta los permisos de gestión de Concesiones (`recurso_gestionar`, `recurso_super_gestion`) y a `recurso-service`.
+
+En `docker-compose.yml`, `app-recurso` arranca cuando `postgres-recurso` y `app-users` están *healthy*.
+
+#### Modelo de datos (resumen)
+
+El modelo vigente, generado desde los modelos SQLAlchemy desplegados, está en
+`app-recurso/plan trabajo/concesiones_dbml_actual.txt` (formato DBML). Se organiza en cinco grupos:
+
+| Grupo | Tablas |
+| --- | --- |
+| Información base | `expediente`, `expediente_fuente`, `expediente_uso`, `expediente_involucrado` (solicitantes y terceros intervinientes), catálogos `municipio`, `vereda`, `tipo_fuente`, `fuente` |
+| Actos y publicidad | `acto_administrativo` (tipo de acto, clase AUTO/RES, número y fecha), `comunicacion`, `notificacion`, `tipo_notificacion` |
+| Etapas | `acto_admite`, `concepto_tecnico`, `requerimiento`, `decision`, `recurso_reposicion`, `memorias_calculo`, `subsanacion`, `informe_usuario`, `recibo_satisfaccion_obras`, `documentos_anexos` |
+| Revisión de documentos | `documento_proceso`, `documento_proceso_version`, `documento_proceso_revision`, `documento_proceso_revisor`, `documento_proceso_auditoria` |
+| Auditoría | `auditoria` |
+
+Las tablas editables tienen columna `version` para bloqueo optimista. Los campos que apuntan a otros servicios
+(archivos de app-docs, personas de app-involved, funcionarios de app-users) son referencias lógicas por id, sin llave
+foránea entre bases.
+
+#### Proceso propio de revisión de documentos
+
+Los documentos que se proyectan en cada etapa (autos, requerimientos, decisión, actos, conceptos técnicos) se revisan
+**dentro de app-recurso**, en las tablas `documento_proceso*`, construidas sobre el módulo compartido
+`satc_shared.review_process` (el mismo que usa app-infraction para sus informes técnicos). app-docs solo almacena los archivos.
+
+- Hay un proceso por fila de etapa; el `tipo_documento` define la cadena de pasos y cada paso es un conjunto de permisos
+  de revisor que deben revisar **todos**, en cualquier orden.
+- Estados: pendiente de carga → en revisión → devuelto / aprobado para firma → aprobado (versión firmada en PDF).
+- Endpoints genéricos `/recurso/revision-documentos/*` (versiones, revisiones, historial, auditoría, descargas) y la
+  bandeja `/recurso/mis-documentos` (Mis informes), con filtros y paginación en el servidor.
+
+#### Concurrencia e integridad de archivos
+
+- **Bloqueo pesimista** (`SELECT … FOR UPDATE` sobre el expediente) en las transiciones de etapa.
+- **Bloqueo optimista** (columna `version`) en las ediciones: si otra persona modificó el registro, respuesta 409.
+- **Asignación atómica** de "Asignarme para diligenciar" (`UPDATE … WHERE encargado IS NULL`): dos solicitudes
+  simultáneas terminan en una asignación y un 409.
+- **Compensación de usos de archivos** (`services/usos_archivos.py`): el uso del archivo en app-docs se suma antes del
+  commit; si la operación falla, se resta exactamente lo sumado para no dejar contadores inflados.
+
+### Módulo compartido `shared/satc_shared`
+
+Paquete Python que se copia en la imagen de cada microservicio (contexto de build `shared`):
+
+| Módulo | Uso |
+| --- | --- |
+| `satc_shared.review_process` | Motor genérico de flujos de revisión por pasos (modelos, máquina de estados, servicio). Lo usan app-infraction (informes técnicos), app-recurso (documentos de Concesiones) y app-docs (flujo genérico de documentos). |
+| `satc_shared.alertas` | Paginación y filtros en servidor de la pestaña Alertas (`paginar_alertas`): lista plana ordenada por urgencia y % de avance, filtros por radicado, estado y tipo, máximo 100 por página. Lo usan app-sancionatoria y app-infraction. |
+| `satc_shared.clients` | Clientes HTTP directos entre servicios (`UsersClient`, `FilesClient`, `InvolvedClient`). |
+| `satc_shared.auth` | Firma y verificación del `X-Service-Token` (JWT de servicio, vigencia 5 minutos) con un secreto por identidad: `sanctioning-service`, `infraction-service`, `recurso-service`, `docs-service`, `involved-service`. |
+
+### Cálculo de alertas en bloque (octubre 2026)
+
+En app-sancionatoria y app-infraction las alertas de vencimiento de todos los expedientes se calculan **en bloque**
+(`calcular_alertas_expedientes` en `services/alertas.py`) con un número fijo de consultas, sin importar cuántos
+expedientes haya, en lugar de una consulta por expediente. Lo usan la pestaña Alertas y el programador de alertas
+(`services/alertas_scheduler.py`). La pestaña Alertas recibe la respuesta ya filtrada y paginada desde el servidor
+(`satc_shared.alertas`) y admite el alcance "Mis expedientes / Todos".
+
+### Sincronización del catálogo de permisos al arrancar app-users (octubre 2026)
+
+El catálogo único de permisos está en `app-users/db/permission_catalog.py` (32 permisos con ruta de menú y descripción,
+17 dependencias y renombres). En cada arranque, app-users ejecuta `sync_permission_catalog()`
+(`db/permission_sync.py`) en una sola transacción protegida con `pg_advisory_xact_lock` (los workers de Gunicorn corren
+en serie). La rutina es idempotente:
+
+- agrega la columna `descripcion` y la tabla `permiso_requiere` si no existen;
+- aplica los renombres sobre la misma fila (los roles conservan el permiso);
+- inserta los permisos faltantes y los otorga a los roles que tenían todos los permisos;
+- llena ruta de menú y descripción solo si están vacías (respeta lo editado en pantalla);
+- deja `permiso_requiere` igual a las dependencias del catálogo;
+- nunca borra permisos ni corrige roles: solo registra en el log los roles que incumplen dependencias.
+
+Con esto, crear o renombrar permisos ya no requiere SQL manual en el servidor.
+
 
 ## Arquitectura de Red y Comunicación
 
@@ -187,6 +297,7 @@ El despliegue separa explícitamente el perímetro público de la red privada in
 | **app-docs**        | 1                 | Flujo documental con MinIO y antivirus      |
 | **app-involved**    | 1                 | Gestión de involucrados                     |
 | **app-infraction**  | 1                 | Gestión de infracciones                     |
+| **app-recurso**     | 1                 | Gestión de Concesiones de Aguas             |
 
 #### Servicios Sin Réplicas
 
@@ -202,14 +313,19 @@ El despliegue separa explícitamente el perímetro público de la red privada in
 #### Distribución de Workers
 
 ```
-Total estimado: 16 workers concurrentes
+Total configurado (octubre 2026): 27 workers Gunicorn
 
 api-gateway:     6 workers
 app-users:       4 workers
 app-sanctioning: 4 workers
 app-docs:        1 worker
-app-infraction:  1 worker
+app-involved:    4 workers
+app-infraction:  4 workers
+app-recurso:     4 workers
 ```
+
+> Valores tomados del `CMD` de cada `Dockerfile`. La tabla de capacidad siguiente corresponde a la prueba de
+> carga de junio de 2026 (16 workers de los servicios principales) y no se ha repetido con la configuración actual.
 
 #### Capacidad por Usuarios Simultáneos
 
@@ -299,7 +415,7 @@ El sistema implementa una arquitectura de dos redes isoladas para seguridad:
 - **Propósito:** Punto de entrada y presentación
 - **Componentes:**
   - Frontend SPA (Node.js / React, puerto interno 80)
-  - Nginx Reverse Proxy (nginx:alpine, puerto interno 8060 → host 8000)
+  - Nginx Reverse Proxy (nginx:alpine, puerto interno 8080 → host 8000)
 - **Exposición:** Solo el proxy en puerto 8000 del host
 - **Acceso:** Disponible para usuarios en la LAN
 
@@ -308,7 +424,7 @@ El sistema implementa una arquitectura de dos redes isoladas para seguridad:
 - **Propósito:** Orquestación interna y datos
 - **Componentes:**
   - API Gateway (FastAPI, orquestación)
-  - Microservicios: App_Usuarios, App_Sancionatoria, App_Documentos, App_Involucrados, App_Infracciones
+  - Microservicios: App_Usuarios, App_Sancionatoria, App_Documentos, App_Involucrados, App_Infracciones, App_Recurso (Concesiones de Aguas)
   - Bases de datos PostgreSQL (una por microservicio)
   - Redis (cache + sesiones)
   - MinIO (storage de archivos)
@@ -331,7 +447,7 @@ El sistema implementa una arquitectura de dos redes isoladas para seguridad:
 
 | Componente          | Red        | Puerto Int. | Puerto Ext. | Protocolo | Acceso            |
 | ------------------- | ---------- | ----------- | ----------- | --------- | ----------------- |
-| **Nginx-LB**        | Public     | 8060        | 8000        | HTTP      | ✓ Desde host (LAN) |
+| **Nginx-LB**        | Public + Private | 8080  | 8000        | HTTP      | ✓ Desde host (LAN) |
 | **Frontend SPA**    | Public     | 80          | —           | HTTP      | ✓ Vía nginx       |
 | **API Gateway**     | Private    | 8000        | —           | HTTP      | ✓ Vía nginx       |
 | **app-users**       | Private    | 8001        | —           | HTTP      | ✓ Vía gateway     |
@@ -339,11 +455,12 @@ El sistema implementa una arquitectura de dos redes isoladas para seguridad:
 | **app-docs**        | Private    | 8003        | —           | HTTP      | ✓ Vía gateway     |
 | **app-involved**    | Private    | 8004        | —           | HTTP      | ✓ Vía gateway     |
 | **app-infraction**  | Private    | 8005        | —           | HTTP      | ✓ Vía gateway     |
-| **PostgreSQL**      | Private    | 5432        | —           | TCP       | ✗ No expuesto    |
+| **app-recurso**     | Private    | 8006        | —           | HTTP      | ✓ Vía gateway     |
+| **PostgreSQL** (×6) | Private    | 5432        | —           | TCP       | ✗ No expuesto    |
 | **Redis**           | Private    | 6379        | —           | TCP       | ✗ No expuesto    |
 | **MinIO**           | Private    | 9000/9001   | —           | HTTP      | ✗ No expuesto    |
 | **ClamAV**          | Private    | 3310        | —           | TCP       | ✗ No expuesto    |
-| **MailHog**         | Private    | 8025 (UI)   | —           | HTTP      | ✗ Solo desarrollo |
+| **MailHog**         | Private    | 8025 (UI)   | —           | HTTP      | ✗ Solo desarrollo (no incluido en el compose vigente) |
 
 #### Flujo de Solicitudes
 
@@ -351,19 +468,27 @@ El sistema implementa una arquitectura de dos redes isoladas para seguridad:
 1. Cliente Externo
    └─> GET http://host:8000/
        └─> Nginx-LB (8000:8080)
-           ├─> / (documentos estáticos)  → Frontend (80)
-           └─> /api/*                   → API Gateway (8000)
+           ├─> / y rutas SPA            → Frontend (80)
+           │     (incluye /infraction/(manage|consult|alerts|assign_manage|reports|my-reports)
+           │      y /recurso/(manage|consult|my-reports))
+           └─> /(users|sanctioning|documents|infraction|recurso|involveds)/*
+                                        → API Gateway (8000), que enruta por el primer segmento:
                ├─> /users/*             → app-users (8001)
-               ├─> /expedientes/*       → app-sanctioning (8002)
-               ├─> /docs/*              → app-docs (8003)
-               ├─> /involved/*          → app-involved (8004)
-               └─> /infractions/*       → app-infraction (8005)
+               ├─> /sanctioning/*       → app-sanctioning (8002)
+               ├─> /documents/*         → app-docs (8003)
+               ├─> /involveds/*         → app-involved (8004)
+               ├─> /infraction/*        → app-infraction (8005)
+               └─> /recurso/*           → app-recurso (8006)
 ```
+
+> Prefijos según `MICROSERVICES` de `api-gateway/main.py` y la `location` de `nginx/nginx.conf`.
+> Las llamadas entre microservicios no pasan por el gateway: van directas (`app-users:8001`,
+> `app-docs:8003`, `app-involved:8004`) con `X-Service-Token` firmado con el secreto de cada identidad.
 
 #### Servicios Compartidos (Red Privada)
 
 ```
-Microservicios ──────────> PostgreSQL 5432 (5 instancias)
+Microservicios ──────────> PostgreSQL 5432 (6 instancias, una por microservicio con datos)
        │
        ├──────────────────> Redis 6379 (caché y sesiones)
        │
@@ -387,8 +512,9 @@ upstream api_gateway {
     server api-gateway:8000;
 }
 
+# Extracto simplificado. Configuración vigente: nginx/nginx.conf (escucha en 8080).
 server {
-    listen 8060;
+    listen 8080;
 
     server_tokens off;
     client_max_body_size 10M;
@@ -597,20 +723,36 @@ Network: 1 Gbps (recomendado)
 
 #### Distribución de Recursos por Contenedor
 
-| Contenedor           | CPU Límite | RAM Límite | RAM Real   | Disk (estimado)  |
-| -------------------- | ---------- | ---------- | ---------- | ---------------- |
-| nginx-lb             | 0.5        | 128 MB     | 21 MB      | <10 MB           |
-| api-gateway-1/2/3    | 1.5        | 384 MB     | 112 MB     | <50 MB c/u       |
-| app-users-1/2        | 1.0        | 400 MB     | 162 MB     | <50 MB c/u       |
-| app-sanctioning-1/2  | 1.0        | 256 MB     | 209 MB     | <50 MB c/u       |
-| app-docs             | 0.5        | 128 MB     | 90 MB      | <50 MB           |
-| postgres-users       | 0.5        | 200 MB     | 140 MB     | 500 MB - 2 GB    |
-| postgres-docs        | 0.25       | 96 MB      | 21 MB      | 100 MB - 500 MB  |
-| postgres-sanctioning | 0.25       | 128 MB     | 44 MB      | 500 MB - 2 GB    |
-| redis                | 0.25       | 256 MB     | 9 MB       | <100 MB          |
-| minio                | 0.5        | 192 MB     | 103 MB     | Variable (datos) |
-| clamav               | 1.0        | 1400 MB    | 1002 MB    | ~500 MB          |
-| **TOTAL**            | **8.5**    | **4.0 GB** | **2.5 GB** | **~3-5 GB base** |
+Límites y reservas vigentes según `deploy.resources` de `docker-compose.yml` (octubre 2026). En octubre se
+ajustaron los límites de memoria según el uso real observado: `api-gateway` 900 → 384 MB, `app-users`
+600 → 450 MB, `app-docs` 128 → 256 MB, `minio` 192 → 256 MB y `nginx-lb` 128 → 64 MB.
+
+| Contenedor           | CPU Límite | RAM Límite | RAM Reservada |
+| -------------------- | ---------- | ---------- | ------------- |
+| nginx-lb             | 1.0        | 64 MB      | 64 MB         |
+| frontend             | 0.5        | 64 MB      | 32 MB         |
+| api-gateway          | 4.0        | 384 MB     | 256 MB        |
+| app-users            | 2.0        | 450 MB     | 200 MB        |
+| app-sancionatoria    | 2.0        | 450 MB     | 225 MB        |
+| app-docs             | 0.5        | 256 MB     | 64 MB         |
+| app-involved         | 1.0        | 384 MB     | 160 MB        |
+| app-infraction       | 2.0        | 450 MB     | 225 MB        |
+| app-recurso          | 2.0        | 450 MB     | 225 MB        |
+| postgres-users       | 1.0        | 200 MB     | 100 MB        |
+| postgres-sanctioning | 2.0        | 128 MB     | 64 MB         |
+| postgres-docs        | 1.5        | 96 MB      | 48 MB         |
+| postgres-involved    | 1.0        | 96 MB      | 48 MB         |
+| postgres-infraction  | 1.5        | 200 MB     | 100 MB        |
+| postgres-recurso     | 1.5        | 200 MB     | 100 MB        |
+| redis                | 1.0        | 256 MB     | 128 MB        |
+| minio                | 2.0        | 256 MB     | 96 MB         |
+| clamav               | 2.0        | 1400 MB    | 700 MB        |
+| backup-service       | 0.5        | 128 MB     | 64 MB         |
+| **TOTAL**            | **29.0**   | **5912 MB (~5.8 GB)** | **2899 MB (~2.8 GB)** |
+
+> Los límites son topes por contenedor, no consumo simultáneo: la suma de límites de CPU supera los vCPUs del
+> host a propósito. El consumo real medido en junio de 2026 (≈2.5 GB con 5 microservicios) no se ha vuelto a
+> medir con `app-recurso`; la reserva total (~2.8 GB) es la referencia mínima de memoria para el host.
 
 ### Stack Tecnológico
 
@@ -671,8 +813,13 @@ clamd==1.0.2               # ClamAV client
 
 #### Storage
 
-**MinIO (Latest):**
+**MinIO (imagen comunitaria `pgsty/minio`, versión fijada):**
 
+- Imagen: `pgsty/minio:RELEASE.2026-08-04T00-00-00Z` fijada además por digest `sha256`, para que nunca se actualice sola.
+- Por qué: MinIO Inc. dejó de publicar la imagen comunitaria `minio/minio` (octubre de 2025), por lo que `minio/minio:latest`
+  ya no recibe versiones. `pgsty/minio` es un fork comunitario del mismo código (licencia AGPLv3).
+- Verificación del cambio (16/10/2026): con una copia de los datos de producción, los 48 documentos almacenados resultaron
+  idénticos byte a byte. Se conserva una copia de la imagen anterior en `backups/minio-20261016/` para rollback.
 - API compatible con AWS S3
 - Cliente: boto3
 - Bucket principal: `satc-documentos`
@@ -703,6 +850,9 @@ clamd==1.0.2               # ClamAV client
 SECRET_KEY=<your-secret-key-256-bits>
 SECRET_KEY_GATEWAY=<gateway-secret-key>
 SECRET_GATEWAY=<gateway-shared-secret>
+
+# Identidades entre servicios (un secreto por caller; octubre 2026)
+RECURSO_SERVICE_SECRET=<recurso-service-secret>
 
 # PostgreSQL
 POSTGRES_PASSWORD=<strong-password>
@@ -938,6 +1088,6 @@ docker exec satc-postgres-users psql -U postgres -d user_db -c "
 
 **Fin del Documento**
 
-_Última actualización: 18 de junio de 2026_  
-_Versión: 2.1_  
+_Última actualización: 19 de octubre de 2026_  
+_Versión: 2.2_  
 _Clasificación: Documentación Técnica Interna_

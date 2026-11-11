@@ -1,0 +1,487 @@
+// Modelo de base de datos de app-recurso (Concesiones de Aguas Superficiales)
+// Generado desde los modelos SQLAlchemy desplegados (db/models). PostgreSQL 15.
+
+// ===== Enums =====
+Enum resultado_recurso {
+  REPONE
+  CONFIRMA
+  MODIFICA
+  ADICIONA
+}
+
+Enum tipo_acto {
+  AUTO_ADMITE
+  REQUERIMIENTO
+  RECONOCE_TERCERO
+  DECISION
+  RECURSO
+  APRUEBA_MEMORIAS
+  APRUEBA_OBRAS
+}
+
+Enum tipo_decision {
+  OTORGADA
+  NEGADA
+  DESISTIDA
+}
+
+Enum tipo_vinculo {
+  SOLICITANTE
+  TERCERO_INTERVINIENTE
+}
+
+Enum uso_agua {
+  DOMESTICO
+  PECUARIO
+  ABREVADERO
+  AGRICOLA
+  RIEGO
+  INDUSTRIAL
+  ACUICULTURA
+  SILVICULTURA
+  RECREATIVO
+  INSTITUCIONAL
+  OTRO
+}
+
+// ===== Información base =====
+Table municipio {
+  id integer [pk, increment]
+  nombre varchar(20) [unique, not null]
+}
+
+Table vereda {
+  id integer [pk, increment]
+  nombre varchar(25) [not null]
+  municipio_id integer [not null]
+
+  indexes {
+    (municipio_id, nombre) [unique]
+  }
+}
+
+Table tipo_fuente {
+  id integer [pk, increment]
+  nombre varchar(20) [unique, not null]
+}
+
+Table fuente {
+  id integer [pk, increment]
+  nombre varchar(30) [unique, not null]
+}
+
+Table expediente {
+  id integer [pk, increment]
+  radicado varchar(15) [unique, not null]
+  fecha_radicado date [not null]
+  expediente varchar(9) [unique, not null]
+  numero_vital varchar(20) [not null]
+  nombre_predio varchar(50) [not null]
+  matricula_inmobiliaria varchar(20) [not null]
+  codigo_catastral varchar(30) [not null]
+  radicado_oficio_entrada varchar(20) [not null]
+  fecha_oficio_entrada date [not null]
+  doc_comprobante_pago_id integer [not null, note: 'archivo en app-docs (FK lógica)']
+  vereda_id integer [not null]
+  tipo_fuente_id integer [not null]
+  nombre_fuente varchar(50) [not null]
+  fecha_creacion timestamptz [not null, default: `now()`]
+  version integer [not null, default: `1`]
+
+  indexes {
+    fecha_radicado
+    tipo_fuente_id
+    vereda_id
+    numero_vital
+  }
+}
+
+Table expediente_fuente {
+  id integer [pk, increment]
+  expediente_id integer [not null]
+  fuente_id integer [not null]
+
+  indexes {
+    (expediente_id, fuente_id) [unique]
+    fuente_id
+  }
+}
+
+Table expediente_uso {
+  id integer [pk, increment]
+  expediente_id integer [not null]
+  uso uso_agua [not null]
+
+  indexes {
+    (expediente_id, uso) [unique]
+    uso
+  }
+}
+
+Table expediente_involucrado {
+  id integer [pk, increment]
+  expediente_id integer [not null]
+  involucrado_id integer [not null, note: 'id en app-involved (FK lógica)']
+  tipo_vinculo tipo_vinculo [not null, default: `'SOLICITANTE'`]
+  representante_id integer [note: 'id en app-involved (FK lógica)']
+  acto_admin_id integer [unique]
+  fecha_vinculacion timestamptz [not null, default: `now()`]
+  version integer [not null, default: `1`]
+
+  indexes {
+    (expediente_id, involucrado_id) [unique]
+    involucrado_id
+  }
+}
+
+// ===== Actos, comunicación y notificación =====
+Table acto_administrativo {
+  id integer [pk, increment]
+  tipo_acto tipo_acto [not null]
+  clase_acto varchar(4) [note: 'AUTO o RES (check)']
+  numerado integer [not null]
+  fecha_numerado date [not null]
+  documento_acto_administrativo_id integer [not null, note: 'archivo en app-docs (FK lógica)']
+  fecha_creacion timestamptz [not null, default: `now()`]
+
+  indexes {
+    fecha_numerado
+    (tipo_acto, numerado)
+  }
+}
+
+Table comunicacion {
+  id integer [pk, increment]
+  numerado integer [not null]
+  fecha_numerado date [not null]
+  fecha_envio date [not null]
+  documento_comunicacion_id integer [not null, note: 'archivo en app-docs (FK lógica)']
+  acto_administrativo_id integer [unique, not null]
+  fecha_creacion timestamptz [default: `now()`]
+}
+
+Table tipo_notificacion {
+  id integer [pk, increment]
+  nombre varchar(15) [unique, not null]
+}
+
+Table notificacion {
+  id integer [pk, increment]
+  acto_admin_id integer [not null]
+  numerado integer [not null]
+  involucrado_id integer [not null, note: 'id en app-involved (FK lógica)']
+  fecha_numerado date [not null]
+  fecha_envio_citacion date [not null]
+  fecha_constancia_citacion date [not null]
+  documento_citacion_id integer [note: 'archivo en app-docs (FK lógica)']
+  notificacion_exitosa boolean
+  tipo_notificacion_id integer
+  fecha_notificacion date
+  documento_notificacion_id integer [note: 'archivo en app-docs (FK lógica)']
+  fecha_creacion timestamptz [not null, default: `now()`]
+  version integer [not null, default: `1`]
+
+  indexes {
+    involucrado_id
+    (acto_admin_id, involucrado_id)
+  }
+}
+
+// ===== Etapas =====
+Table acto_admite {
+  id integer [pk, increment]
+  expediente_id integer [unique, not null]
+  encargado_acto_id integer [note: 'id en app-users (FK lógica)']
+  acto_admin_id integer [unique]
+  doc_oficio_alcaldia_id integer [note: 'archivo en app-docs (FK lógica)']
+  doc_fijacion_aviso_id integer [note: 'archivo en app-docs (FK lógica)']
+  doc_constancia_fijacion_aviso_id integer [note: 'archivo en app-docs (FK lógica)']
+  version integer [not null, default: `1`]
+
+  indexes {
+    encargado_acto_id
+  }
+}
+
+Table concepto_tecnico {
+  id integer [pk, increment]
+  expediente_id integer [unique]
+  fecha_visita_tecnica date
+  tecnico_encargado_id integer [not null, note: 'id en app-users (FK lógica)']
+  fecha_aceptacion date
+  caudal_fuente float
+  caudal_disponible float
+  caudal_otorgado float
+  num_usuarios integer
+  cumple boolean
+  doc_concepto_tecnico_id integer [note: 'archivo en app-docs (FK lógica)']
+  version integer [not null, default: `1`]
+
+  indexes {
+    tecnico_encargado_id
+  }
+}
+
+Table requerimiento {
+  id integer [pk, increment]
+  expediente_id integer [unique]
+  encargado_acto_id integer [note: 'id en app-users (FK lógica)']
+  acto_admin_id integer [unique]
+  radicado_oficio_entrada varchar(15)
+  fecha_oficio_entrada date
+  doc_oficio_entrada_id integer [note: 'archivo en app-docs (FK lógica)']
+  concepto_tecnico_id integer [unique]
+  version integer [not null, default: `1`]
+
+  indexes {
+    encargado_acto_id
+  }
+}
+
+Table decision {
+  id integer [pk, increment]
+  expediente_id integer [unique, not null]
+  encargado_acto_id integer [note: 'id en app-users (FK lógica)']
+  acto_admin_id integer [unique]
+  decision tipo_decision
+  requiere_memorias boolean
+  fecha_ejecutoria date
+  version integer [not null, default: `1`]
+
+  indexes {
+    decision
+    encargado_acto_id
+  }
+}
+
+Table recurso_reposicion {
+  id integer [pk, increment]
+  decision_id integer [unique]
+  encargado_acto_id integer [note: 'id en app-users (FK lógica)']
+  acto_admin_id integer [unique]
+  radicado varchar(15) [not null]
+  fecha_radicado date [not null]
+  resultado resultado_recurso
+  doc_recurso_id integer [not null, note: 'archivo en app-docs (FK lógica)']
+  version integer [not null, default: `1`]
+
+  indexes {
+    encargado_acto_id
+  }
+}
+
+Table memorias_calculo {
+  id integer [pk, increment]
+  expediente_id integer [unique, not null]
+  radicado varchar(15) [unique, not null]
+  fecha_radicado date [not null]
+  doc_planos_id integer [not null, note: 'archivo en app-docs (FK lógica)']
+  concepto_tecnico_id integer [unique]
+  requerimiento_id integer [unique]
+  subsanacion_id integer [unique]
+  encargado_acto_id integer [note: 'id en app-users (FK lógica)']
+  acto_admin_id integer [unique]
+  version integer [not null, default: `1`]
+
+  indexes {
+    encargado_acto_id
+  }
+}
+
+Table subsanacion {
+  id integer [pk, increment]
+  radicado varchar(15) [unique, not null]
+  fecha_radicado date [not null]
+  doc_planos_ajustados_id integer [not null, note: 'archivo en app-docs (FK lógica)']
+  concepto_tecnico_id integer [unique]
+}
+
+Table informe_usuario {
+  id integer [pk, increment]
+  radicado varchar(15) [unique, not null]
+  fecha_radicado date [not null]
+  doc_informe_usuario_id integer [not null, note: 'archivo en app-docs (FK lógica)']
+}
+
+Table recibo_satisfaccion_obras {
+  id integer [pk, increment]
+  expediente_id integer [unique, not null]
+  informe_usuario_id integer [unique, not null]
+  concepto_tecnico_id integer [unique]
+  requerimiento_id integer [unique]
+  nuevo_informe_usuario_id integer [unique]
+  concepto_tecnico_segundo_id integer [unique]
+  encargado_acto_id integer [note: 'id en app-users (FK lógica)']
+  acto_admin_id integer [unique]
+  version integer [not null, default: `1`]
+
+  indexes {
+    encargado_acto_id
+  }
+}
+
+Table documentos_anexos {
+  id integer [pk, increment]
+  etapa_tipo varchar(50) [not null]
+  etapa_ref_id integer [not null]
+  nombre varchar(100) [not null]
+  documento_anexo_id integer [not null, note: 'archivo en app-docs (FK lógica)']
+  fecha_subida timestamptz [not null, default: `now()`]
+
+  indexes {
+    (etapa_tipo, etapa_ref_id)
+  }
+}
+
+// ===== Revisión de documentos =====
+Table documento_proceso {
+  id integer [pk, increment]
+  expediente_id integer [not null]
+  tipo_documento varchar(40) [not null]
+  etapa_tipo varchar(50) [not null]
+  etapa_ref_id integer [not null]
+  paso_actual integer [not null, default: `0`]
+  activo boolean [not null, default: `true`]
+  nombre varchar(255) [not null]
+  descripcion text
+  estado varchar(30) [not null]
+  creador_id integer [not null, note: 'id en app-users (FK lógica)']
+  version_actual integer [not null, default: 0]
+  numero_devoluciones integer [not null, default: 0]
+  fecha_creacion timestamptz [not null, default: `now()`]
+  fecha_ultima_actualizacion timestamptz [not null, default: `now()`]
+
+  indexes {
+    expediente_id
+    estado
+    (etapa_tipo, etapa_ref_id)
+    fecha_creacion
+    tipo_documento
+    (etapa_tipo, etapa_ref_id) [unique, note: 'parcial: solo activo']
+    creador_id
+  }
+}
+
+Table documento_proceso_version {
+  id integer [pk, increment]
+  numero_version integer [not null]
+  file_id integer [note: 'id en app-docs (FK lógica)']
+  archivo_url varchar(500) [not null]
+  archivo_nombre varchar(255) [not null]
+  archivo_size bigint
+  usuario_subida_id integer [not null, note: 'id en app-users (FK lógica)']
+  comentario text
+  fecha_subida timestamptz [not null, default: `now()`]
+  proceso_id integer [not null]
+
+  indexes {
+    file_id
+    proceso_id
+  }
+}
+
+Table documento_proceso_revision {
+  id integer [pk, increment]
+  paso integer
+  permiso varchar(50)
+  version_revisada integer [not null]
+  revisor_id integer [not null, note: 'id en app-users (FK lógica)']
+  accion varchar(30) [not null]
+  comentarios text
+  adjunto_file_id integer [note: 'id en app-docs (FK lógica)']
+  adjunto_url varchar(500)
+  adjunto_nombre varchar(255)
+  adjunto_size bigint
+  fecha_revision timestamptz [not null, default: `now()`]
+  proceso_id integer [not null]
+
+  indexes {
+    revisor_id
+    proceso_id
+  }
+}
+
+Table documento_proceso_revisor {
+  id integer [pk, increment]
+  revisor_id integer [not null, note: 'id en app-users (FK lógica)']
+  fecha_asignacion timestamptz [not null, default: `now()`]
+  notificado boolean [not null, default: false]
+  proceso_id integer [not null]
+
+  indexes {
+    revisor_id
+    proceso_id
+  }
+}
+
+Table documento_proceso_auditoria {
+  id integer [pk, increment]
+  accion varchar(50) [not null]
+  usuario_id integer [note: 'id en app-users (FK lógica)']
+  descripcion text
+  datos_adicionales json
+  fecha_accion timestamptz [not null, default: `now()`]
+  proceso_id integer [not null]
+
+  indexes {
+    proceso_id
+  }
+}
+
+// ===== Auditoría =====
+Table auditoria {
+  id integer [pk, increment]
+  expediente_id integer
+  expediente_radicado varchar(15)
+  usuario_id integer [note: 'id en app-users (FK lógica)']
+  tipo_evento varchar(30) [not null]
+  resultado varchar(10) [not null]
+  ip_address varchar(50)
+  user_agent text
+  fecha timestamp [not null, note: 'default en la app']
+  detalle text
+  datos_anteriores json
+  datos_nuevos json
+}
+
+// ===== Refs =====
+Ref: acto_admite.acto_admin_id - acto_administrativo.id
+Ref: acto_admite.expediente_id - expediente.id
+Ref: auditoria.expediente_id > expediente.id
+Ref: comunicacion.acto_administrativo_id - acto_administrativo.id
+Ref: concepto_tecnico.expediente_id - expediente.id
+Ref: decision.acto_admin_id - acto_administrativo.id
+Ref: decision.expediente_id - expediente.id
+Ref: documento_proceso.expediente_id > expediente.id
+Ref: documento_proceso_auditoria.proceso_id > documento_proceso.id
+Ref: documento_proceso_revision.proceso_id > documento_proceso.id
+Ref: documento_proceso_revisor.proceso_id > documento_proceso.id
+Ref: documento_proceso_version.proceso_id > documento_proceso.id
+Ref: expediente.tipo_fuente_id > tipo_fuente.id
+Ref: expediente.vereda_id > vereda.id
+Ref: expediente_fuente.expediente_id > expediente.id
+Ref: expediente_fuente.fuente_id > fuente.id
+Ref: expediente_involucrado.acto_admin_id - acto_administrativo.id
+Ref: expediente_involucrado.expediente_id > expediente.id
+Ref: expediente_uso.expediente_id > expediente.id
+Ref: memorias_calculo.acto_admin_id - acto_administrativo.id
+Ref: memorias_calculo.concepto_tecnico_id - concepto_tecnico.id
+Ref: memorias_calculo.expediente_id - expediente.id
+Ref: memorias_calculo.requerimiento_id - requerimiento.id
+Ref: memorias_calculo.subsanacion_id - subsanacion.id
+Ref: notificacion.acto_admin_id > acto_administrativo.id
+Ref: notificacion.tipo_notificacion_id > tipo_notificacion.id
+Ref: recibo_satisfaccion_obras.acto_admin_id - acto_administrativo.id
+Ref: recibo_satisfaccion_obras.concepto_tecnico_id - concepto_tecnico.id
+Ref: recibo_satisfaccion_obras.concepto_tecnico_segundo_id - concepto_tecnico.id
+Ref: recibo_satisfaccion_obras.expediente_id - expediente.id
+Ref: recibo_satisfaccion_obras.informe_usuario_id - informe_usuario.id
+Ref: recibo_satisfaccion_obras.nuevo_informe_usuario_id - informe_usuario.id
+Ref: recibo_satisfaccion_obras.requerimiento_id - requerimiento.id
+Ref: recurso_reposicion.acto_admin_id - acto_administrativo.id
+Ref: recurso_reposicion.decision_id - decision.id
+Ref: requerimiento.acto_admin_id - acto_administrativo.id
+Ref: requerimiento.concepto_tecnico_id - concepto_tecnico.id
+Ref: requerimiento.expediente_id - expediente.id
+Ref: subsanacion.concepto_tecnico_id - concepto_tecnico.id
+Ref: vereda.municipio_id > municipio.id

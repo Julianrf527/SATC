@@ -3,8 +3,8 @@
 ## Documento Técnico Empresarial
 
 **Sistema:** SATC (Sistema de Administración de Trámites de Corpochivor)
-**Versión:** 2.1
-**Fecha:** 18 de junio de 2026
+**Versión:** 2.2
+**Fecha:** 19 de octubre de 2026
 **Autor:** Julian David Rodriguez Fernandez
 **Audiencia:** Administradores del sistema, coordinadores, soporte técnico
 **Clasificación:** Confidencial — Solo Uso Interno
@@ -13,7 +13,7 @@
 
 ## Tabla de Contenidos
 
-1. [Resumen de cambios desde febrero 2026](#1-resumen-de-cambios-desde-febrero-2026)
+1. [Resumen de cambios desde febrero 2026](#1-resumen-de-cambios-desde-febrero-2026) (incluye [octubre 2026](#cambios-de-octubre-2026))
 2. [Arquitectura de Seguridad](#2-arquitectura-de-seguridad)
 3. [Autenticación y Gestión de Sesiones](#3-autenticacion-y-gestion-de-sesiones)
 4. [Autorización y Control de Acceso (RBAC)](#4-autorizacion-y-control-de-acceso-rbac)
@@ -39,6 +39,22 @@
 | Cabeceras HTTP | No documentadas | **Nuevo** — X-Frame-Options, X-Content-Type-Options, Referrer-Policy, CSP |
 | Auditoría | Implementada | **Reforzada** — campos de documento que faltaban en el snapshot de auditoría |
 
+### Cambios de octubre 2026
+
+| Ítem | Estado anterior (junio 2026) | Estado real (octubre 2026) |
+|---|---|---|
+| Permisos RBAC | 21 permisos | **32 permisos** (nuevo módulo Concesiones de Aguas, `recurso_*`) con descripción obligatoria — ver `MANUAL_PERMISOS_SATC.md` v1.2 |
+| Dependencias entre permisos | No existían | **Nuevo** — 17 dependencias obligatorias validadas en el servidor; reporte de roles que incumplen (§4.4) |
+| Acceso a expedientes | Reglas distintas por módulo | **Unificado** — consultar ve todo en solo lectura, gestionar solo lo propio, 403 sin revelar existencia (§4.5) |
+| Persona asignada | No se validaba en todos los casos | **Validada en el servidor** — abogado, técnico, revisor o encargado debe tener el permiso (§4.6) |
+| Límite de intentos de login | Por IP del contenedor del gateway (límite común a toda la entidad) | **Por IP real del cliente** vía `X-Gateway-Client-IP` (§3.3.4) |
+| Validaciones de longitud | Algunos valores largos llegaban a la BD (HTTP 500) | **422** con mensaje claro en app-users (§5.5) |
+| Identidades entre servicios | 4 callers | **+ `recurso-service`** con secreto propio (§5.4) |
+| Concurrencia (Concesiones) | — | Bloqueo optimista y pesimista, asignación atómica (§4.7) |
+| Usos de archivos | Contador podía quedar inflado si la operación fallaba | **Compensación** automática en Concesiones (§6.4) |
+| MinIO | `minio/minio:latest` (sin actualizaciones del fabricante) | `pgsty/minio` fijado por versión y digest (§6.3) |
+| Despliegue | Procedimiento manual | **Respaldos verificados con SHA-256** y versiones de rollback (§12.5) |
+
 ### Postura de Seguridad
 
 SATC implementa un modelo de seguridad de **defensa en profundidad** (Defense in Depth) con múltiples capas de protección:
@@ -58,7 +74,7 @@ SATC implementa un modelo de seguridad de **defensa en profundidad** (Defense in
 │   └─ Login Throttling (bloqueo progresivo)                  │
 │                                                             │
 │  [CAPA 3] Autorización                                      │
-│   └─ RBAC Granular con 21 permisos                          │
+│   └─ RBAC Granular con 32 permisos + 17 dependencias        │
 │   └─ Validación en cada microservicio (no confiado al token)│
 │                                                             │
 │  [CAPA 4] Cabeceras HTTP (nuevo, junio 2026)                │
@@ -74,7 +90,7 @@ SATC implementa un modelo de seguridad de **defensa en profundidad** (Defense in
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Métricas de Seguridad (estado junio 2026)
+### Métricas de Seguridad (estado octubre 2026)
 
 | Métrica | Estado Actual | Objetivo |
 |---|---|---|
@@ -83,10 +99,10 @@ SATC implementa un modelo de seguridad de **defensa en profundidad** (Defense in
 | **Encriptación en Reposo** | Sin encriptación (seguridad perimetral) | Próximo ciclo |
 | **Escaneo Antivirus** | ✅ ClamAV activo e invocado en upload | ✅ Completo |
 | **Auditoría de Accesos** | ✅ 100% trazabilidad, reforzada este mes | ✅ Completo |
-| **Rate Limiting** | ✅ Redis (login) | ✅ Activo |
+| **Rate Limiting** | ✅ Redis (login, por IP real del cliente) | ✅ Activo |
 | **Brute Force Protection** | ✅ Login Throttling con bloqueo progresivo | ✅ Completo |
 | **Gestión de Sesiones** | ✅ Redis + PostgreSQL con TTL automático | ✅ Completo |
-| **Control de Privilegios** | ✅ RBAC granular con 21 permisos | ✅ Completo |
+| **Control de Privilegios** | ✅ RBAC granular con 32 permisos y dependencias obligatorias | ✅ Completo |
 | **Password Hashing** | ✅ Bcrypt configurable (default 10 rounds) | ✅ Completo |
 | **Cabeceras HTTP** | ✅ X-Frame-Options, CSP, nosniff, Referrer-Policy | ✅ Nuevo |
 | **Cookie Secure=True** | ⚠️ Bloqueado hasta tener HTTPS | Pendiente |
@@ -124,7 +140,7 @@ SATC implementa un modelo de seguridad de **defensa en profundidad** (Defense in
     │                                            │
 ┌───▼─────────┐  ┌────────────┐  ┌─────────────┐ │
 │ app-users   │  │app-sanction│  │  app-docs   │ │◄─ CAPA 2/3: JWT +
-│ (Authn)     │  │   (Files)  │  │  (Docs)     │ │   RBAC 21 permisos
+│ (Authn)     │  │   (Files)  │  │  (Docs)     │ │   RBAC 32 permisos
 │ RBAC        │  │  RBAC      │  │  RBAC       │ │◄─ Cada uno valida
 └─────┬───────┘  └─────┬──────┘  └──────┬──────┘ │   con su propia BD
       │                │                 │       │
@@ -184,7 +200,7 @@ SATC implementa un modelo de seguridad de **defensa en profundidad** (Defense in
 │  • app-users (autenticación)                                 │
 │  • app-sanctioning (expedientes)                             │
 │  • app-docs (documentos)                                     │
-│  • Validación RBAC (21 permisos) por endpoint                │
+│  • Validación RBAC (32 permisos) por endpoint                │
 │  • Gateway NO reenvía permisos — cada MS valida por su BD    │
 └──────────────────────────────────────────────────────────────┘
                          │
@@ -195,7 +211,7 @@ SATC implementa un modelo de seguridad de **defensa en profundidad** (Defense in
 │  Nivel de Confianza: 95%                                     │
 │  Acceso: Solo desde microservicios autorizados               │
 ├──────────────────────────────────────────────────────────────┤
-│  • PostgreSQL ×5 (separados, sin acceso cruzado)             │
+│  • PostgreSQL ×6 (separados, sin acceso cruzado)             │
 │  • MinIO (archivos — ClamAV activo)                          │
 │  • Redis (sesiones con TTL)                                  │
 │  • Sin acceso externo                                        │
@@ -206,7 +222,7 @@ SATC implementa un modelo de seguridad de **defensa en profundidad** (Defense in
 
 | Principio | Descripción | Implementación en SATC |
 |---|---|---|
-| **Least Privilege** | Usuarios solo tienen permisos mínimos necesarios | ✅ RBAC granular con 21 permisos específicos |
+| **Least Privilege** | Usuarios solo tienen permisos mínimos necesarios | ✅ RBAC granular con 32 permisos específicos |
 | **Defense in Depth** | Múltiples capas de seguridad | ✅ 6 capas activas |
 | **Fail Secure** | En caso de error, denegar acceso por defecto | ✅ HTTPException 403 si falta permiso |
 | **Separation of Duties** | Roles separados (admin, revisor, usuario) | ✅ 3+ roles con permisos distintos |
@@ -390,13 +406,30 @@ async def verify_password_async(password: str, hashed: str) -> bool:
 | 8–10 | ~250 ms | Producción red local |
 | 10–12 | ~300–600 ms | Internet público |
 
+#### 3.3.4 Límite de intentos por IP real del cliente (octubre 2026)
+
+Toda petición llega por nginx → api-gateway → app-users, así que para app-users la IP de origen era siempre la del
+contenedor del gateway: el límite de intentos de login era uno solo para toda la entidad (los intentos fallidos de unos
+bloqueaban a todos). Ahora:
+
+1. **nginx** sobrescribe `X-Real-IP` con `$remote_addr`.
+2. **api-gateway** descarta siempre la cabecera `X-Gateway-Client-IP` que envíe el cliente (forma parte de sus
+   cabeceras de confianza, junto con `X-Gateway-Token`, `X-Gateway-User-Id`, `X-Gateway-Role-Id` y `X-Service-Token`),
+   calcula la IP del cliente desde `X-Real-IP` y la reenvía en `X-Gateway-Client-IP`.
+3. **app-users** (`utils/client_ip.py`) solo acepta `X-Gateway-Client-IP` si la petición trae un `X-Gateway-Token`
+   válido (comparación en tiempo constante) y el valor es una IP válida; en cualquier otro caso usa la IP de la conexión.
+   Una cabecera falsificada no sirve para repartir intentos entre IPs inventadas.
+
+El bloqueo progresivo (§3.3.1) se lleva por la combinación correo + IP real y el límite de frecuencia del login por IP real.
+
 ---
 
 ## 4. Autorización y Control de Acceso (RBAC)
 
 ### 4.1 Modelo RBAC
 
-El sistema cuenta ahora con **21 permisos** (eran 13 en febrero 2026). Ver listado completo en `MANUAL_PERMISOS_SATC.md`.
+El sistema cuenta ahora con **32 permisos** (eran 13 en febrero y 21 en junio de 2026). Ver listado completo en `MANUAL_PERMISOS_SATC.md`.
+El catálogo oficial (`app-users/db/permission_catalog.py`) se sincroniza con la base de datos en cada arranque de app-users.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -404,7 +437,7 @@ El sistema cuenta ahora con **21 permisos** (eran 13 en febrero 2026). Ver lista
 ├──────────────────────────────────────────────────────────────┤
 │                                                              │
 │  Rol: Admin (id: 1)                                          │
-│  └─► Permisos: TODOS (21 permisos)                           │
+│  └─► Permisos: TODOS (32 permisos)                           │
 │                                                              │
 │  Rol: Revisor (id: 2)                                        │
 │  └─► Subconjunto de permisos de documento y expediente       │
@@ -445,6 +478,59 @@ if permisos_no_autorizados:
     )
 ```
 
+### 4.4 Dependencias obligatorias entre permisos (octubre 2026)
+
+- Hay 17 dependencias obligatorias (por ejemplo, `infraccion_alertas` exige `infraccion_consultar`; los permisos de
+  revisor de Concesiones exigen `recurso_consultar`). La lista está en `permission_catalog.py` (`DEPENDENCIAS`) y en la
+  tabla `permiso_requiere`.
+- **Validación en el servidor:** al crear (`POST /role/add`) o editar (`PUT /role/update/{id}`) un rol, app-users
+  responde **422** e indica qué falta si el conjunto de permisos deja alguno sin su requerido. La pantalla de roles
+  aplica la misma regla (bloqueo y cascada), pero la decisión final la toma el servidor.
+- **Roles existentes:** los que ya incumplían siguen funcionando (el login y la verificación de permisos no consultan
+  las dependencias); solo se exige la regla al volver a guardarlos.
+- **Reporte:** `GET /users/role/dependencias-incumplidas` (solo lectura, exige `admin_roles_y_permisos`) lista los roles
+  que incumplen y qué les falta; además, app-users los registra en su log al arrancar.
+- La descripción de cada permiso es obligatoria (máximo 200 caracteres, columna `NOT NULL`).
+
+### 4.5 Reglas unificadas de acceso a expedientes (octubre 2026)
+
+En app-sancionatoria y app-infraction todas las lecturas de un expediente (detalle, etapas, involucrados, descarga,
+alertas del expediente) pasan por la misma verificación (`exigir_lectura_expediente`):
+
+| Permiso | Lectura | Escritura |
+|---|---|---|
+| Consultar (`sancionatorio_consultar` / `infraccion_consultar`) | Cualquier expediente, solo lectura | No |
+| Gestionar (`sancionatorio_gestionar` / `infraccion_gestionar`) | Solo los expedientes a su cargo (sin consultar) | Solo los expedientes a su cargo |
+
+- Si el usuario no tiene permiso, si el expediente es ajeno o si **no existe**, la respuesta es la misma: **403**
+  "sin permisos". Así no se revela qué identificadores existen.
+- En la pestaña Alertas, la vista "Todos" solo se entrega a quien tiene el permiso de alertas del módulo.
+- En Concesiones de Aguas, la lectura la tienen `recurso_consultar`, `recurso_gestionar` y `recurso_super_gestion`; la
+  escritura de cada etapa y de su acto solo la tiene el abogado encargado de esa etapa (o super gestión).
+
+### 4.6 Validación de la persona asignada (octubre 2026)
+
+El servidor ya no confía en que la pantalla solo ofrezca usuarios válidos: valida que la persona elegida tenga el
+permiso del rol que se le asigna y responde **400** si no lo tiene.
+
+| Módulo | Persona elegida | Permiso exigido |
+|---|---|---|
+| Sancionatorio | Abogado responsable (asignación individual y masiva) | `sancionatorio_gestionar` |
+| Infracciones | Encargado del expediente | `infraccion_gestionar` |
+| Infracciones | Profesional y revisor de un informe técnico | `infraccion_informes_subir` / `infraccion_informes_revisar` |
+| Concesiones | Técnico de un concepto | `recurso_tecnico` |
+| Concesiones (super gestión) | Abogado encargado / técnico | `recurso_gestionar` / `recurso_tecnico` |
+
+### 4.7 Control de concurrencia en Concesiones de Aguas (octubre 2026)
+
+- **Asignación atómica** de "Asignarme para diligenciar" (`UPDATE … WHERE encargado IS NULL`): si dos usuarios se
+  asignan a la vez, uno queda asignado y el otro recibe **409** "Ya fue asignado". No hay reasignación.
+- **Bloqueo optimista** en las ediciones: los registros editables llevan `version`; si cambió desde que se leyó,
+  **409** "Fue modificado por otra persona, recarga".
+- **Bloqueo pesimista** (`SELECT … FOR UPDATE` sobre el expediente) en las transiciones de etapa, para validar y escribir
+  sin carreras.
+- Los `unique` de la base de datos impiden crear dos veces la misma etapa (el error se traduce a 409).
+
 ---
 
 ## 5. Seguridad en Endpoints y APIs
@@ -481,7 +567,8 @@ result = await db.execute(stmt)
 
 #### Broken Access Control
 
-- ✅ RBAC granular en todos los endpoints (21 permisos)
+- ✅ RBAC granular en todos los endpoints (32 permisos) con dependencias obligatorias
+- ✅ 403 sin revelar la existencia de expedientes ajenos o inexistentes
 - ✅ Control de escalada de privilegios
 - ✅ Admin no puede eliminarse a sí mismo
 
@@ -512,6 +599,26 @@ def verify_gateway_token(request: Request) -> int:
     user_id = request.headers.get("X-Gateway-User-Id")
     return int(user_id)
 ```
+
+**Identidades entre servicios (`X-Service-Token`).** Las llamadas directas entre microservicios llevan un JWT de
+servicio (vigencia 5 minutos) firmado con el secreto propio de cada identidad: `sanctioning-service`,
+`infraction-service`, `recurso-service`, `docs-service` e `involved-service` (`shared/satc_shared/auth/service_jwt.py`).
+En octubre de 2026 app-users, app-docs y app-involved aceptan además el caller `recurso-service`, con su secreto propio
+`RECURSO_SERVICE_SECRET`; un servicio no puede hacerse pasar por otro porque cada receptor verifica la firma con el
+secreto de la identidad declarada.
+
+### 5.5 Validaciones de longitud en app-users (octubre 2026)
+
+Antes, un valor más largo que la columna llegaba a la base de datos y producía un error 500. Ahora los esquemas de
+entrada responden **422** con un mensaje claro:
+
+| Campo | Máximo |
+|---|---|
+| Nombre del rol | 20 caracteres (obligatorio, sin espacios laterales) |
+| Nombre / ruta de menú / descripción de permiso | 40 / 50 / 200 caracteres (descripción obligatoria) |
+| Nombres y apellidos de usuario | 20 caracteres |
+| Correo electrónico (registro, edición y perfil) | 100 caracteres |
+| Notificación: `tipo` / `id_vinculada` | 15 / 20 caracteres |
 
 ---
 
@@ -570,6 +677,12 @@ def escanear_archivo(file_data: bytes, filename: str) -> Dict:
 
 ### 6.3 Almacenamiento Seguro (MinIO)
 
+**Imagen (octubre 2026):** MinIO Inc. dejó de publicar la imagen comunitaria `minio/minio`, por lo que `:latest` ya no
+recibe correcciones. Se usa el fork comunitario `pgsty/minio` (mismo código, AGPLv3) fijado a la versión
+`RELEASE.2026-08-04T00-00-00Z` **y a su digest `sha256`**: la imagen no cambia sin una decisión explícita y el digest garantiza que
+se descarga exactamente la imagen probada. Antes del cambio se verificó con una copia de los datos que
+los 48 documentos almacenados seguían idénticos.
+
 ```python
 def get_file_from_minio(bucket: str, object_name: str) -> str:
     url = client.presigned_get_object(
@@ -577,6 +690,14 @@ def get_file_from_minio(bucket: str, object_name: str) -> str:
     )
     return url
 ```
+
+### 6.4 Compensación de usos de archivos (Concesiones de Aguas, octubre 2026)
+
+app-docs borra en su limpieza programada los archivos con `numero_usos = 0`, así que el contador debe ser exacto. En
+app-recurso (`services/usos_archivos.py`) el uso se suma en app-docs **antes** del commit (si no se puede registrar,
+no se guarda nada) y el de los archivos reemplazados se resta **después**. Si la operación falla después de sumar
+(error de validación, excepción o commit fallido), se resta exactamente lo sumado y no confirmado, sin ocultar el error
+original. Así no quedan archivos huérfanos con contador inflado ni archivos en uso con contador en cero.
 
 ---
 
@@ -881,6 +1002,14 @@ SECRET_KEY_GATEWAY=<openssl rand -hex 32>
 SECRET_GATEWAY=<openssl rand -hex 32>
 SERVICE_SECRET_KEY=<openssl rand -hex 32>
 
+# SECRETOS POR IDENTIDAD DE SERVICIO (uno distinto por caller)
+SANCTIONING_SERVICE_SECRET=<openssl rand -hex 32>
+INFRACTION_SERVICE_SECRET=<openssl rand -hex 32>
+RECURSO_SERVICE_SECRET=<openssl rand -hex 32>     # nuevo, octubre 2026
+DOCS_SERVICE_SECRET=<openssl rand -hex 32>
+INVOLVED_SERVICE_SECRET=<openssl rand -hex 32>
+USERS_SERVICE_SECRET=<openssl rand -hex 32>
+
 # AUTENTICACIÓN
 JWT_ALGORITHM=HS256
 JWT_EXP_DAYS=1
@@ -966,6 +1095,27 @@ npm audit
 | 1.1 | 2026-02-01 | Sistema de sesiones únicas |
 | 2.0 | 2026-02-14 | Revisión completa — seguridad de archivos (5 capas) |
 | 2.1 | 2026-06-18 | **Corrección de afirmaciones incorrectas** (WAF, HTTPS, 13 permisos). Nuevas cabeceras HTTP. ClamAV efectivamente invocado. Auditoría reforzada. Actualización de dependencias. |
+| 2.2 | 2026-10-19 | 32 permisos y dependencias obligatorias validadas en servidor. Reglas unificadas de acceso a expedientes (403 sin revelar existencia). Validación de la persona asignada. Límite de login por IP real del cliente. Validaciones de longitud (422). Caller `recurso-service`. Concurrencia y compensación de usos en Concesiones. MinIO `pgsty/minio` fijado por digest. Procedimiento de despliegue con respaldos verificados. |
+
+### 12.5 Procedimiento de despliegue con respaldo verificado (octubre 2026)
+
+Procedimiento usado en los despliegues a producción de octubre de 2026, que no toca los volúmenes de datos:
+
+```
+[1] RESPALDO      pg_dump -Fc de cada base + tar del volumen de MinIO + copia de la configuración
+                  (compose, nginx, scripts) en una carpeta fechada en el servidor y una copia local.
+[2] VERIFICACIÓN  archivo SHA256SUMS de los respaldos y del paquete de imágenes; se comprueba la suma
+                  de comprobación al copiarlos antes de usarlos (docker load).
+[3] ROLLBACK      antes de reemplazar, las imágenes vigentes se etiquetan como :pre-AAAAMMDD.
+[4] CONTEOS       conteo de filas por tabla y comparación de columnas modelo vs. base antes y después.
+[5] DESPLIEGUE    docker compose up -d --no-deps <servicio>, uno a uno, esperando estado healthy;
+                  no se reinician PostgreSQL, MinIO ni Redis.
+[6] REVERSA       si algo falla: re-etiquetar :pre-AAAAMMDD como :latest y levantar solo ese servicio.
+```
+
+> ⚠️ El script `desplegar_vm.ps1` borra la carpeta de despliegue y ejecuta `docker compose down -v` y
+> `docker system prune -af --volumes`: **elimina todas las bases de datos y los archivos**. Solo sirve para
+> instalar en un servidor vacío; nunca debe usarse en producción con datos.
 
 ---
 
