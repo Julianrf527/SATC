@@ -50,7 +50,7 @@ def v5_concepto_etapa2(e) -> Motivo:
 
 
 MSG_CONCEPTO_DECIDE = (
-    "El concepto técnico de la etapa 2 definió la acción «Decide»: no procede el requerimiento (V6)"
+    "El concepto técnico definió la acción «Decide»: no procede el requerimiento (V6)"
 )
 
 
