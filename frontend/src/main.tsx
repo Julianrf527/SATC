@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './app/index.css'
 import App from './app/App.tsx'
 import { AppProviders } from './app/providers/AppProviders.tsx'
+import { instalarParcheDomExterno } from './app/parcheDomExterno.ts'
+
+instalarParcheDomExterno()
 
 // Tras un deploy, los hashes de los chunks cambian: un import() dinámico
 // pendiente de una sesión vieja apunta a un archivo que ya no existe.
