@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from db.models import TipoDecision
+from db.models import AccionConcepto, TipoDecision
 
 Motivo = Optional[str]
 
@@ -49,12 +49,38 @@ def v5_concepto_etapa2(e) -> Motivo:
     )
 
 
+MSG_CONCEPTO_DECIDE = (
+    "El concepto técnico de la etapa 2 definió la acción «Decide»: no procede el requerimiento (V6)"
+)
+
+
 def v6_requerimiento(e) -> Motivo:
     """V6: requerimiento de la etapa 3 solo si existe el concepto de la etapa 2
-    (con fecha de concepto, plan §4-Etapa 3)."""
+    (con fecha de concepto, plan §4-Etapa 3) y su acción es «Requiere». Sin
+    acción (concepto anterior al campo) cuenta como «Requiere»."""
     if e.concepto2 is None or e.concepto2.fecha_aceptacion is None:
         return primera(v4_auto_admite(e), "Primero debe estar cargado el concepto técnico de la etapa 2 (V6)")
+    if e.concepto2.accion == AccionConcepto.DECIDE.value:
+        return primera(v4_auto_admite(e), MSG_CONCEPTO_DECIDE)
     return v4_auto_admite(e)
+
+
+def aviso_eliminar_requerimiento(req) -> str:
+    """Advertencia para super gestión antes de cambiar el concepto de la etapa 2
+    a «Decide» con la etapa de requerimiento ya creada (se elimina entera)."""
+    partes = ["el requerimiento"]
+    if req.acto_admin_id:
+        partes.append("su acto administrativo con la comunicación y las notificaciones")
+    if req.doc_oficio_entrada_id:
+        partes.append("la respuesta del usuario")
+    if req.concepto_tecnico_id:
+        partes.append("el concepto técnico adicional")
+    partes.append("los documentos anexos y los procesos de revisión")
+    lista = ", ".join(partes[:-1]) + " y " + partes[-1]
+    return (
+        "La etapa de requerimiento ya está creada. Si cambias la acción del concepto a «Decide» se "
+        f"ELIMINARÁ por completo: {lista}. Esta acción no se puede deshacer."
+    )
 
 
 def v7_decision(e) -> Motivo:

@@ -3,7 +3,7 @@ import { OPCIONES_DECISION, OPCIONES_RESULTADO } from "../formularios/actoFinal"
 import { OPCIONES_CLASE_ACTO } from "../formularios/comunes";
 import { soloOpcionales } from "../formularios/conceptoFinal";
 import { MAX_RADICADO, type RadicadoForm } from "../formularios/radicado";
-import type { SeccionesSuper, SuperCargueForm } from "../formularios/superCargue";
+import { eliminaRequerimiento, type SeccionesSuper, type SuperCargueForm } from "../formularios/superCargue";
 import { CampoFecha, CampoOpciones, CampoPdf, CampoSiNo, CampoTexto } from "./campos/Campos";
 import AvisoFechaVisita from "./AvisoFechaVisita";
 import CampoAbogado from "./campos/CampoAbogado";
@@ -114,6 +114,20 @@ export default function SuperCargueCampos({ s, form, cambiar, existe, actuales }
             onChange={(c) => cambiar({ concepto: { ...form.concepto, ...c } })}
             campos={soloOpcionales(s.concepto)}
           />
+          {eliminaRequerimiento(s, form) && (
+            <div role="alert" className="alert alert-error flex-col items-start gap-2 text-sm">
+              <span className="font-semibold">{s.avisoDecide}</span>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm"
+                  checked={form.confirmar_eliminar_requerimiento}
+                  onChange={(e) => cambiar({ confirmar_eliminar_requerimiento: e.target.checked })}
+                />
+                Entiendo y quiero eliminar la etapa de requerimiento
+              </label>
+            </div>
+          )}
         </Seccion>
       )}
 

@@ -71,6 +71,8 @@ from db.models import (
 )
 from services.actos import crear_acto
 from services.alertas import advertencia_visita
+from services.eliminar_requerimiento import eliminar_requerimiento_etapa3
+from services.validaciones import aviso_eliminar_requerimiento
 from services.concurrencia import MSG_MODIFICADO, bloquear_expediente, integridad_a_409
 from services.etapas import (
     AMBITOS_REQUERIMIENTO,
@@ -134,7 +136,10 @@ class ConceptoSuper(_Base):
     caudal_otorgado: Optional[float] = Field(None, ge=0)
     num_usuarios: Optional[int] = Field(None, ge=0)
     cumple: Optional[bool] = None
+    accion: Optional[Literal["DECIDE", "REQUIERE"]] = Field(None, description="Solo etapa 2")
     file_id: Optional[int] = Field(None, gt=0, description="Concepto firmado (PDF)")
+    confirmar_eliminar_requerimiento: bool = Field(
+        False, description="Pasar a «Decide» con requerimiento creado: confirma que se elimina")
 
 
 class RequerimientoSuper(_ConActo):
@@ -360,7 +365,17 @@ async def super_concepto(request: Request, expediente_id: int, tipo: str, body: 
     avisos = Avisos()
     concepto = e.concepto(tipo)
     _version(concepto, body.version)
+    if body.accion is not None and tipo != "etapa2":
+        raise HTTPException(status_code=400, detail="La acción (Decide / Requiere) solo aplica al concepto de la etapa 2")
     await exigir_tecnico(body.tecnico_encargado_id, concepto.tecnico_encargado_id if concepto else None)
+    eliminado = None
+    if (body.accion == "DECIDE" and (concepto is None or concepto.accion != "DECIDE")
+            and e.req3 is not None):
+        if not body.confirmar_eliminar_requerimiento:
+            raise HTTPException(status_code=409, detail=aviso_eliminar_requerimiento(e.req3))
+        eliminado, archivos = await eliminar_requerimiento_etapa3(db, e.req3)
+        e.req3 = None
+        c.anteriores.extend(archivos)
     if concepto is None:
         if body.tecnico_encargado_id is None:
             raise HTTPException(status_code=400, detail="Para crear el concepto falta: técnico encargado")
@@ -376,19 +391,28 @@ async def super_concepto(request: Request, expediente_id: int, tipo: str, body: 
         )
     else:
         subir_version(concepto)
-    await c.campos(concepto, body.model_dump(exclude={"version", "file_id"}))
+    await c.campos(concepto, body.model_dump(exclude={"version", "file_id", "confirmar_eliminar_requerimiento"}))
     if body.file_id is not None:
         await c.campos(concepto, {"doc_concepto_tecnico_id": body.file_id},
                        {"doc_concepto_tecnico_id": "Concepto técnico"})
         await cerrar_proceso_vigente(db, "concepto_tecnico", concepto.id, usuario_id=usuario.user_id,
                                      descripcion=DESCRIPCION_CIERRE)
+    if tipo == "etapa2" and concepto.doc_concepto_tecnico_id and concepto.accion is None:
+        raise HTTPException(status_code=400, detail="Para cargar el concepto de la etapa 2 falta: acción (Decide / Requiere)")
     await _sincronizar_concepto(db, usuario, exp, concepto, tipo, avisos)
     await db.flush()
-    data = _resp(concepto, c, tipo=tipo)
+    data = _resp(concepto, c, tipo=tipo, requerimiento_eliminado=eliminado is not None)
     data.pop("acto_id")
-    await c.terminar(exp, "SUPER_CONCEPTO", f"Cargue directo del concepto ({tipo})", body.model_dump(), request)
+    datos = body.model_dump()
+    if eliminado:
+        datos["requerimiento_eliminado"] = eliminado
+    await c.terminar(exp, "SUPER_CONCEPTO", f"Cargue directo del concepto ({tipo})"
+                     + (" · requerimiento eliminado" if eliminado else ""), datos, request)
     await avisos.enviar()
-    return ok("Concepto técnico cargado (super gestión)", data)
+    mensaje = "Concepto técnico cargado (super gestión)"
+    if eliminado:
+        mensaje += "; se eliminó la etapa de requerimiento"
+    return ok(mensaje, data)
 
 
 @router.post("/{expediente_id}/requerimientos/{ambito}")

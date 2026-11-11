@@ -5,7 +5,7 @@ import {
   type CamposConcepto as Campos,
   type ConceptoFinalForm,
 } from "../../formularios/conceptoFinal";
-import { CampoFecha, CampoSiNo, CampoTexto } from "./Campos";
+import { CampoFecha, CampoOpciones, CampoSiNo, CampoTexto } from "./Campos";
 
 type Props = {
   form: ConceptoFinalForm;
@@ -19,7 +19,7 @@ type Props = {
 export default function CamposConcepto({ form, onChange, campos, disabled }: Props) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {camposVisibles(campos).map(({ campo, tipo, etiqueta, obligatorio }) => {
+      {camposVisibles(campos).map(({ campo, tipo, etiqueta, obligatorio, opciones }) => {
         const cambiar = (v: string | boolean) => onChange({ [campo]: v } as Partial<ConceptoFinalForm>);
         switch (tipo) {
           case "fecha":
@@ -42,6 +42,18 @@ export default function CamposConcepto({ form, onChange, campos, disabled }: Pro
                 onChange={cambiar}
                 si="Cumple"
                 no="No cumple"
+                requerido={obligatorio}
+                disabled={disabled}
+              />
+            );
+          case "opciones":
+            return (
+              <CampoOpciones
+                key={campo}
+                etiqueta={etiqueta}
+                valor={textoCampo(form, campo)}
+                opciones={(opciones ?? []).map((o) => ({ value: o.valor, label: o.etiqueta }))}
+                onChange={cambiar}
                 requerido={obligatorio}
                 disabled={disabled}
               />

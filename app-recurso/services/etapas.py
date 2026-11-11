@@ -122,7 +122,7 @@ CAUDALES = ("caudal_fuente", "caudal_disponible", "caudal_otorgado", "num_usuari
 
 # tipo de concepto → (campos permitidos, obligatorios), además de file_id y fecha_aceptacion.
 CAMPOS_CONCEPTO: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
-    "etapa2": (CAUDALES, CAUDALES),
+    "etapa2": ((*CAUDALES, "accion"), (*CAUDALES, "accion")),
     "adicional": (CAUDALES, ()),
     "memorias": (("cumple",), ("cumple",)),
     "subsanacion": (("cumple",), ("cumple",)),
@@ -139,6 +139,12 @@ DEF_CAMPO_CONCEPTO: dict[str, tuple[str, str]] = {
     "caudal_otorgado": ("decimal", "Caudal otorgado (L/s)"),
     "num_usuarios": ("entero", "Número de usuarios"),
     "cumple": ("si_no", "¿Cumple?"),
+    "accion": ("opciones", "Acción"),
+}
+
+# Opciones de los campos ``opciones`` (valor → etiqueta), en orden de pantalla.
+OPCIONES_CAMPO_CONCEPTO: dict[str, tuple[tuple[str, str], ...]] = {
+    "accion": (("DECIDE", "Decide"), ("REQUIERE", "Requiere")),
 }
 
 # Nombres en los mensajes de error ("Faltan datos del concepto: ...").
@@ -146,6 +152,7 @@ NOMBRES_CAMPO = {
     "caudal_fuente": "caudal fuente", "caudal_disponible": "caudal disponible",
     "caudal_otorgado": "caudal otorgado", "num_usuarios": "número de usuarios",
     "cumple": "cumple / no cumple", "fecha_visita_tecnica": "fecha de visita técnica",
+    "accion": "acción (Decide / Requiere)",
 }
 
 
@@ -166,7 +173,9 @@ def definicion_campos_concepto(tipo: str) -> dict:
         "opcionales": [c for c in permitidos if c not in obligatorios],
         "campos": [
             {"campo": c, "tipo": DEF_CAMPO_CONCEPTO[c][0], "etiqueta": DEF_CAMPO_CONCEPTO[c][1],
-             "obligatorio": c in oblig}
+             "obligatorio": c in oblig,
+             **({"opciones": [{"valor": v, "etiqueta": t} for v, t in OPCIONES_CAMPO_CONCEPTO[c]]}
+                if c in OPCIONES_CAMPO_CONCEPTO else {})}
             for c in datos
         ],
     }

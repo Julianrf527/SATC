@@ -241,8 +241,12 @@ class _Lector:
             "caudal_otorgado": c.caudal_otorgado,
             "num_usuarios": c.num_usuarios,
             "cumple": c.cumple,
+            "accion": c.accion,
             "doc_concepto_tecnico_id": c.doc_concepto_tecnico_id,
         }
+        # Super gestión: qué se perdería al pasar el concepto a «Decide» (C.9).
+        if tipo == "etapa2" and self.e.req3 is not None and self.u.super_gestion:
+            n["aviso_cambio_decide"] = V.aviso_eliminar_requerimiento(self.e.req3)
         self.con_proceso(n, "concepto_tecnico", c.id, c.tecnico_encargado_id,
                          final_cargado=bool(c.doc_concepto_tecnico_id))
         self.con_anexos(n, "concepto_tecnico", c)

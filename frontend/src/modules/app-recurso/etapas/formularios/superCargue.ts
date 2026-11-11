@@ -26,6 +26,11 @@ export type SeccionesSuper = {
   tecnicoVisita: boolean;
   /** Nodo de concepto: definición de sus campos (backend); `null` si no aplica. */
   concepto: CamposConcepto | null;
+  /**
+   * Concepto de la etapa 2 con requerimiento creado: advertencia del backend
+   * (qué se elimina) al pasar la acción a «Decide»; `null` si no aplica.
+   */
+  avisoDecide: string | null;
   decision: boolean;
   resultado: boolean;
   /** Respuesta del usuario al requerimiento de la etapa 3. */
@@ -47,6 +52,7 @@ const NINGUNA: SeccionesSuper = {
   docsAdmite: false,
   tecnicoVisita: false,
   concepto: null,
+  avisoDecide: null,
   decision: false,
   resultado: false,
   respuesta: false,
@@ -57,13 +63,18 @@ const NINGUNA: SeccionesSuper = {
 const SIN_CAMPOS: CamposConcepto = { obligatorios: [], opcionales: [], campos: [] };
 
 /** `camposConcepto`: en nodos de concepto, la definición de campos que trae el nodo del árbol. */
-export function seccionesSuper(ref: RefNodo, tieneActo: boolean, camposConcepto?: CamposConcepto): SeccionesSuper {
+export function seccionesSuper(
+  ref: RefNodo,
+  tieneActo: boolean,
+  camposConcepto?: CamposConcepto,
+  avisoDecide?: string | null,
+): SeccionesSuper {
   const acto = !tieneActo;
   switch (ref.clase) {
     case "admite":
       return { ...NINGUNA, acto, docsAdmite: true, tecnicoVisita: true, encargado: true };
     case "concepto":
-      return { ...NINGUNA, concepto: camposConcepto ?? SIN_CAMPOS };
+      return { ...NINGUNA, concepto: camposConcepto ?? SIN_CAMPOS, avisoDecide: avisoDecide ?? null };
     case "requerimiento":
       return { ...NINGUNA, acto, respuesta: ref.ambito === "etapa3", encargado: true };
     case "decision":
@@ -100,6 +111,8 @@ export type SuperCargueForm = {
   tecnico_id: number | "";
   fecha_visita_tecnica: string;
   concepto: ConceptoFinalForm;
+  /** Confirmación de super gestión: pasar a «Decide» elimina el requerimiento. */
+  confirmar_eliminar_requerimiento: boolean;
   /** Técnico del concepto (obligatorio para crearlo). */
   tecnico_encargado_id: number | "";
   decision: TipoDecision | "";
@@ -120,6 +133,7 @@ export const SUPER_VACIO: SuperCargueForm = {
   tecnico_id: "",
   fecha_visita_tecnica: "",
   concepto: conceptoFinalInicial(),
+  confirmar_eliminar_requerimiento: false,
   tecnico_encargado_id: "",
   decision: "",
   requiere_memorias: null,
@@ -188,6 +202,9 @@ export function validarSuper(s: SeccionesSuper, f: SuperCargueForm, existe: bool
     if (f.concepto.archivo && !esPdf(f.concepto.archivo)) return "El concepto firmado debe ser PDF";
     const error = validarCamposConcepto(f.concepto, soloOpcionales(s.concepto));
     if (error) return error;
+    if (eliminaRequerimiento(s, f) && !f.confirmar_eliminar_requerimiento) {
+      return "Confirme que entiende que se eliminará la etapa de requerimiento";
+    }
   }
   if (s.decision && f.decision === "OTORGADA" && f.requiere_memorias === null && !existe) {
     return "Indique si la decisión exige memorias de cálculo (planos)";
@@ -241,6 +258,7 @@ export function bodySuper(
     void _sinArchivo;
     Object.entries(datos).forEach(([k, v]) => poner(k, v));
     poner("file_id", ids.concepto);
+    if (eliminaRequerimiento(s, f) && f.confirmar_eliminar_requerimiento) body.confirmar_eliminar_requerimiento = true;
   }
   if (s.decision) {
     poner("decision", f.decision);
@@ -249,6 +267,11 @@ export function bodySuper(
   }
   if (s.resultado) poner("resultado", f.resultado);
   return body;
+}
+
+/** El cargue pasa el concepto de la etapa 2 a «Decide» con requerimiento creado (lo elimina). */
+export function eliminaRequerimiento(s: SeccionesSuper, f: SuperCargueForm): boolean {
+  return !!s.avisoDecide && f.concepto.accion === "DECIDE";
 }
 
 /** `true` si el body no carga nada (solo `version`). */

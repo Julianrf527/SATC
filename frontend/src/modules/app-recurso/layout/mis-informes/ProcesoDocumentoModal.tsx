@@ -4,6 +4,7 @@ import { documentoAdapter } from "../../api/documentoAdapter";
 import { useInvalidarMisDocumentos } from "../../api/misDocumentos";
 import type { ProcesoDocumentoDetalle } from "../../types";
 import CargarConceptoFinal from "./CargarConceptoFinal";
+import EditarConcepto from "./EditarConcepto";
 import PasosRevision from "./PasosRevision";
 import { useIrAlExpediente } from "./useIrAlExpediente";
 
@@ -92,6 +93,11 @@ export default function ProcesoDocumentoModal({ procesoId, onClose }: Props) {
                 )}
               </div>
             )
+          )}
+
+          {/* Concepto ya cargado: el técnico lo puede corregir (si el backend lo permite). */}
+          {d.estado.codigo === "aprobado" && d.etapa_tipo === "concepto_tecnico" && (
+            <EditarConcepto conceptoId={d.etapa_ref_id} />
           )}
 
           <PasosRevision pasos={d.pasos ?? []} />

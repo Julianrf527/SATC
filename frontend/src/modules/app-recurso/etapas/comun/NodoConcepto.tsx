@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { CalendarDays, CheckCircle, Droplets, FileText, Gauge, User, Users, XCircle } from "lucide-react";
+import { CalendarDays, CheckCircle, Droplets, FileText, Gauge, GitBranch, User, Users, XCircle } from "lucide-react";
 import { formatDate } from "@shared/lib/format";
 import { EstadoBadge } from "@shared/ui";
 import type { DatosConcepto, NodoConcepto as Nodo } from "../../types";
@@ -22,6 +22,8 @@ type Props = {
   pendiente?: string;
   children?: ReactNode;
 };
+
+const ETIQUETA_ACCION = { DECIDE: "Decide", REQUIERE: "Requiere" } as const;
 
 const num = (v: number | null | undefined) => (v === null || v === undefined ? <SinDato /> : v.toLocaleString("es-CO"));
 
@@ -75,6 +77,7 @@ export default function NodoConcepto({ entorno, nodo, anidada, pendiente, childr
               tieneActo={false}
               actuales={{ concepto: d.doc_concepto_tecnico_id ?? null }}
               camposConcepto={campos}
+              avisoDecide={d.accion === "DECIDE" ? null : nodo.aviso_cambio_decide}
               setToast={setToast}
             />
           )}
@@ -116,6 +119,20 @@ export default function NodoConcepto({ entorno, nodo, anidada, pendiente, childr
                 <Dato icono={<Gauge size={16} />} label="Caudal otorgado (L/s)">{num(d.caudal_otorgado)}</Dato>
                 <Dato icono={<Users size={16} />} label="Número de usuarios">{num(d.num_usuarios)}</Dato>
               </>
+            )}
+            {muestra("accion") && (
+              <Dato icono={<GitBranch size={16} />} label="Acción">
+                {d.accion ? (
+                  <EstadoBadge
+                    etiqueta={ETIQUETA_ACCION[d.accion]}
+                    tono={d.accion === "DECIDE" ? "info" : "warning"}
+                  />
+                ) : cargado ? (
+                  <SinDato texto="Sin definir (cuenta como Requiere)" />
+                ) : (
+                  <SinDato />
+                )}
+              </Dato>
             )}
             {muestra("cumple") && (
               <Dato icono={d.cumple === false ? <XCircle size={16} /> : <CheckCircle size={16} />} label="Resultado">

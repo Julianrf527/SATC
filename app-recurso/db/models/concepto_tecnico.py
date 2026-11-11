@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Boolean, Float, ForeignKey, Date, Index
+from sqlalchemy import CheckConstraint, Column, Integer, Boolean, Float, ForeignKey, Date, Index, String
 from sqlalchemy.orm import relationship
 from .base import Base, VersionadoMixin
 
@@ -23,9 +23,12 @@ class ConceptoTecnico(VersionadoMixin, Base):
     # (antes de que exista el concepto firmado, plan §4-E): se llena al cargar
     # la versión final.
     doc_concepto_tecnico_id = Column(Integer)
+    # Solo etapa 2: DECIDE (no procede requerimiento) o REQUIERE (habilita la etapa 3).
+    accion = Column(String(10))
 
     expediente = relationship("Expediente", back_populates="concepto_tecnico")
 
     __table_args__ = (
         Index('ix_concepto_tecnico_tecnico', 'tecnico_encargado_id'),
+        CheckConstraint("accion IN ('DECIDE', 'REQUIERE')", name='ck_concepto_tecnico_accion'),
     )

@@ -125,6 +125,7 @@ export type ResumenProceso = {
 /** Códigos estables de `acciones_disponibles` de un nodo (tabla de C.2). */
 export type AccionEtapa =
   | "asignarme"
+  | "editar_concepto"
   | "subir_version"
   | "revisar"
   | "cargar_version_final"
@@ -256,8 +257,12 @@ export type DatosConcepto = {
   caudal_otorgado: number | null;
   num_usuarios: number | null;
   cumple: boolean | null;
+  /** Solo etapa 2: qué sigue tras el concepto (Decide / Requiere). */
+  accion?: AccionConcepto | null;
   doc_concepto_tecnico_id: number | null;
 };
+
+export type AccionConcepto = "DECIDE" | "REQUIERE";
 
 export type DatosRespuestaRequerimiento = {
   radicado_oficio_entrada: string | null;
@@ -292,10 +297,17 @@ export type DatosRadicado = {
 type SinDatos = Record<string, never>;
 
 /** Tipo de dato de un campo del concepto (cómo se pinta y se convierte). */
-export type TipoCampoConcepto = "fecha" | "decimal" | "entero" | "si_no";
+export type TipoCampoConcepto = "fecha" | "decimal" | "entero" | "si_no" | "opciones";
 
 /** Un dato que pide el concepto (backend: `definicion_campos_concepto`, API.md C.4). */
-export type CampoConceptoDef = { campo: string; tipo: TipoCampoConcepto; etiqueta: string; obligatorio: boolean };
+export type CampoConceptoDef = {
+  campo: string;
+  tipo: TipoCampoConcepto;
+  etiqueta: string;
+  obligatorio: boolean;
+  /** Solo `tipo: "opciones"`: valores permitidos, en orden de pantalla. */
+  opciones?: { valor: string; etiqueta: string }[];
+};
 
 /**
  * Campos que pide un tipo de concepto. `obligatorios` / `opcionales` incluyen
@@ -304,7 +316,12 @@ export type CampoConceptoDef = { campo: string; tipo: TipoCampoConcepto; etiquet
  */
 export type CamposConcepto = { obligatorios: string[]; opcionales: string[]; campos: CampoConceptoDef[] };
 
-export type NodoConcepto = NodoEtapa<DatosConcepto | SinDatos> & { tipo: TipoConcepto; campos: CamposConcepto };
+export type NodoConcepto = NodoEtapa<DatosConcepto | SinDatos> & {
+  tipo: TipoConcepto;
+  campos: CamposConcepto;
+  /** Solo super gestión, etapa 2 con requerimiento creado: qué se elimina al pasar a «Decide». */
+  aviso_cambio_decide?: string;
+};
 export type NodoRequerimiento<D = SinDatos> = NodoEtapa<D> & { ambito: AmbitoRequerimiento };
 export type NodoAdmite = NodoEtapa<DatosAdmite>;
 export type NodoRequerimientoEtapa3 = NodoRequerimiento<DatosRespuestaRequerimiento> & {

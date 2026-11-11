@@ -90,7 +90,8 @@ async def concepto_firmado(client, stubs, exp_id: int, tipo: str, tecnico: int =
     arbol = await etapas(client, exp_id)
     nodo = buscar_concepto(arbol, tipo)
     await aprobar_para_firma(client, nodo["proceso"]["proceso_id"], tecnico)
-    body = {"file_id": stubs.files.registrar(), "fecha_aceptacion": "2026-05-20", **datos}
+    body = {"file_id": stubs.files.registrar(), "fecha_aceptacion": "2026-05-20",
+            **({"accion": "REQUIERE"} if tipo == "etapa2" else {}), **datos}
     return (await post(client, f"/etapas/{exp_id}/conceptos/{tipo}/version-final", tecnico, body)).json()["data"]
 
 

@@ -18,7 +18,7 @@ Un concepto se identifica por expediente + tipo (slug):
 """
 import logging
 from datetime import date
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
@@ -28,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.acceso import requiere_gestion, requiere_lectura, requiere_permiso, tiene_permiso, usuario_actual
 from core.permission import Permission
 from db.deps import get_db_managed
-from services.concurrencia import bloquear_expediente
+from services.concurrencia import MSG_MODIFICADO, bloquear_expediente
 from services.etapas import (
     CAMPOS_CONCEPTO,
     ETIQUETAS_CONCEPTO,
@@ -44,12 +44,18 @@ from services.etapas import (
     definicion_campos_concepto,
     exigir,
     exigir_encargado,
+    liberar_archivos,
     ok,
+    registrar_archivos,
+    subir_version,
     ubicar_concepto,
+    validar_pdf,
 )
 from services.revision_documentos import Avisos, proceso_vigente, resumen_proceso
 from services.users import get_user_info, get_users_by_permission
 from services.validaciones import CONDICION_CONCEPTO
+
+AccionConceptoIn = Literal["DECIDE", "REQUIERE"]
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -68,6 +74,44 @@ class ConceptoFinalIn(BaseModel):
     caudal_otorgado: Optional[float] = Field(None, ge=0)
     num_usuarios: Optional[int] = Field(None, ge=0)
     cumple: Optional[bool] = None
+    accion: Optional[AccionConceptoIn] = Field(None, description="Solo etapa 2: Decide o Requiere")
+
+
+class ConceptoEdicionIn(BaseModel):
+    """Edición del concepto de la etapa 2 ya cargado (técnico encargado).
+    Solo se cambia lo enviado; el técnico y la fecha de visita no se editan
+    aquí (vienen del auto que admite)."""
+
+    version: int = Field(..., ge=1)
+    file_id: Optional[int] = Field(None, gt=0, description="Nuevo PDF firmado (reemplaza el actual)")
+    fecha_aceptacion: Optional[date] = None
+    caudal_fuente: Optional[float] = Field(None, ge=0)
+    caudal_disponible: Optional[float] = Field(None, ge=0)
+    caudal_otorgado: Optional[float] = Field(None, ge=0)
+    num_usuarios: Optional[int] = Field(None, ge=0)
+    accion: Optional[AccionConceptoIn] = None
+
+
+CAMPOS_EDICION = ("fecha_aceptacion", "caudal_fuente", "caudal_disponible", "caudal_otorgado", "num_usuarios", "accion")
+MSG_REQ_EXISTE_TECNICO = (
+    "Ya existe la etapa de requerimiento: no puedes cambiar la acción a «Decide». "
+    "Solo super gestión puede hacerlo (eliminaría el requerimiento)"
+)
+
+
+def motivo_no_editable(concepto, tipo: str, e, user_id: int) -> Optional[str]:
+    """Por qué el técnico NO puede editar su concepto (None = sí puede):
+    solo el de la etapa 2, ya cargado, el técnico encargado y mientras no
+    exista la decisión. Super gestión edita con el cargue directo."""
+    if tipo != "etapa2":
+        return "Solo el concepto técnico de la etapa 2 se puede editar"
+    if concepto.tecnico_encargado_id != user_id:
+        return "Solo el técnico encargado puede editar el concepto"
+    if not concepto.doc_concepto_tecnico_id:
+        return "El concepto aún no tiene la versión final cargada"
+    if e.decision is not None:
+        return "Ya existe la decisión: el concepto solo lo puede corregir super gestión"
+    return None
 
 
 def _tipo(tipo: str) -> str:
@@ -195,6 +239,9 @@ async def obtener_concepto(request: Request, concepto_id: int, db: AsyncSession 
             acciones.append("subir_version")
         elif proceso.estado == "aprobado_firma" and not concepto.doc_concepto_tecnico_id:
             acciones.append("cargar_version_final")
+    if motivo_no_editable(concepto, tipo, e, usuario.user_id) is None and await tiene_permiso(
+            usuario.user_id, Permission.TECNICO):
+        acciones.append("editar_concepto")
     data = {
         "id": concepto.id, "version": concepto.version, "tipo": tipo, "etiqueta": ETIQUETAS_CONCEPTO[tipo],
         "expediente": {"id": exp.id, "expediente": exp.expediente, "radicado": exp.radicado,
@@ -204,7 +251,8 @@ async def obtener_concepto(request: Request, concepto_id: int, db: AsyncSession 
             "fecha_visita_tecnica": concepto.fecha_visita_tecnica, "fecha_aceptacion": concepto.fecha_aceptacion,
             "caudal_fuente": concepto.caudal_fuente, "caudal_disponible": concepto.caudal_disponible,
             "caudal_otorgado": concepto.caudal_otorgado, "num_usuarios": concepto.num_usuarios,
-            "cumple": concepto.cumple, "doc_concepto_tecnico_id": concepto.doc_concepto_tecnico_id,
+            "cumple": concepto.cumple, "accion": concepto.accion,
+            "doc_concepto_tecnico_id": concepto.doc_concepto_tecnico_id,
         },
         "campos": definicion_campos_concepto(tipo),
         "proceso": resumen if proceso is not None else None,
@@ -224,3 +272,51 @@ async def version_final_concepto_por_id(
     exp = await bloquear_expediente(db, exp.id)
     concepto, exp2, e, tipo = await ubicar_concepto(db, concepto_id)
     return await _cargar_final(db, request, usuario, exp, concepto, tipo, body)
+
+
+@router.put("/conceptos/{concepto_id}")
+async def editar_concepto(
+    request: Request, concepto_id: int, body: ConceptoEdicionIn, db: AsyncSession = Depends(get_db_managed),
+):
+    """El técnico encargado corrige su concepto de la etapa 2 ya cargado (datos,
+    acción y PDF) mientras no exista la decisión. No puede pasar a «Decide» si
+    ya existe el requerimiento (solo super gestión, que lo elimina)."""
+    usuario = await requiere_permiso(request, Permission.TECNICO)
+    _, exp, _, _ = await ubicar_concepto(db, concepto_id)
+    exp = await bloquear_expediente(db, exp.id)
+    concepto, exp, e, tipo = await ubicar_concepto(db, concepto_id)
+    if concepto.tecnico_encargado_id != usuario.user_id:
+        raise HTTPException(status_code=403, detail="Solo el técnico encargado puede editar el concepto")
+    motivo = motivo_no_editable(concepto, tipo, e, usuario.user_id)
+    if motivo:
+        raise HTTPException(status_code=400, detail=motivo)
+    if concepto.version != body.version:
+        raise HTTPException(status_code=409, detail=MSG_MODIFICADO)
+    if body.accion == "DECIDE" and concepto.accion != "DECIDE" and e.req3 is not None:
+        raise HTTPException(status_code=400, detail=MSG_REQ_EXISTE_TECNICO)
+
+    antes, despues = {}, {}
+    for campo in CAMPOS_EDICION:
+        nuevo = getattr(body, campo)
+        if nuevo is not None and getattr(concepto, campo) != nuevo:
+            antes[campo], despues[campo] = getattr(concepto, campo), nuevo
+            setattr(concepto, campo, nuevo)
+    anterior_pdf = None
+    if body.file_id is not None and body.file_id != concepto.doc_concepto_tecnico_id:
+        await validar_pdf(body.file_id, "Concepto técnico")
+        anterior_pdf = concepto.doc_concepto_tecnico_id
+        antes["doc_concepto_tecnico_id"], despues["doc_concepto_tecnico_id"] = anterior_pdf, body.file_id
+        concepto.doc_concepto_tecnico_id = body.file_id
+    if not despues:
+        raise HTTPException(status_code=400, detail="No hay cambios para guardar")
+
+    subir_version(concepto)
+    await db.flush()
+    if anterior_pdf is not None:
+        await registrar_archivos([body.file_id])
+    await auditar(db, usuario, exp, "EDITAR_CONCEPTO", f"{ETIQUETAS_CONCEPTO[tipo]} editado",
+                  {"concepto_id": concepto.id, "antes": antes, "despues": despues}, request)
+    data = {**datos_fila(concepto, "fecha_aceptacion", "accion", "doc_concepto_tecnico_id"), "tipo": tipo}
+    await db.commit()
+    await liberar_archivos([anterior_pdf])
+    return ok("Concepto técnico actualizado", data)

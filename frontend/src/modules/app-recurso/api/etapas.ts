@@ -130,3 +130,27 @@ export function useVersionFinalConceptoMutation(conceptoId: number) {
       ]),
   });
 }
+
+/**
+ * PUT /etapas/conceptos/{id}: el técnico corrige su concepto de la etapa 2 ya
+ * cargado (datos, acción y, opcional, un nuevo PDF firmado). Recarga Mis
+ * informes, el concepto y el expediente.
+ */
+export function useEditarConceptoMutation(conceptoId: number, expedienteId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ archivo, body }: { archivo: File | null; body: (fileId: number | null) => Record<string, unknown> }) => {
+      const fileId = archivo ? await uploadFileToDocuments(archivo, nombreArchivo("CONCEPTO", conceptoId, archivo)) : null;
+      return apiRequest<RespuestaEtapa>(RECURSO_ENDPOINTS.RECURSO_CONCEPTO(conceptoId), {
+        method: "PUT",
+        ...jsonBody(body(fileId)),
+      });
+    },
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: recursoKeys.misDocumentos() }),
+        queryClient.invalidateQueries({ queryKey: recursoKeys.concepto(conceptoId) }),
+        invalidarExpediente(queryClient, expedienteId),
+      ]),
+  });
+}
