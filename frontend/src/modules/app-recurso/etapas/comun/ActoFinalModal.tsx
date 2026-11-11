@@ -11,6 +11,7 @@ import {
   type VarianteActoFinal,
 } from "../formularios/actoFinal";
 import { OPCIONES_CLASE_ACTO } from "../formularios/comunes";
+import AvisoFechaVisita from "./AvisoFechaVisita";
 import { CampoFecha, CampoOpciones, CampoPdf, CampoSiNo, CampoTexto } from "./campos/Campos";
 import CampoTecnico from "./campos/CampoTecnico";
 import ModalFormulario from "./ModalFormulario";
@@ -106,6 +107,9 @@ export default function ActoFinalModal({ expedienteId, url, titulo, variante, se
             requerido
           />
         </div>
+      )}
+      {variante === "admite" && (
+        <AvisoFechaVisita fechaNumerado={form.fecha_numerado} fechaVisita={form.fecha_visita_tecnica} />
       )}
 
       {variante === "decision" && (

@@ -39,6 +39,7 @@ const AlertasInfraccionLayout = lazy(() => import("@modules/app-infraccion/layou
 const GestionRecursoLayout = lazy(() => import("@modules/app-recurso/layout/GestionRecursoLayout"));
 const ConsultaRecursoLayout = lazy(() => import("@modules/app-recurso/layout/ConsultaRecursoLayout"));
 const MisInformesRecurso = lazy(() => import("@modules/app-recurso/layout/MisInformesRecurso"));
+const AlertasRecursoLayout = lazy(() => import("@modules/app-recurso/layout/AlertasRecursoLayout"));
 // === app-involved ===
 const InvolucradoLogLayout = lazy(() => import("@modules/app-involved/layout/InvolucradoLogLayout"));
 const ManageInvolvedLayout = lazy(() => import("@modules/app-involved/layout/ManageInvolvedLayout"));
@@ -102,6 +103,7 @@ const inferPermissionFromPath = (path: string): string | string[] => {
     // === CONCESIONES DE AGUAS (app-recurso) ===
     "/recurso/manage": ["recurso_gestionar", "recurso_super_gestion"],
     "/recurso/consult": "recurso_consultar",
+    "/recurso/alerts": "recurso_gestionar",
     // Quien sube (abogado o técnico) o revisa documentos (permisos de revisor).
     "/recurso/my-reports": [
       "recurso_gestionar",
@@ -192,6 +194,7 @@ function App() {
     { path: "/recurso/manage", component: GestionRecursoLayout },
     { path: "/recurso/consult", component: ConsultaRecursoLayout },
     { path: "/recurso/my-reports", component: MisInformesRecurso },
+    { path: "/recurso/alerts", component: AlertasRecursoLayout },
   ];
 
   return (

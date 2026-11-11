@@ -16,7 +16,14 @@ export type PeticionEtapa = {
 /** Respuesta de escritura de C: `{ ok, message, data: {id, version, proceso_id?, acto_id?} }`. */
 export type RespuestaEtapa = {
   message?: string;
-  data?: { id?: number; version?: number | null; proceso_id?: number; acto_id?: number | null };
+  data?: {
+    id?: number;
+    version?: number | null;
+    proceso_id?: number;
+    acto_id?: number | null;
+    /** Avisos que no bloquearon el guardado (p. ej. fecha de visita técnica). */
+    advertencias?: string[];
+  };
 };
 
 export type EscrituraEtapa = {

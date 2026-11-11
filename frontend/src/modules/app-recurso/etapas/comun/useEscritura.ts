@@ -25,7 +25,9 @@ export function useEscritura(expedienteId: number, setToast: SetToast) {
     (escritura: EscrituraEtapa, op: Opciones) =>
       mutate(escritura, {
         onSuccess: (res) => {
-          setToast({ id: Date.now(), message: res?.message || op.exito, type: "success" });
+          const mensaje = res?.message || op.exito;
+          const avisos = res?.data?.advertencias ?? [];
+          setToast({ id: Date.now(), message: avisos.length ? `${mensaje}. ${avisos.join(" ")}` : mensaje, type: "success" });
           op.onSuccess?.(res);
         },
         onError: (err) => {

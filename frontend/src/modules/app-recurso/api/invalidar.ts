@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { alertasKeys } from "@features/alertas";
 import { recursoKeys } from "./queryKeys";
 
 /**
@@ -11,6 +12,8 @@ export function invalidarExpediente(queryClient: QueryClient, expedienteId: numb
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: recursoKeys.expediente(expedienteId) }),
     queryClient.invalidateQueries({ queryKey: recursoKeys.listaExpedientes() }),
+    // Las alertas de vencimiento dependen de las etapas.
+    queryClient.invalidateQueries({ queryKey: alertasKeys.all }),
   ]);
 }
 

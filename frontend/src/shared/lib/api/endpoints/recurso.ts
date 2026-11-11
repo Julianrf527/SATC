@@ -2,7 +2,7 @@
 // Contrato: app-recurso/API.md (secciones A, B y C). Strings fijos o funciones que
 // construyen la ruta; se concatenan a BASE_URL en apiCall.
 //
-// Ojo: las rutas SPA (/recurso/manage, /recurso/consult, /recurso/my-reports)
+// Ojo: las rutas SPA (/recurso/manage, /recurso/consult, /recurso/my-reports, /recurso/alerts)
 // comparten prefijo con la API; nginx las distingue (frontend/nginx.conf).
 export const RECURSO_ENDPOINTS = {
   // === A.1 Catálogos (lectura) ===
@@ -54,6 +54,14 @@ export const RECURSO_ENDPOINTS = {
   // === B.2 Mis informes ===
   /** GET (query: vista, expediente, tipo_documento, estado). */
   RECURSO_MIS_DOCUMENTOS: "/recurso/mis-documentos",
+
+  // === Alertas de vencimiento ===
+  /** GET pestaña Alertas (query: alcance=mios|todos, page, limit, radicado, estado, tipo). */
+  RECURSO_ALERTAS_ALL: "/recurso/alertas/todas",
+  /** GET alertas de un expediente. */
+  RECURSO_ALERTAS: (expedienteId: number) => `/recurso/alertas/${expedienteId}`,
+  /** GET aviso de la fecha de visita técnica (query: fecha_numerado, fecha_visita). */
+  RECURSO_ALERTAS_AVISO_VISITA: "/recurso/alertas/aviso-visita",
 
   // === B.3 Actos, comunicación y notificación (para @features/acto-administrativo) ===
   RECURSO_TIPOS_NOTIFICACION: "/recurso/actos/tipos-notificacion",

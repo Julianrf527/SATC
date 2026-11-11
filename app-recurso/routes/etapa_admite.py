@@ -40,6 +40,7 @@ from services.etapas import (
     registrar_archivos,
     validar_pdf,
 )
+from services.alertas import advertencia_visita
 from services.etapas_lectura import leer_etapas
 from services.expediente import cargar_expediente
 from services.revision_documentos import Avisos
@@ -124,12 +125,17 @@ async def version_final_admite(
             avisos=avisos, fecha_visita=body.fecha_visita_tecnica, validar_tecnico=False,
         )
         concepto_id = concepto.id
+    # Aviso que no bloquea: visita fuera de los 10 hábiles siguientes al numerado.
+    visita = e.concepto2.fecha_visita_tecnica if e.concepto2 is not None else body.fecha_visita_tecnica
+    advertencias = [a for a in [advertencia_visita(acto.fecha_numerado, visita)] if a]
     await auditar(
         db, usuario, exp, "VERSION_FINAL_AUTO_ADMITE", f"Auto que admite No. {acto.numerado} cargado",
-        {"acto_id": acto.id, "tecnico_id": body.tecnico_id, "fecha_visita_tecnica": body.fecha_visita_tecnica},
+        {"acto_id": acto.id, "tecnico_id": body.tecnico_id, "fecha_visita_tecnica": body.fecha_visita_tecnica,
+         **({"advertencias": advertencias} if advertencias else {})},
         request,
     )
-    data = {**datos_fila(e.admite), "acto_id": acto.id, "concepto_tecnico_id": concepto_id}
+    data = {**datos_fila(e.admite), "acto_id": acto.id, "concepto_tecnico_id": concepto_id,
+            "advertencias": advertencias}
     await db.commit()
     await avisos.enviar()
     return ok("Auto que admite cargado; nace el concepto técnico", data)

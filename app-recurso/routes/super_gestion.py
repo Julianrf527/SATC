@@ -48,12 +48,14 @@ from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.acceso import Usuario, requiere_permiso
 from core.permission import Permission
 from db.deps import get_db_managed
 from db.models import (
+    ActoAdministrativo,
     ActoAdmite,
     Decision,
     InformeUsuario,
@@ -68,6 +70,7 @@ from db.models import (
     TipoVinculo,
 )
 from services.actos import crear_acto
+from services.alertas import advertencia_visita
 from services.concurrencia import MSG_MODIFICADO, bloquear_expediente, integridad_a_409
 from services.etapas import (
     AMBITOS_REQUERIMIENTO,
@@ -323,12 +326,29 @@ async def super_admite(request: Request, expediente_id: int, body: AdmiteSuper,
                                      "fecha_visita_tecnica": body.fecha_visita_tecnica})
         subir_version(e.concepto2)
         await _sincronizar_concepto(db, usuario, exp, e.concepto2, "etapa2", avisos)
-    data = None
     await db.flush()
-    data = _resp(fila, c)
-    await c.terminar(exp, "SUPER_ADMITE", "Cargue directo del auto que admite", body.model_dump(), request)
+    advertencias = await _advertencias_visita(db, body, fila, e.concepto2)
+    data = _resp(fila, c, advertencias=advertencias)
+    datos = body.model_dump()
+    if advertencias:
+        datos["advertencias"] = advertencias
+    await c.terminar(exp, "SUPER_ADMITE", "Cargue directo del auto que admite", datos, request)
     await avisos.enviar()
     return ok("Auto que admite cargado (super gestión)", data)
+
+
+async def _advertencias_visita(db: AsyncSession, body: AdmiteSuper, fila, concepto2) -> list[str]:
+    """Aviso de la fecha de visita (no bloquea) si el cuerpo trae el numerado
+    del auto o la visita; la fecha que no llegue se toma de lo guardado."""
+    if body.acto is None and body.fecha_visita_tecnica is None:
+        return []
+    numerado = body.acto.fecha_numerado if body.acto is not None else None
+    if numerado is None and fila.acto_admin_id is not None:
+        numerado = await db.scalar(
+            select(ActoAdministrativo.fecha_numerado).where(ActoAdministrativo.id == fila.acto_admin_id))
+    visita = body.fecha_visita_tecnica or (concepto2.fecha_visita_tecnica if concepto2 is not None else None)
+    aviso = advertencia_visita(numerado, visita)
+    return [aviso] if aviso else []
 
 
 @router.post("/{expediente_id}/conceptos/{tipo}")

@@ -2,3 +2,5 @@
 export { default as Alertas } from "./Alertas";
 export { default as AlertasExpediente } from "./AlertasExpediente";
 export type { RutasAlertas } from "./alertasAlcance";
+export type { AlertaPaginada } from "./types";
+export { alertasKeys } from "./api/queryKeys";

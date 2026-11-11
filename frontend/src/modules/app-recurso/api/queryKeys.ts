@@ -22,4 +22,7 @@ export const recursoKeys = {
   concepto: (conceptoId: number) => [...recursoKeys.misDocumentos(), "concepto", conceptoId] as const,
   tecnicos: () => [...recursoKeys.all, "tecnicos"] as const,
   abogados: () => [...recursoKeys.all, "abogados"] as const,
+  /** Aviso de la fecha de visita técnica (depende solo de las dos fechas). */
+  avisoVisita: (fechaNumerado: string, fechaVisita: string) =>
+    [...recursoKeys.all, "aviso-visita", fechaNumerado, fechaVisita] as const,
 };
