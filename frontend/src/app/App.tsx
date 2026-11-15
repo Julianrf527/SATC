@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense, useState, useEffect } from "react";
 import { toastService } from "@shared/lib/toastService";
 import Toast from "@shared/ui/Toast";
+import SesionHandler from "./router/SesionHandler";
 import LoadingBar from "@shared/ui/LoadingBar";
 import ErrorBoundary from "@shared/ui/ErrorBoundary";
 import { useTheme } from "@shared/hooks/useTheme";
@@ -209,6 +210,7 @@ function App() {
       )}
       <ErrorBoundary>
         <BrowserRouter>
+          <SesionHandler />
           <Suspense fallback={<PageFallback />}>
             <Routes>
               {/* páginas públicas */}
