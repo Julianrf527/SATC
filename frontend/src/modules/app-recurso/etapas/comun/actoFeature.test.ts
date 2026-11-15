@@ -96,6 +96,7 @@ describe("seComunica (regla del área 14/10/2026)", () => {
   it("solo el auto que admite y el acto que reconoce al tercero se comunican", () => {
     expect(seComunica("AUTO_ADMITE")).toBe(true);
     expect(seComunica("RECONOCE_TERCERO")).toBe(true);
+    expect(seComunica("AUTO_PRUEBAS")).toBe(true);
     for (const tipo of ["REQUERIMIENTO", "DECISION", "RECURSO", "APRUEBA_MEMORIAS", "APRUEBA_OBRAS"]) {
       expect(seComunica(tipo)).toBe(false);
     }

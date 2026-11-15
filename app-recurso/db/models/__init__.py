@@ -18,6 +18,7 @@ from .documento_anexo import DocumentoAnexo
 from .requerimiento import Requerimiento
 from .decision import Decision
 from .recurso_reposicion import RecursoReposicion
+from .practica_pruebas import PracticaPruebas
 from .subsanacion import Subsanacion
 from .memorias_calculo import MemoriasCalculo
 from .informe_usuario import InformeUsuario
@@ -59,6 +60,7 @@ __all__ = [
     "Requerimiento",
     "Decision",
     "RecursoReposicion",
+    "PracticaPruebas",
     "Subsanacion",
     "MemoriasCalculo",
     "InformeUsuario",

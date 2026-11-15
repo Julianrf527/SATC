@@ -115,6 +115,7 @@ ETIQUETAS_ETAPA: dict[str, str] = {
     "requerimiento": "Requerimiento",
     "decision": "Etapa 4 · Decisión",
     "recurso_reposicion": "Recurso de reposición",
+    "practica_pruebas": "Práctica de pruebas",
     "memorias_calculo": "Etapa 5 · Memorias de cálculo",
     "recibo_satisfaccion_obras": "Etapa 6 · Recibo a satisfacción de obras",
     "expediente_involucrado": "Tercero interviniente",
@@ -159,6 +160,8 @@ CADENAS: dict[str, Cadena] = {c.tipo_documento: c for c in (
     Cadena("APRUEBA_MEMORIAS", "Acto que aprueba las memorias", "memorias_calculo", _JURIDICA_ESTANDAR),
     Cadena("DECISION", "Decisión", "decision", _JURIDICA_DECISION),
     Cadena("RECURSO", "Acto que resuelve el recurso", "recurso_reposicion", _JURIDICA_DECISION),
+    # Mismos revisores que el acto que resuelve el recurso.
+    Cadena("AUTO_PRUEBAS", "Auto que admite y decreta práctica de pruebas", "practica_pruebas", _JURIDICA_DECISION),
     # TODO(negocio): el plan no dice quién revisa el acto que reconoce al tercero
     # interviniente. Provisional: igual que el auto admite.
     Cadena("RECONOCE_TERCERO", "Acto que reconoce al tercero interviniente", "expediente_involucrado",
@@ -172,6 +175,8 @@ CADENAS: dict[str, Cadena] = {c.tipo_documento: c for c in (
     Cadena("CONCEPTO_SUBSANACION", "Concepto técnico de la subsanación", "concepto_tecnico", _SOLO_LIDER_TECNICO),
     Cadena("CONCEPTO_OBRAS", "Concepto técnico de obras", "concepto_tecnico", _SOLO_LIDER_TECNICO),
     Cadena("CONCEPTO_OBRAS_SEGUNDO", "Segundo concepto técnico de obras", "concepto_tecnico", _SOLO_LIDER_TECNICO),
+    # Mismos revisores que el concepto técnico de la etapa 2.
+    Cadena("CONCEPTO_PRUEBAS", "Concepto técnico de la práctica de pruebas", "concepto_tecnico", ((_T, _S), (_P,))),
 )}
 
 PERMISOS_REVISOR: tuple[str, ...] = tuple(Permission.REVISORES)

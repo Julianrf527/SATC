@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { FileInput } from "lucide-react";
 import type { SetToast } from "../../types";
 import { MAX_RADICADO, RADICADO_VACIO, validarRadicado, type RadicadoForm } from "../formularios/radicado";
@@ -16,17 +16,30 @@ type Props = {
   peticion: (form: RadicadoForm, fileId: number) => PeticionEtapa;
   setToast: SetToast;
   onClose: () => void;
+  /** Campos propios del documento (debajo del PDF), p. ej. «¿Requiere práctica de pruebas?». */
+  children?: ReactNode;
+  /** Valida los campos propios (primer error o `null`). */
+  validarExtra?: () => string | null;
 };
 
 /** Registra un documento radicado por el usuario: radicado, fecha y PDF. */
-export default function RadicadoModal({ expedienteId, titulo, documento, peticion, setToast, onClose }: Props) {
+export default function RadicadoModal({
+  expedienteId,
+  titulo,
+  documento,
+  peticion,
+  setToast,
+  onClose,
+  children,
+  validarExtra,
+}: Props) {
   const [form, setForm] = useState<RadicadoForm>(RADICADO_VACIO);
   const [error, setError] = useState<string | null>(null);
   const { ejecutar, ocupado } = useEscritura(expedienteId, setToast);
   const cambiar = (c: Partial<RadicadoForm>) => setForm((f) => ({ ...f, ...c }));
 
   const guardar = () => {
-    const invalido = validarRadicado(form);
+    const invalido = validarRadicado(form) ?? validarExtra?.() ?? null;
     if (invalido) return setError(invalido);
     setError(null);
     ejecutar(
@@ -56,6 +69,7 @@ export default function RadicadoModal({ expedienteId, titulo, documento, peticio
         <CampoFecha etiqueta="Fecha de radicado" valor={form.fecha_radicado} onChange={(fecha_radicado) => cambiar({ fecha_radicado })} requerido />
       </div>
       <CampoPdf etiqueta={`${documento} (PDF)`} archivo={form.archivo} onChange={(archivo) => cambiar({ archivo })} requerido />
+      {children}
     </ModalFormulario>
   );
 }

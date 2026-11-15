@@ -92,11 +92,12 @@ export function vinculosNotificables(
 
 /**
  * Regla del área (14/10/2026): SOLO se comunican —y nunca se notifican— el auto
- * que admite y el acto que reconoce a un tercero; todos los demás actos solo
+ * que admite, el acto que reconoce a un tercero y el auto que admite y decreta
+ * práctica de pruebas; todos los demás actos solo
  * se notifican. Misma regla que `ACTOS_SOLO_COMUNICACION` del backend
  * (services/actos.py), que además la valida.
  */
-export const ACTOS_SOLO_COMUNICACION: readonly string[] = ["AUTO_ADMITE", "RECONOCE_TERCERO"];
+export const ACTOS_SOLO_COMUNICACION: readonly string[] = ["AUTO_ADMITE", "RECONOCE_TERCERO", "AUTO_PRUEBAS"];
 
 /** ¿El acto (por su clase interna `tipo_acto`) se comunica en vez de notificarse? */
 export function seComunica(tipoActo: string): boolean {

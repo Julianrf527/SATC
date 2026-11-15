@@ -15,6 +15,7 @@ Enum tipo_acto {
   RECONOCE_TERCERO
   DECISION
   RECURSO
+  AUTO_PRUEBAS
   APRUEBA_MEMORIAS
   APRUEBA_OBRAS
 }
@@ -263,6 +264,20 @@ Table recurso_reposicion {
   fecha_radicado date [not null]
   resultado resultado_recurso
   doc_recurso_id integer [not null, note: 'archivo en app-docs (FK lógica)']
+  requiere_pruebas boolean [not null, default: false, note: '¿Requiere práctica de pruebas? (se responde al crear el recurso)']
+  version integer [not null, default: `1`]
+
+  indexes {
+    encargado_acto_id
+  }
+}
+
+Table practica_pruebas {
+  id integer [pk, increment]
+  recurso_id integer [unique, not null]
+  encargado_acto_id integer [note: 'id en app-users (FK lógica)']
+  acto_admin_id integer [unique, note: 'auto que admite y decreta práctica de pruebas (AUTO_PRUEBAS)']
+  concepto_tecnico_id integer [unique, note: 'nace al cargar el auto firmado con técnico y visita']
   version integer [not null, default: `1`]
 
   indexes {
@@ -480,6 +495,9 @@ Ref: recibo_satisfaccion_obras.nuevo_informe_usuario_id - informe_usuario.id
 Ref: recibo_satisfaccion_obras.requerimiento_id - requerimiento.id
 Ref: recurso_reposicion.acto_admin_id - acto_administrativo.id
 Ref: recurso_reposicion.decision_id - decision.id
+Ref: practica_pruebas.recurso_id - recurso_reposicion.id
+Ref: practica_pruebas.acto_admin_id - acto_administrativo.id
+Ref: practica_pruebas.concepto_tecnico_id - concepto_tecnico.id
 Ref: requerimiento.acto_admin_id - acto_administrativo.id
 Ref: requerimiento.concepto_tecnico_id - concepto_tecnico.id
 Ref: requerimiento.expediente_id - expediente.id

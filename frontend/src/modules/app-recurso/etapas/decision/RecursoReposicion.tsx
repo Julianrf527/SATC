@@ -1,32 +1,46 @@
 import { useState } from "react";
-import { CalendarDays, FileInput, FileText, Hash, Scale } from "lucide-react";
+import { CalendarDays, FileInput, FileText, FlaskConical, Hash, Pencil, Scale } from "lucide-react";
 import { formatDate } from "@shared/lib/format";
 import { EstadoBadge } from "@shared/ui";
-import type { NodoRecurso, VinculoInvolucrado } from "../../types";
+import type { NodoPracticaPruebas, NodoRecurso, VinculoInvolucrado } from "../../types";
+import { CampoSiNo } from "../comun/campos/Campos";
 import { Dato, SinDato, VerDocumento } from "../comun/Dato";
 import NodoActo from "../comun/NodoActo";
+import NodoConcepto from "../comun/NodoConcepto";
 import RadicadoModal from "../comun/RadicadoModal";
 import { OPCIONES_RESULTADO } from "../formularios/actoFinal";
 import { bodyRadicado } from "../formularios/radicado";
+import { validarRespuestaPruebas } from "../formularios/requierePruebas";
 import { accionesNodo, urlRegistrarRadicado } from "../nodos";
 import type { EntornoEtapa } from "../tipos";
+import RequierePruebasModal from "./RequierePruebasModal";
 
 const REF = { clase: "recurso" } as const;
+const REF_PRUEBAS = { clase: "pruebas" } as const;
 
 type Props = { entorno: EntornoEtapa; nodo: NodoRecurso; vinculos: VinculoInvolucrado[] };
 
 /**
- * Sub-proceso: recurso de reposición (opcional). Se crea con el radicado y el
- * escrito del usuario; luego un abogado se asigna el acto que lo resuelve
- * (resultado REPONE / CONFIRMA / MODIFICA / ADICIONA) y se notifica.
+ * Sub-proceso: recurso de reposición (opcional). Se crea con el radicado, el
+ * escrito del usuario y la respuesta a «¿Requiere práctica de pruebas?».
+ * Sin pruebas, un abogado se asigna directo el acto que lo resuelve. Con
+ * pruebas, antes van el auto que admite y decreta práctica de pruebas (con
+ * técnico y fecha de visita) y su concepto técnico; con el concepto firmado
+ * se habilita el acto que resuelve (REPONE / CONFIRMA / MODIFICA / ADICIONA).
  */
 export default function RecursoReposicion({ entorno, nodo, vinculos }: Props) {
   const { expediente, setToast, isEditable } = entorno;
-  const [registrando, setRegistrando] = useState(false);
+  const [modal, setModal] = useState<"registrar" | "pruebas" | null>(null);
+  const [requiere, setRequiere] = useState<boolean | null>(null);
   const puede = accionesNodo(nodo, isEditable);
   const urlCrear = urlRegistrarRadicado(expediente.id, REF);
   const d = nodo.datos;
   const resultado = OPCIONES_RESULTADO.find((o) => o.value === d.resultado)?.label;
+
+  const abrirRegistro = () => {
+    setRequiere(null);
+    setModal("registrar");
+  };
 
   return (
     <>
@@ -46,11 +60,18 @@ export default function RecursoReposicion({ entorno, nodo, vinculos }: Props) {
             : "Pendiente de que un abogado se asigne el acto que resuelve el recurso."
         }
         acciones={
-          puede("crear_recurso") && urlCrear ? (
-            <button type="button" className="btn btn-success btn-sm text-white gap-1.5" onClick={() => setRegistrando(true)}>
-              <FileInput size={14} /> Registrar recurso
-            </button>
-          ) : undefined
+          <>
+            {puede("crear_recurso") && urlCrear && (
+              <button type="button" className="btn btn-success btn-sm text-white gap-1.5" onClick={abrirRegistro}>
+                <FileInput size={14} /> Registrar recurso
+              </button>
+            )}
+            {puede("editar_requiere_pruebas") && nodo.version !== null && (
+              <button type="button" className="btn btn-outline btn-sm gap-1.5" onClick={() => setModal("pruebas")}>
+                <Pencil size={14} /> Práctica de pruebas
+              </button>
+            )}
+          </>
         }
         datos={
           nodo.id !== null ? (
@@ -64,23 +85,74 @@ export default function RecursoReposicion({ entorno, nodo, vinculos }: Props) {
               <Dato icono={<FileText size={16} />} label="Escrito del recurso">
                 <VerDocumento fileId={d.doc_recurso_id} />
               </Dato>
+              <Dato icono={<FlaskConical size={16} />} label="¿Requiere práctica de pruebas?">
+                <EstadoBadge etiqueta={d.requiere_pruebas ? "Sí" : "No"} tono={d.requiere_pruebas ? "info" : "neutral"} />
+              </Dato>
               <Dato icono={<Scale size={16} />} label="Resultado">
                 {resultado ? <EstadoBadge etiqueta={resultado} tono="info" /> : <SinDato texto="Sin resolver" />}
               </Dato>
             </>
           ) : undefined
         }
-      />
-      {registrando && urlCrear && (
+      >
+        {nodo.pruebas && <PracticaPruebas entorno={entorno} nodo={nodo.pruebas} vinculos={vinculos} />}
+      </NodoActo>
+
+      {modal === "registrar" && urlCrear && (
         <RadicadoModal
           expedienteId={expediente.id}
           titulo="Registrar recurso de reposición"
           documento="Escrito del recurso"
-          peticion={(form, id) => ({ url: urlCrear, method: "POST", body: bodyRadicado(form, id) })}
+          peticion={(form, id) => ({
+            url: urlCrear,
+            method: "POST",
+            body: { ...bodyRadicado(form, id), requiere_pruebas: requiere },
+          })}
+          validarExtra={() => validarRespuestaPruebas(requiere)}
           setToast={setToast}
-          onClose={() => setRegistrando(false)}
+          onClose={() => setModal(null)}
+        >
+          <CampoSiNo etiqueta="¿Requiere práctica de pruebas?" valor={requiere} onChange={setRequiere} requerido />
+          <p className="text-xs text-base-content/60">
+            Si requiere, antes del acto que resuelve el recurso se emite el auto que admite y decreta práctica de pruebas
+            y se carga su concepto técnico. Se puede cambiar después.
+          </p>
+        </RadicadoModal>
+      )}
+      {modal === "pruebas" && nodo.version !== null && (
+        <RequierePruebasModal
+          expedienteId={expediente.id}
+          version={nodo.version}
+          actual={!!d.requiere_pruebas}
+          avisoEliminar={nodo.aviso_eliminar_pruebas}
+          setToast={setToast}
+          onClose={() => setModal(null)}
         />
       )}
     </>
+  );
+}
+
+/** Auto que admite y decreta práctica de pruebas (solo se comunica) + concepto técnico de pruebas. */
+function PracticaPruebas({ entorno, nodo, vinculos }: { entorno: EntornoEtapa; nodo: NodoPracticaPruebas; vinculos: VinculoInvolucrado[] }) {
+  return (
+    <NodoActo
+      entorno={entorno}
+      nodo={nodo}
+      refNodo={REF_PRUEBAS}
+      icono="bx-test-tube"
+      variante="pruebas"
+      que="el auto que admite y decreta práctica de pruebas"
+      vinculos={vinculos}
+      anidada
+      pendiente="Pendiente de que un abogado se asigne el auto que admite y decreta práctica de pruebas."
+    >
+      <NodoConcepto
+        entorno={entorno}
+        nodo={nodo.concepto}
+        anidada
+        pendiente="Nace al cargar el auto firmado con el técnico y la fecha de visita."
+      />
+    </NodoActo>
   );
 }

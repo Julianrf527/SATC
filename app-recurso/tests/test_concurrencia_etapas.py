@@ -29,7 +29,8 @@ async def test_dos_asignaciones_del_recurso_update_atomico(client, rv_permisos, 
     exp_id, data = await con_decision("NEGADA", None)
     await notificar(client, stubs, catalogo, exp_id, data["acto_id"])
     await post(client, f"/etapas/{exp_id}/recurso", json={
-        "radicado": "2026ER1", "fecha_radicado": "2026-06-10", "file_id": stubs.files.registrar()}, esperado=201)
+        "radicado": "2026ER1", "fecha_radicado": "2026-06-10", "file_id": stubs.files.registrar(),
+        "requiere_pruebas": False}, esperado=201)
     r = await _a_la_vez(client, f"/etapas/{exp_id}/recurso/asignarme", (ABOGADO, ABOGADO2))
     assert _codigos(*r) == [200, 409]
     ganador = ABOGADO if r[0].status_code == 200 else ABOGADO2

@@ -136,6 +136,7 @@ export type AccionEtapa =
   | "registrar_respuesta"
   | "registrar_ejecutoria"
   | "crear_recurso"
+  | "editar_requiere_pruebas"
   | "registrar_planos"
   | "registrar_subsanacion"
   | "registrar_informe_usuario"
@@ -238,7 +239,7 @@ export type NodoEtapa<D = Record<string, unknown>> = {
   acciones_disponibles: AccionEtapa[];
 };
 
-export type TipoConcepto = "etapa2" | "adicional" | "memorias" | "subsanacion" | "obras" | "obras_segundo";
+export type TipoConcepto = "etapa2" | "adicional" | "memorias" | "subsanacion" | "obras" | "obras_segundo" | "pruebas";
 export type AmbitoRequerimiento = "etapa3" | "memorias" | "obras";
 export type TipoDecision = "OTORGADA" | "NEGADA" | "DESISTIDA";
 export type ResultadoRecurso = "REPONE" | "CONFIRMA" | "MODIFICA" | "ADICIONA";
@@ -280,6 +281,8 @@ export type DatosRecurso = {
   radicado: string | null;
   fecha_radicado: string | null;
   doc_recurso_id: number | null;
+  /** «¿Requiere práctica de pruebas?» (null si el recurso no existe). */
+  requiere_pruebas: boolean | null;
   resultado: ResultadoRecurso | null;
 };
 
@@ -327,7 +330,14 @@ export type NodoAdmite = NodoEtapa<DatosAdmite>;
 export type NodoRequerimientoEtapa3 = NodoRequerimiento<DatosRespuestaRequerimiento> & {
   concepto_adicional: NodoConcepto;
 };
-export type NodoRecurso = NodoEtapa<DatosRecurso>;
+/** Auto que admite y decreta práctica de pruebas + concepto técnico de pruebas. */
+export type NodoPracticaPruebas = NodoEtapa<SinDatos> & { concepto: NodoConcepto };
+export type NodoRecurso = NodoEtapa<DatosRecurso> & {
+  /** Solo si el recurso requiere práctica de pruebas. */
+  pruebas: NodoPracticaPruebas | null;
+  /** Sí → No con la práctica iniciada: qué se elimina (pide confirmación). */
+  aviso_eliminar_pruebas?: string;
+};
 export type NodoDecision = NodoEtapa<DatosDecision> & { recurso: NodoRecurso };
 export type NodoRadicado = NodoEtapa<DatosRadicado>;
 export type NodoAprobacion = NodoEtapa<SinDatos>;

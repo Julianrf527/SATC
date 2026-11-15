@@ -2,13 +2,14 @@
 
 Un concepto se identifica por expediente + tipo (slug):
 ``etapa2`` (etapa 2, nace con el auto admite), ``adicional`` (etapa 3),
-``memorias``, ``subsanacion`` (etapa 5), ``obras``, ``obras_segundo`` (etapa 6).
+``memorias``, ``subsanacion`` (etapa 5), ``obras``, ``obras_segundo`` (etapa 6),
+``pruebas`` (práctica de pruebas del recurso, nace con el auto de pruebas).
 
 - ``GET  /etapas/tecnicos``: usuarios con ``recurso_tecnico`` (para el selector).
 - ``GET  /etapas/abogados``: usuarios con ``recurso_gestionar`` (encargado en super gestión).
 - ``POST /etapas/{expediente_id}/conceptos/{tipo}/tecnico``: el abogado
   selecciona el técnico (V3) → nace la fila ``concepto_tecnico`` y su proceso
-  con el técnico como encargado. No aplica a ``etapa2``.
+  con el técnico como encargado. No aplica a ``etapa2`` ni a ``pruebas``.
 - ``POST /etapas/{expediente_id}/conceptos/{tipo}/version-final``: el técnico
   seleccionado carga el concepto firmado y los datos escritos en él.
 - ``GET  /etapas/conceptos/{concepto_id}`` y
@@ -153,6 +154,11 @@ async def seleccionar_tecnico(
         raise HTTPException(
             status_code=400,
             detail="El técnico del concepto de la etapa 2 se registra al cargar el auto admite firmado (V5)",
+        )
+    if tipo == "pruebas":
+        raise HTTPException(
+            status_code=400,
+            detail="El técnico del concepto de pruebas se registra al cargar el auto de pruebas firmado",
         )
     exp = await bloquear_expediente(db, expediente_id)
     e = await cargar_estado(db, exp)

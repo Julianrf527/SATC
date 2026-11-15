@@ -4,7 +4,7 @@ La referencia es polimórfica ``(etapa_tipo, etapa_ref_id)`` con ``etapa_tipo`` 
 nombre de la tabla de la fila, los MISMOS valores que usa la descarga del
 expediente (``services/expediente_documentos.py``): ``acto_admite``,
 ``concepto_tecnico``, ``requerimiento``,
-``decision``, ``recurso_reposicion``, ``memorias_calculo``, ``subsanacion``,
+``decision``, ``recurso_reposicion``, ``practica_pruebas``, ``memorias_calculo``, ``subsanacion``,
 ``recibo_satisfaccion_obras``, ``informe_usuario``. El tercero interviniente
 (``expediente_involucrado``) no lleva anexos.
 

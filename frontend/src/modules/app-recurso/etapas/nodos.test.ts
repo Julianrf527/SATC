@@ -3,6 +3,7 @@ import {
   accionesNodo,
   urlAsignarme,
   urlRegistrarRadicado,
+  urlRequierePruebas,
   urlSeleccionarTecnico,
   urlSuperCargue,
   urlVersionFinal,
@@ -31,8 +32,19 @@ describe("rutas de acciones por nodo (C.3–C.10)", () => {
     expect(urlVersionFinal(7, { clase: "memorias" })).toBeNull();
   });
 
+  it("práctica de pruebas del recurso", () => {
+    expect(urlAsignarme(7, { clase: "pruebas" })).toBe("/recurso/etapas/7/recurso/pruebas/asignarme");
+    expect(urlVersionFinal(7, { clase: "pruebas" })).toBe("/recurso/etapas/7/recurso/pruebas/version-final");
+    expect(urlSuperCargue(7, { clase: "pruebas" })).toBe("/recurso/super-gestion/7/recurso/pruebas");
+    expect(urlVersionFinal(7, { clase: "concepto", tipo: "pruebas" })).toBe(
+      "/recurso/etapas/7/conceptos/pruebas/version-final",
+    );
+    expect(urlRequierePruebas(7)).toBe("/recurso/etapas/7/recurso/requiere-pruebas");
+  });
+
   it("seleccionar técnico no aplica a la etapa 2", () => {
     expect(urlSeleccionarTecnico(7, "etapa2")).toBeNull();
+    expect(urlSeleccionarTecnico(7, "pruebas")).toBeNull();
     expect(urlSeleccionarTecnico(7, "adicional")).toBe("/recurso/etapas/7/conceptos/adicional/tecnico");
   });
 

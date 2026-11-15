@@ -175,6 +175,65 @@ def v13_recurso(e) -> Motivo:
 
 # ═════════════════════════════════════════════ orden del flujo (§4)
 
+# ─── Recurso de reposición: práctica de pruebas ───
+
+MSG_SIN_RECURSO = "El expediente no tiene recurso de reposición"
+MSG_PRIMERO_CONCEPTO_PRUEBAS = "Primero debe cargarse el concepto técnico de la práctica de pruebas"
+
+
+def flujo_auto_pruebas(e) -> Motivo:
+    """Auto que admite y decreta práctica de pruebas: solo si el recurso
+    respondió «Sí» a «¿Requiere práctica de pruebas?»."""
+    if e.recurso is None:
+        return MSG_SIN_RECURSO
+    if not e.recurso.requiere_pruebas:
+        return "El recurso no requiere práctica de pruebas"
+    return None
+
+
+def flujo_resuelve_recurso(e) -> Motivo:
+    """Acto que resuelve el recurso (asignarse y cargarlo): si requiere
+    práctica de pruebas, después del concepto técnico de pruebas firmado."""
+    if e.recurso is None:
+        return MSG_SIN_RECURSO
+    if e.recurso.requiere_pruebas:
+        concepto = e.concepto("pruebas")
+        if concepto is None or not concepto.doc_concepto_tecnico_id:
+            return MSG_PRIMERO_CONCEPTO_PRUEBAS
+    return None
+
+
+def motivo_cambio_requiere_pruebas(e, nuevo: bool) -> Motivo:
+    """Cambio de «¿Requiere práctica de pruebas?» ya creado el recurso. Aplica
+    también a super gestión (no se omite con ``exigir``):
+
+    - Sí → No: bloqueado si ya existe el concepto técnico de pruebas.
+    - No → Sí: bloqueado si el acto que resuelve el recurso ya está cargado."""
+    if e.recurso is None:
+        return MSG_SIN_RECURSO
+    if bool(e.recurso.requiere_pruebas) == nuevo:
+        return None
+    if not nuevo and e.concepto("pruebas") is not None:
+        return ("No se puede cambiar a «No»: el concepto técnico de la práctica de pruebas ya existe")
+    if nuevo and e.recurso.acto_admin_id:
+        return "No se puede cambiar a «Sí»: el acto que resuelve el recurso ya está cargado"
+    return None
+
+
+def aviso_eliminar_practica_pruebas(pruebas) -> str:
+    """Advertencia antes de pasar de Sí a No con la práctica ya iniciada (se
+    elimina entera)."""
+    partes = ["la asignación del auto que admite y decreta práctica de pruebas", "su proceso de revisión"]
+    if pruebas.acto_admin_id:
+        partes.append("el acto cargado con su comunicación")
+    partes.append("los documentos anexos")
+    lista = ", ".join(partes[:-1]) + " y " + partes[-1]
+    return (
+        "La práctica de pruebas ya está iniciada. Si cambias a «No» se ELIMINARÁ por completo: "
+        f"{lista}. Esta acción no se puede deshacer."
+    )
+
+
 def flujo_documentos_admite(e) -> Motivo:
     """Oficio a la Alcaldía / fijación del aviso / constancia: después del auto
     firmado (plan §4-Etapa 1 pasos 6–7)."""
@@ -236,7 +295,17 @@ def flujo_concepto_obras_segundo(e) -> Motivo:
     return None if e.nuevo_informe_obras is not None else "Primero debe registrarse el nuevo informe del usuario"
 
 
-# Condición para crear cada concepto (slug → regla). Etapa 2 nace con el auto.
+def flujo_concepto_pruebas(e) -> Motivo:
+    """El concepto de pruebas nace al cargar el auto de pruebas firmado (con
+    técnico y fecha de visita); no se selecciona técnico aparte."""
+    if e.concepto("pruebas") is not None:
+        return None
+    return flujo_auto_pruebas(e) or (
+        "El concepto técnico de pruebas nace al cargar el auto de pruebas firmado con técnico y fecha de visita"
+    )
+
+
+# Condición para crear cada concepto (slug → regla). Etapa 2 y pruebas nacen con su auto.
 CONDICION_CONCEPTO = {
     "etapa2": v5_concepto_etapa2,
     "adicional": flujo_concepto_adicional,
@@ -244,6 +313,7 @@ CONDICION_CONCEPTO = {
     "subsanacion": flujo_concepto_subsanacion,
     "obras": flujo_concepto_obras,
     "obras_segundo": flujo_concepto_obras_segundo,
+    "pruebas": flujo_concepto_pruebas,
 }
 
 # Condición para asignarse cada requerimiento (ámbito → regla).

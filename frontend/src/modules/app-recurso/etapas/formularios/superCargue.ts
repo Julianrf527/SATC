@@ -22,8 +22,12 @@ export type SeccionesSuper = {
   radicado: string | null;
   /** Oficio a la Alcaldía, fijación del aviso y constancia (auto admite). */
   docsAdmite: boolean;
-  /** Técnico y fecha de visita del auto admite (con técnico nace el concepto de la etapa 2). */
-  tecnicoVisita: boolean;
+  /**
+   * Técnico y fecha de visita del auto (con técnico nace su concepto): el
+   * concepto que nace, o `null` si no aplica. `avisoVisita`: aviso de plazo de
+   * la visita (solo el auto admite).
+   */
+  tecnicoVisita: { concepto: string; avisoVisita: boolean } | null;
   /** Nodo de concepto: definición de sus campos (backend); `null` si no aplica. */
   concepto: CamposConcepto | null;
   /**
@@ -50,7 +54,7 @@ const NINGUNA: SeccionesSuper = {
   actoObligatorio: false,
   radicado: null,
   docsAdmite: false,
-  tecnicoVisita: false,
+  tecnicoVisita: null,
   concepto: null,
   avisoDecide: null,
   decision: false,
@@ -72,7 +76,13 @@ export function seccionesSuper(
   const acto = !tieneActo;
   switch (ref.clase) {
     case "admite":
-      return { ...NINGUNA, acto, docsAdmite: true, tecnicoVisita: true, encargado: true };
+      return {
+        ...NINGUNA,
+        acto,
+        docsAdmite: true,
+        tecnicoVisita: { concepto: "el concepto de la etapa 2", avisoVisita: true },
+        encargado: true,
+      };
     case "concepto":
       return { ...NINGUNA, concepto: camposConcepto ?? SIN_CAMPOS, avisoDecide: avisoDecide ?? null };
     case "requerimiento":
@@ -81,6 +91,13 @@ export function seccionesSuper(
       return { ...NINGUNA, acto, decision: true, encargado: true };
     case "recurso":
       return { ...NINGUNA, acto, radicado: "Escrito del recurso", resultado: true, encargado: true };
+    case "pruebas":
+      return {
+        ...NINGUNA,
+        acto,
+        tecnicoVisita: { concepto: "el concepto de la práctica de pruebas", avisoVisita: false },
+        encargado: true,
+      };
     case "memorias":
       return { ...NINGUNA, radicado: "Planos" };
     case "subsanacion":

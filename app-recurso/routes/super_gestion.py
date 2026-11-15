@@ -32,10 +32,11 @@ Semántica común (todos ``POST``, body JSON, ``version`` opcional):
 Endpoints (prefijo ``/super-gestion``):
 
 - ``POST /{expediente_id}/admite``
-- ``POST /{expediente_id}/conceptos/{tipo}`` (etapa2|adicional|memorias|subsanacion|obras|obras_segundo)
+- ``POST /{expediente_id}/conceptos/{tipo}`` (etapa2|adicional|memorias|subsanacion|obras|obras_segundo|pruebas)
 - ``POST /{expediente_id}/requerimientos/{ambito}`` (etapa3|memorias|obras)
 - ``POST /{expediente_id}/decision``
-- ``POST /{expediente_id}/recurso``
+- ``POST /{expediente_id}/recurso`` (incluye ``requiere_pruebas``: mismas reglas de cambio que el flujo normal)
+- ``POST /{expediente_id}/recurso/pruebas`` (auto que admite y decreta práctica de pruebas)
 - ``POST /{expediente_id}/memorias``
 - ``POST /{expediente_id}/memorias/subsanacion``
 - ``POST /{expediente_id}/obras``
@@ -61,6 +62,7 @@ from db.models import (
     InformeUsuario,
     MemoriasCalculo,
     ReciboSatisfaccionObras,
+    PracticaPruebas,
     RecursoReposicion,
     Requerimiento,
     ResultadoRecurso,
@@ -72,7 +74,13 @@ from db.models import (
 from services.actos import crear_acto
 from services.alertas import advertencia_visita
 from services.eliminar_requerimiento import eliminar_requerimiento_etapa3
-from services.validaciones import aviso_eliminar_requerimiento
+from services.eliminar_practica_pruebas import eliminar_practica_pruebas
+from services.validaciones import (
+    aviso_eliminar_practica_pruebas,
+    aviso_eliminar_requerimiento,
+    flujo_auto_pruebas,
+    motivo_cambio_requiere_pruebas,
+)
 from services.concurrencia import MSG_MODIFICADO, bloquear_expediente, integridad_a_409
 from services.etapas import (
     AMBITOS_REQUERIMIENTO,
@@ -167,6 +175,16 @@ class RadicadoActoSuper(RadicadoSuper):
 
 class RecursoSuper(RadicadoActoSuper):
     resultado: Optional[ResultadoRecurso] = None
+    requiere_pruebas: Optional[bool] = Field(None, description="«¿Requiere práctica de pruebas?» (al crear: No si falta)")
+    confirmar_eliminar_pruebas: bool = Field(
+        False, description="Sí → No con la práctica iniciada: confirma que se elimina")
+
+
+class PruebasSuper(_ConActo):
+    """Auto que admite y decreta práctica de pruebas (+ técnico y visita del concepto)."""
+
+    tecnico_id: Optional[int] = Field(None, gt=0, description="Técnico del concepto de pruebas")
+    fecha_visita_tecnica: Optional[date] = None
 
 
 class TerceroActoSuper(BaseModel):
@@ -490,10 +508,23 @@ async def super_recurso(request: Request, expediente_id: int, body: RecursoSuper
     _version(fila, body.version)
     await _abogado_elegido(body, fila)
     nueva = fila is None
+    eliminado = None
     if nueva:
         _obligatorios(body, RADICADO, "el recurso de reposición")
-        fila = RecursoReposicion(decision_id=e.decision.id)
+        fila = RecursoReposicion(decision_id=e.decision.id, requiere_pruebas=bool(body.requiere_pruebas))
     else:
+        if body.requiere_pruebas is not None and body.requiere_pruebas != fila.requiere_pruebas:
+            # Mismas reglas que el flujo normal (no se omiten en super gestión).
+            motivo = motivo_cambio_requiere_pruebas(e, body.requiere_pruebas)
+            if motivo:
+                raise HTTPException(status_code=400, detail=motivo)
+            if not body.requiere_pruebas and e.pruebas is not None:
+                if not body.confirmar_eliminar_pruebas:
+                    raise HTTPException(status_code=409, detail=aviso_eliminar_practica_pruebas(e.pruebas))
+                eliminado, archivos = await eliminar_practica_pruebas(db, e.pruebas)
+                e.pruebas = None
+                c.anteriores.extend(archivos)
+            fila.requiere_pruebas = body.requiere_pruebas
         subir_version(fila)
     await c.campos(fila, {"radicado": body.radicado, "fecha_radicado": body.fecha_radicado,
                           "doc_recurso_id": body.file_id, "encargado_acto_id": body.encargado_acto_id,
@@ -504,10 +535,59 @@ async def super_recurso(request: Request, expediente_id: int, body: RecursoSuper
     avisos = Avisos()
     await _sincronizar_acto(db, usuario, exp, fila, "recurso_reposicion", "RECURSO", avisos)
     await db.flush()
-    data = _resp(fila, c)
-    await c.terminar(exp, "SUPER_RECURSO", "Cargue directo del recurso de reposición", body.model_dump(), request)
+    data = _resp(fila, c, requiere_pruebas=fila.requiere_pruebas, practica_eliminada=eliminado is not None)
+    datos = body.model_dump()
+    if eliminado:
+        datos["practica_eliminada"] = eliminado
+    await c.terminar(exp, "SUPER_RECURSO", "Cargue directo del recurso de reposición"
+                     + (" · práctica de pruebas eliminada" if eliminado else ""), datos, request)
     await avisos.enviar()
-    return ok("Recurso de reposición cargado (super gestión)", data)
+    mensaje = "Recurso de reposición cargado (super gestión)"
+    if eliminado:
+        mensaje += "; se eliminó la práctica de pruebas"
+    return ok(mensaje, data)
+
+
+@router.post("/{expediente_id}/recurso/pruebas")
+async def super_auto_pruebas(request: Request, expediente_id: int, body: PruebasSuper,
+                             db: AsyncSession = Depends(get_db_managed)):
+    """Cargue directo del auto que admite y decreta práctica de pruebas. Con
+    técnico nace el concepto de pruebas (su carga va por ``/conceptos/pruebas``).
+    Solo si el recurso requiere práctica de pruebas."""
+    usuario, exp, e, c = await _inicio(request, db, expediente_id)
+    motivo = flujo_auto_pruebas(e)
+    if motivo:
+        raise HTTPException(status_code=400, detail=motivo)
+    fila = e.pruebas
+    concepto = e.concepto("pruebas")
+    _version(fila, body.version)
+    await _abogado_elegido(body, fila)
+    await exigir_tecnico(body.tecnico_id, concepto.tecnico_encargado_id if concepto else None)
+    if fila is None:
+        fila = PracticaPruebas(recurso_id=e.recurso.id, encargado_acto_id=body.encargado_acto_id)
+        await _guardar_nueva(db, fila)
+    else:
+        await c.campos(fila, {"encargado_acto_id": body.encargado_acto_id})
+        subir_version(fila)
+    await c.acto(fila, "practica_pruebas", TipoActo.AUTO_PRUEBAS, body.acto)
+    avisos = Avisos()
+    await _sincronizar_acto(db, usuario, exp, fila, "practica_pruebas", "AUTO_PRUEBAS", avisos)
+    if concepto is None and body.tecnico_id:
+        await db.flush()
+        await crear_concepto(db, tipo="pruebas", tecnico_id=body.tecnico_id, expediente_id=exp.id, usuario=usuario,
+                             avisos=avisos, padre=fila, columna="concepto_tecnico_id",
+                             fecha_visita=body.fecha_visita_tecnica, validar_tecnico=False)
+    elif concepto is not None and (body.tecnico_id or body.fecha_visita_tecnica):
+        await c.campos(concepto, {"tecnico_encargado_id": body.tecnico_id,
+                                  "fecha_visita_tecnica": body.fecha_visita_tecnica})
+        subir_version(concepto)
+        await _sincronizar_concepto(db, usuario, exp, concepto, "pruebas", avisos)
+    await db.flush()
+    data = _resp(fila, c)
+    await c.terminar(exp, "SUPER_AUTO_PRUEBAS", "Cargue directo del auto que admite y decreta práctica de pruebas",
+                     body.model_dump(), request)
+    await avisos.enviar()
+    return ok("Auto de pruebas cargado (super gestión)", data)
 
 
 @router.post("/{expediente_id}/memorias")

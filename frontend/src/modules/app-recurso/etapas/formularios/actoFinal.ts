@@ -1,10 +1,14 @@
 // "Cargar versión final" de un acto (C.1): PDF firmado + numerado + fecha,
 // y los datos propios de algunas etapas (auto admite: técnico y fecha de
-// visita; decisión: decisión y requiere memorias; recurso: resultado).
+// visita; auto de pruebas: técnico y fecha de visita, sin aviso de plazo;
+// decisión: decisión y requiere memorias; recurso: resultado).
 import type { ResultadoRecurso, TipoDecision } from "../../types";
 import { type ClaseActo, esPdf, fechaValida, numeradoParaEnviar, numeradoValido } from "./comunes";
 
-export type VarianteActoFinal = "simple" | "admite" | "decision" | "recurso";
+export type VarianteActoFinal = "simple" | "admite" | "pruebas" | "decision" | "recurso";
+
+/** Variantes que llevan técnico y fecha de visita (con ellos nace un concepto técnico). */
+export const conTecnicoVisita = (v: VarianteActoFinal) => v === "admite" || v === "pruebas";
 
 export type ActoFinalForm = {
   archivo: File | null;
@@ -51,7 +55,7 @@ export function validarActoFinal(f: ActoFinalForm, variante: VarianteActoFinal):
   if (!f.clase_acto) return "Seleccione el tipo de acto (AUTO o RES)";
   if (!numeradoValido(f.numerado)) return "El numerado debe ser un número de 1 a 4 dígitos";
   if (!fechaValida(f.fecha_numerado)) return "Indique la fecha de numerado";
-  if (variante === "admite") {
+  if (conTecnicoVisita(variante)) {
     if (!f.tecnico_id) return "Seleccione el técnico encargado del concepto";
     if (!fechaValida(f.fecha_visita_tecnica)) return "Indique la fecha de visita técnica";
   }
@@ -73,7 +77,7 @@ export function bodyActoFinal(f: ActoFinalForm, variante: VarianteActoFinal, fil
     numerado: numeradoParaEnviar(f.numerado),
     fecha_numerado: f.fecha_numerado,
   };
-  if (variante === "admite") {
+  if (conTecnicoVisita(variante)) {
     body.tecnico_id = f.tecnico_id;
     body.fecha_visita_tecnica = f.fecha_visita_tecnica;
   }

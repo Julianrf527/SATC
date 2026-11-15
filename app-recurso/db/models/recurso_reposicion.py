@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Date, Index
+from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, Date, Index, text
 from sqlalchemy.orm import relationship
 from .base import Base, VersionadoMixin
 from .enums import resultado_recurso_enum
@@ -15,9 +15,11 @@ class RecursoReposicion(VersionadoMixin, Base):
     fecha_radicado = Column(Date, nullable=False)
     resultado = Column(resultado_recurso_enum)
     doc_recurso_id = Column(Integer, nullable=False)
+    requiere_pruebas = Column(Boolean, nullable=False, default=False, server_default=text("false"))
 
     decision = relationship("Decision", back_populates="recurso_reposicion")
     acto_administrativo = relationship("ActoAdministrativo")
+    practica_pruebas = relationship("PracticaPruebas", back_populates="recurso", uselist=False, cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('ix_recurso_reposicion_encargado', 'encargado_acto_id'),

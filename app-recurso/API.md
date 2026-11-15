@@ -262,7 +262,8 @@ filename="concesion_CA_001-26_completo.pdf"`). Usar como descarga de blob
 comunicación, citaciones/notificaciones, oficio Alcaldía, fijación del aviso,
 constancia de fijación, anexos) → actos que reconocen terceros → concepto
 técnico + anexos → requerimiento (acto, respuesta, concepto adicional) →
-decisión → recurso de reposición (escrito, acto) → memorias de cálculo
+decisión → recurso de reposición (escrito, práctica de pruebas: auto que la
+decreta, concepto técnico y anexos; acto que lo resuelve) → memorias de cálculo
 (planos, concepto, requerimiento, subsanación, acto) → recibo de obras
 (informes, conceptos, requerimiento, acto). Solo documentos finales (no las
 versiones en revisión). Un archivo repetido aparece una vez.
@@ -287,9 +288,9 @@ Reglas comunes:
   | tipo_documento | etapa_tipo | Pasos |
   |---|---|---|
   | `AUTO_ADMITE`, `REQUERIMIENTO`, `APRUEBA_MEMORIAS` | acto_admite / requerimiento / memorias_calculo | líder jurídico → líder del proyecto |
-  | `DECISION`, `RECURSO` | decision / recurso_reposicion | líder jurídico → líder del proyecto **y** asesora de subdirección |
+  | `DECISION`, `RECURSO`, `AUTO_PRUEBAS` | decision / recurso_reposicion / practica_pruebas | líder jurídico → líder del proyecto **y** asesora de subdirección |
   | `RECONOCE_TERCERO`, `APRUEBA_OBRAS` | expediente_involucrado / recibo_satisfaccion_obras | provisional: como AUTO_ADMITE (`TODO(negocio)`) |
-  | `CONCEPTO_ETAPA2` | concepto_tecnico | líder técnico **y** SIG → líder del proyecto |
+  | `CONCEPTO_ETAPA2`, `CONCEPTO_PRUEBAS` | concepto_tecnico | líder técnico **y** SIG → líder del proyecto |
   | `CONCEPTO_ADICIONAL`, `CONCEPTO_MEMORIAS`, `CONCEPTO_SUBSANACION`, `CONCEPTO_OBRAS`, `CONCEPTO_OBRAS_SEGUNDO` | concepto_tecnico | líder técnico |
 
 - Flujo: el proceso nace en `pendiente_carga` al asignarse el encargado (lo crea
@@ -549,7 +550,8 @@ envía `"0012"`). Fechas `AAAA-MM-DD`.
 **Comunicar vs. notificar** (regla del área, 14/10/2026; una sola definición:
 `ACTOS_SOLO_COMUNICACION` en `services/actos.py`, replicada en el front por
 `seComunica` de `etapas/comun/actoFeature.ts`): **solo se comunican** —y nunca se
-notifican— `AUTO_ADMITE` y `RECONOCE_TERCERO`; todos los demás actos **solo se
+notifican— `AUTO_ADMITE`, `RECONOCE_TERCERO` y `AUTO_PRUEBAS` (auto que admite y
+decreta práctica de pruebas); todos los demás actos **solo se
 notifican** y no llevan comunicación. `POST /actos/notificaciones` sobre un acto que
 solo se comunica → 400 "Este acto solo se comunica; no se notifica";
 `POST /actos/comunicaciones` sobre un acto que solo se notifica → 400 "Este acto
@@ -787,6 +789,7 @@ para el cargue directo); los de requerimiento, `ambito`.
 | `registrar_respuesta` | requerimiento etapa 3 (tras el acto) | C.5 |
 | `registrar_ejecutoria` | decisión (tras el acto) | C.6 |
 | `crear_recurso` | `decision.recurso` | C.6 |
+| `editar_requiere_pruebas` | `decision.recurso` (cuando el cambio es posible) | C.6 `PUT .../recurso/requiere-pruebas` |
 | `registrar_planos`, `registrar_subsanacion` | memorias | C.7 |
 | `registrar_informe_usuario`, `registrar_nuevo_informe` | obras | C.8 |
 | `vincular_tercero` (raíz), `editar_representante`, `desvincular` | terceros | C.10 |
@@ -805,13 +808,13 @@ para el cargue directo); los de requerimiento, `ambito`.
 con técnico + fecha de visita y su proceso `CONCEPTO_ETAPA2` (encargado = técnico, que
 recibe aviso). `documentos` solo después del acto.
 
-### C.4 Conceptos técnicos (`tipo` = `etapa2|adicional|memorias|subsanacion|obras|obras_segundo`)
+### C.4 Conceptos técnicos (`tipo` = `etapa2|adicional|memorias|subsanacion|obras|obras_segundo|pruebas`)
 
 | Método | Ruta | Permiso | Body |
 |---|---|---|---|
 | GET | `/etapas/tecnicos` | gestión | → `[{id, nombre, correo}]` (usuarios con `recurso_tecnico`) |
 | GET | `/etapas/abogados` | gestión | → `[{id, nombre, correo}]` (usuarios con `recurso_gestionar`; encargado en super gestión, C.9) |
-| POST | `/etapas/{exp}/conceptos/{tipo}/tecnico` | gestión; `adicional`: encargado del requerimiento | `{tecnico_id}` (no aplica a `etapa2`) |
+| POST | `/etapas/{exp}/conceptos/{tipo}/tecnico` | gestión; `adicional`: encargado del requerimiento | `{tecnico_id}` (no aplica a `etapa2` ni a `pruebas`: nacen con su auto) |
 | POST | `/etapas/{exp}/conceptos/{tipo}/version-final` | **técnico seleccionado** (`recurso_tecnico`) | `ConceptoFinal` |
 | GET | `/etapas/conceptos/{concepto_id}` | técnico seleccionado o lectura | — |
 | POST | `/etapas/conceptos/{concepto_id}/version-final` | **técnico seleccionado** | `ConceptoFinal` |
@@ -820,7 +823,8 @@ recibe aviso). `documentos` solo después del acto.
 caudal_fuente?, caudal_disponible?, caudal_otorgado?, num_usuarios?, cumple?}`. Obligatorios por tipo:
 `etapa2`: los 3 caudales + `num_usuarios`; `adicional`: ninguno extra (caudales opcionales,
 `TODO(negocio)`); `memorias` / `subsanacion`: `cumple`; `obras` / `obras_segundo`: `cumple` +
-`fecha_visita_tecnica` (la diligencia el técnico). Los campos que no aplican al tipo se ignoran.
+`fecha_visita_tecnica` (la diligencia el técnico); `pruebas`: solo el PDF y `fecha_aceptacion`.
+Los campos que no aplican al tipo se ignoran.
 
 **Campos del concepto** (una sola fuente: `CAMPOS_CONCEPTO` / `definicion_campos_concepto`
 en `services/etapas.py`). Vienen en `campos` del nodo de concepto del árbol (C.2) y de
@@ -889,14 +893,44 @@ de memorias / de obras dice `cumple = false`). La respuesta va después del acto
 | POST | `/etapas/{exp}/decision/asignarme` | gestión | — (V4 + V7: constancia de fijación; no requiere concepto) |
 | POST | `/etapas/{exp}/decision/version-final` | encargado | `ActoFinal` + `decision` (`OTORGADA|NEGADA|DESISTIDA`) + `requiere_memorias` (obligatorio si OTORGADA; V8) |
 | PUT | `/etapas/{exp}/decision/ejecutoria` | encargado (o super) | `{version, fecha_ejecutoria}` (`null` la borra) |
-| POST | `/etapas/{exp}/recurso` | gestión | `Radicado` → `201` (V13: decisión notificada) |
-| POST | `/etapas/{exp}/recurso/asignarme` | gestión | — (UPDATE atómico) |
-| POST | `/etapas/{exp}/recurso/version-final` | encargado | `ActoFinal` + `resultado` (`REPONE|CONFIRMA|MODIFICA|ADICIONA`) |
+| POST | `/etapas/{exp}/recurso` | gestión | `Radicado` + `requiere_pruebas` (obligatorio) → `201` (V13: decisión notificada) |
+| PUT | `/etapas/{exp}/recurso/requiere-pruebas` | gestión (cualquier abogado) | `{version, requiere_pruebas, confirmar_eliminar_pruebas?}` |
+| POST | `/etapas/{exp}/recurso/pruebas/asignarme` | gestión (cualquier abogado) | — (solo si `requiere_pruebas`) |
+| POST | `/etapas/{exp}/recurso/pruebas/version-final` | encargado | `ActoFinal` (`AUTO_PRUEBAS`) + `tecnico_id` + `fecha_visita_tecnica` |
+| POST | `/etapas/{exp}/recurso/asignarme` | gestión | — (UPDATE atómico; con pruebas, tras el concepto de pruebas firmado) |
+| POST | `/etapas/{exp}/recurso/version-final` | encargado | `ActoFinal` + `resultado` (`REPONE|CONFIRMA|MODIFICA|ADICIONA`) (mismo bloqueo) |
 
 `Radicado`: `{radicado (≤15), fecha_radicado, file_id}`. La decisión se toma una sola vez
 (segunda carga → 409). `fecha_ejecutoria` la diligencia el abogado: `TODO(negocio)` (no
 hay calendario de días hábiles). "Notificada" = regla provisional de B (≥1 notificación
 y todas exitosas).
+
+**Práctica de pruebas.** «¿Requiere práctica de pruebas?» (`requiere_pruebas`) se responde
+al crear el recurso (los recursos anteriores al campo quedan en «No»):
+
+- **No**: un abogado se asigna directo el acto que resuelve.
+- **Sí**: cualquier abogado se asigna el **auto que admite y decreta práctica de pruebas**
+  (fila `practica_pruebas`, proceso `AUTO_PRUEBAS`, mismos revisores que el acto que
+  resuelve; el acto **solo se comunica**). Su versión final lleva técnico y fecha de visita
+  (sin aviso de plazo) y hace nacer el **concepto técnico de pruebas** (`tipo = pruebas`,
+  proceso `CONCEPTO_PRUEBAS`, mismos revisores que el de la etapa 2; su versión final solo
+  pide el PDF y la fecha del concepto). Mientras ese concepto no esté firmado, asignarse o
+  cargar el acto que resuelve → 400 "Primero debe cargarse el concepto técnico de la
+  práctica de pruebas" (en el árbol: `motivos_bloqueo` del nodo `recurso`, aunque exista).
+
+Cambiar la respuesta (`PUT .../requiere-pruebas`, también vía super gestión):
+
+- Sí → No: bloqueado (400) si ya existe el concepto de pruebas. Si la práctica está
+  iniciada (auto asignado o cargado), responde **409** con el aviso de lo que se elimina
+  (`aviso_eliminar_pruebas` en el nodo); con `confirmar_eliminar_pruebas: true` se borran
+  la fila, su acto (con la comunicación), su proceso y sus anexos.
+- No → Sí: bloqueado (400) si el acto que resuelve ya está cargado; si alguien ya se
+  había asignado el acto que resuelve, la asignación se conserva (queda esperando al
+  concepto de pruebas).
+
+En el árbol, `decision.recurso` trae `datos.requiere_pruebas` y `pruebas` (nodo de acto
+`codigo = "pruebas"`, `etapa_tipo = "practica_pruebas"`, con `concepto` = nodo de concepto
+`tipo = "pruebas"`), o `null` si el recurso no requiere pruebas.
 
 ### C.7 Etapa 5 · Memorias de cálculo
 
@@ -945,7 +979,8 @@ DISENO_TECNICO §2.)
 | `/super-gestion/{exp}/conceptos/{tipo}` | `{version?, tecnico_encargado_id (para crear), fecha_visita_tecnica?, fecha_aceptacion?, caudales?, num_usuarios?, cumple?, file_id?}` (`file_id` = concepto firmado; cierra su proceso). El padre debe existir |
 | `/super-gestion/{exp}/requerimientos/{ambito}` | `{version?, encargado_acto_id?, acto?, radicado_oficio_entrada?, fecha_oficio_entrada?, doc_oficio_entrada_id?}` (la respuesta solo aplica a `etapa3`) |
 | `/super-gestion/{exp}/decision` | `{version?, encargado_acto_id?, acto?, decision?, requiere_memorias?, fecha_ejecutoria?}` |
-| `/super-gestion/{exp}/recurso` | `{version?, radicado?, fecha_radicado?, file_id?, encargado_acto_id?, acto?, resultado?}` (requiere decisión) |
+| `/super-gestion/{exp}/recurso` | `{version?, radicado?, fecha_radicado?, file_id?, encargado_acto_id?, acto?, resultado?, requiere_pruebas?, confirmar_eliminar_pruebas?}` (requiere decisión; al crear sin `requiere_pruebas` queda en «No»; el cambio sigue las reglas de C.6) |
+| `/super-gestion/{exp}/recurso/pruebas` | `{version?, encargado_acto_id?, acto?, tecnico_id?, fecha_visita_tecnica?}` (solo si el recurso requiere pruebas; con `tecnico_id` nace el concepto de pruebas con su proceso; el concepto se carga por `/conceptos/pruebas`) |
 | `/super-gestion/{exp}/memorias` | `{version?, radicado?, fecha_radicado?, file_id? (planos), encargado_acto_id?, acto?}` |
 | `/super-gestion/{exp}/memorias/subsanacion` | `{radicado?, fecha_radicado?, file_id?}` |
 | `/super-gestion/{exp}/obras` | `{version?, radicado?, fecha_radicado?, file_id? (informe), encargado_acto_id?, acto?}` |
@@ -991,10 +1026,10 @@ Las filas de `GET /mis-documentos` y el detalle `GET /revision-documentos/{id}` 
 
 - `etapa_padre`: etapa del plan (pestaña) a la que pertenece el documento:
   `acto_admite`, `concepto_tecnico` (etapa 2), `requerimiento` (etapa 3, incluido su
-  concepto adicional), `decision` (incluido el recurso), `memorias_calculo`,
+  concepto adicional), `decision` (incluido el recurso y su práctica de pruebas), `memorias_calculo`,
   `recibo_satisfaccion_obras`, `tercero_interviniente`.
 - `etapa_padre_etiqueta`: p. ej. `"Etapa 5 · Memorias de cálculo"`.
 - `sub_proceso`: `auto_admite`, `concepto_etapa2`, `concepto_adicional`,
   `requerimiento_etapa3` | `requerimiento_memorias` | `requerimiento_obras`, `decision`,
-  `recurso`, `concepto_memorias`, `concepto_subsanacion`, `concepto_obras`,
+  `recurso`, `auto_pruebas`, `concepto_pruebas`, `concepto_memorias`, `concepto_subsanacion`, `concepto_obras`,
   `concepto_obras_segundo`, `aprobacion`, `reconoce_tercero`.

@@ -65,7 +65,8 @@ async def test_ejecutoria(client, rv_permisos, con_decision, db_session):
 async def test_recurso_v13_y_acto(client, rv_permisos, con_decision, catalogo, db_session):
     stubs = rv_permisos
     exp_id, data = await con_decision("NEGADA", None)
-    radicado = {"radicado": "2026ER5555", "fecha_radicado": "2026-06-10", "file_id": stubs.files.registrar()}
+    radicado = {"radicado": "2026ER5555", "fecha_radicado": "2026-06-10", "file_id": stubs.files.registrar(),
+                "requiere_pruebas": False}
     # V13: decisión no notificada
     r = await post(client, f"/etapas/{exp_id}/recurso", json=radicado, esperado=400)
     assert "V13" in r.json()["detail"]

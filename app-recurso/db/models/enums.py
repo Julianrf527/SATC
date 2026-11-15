@@ -12,6 +12,8 @@ class TipoActo(str, enum.Enum):
     RECONOCE_TERCERO = "RECONOCE_TERCERO"
     DECISION = "DECISION"
     RECURSO = "RECURSO"
+    # Auto que admite y decreta práctica de pruebas (dentro del recurso).
+    AUTO_PRUEBAS = "AUTO_PRUEBAS"
     APRUEBA_MEMORIAS = "APRUEBA_MEMORIAS"
     APRUEBA_OBRAS = "APRUEBA_OBRAS"
 

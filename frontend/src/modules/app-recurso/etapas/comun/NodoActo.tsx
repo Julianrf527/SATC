@@ -105,12 +105,9 @@ export default function NodoActo({
       anidada={anidada}
     >
       <div className="space-y-4">
-        {!nodo.existe && (
-          <>
-            <MotivosBloqueo motivos={nodo.motivos_bloqueo} />
-            {nodo.habilitada && <p className="text-sm text-base-content/60">{pendiente}</p>}
-          </>
-        )}
+        {/* También en nodos que existen: p. ej. el acto que resuelve el recurso espera al concepto de pruebas. */}
+        <MotivosBloqueo motivos={nodo.motivos_bloqueo} />
+        {!nodo.existe && nodo.habilitada && <p className="text-sm text-base-content/60">{pendiente}</p>}
 
         {(nodo.existe || datos) && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
