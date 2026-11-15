@@ -17,7 +17,7 @@ const CAMPOS_ETAPA2: CamposConcepto = {
 describe("seccionesSuper (C.9)", () => {
   it("cada nodo lleva sus secciones", () => {
     const admite = seccionesSuper({ clase: "admite" }, false);
-    expect(admite).toMatchObject({ acto: true, docsAdmite: true, tecnicoVisita: true });
+    expect(admite).toMatchObject({ acto: true, docsAdmite: true, tecnicoVisita: { avisoVisita: true } });
     expect(seccionesSuper({ clase: "admite" }, true).acto).toBe(false);
     expect(seccionesSuper({ clase: "requerimiento", ambito: "etapa3" }, false).respuesta).toBe(true);
     expect(seccionesSuper({ clase: "requerimiento", ambito: "obras" }, false).respuesta).toBe(false);

@@ -35,6 +35,7 @@ from db.models import (
     MemoriasCalculo,
     Notificacion,
     ReciboSatisfaccionObras,
+    PracticaPruebas,
     RecursoReposicion,
     Requerimiento,
     TipoActo,
@@ -54,7 +55,7 @@ ANIO_CONTROL_DUPLICADOS = 2012  # infraction solo controla duplicados desde 2013
 #   distinguir), así que no hay notificaciones por persona.
 # - Todos los demás actos SOLO se notifican (una fila por persona) y no tienen
 #   comunicación.
-ACTOS_SOLO_COMUNICACION = frozenset({TipoActo.AUTO_ADMITE, TipoActo.RECONOCE_TERCERO})
+ACTOS_SOLO_COMUNICACION = frozenset({TipoActo.AUTO_ADMITE, TipoActo.RECONOCE_TERCERO, TipoActo.AUTO_PRUEBAS})
 MSG_SIN_NOTIFICACION = "Este acto solo se comunica; no se notifica"
 MSG_SIN_COMUNICACION = "Este acto solo se notifica; no se comunica"
 
@@ -218,6 +219,7 @@ TABLAS_CON_ACTO: tuple[tuple[str, type], ...] = (
     ("requerimiento", Requerimiento),
     ("decision", Decision),
     ("recurso_reposicion", RecursoReposicion),
+    ("practica_pruebas", PracticaPruebas),
     ("memorias_calculo", MemoriasCalculo),
     ("recibo_satisfaccion_obras", ReciboSatisfaccionObras),
     ("expediente_involucrado", ExpedienteInvolucrado),
@@ -260,6 +262,12 @@ async def etapa_de_acto(db: AsyncSession, acto_id: int) -> Optional[EtapaActo]:
             expediente_id = await _expediente_de_requerimiento(db, fila)
         elif etapa_tipo == "recurso_reposicion":
             expediente_id = await db.scalar(select(Decision.expediente_id).where(Decision.id == fila.decision_id))
+        elif etapa_tipo == "practica_pruebas":
+            expediente_id = await db.scalar(
+                select(Decision.expediente_id)
+                .join(RecursoReposicion, RecursoReposicion.decision_id == Decision.id)
+                .where(RecursoReposicion.id == fila.recurso_id)
+            )
         else:
             expediente_id = fila.expediente_id
         if etapa_tipo == "expediente_involucrado":

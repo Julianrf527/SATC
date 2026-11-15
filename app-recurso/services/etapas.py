@@ -40,6 +40,7 @@ from db.models import (
     InformeUsuario,
     MemoriasCalculo,
     ReciboSatisfaccionObras,
+    PracticaPruebas,
     RecursoReposicion,
     Requerimiento,
     Subsanacion,
@@ -90,6 +91,7 @@ TIPOS_CONCEPTO: dict[str, str] = {
     "subsanacion": "CONCEPTO_SUBSANACION",
     "obras": "CONCEPTO_OBRAS",
     "obras_segundo": "CONCEPTO_OBRAS_SEGUNDO",
+    "pruebas": "CONCEPTO_PRUEBAS",
 }
 
 ETIQUETAS_CONCEPTO: dict[str, str] = {
@@ -99,6 +101,7 @@ ETIQUETAS_CONCEPTO: dict[str, str] = {
     "subsanacion": "Concepto técnico de la subsanación",
     "obras": "Concepto técnico de obras",
     "obras_segundo": "Segundo concepto técnico de obras",
+    "pruebas": "Concepto técnico de la práctica de pruebas",
 }
 
 # tipo de concepto → (atributo del padre en Estado, columna del padre que lo referencia).
@@ -108,6 +111,7 @@ PADRES_CONCEPTO: dict[str, tuple[str, str]] = {
     "subsanacion": ("subsanacion", "concepto_tecnico_id"),
     "obras": ("obras", "concepto_tecnico_id"),
     "obras_segundo": ("obras", "concepto_tecnico_segundo_id"),
+    "pruebas": ("pruebas", "concepto_tecnico_id"),
 }
 
 # ─── Campos que el técnico diligencia en cada concepto (UNA sola fuente) ───
@@ -128,6 +132,8 @@ CAMPOS_CONCEPTO: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "subsanacion": (("cumple",), ("cumple",)),
     "obras": (("cumple", "fecha_visita_tecnica"), ("cumple", "fecha_visita_tecnica")),
     "obras_segundo": (("cumple", "fecha_visita_tecnica"), ("cumple", "fecha_visita_tecnica")),
+    # Práctica de pruebas: solo el PDF firmado y su fecha.
+    "pruebas": ((), ()),
 }
 
 # campo → (tipo de dato para el formulario, etiqueta). Tipos: fecha | decimal | entero | si_no.
@@ -195,7 +201,7 @@ ETIQUETAS_REQUERIMIENTO: dict[str, str] = {
 # Todas las filas de etapa de un expediente (anexos, procesos, pertenencia).
 ETAPA_TIPOS = (
     "acto_admite", "expediente_involucrado", "concepto_tecnico", "requerimiento", "decision",
-    "recurso_reposicion", "memorias_calculo", "subsanacion", "recibo_satisfaccion_obras", "informe_usuario",
+    "recurso_reposicion", "practica_pruebas", "memorias_calculo", "subsanacion", "recibo_satisfaccion_obras", "informe_usuario",
 )
 # Filas que admiten documentos anexos: todas menos el tercero interviniente
 # (expediente_involucrado), que no lleva anexos (aclaración del área, 13/10/2026).
@@ -245,6 +251,7 @@ class Estado:
     req3: Optional[Requerimiento] = None
     decision: Optional[Decision] = None
     recurso: Optional[RecursoReposicion] = None
+    pruebas: Optional[PracticaPruebas] = None
     memorias: Optional[MemoriasCalculo] = None
     subsanacion: Optional[Subsanacion] = None
     obras: Optional[ReciboSatisfaccionObras] = None
@@ -280,6 +287,8 @@ class Estado:
             return self._concepto(self.obras.concepto_tecnico_id) if self.obras else None
         if tipo == "obras_segundo":
             return self._concepto(self.obras.concepto_tecnico_segundo_id) if self.obras else None
+        if tipo == "pruebas":
+            return self._concepto(self.pruebas.concepto_tecnico_id) if self.pruebas else None
         raise HTTPException(status_code=404, detail=f"Tipo de concepto desconocido: {tipo}")
 
     def requerimiento(self, ambito: str) -> Optional[Requerimiento]:
@@ -316,6 +325,7 @@ class Estado:
         res: dict[str, set[int]] = {t: set() for t in ETAPA_TIPOS}
         for t, fila in (
             ("acto_admite", self.admite), ("decision", self.decision), ("recurso_reposicion", self.recurso),
+            ("practica_pruebas", self.pruebas),
             ("memorias_calculo", self.memorias), ("subsanacion", self.subsanacion),
             ("recibo_satisfaccion_obras", self.obras),
         ):
@@ -358,6 +368,8 @@ async def cargar_estado(db: AsyncSession, expediente: Expediente) -> Estado:
     e.decision = await _una(db, Decision, Decision.expediente_id == exp_id)
     if e.decision is not None:
         e.recurso = await _una(db, RecursoReposicion, RecursoReposicion.decision_id == e.decision.id)
+    if e.recurso is not None:
+        e.pruebas = await _una(db, PracticaPruebas, PracticaPruebas.recurso_id == e.recurso.id)
     e.memorias = await _una(db, MemoriasCalculo, MemoriasCalculo.expediente_id == exp_id)
     if e.memorias is not None and e.memorias.subsanacion_id:
         e.subsanacion = await _una(db, Subsanacion, Subsanacion.id == e.memorias.subsanacion_id)
@@ -375,6 +387,7 @@ async def cargar_estado(db: AsyncSession, expediente: Expediente) -> Estado:
         e.subsanacion.concepto_tecnico_id if e.subsanacion else None,
         e.obras.concepto_tecnico_id if e.obras else None,
         e.obras.concepto_tecnico_segundo_id if e.obras else None,
+        e.pruebas.concepto_tecnico_id if e.pruebas else None,
     ])
     if e.concepto2 is not None:
         e.conceptos[e.concepto2.id] = e.concepto2
@@ -387,7 +400,7 @@ async def cargar_estado(db: AsyncSession, expediente: Expediente) -> Estado:
     if e.obras is not None:
         e.informes = await _por_ids(db, InformeUsuario, [e.obras.informe_usuario_id, e.obras.nuevo_informe_usuario_id])
 
-    acto_ids = [f.acto_admin_id for f in (e.admite, e.decision, e.recurso, e.memorias, e.obras) if f is not None]
+    acto_ids = [f.acto_admin_id for f in (e.admite, e.decision, e.recurso, e.pruebas, e.memorias, e.obras) if f is not None]
     acto_ids += [r.acto_admin_id for r in e.requerimientos.values()]
     acto_ids += [v.acto_admin_id for v in e.terceros]
     e.actos = await _por_ids(db, ActoAdministrativo, acto_ids)
@@ -684,6 +697,8 @@ _PADRE_POR_TIPO: dict[str, tuple[str, str]] = {
     "CONCEPTO_ADICIONAL": ("requerimiento", "concepto_adicional"),
     "DECISION": ("decision", "decision"),
     "RECURSO": ("decision", "recurso"),
+    "AUTO_PRUEBAS": ("decision", "auto_pruebas"),
+    "CONCEPTO_PRUEBAS": ("decision", "concepto_pruebas"),
     "CONCEPTO_MEMORIAS": ("memorias_calculo", "concepto_memorias"),
     "CONCEPTO_SUBSANACION": ("memorias_calculo", "concepto_subsanacion"),
     "APRUEBA_MEMORIAS": ("memorias_calculo", "aprobacion"),

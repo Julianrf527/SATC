@@ -12,7 +12,8 @@ Orden:
      aparecer durante el auto admite), por fecha de vinculación.
   2. Concepto técnico (etapa 2) + anexos.
   3. Requerimiento (etapa 3): acto, oficio de respuesta, concepto adicional, anexos.
-  4. Decisión: acto, anexos; recurso de reposición: escrito, acto que lo resuelve.
+  4. Decisión: acto, anexos; recurso de reposición: escrito, práctica de pruebas
+     (auto que la decreta, concepto técnico, anexos), acto que lo resuelve.
   5. Memorias de cálculo: planos, concepto, requerimiento, subsanación (planos
      ajustados + concepto), acto que aprueba.
   6. Recibo a satisfacción de obras: informe del usuario, concepto,
@@ -43,6 +44,7 @@ from db.models import (
     InformeUsuario,
     MemoriasCalculo,
     Notificacion,
+    PracticaPruebas,
     ReciboSatisfaccionObras,
     RecursoReposicion,
     Requerimiento,
@@ -114,6 +116,14 @@ class _Colector:
         await self.concepto(req.concepto_tecnico_id, f"Concepto técnico adicional ({nombre.lower()})")
         await self.anexos("requerimiento", req.id, nombre)
 
+    async def practica_pruebas(self, pruebas: PracticaPruebas | None) -> None:
+        if pruebas is None:
+            return
+        nombre = "Auto que admite y decreta práctica de pruebas"
+        await self.acto(pruebas.acto_admin_id, nombre)
+        await self.concepto(pruebas.concepto_tecnico_id, "Concepto técnico de la práctica de pruebas")
+        await self.anexos("practica_pruebas", pruebas.id, nombre)
+
     async def informe_usuario(self, informe_id: int | None, nombre: str) -> None:
         if not informe_id:
             return
@@ -168,6 +178,8 @@ async def _recorrer(db: AsyncSession, expediente: Expediente) -> _Colector:
         recurso = await db.scalar(select(RecursoReposicion).where(RecursoReposicion.decision_id == decision.id))
         if recurso:
             c.doc(recurso.doc_recurso_id, "Recurso de reposición")
+            await c.practica_pruebas(await db.scalar(
+                select(PracticaPruebas).where(PracticaPruebas.recurso_id == recurso.id)))
             await c.acto(recurso.acto_admin_id, "Acto que resuelve el recurso")
             await c.anexos("recurso_reposicion", recurso.id, "Recurso de reposición")
 

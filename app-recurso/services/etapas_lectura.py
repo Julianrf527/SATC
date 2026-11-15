@@ -63,8 +63,10 @@ ETIQUETAS_ETAPA: dict[str, str] = {
     "obras": "Etapa 6 · Recibo a satisfacción de obras",
 }
 
+ETIQUETA_AUTO_PRUEBAS = "Auto que admite y decreta práctica de pruebas"
+
 ETAPAS_CON_PROCESO = (
-    "acto_admite", "concepto_tecnico", "requerimiento", "decision", "recurso_reposicion",
+    "acto_admite", "concepto_tecnico", "requerimiento", "decision", "recurso_reposicion", "practica_pruebas",
     "memorias_calculo", "recibo_satisfaccion_obras", "expediente_involucrado",
 )
 
@@ -322,15 +324,39 @@ class _Lector:
             rec = self.nodo_acto("recurso", "Recurso de reposición", "recurso_reposicion", None, None, motivo,
                                  codigo_crear="crear_recurso")
         else:
-            rec = self.nodo_acto("recurso", "Recurso de reposición", "recurso_reposicion", r, r.encargado_acto_id, None)
+            # Con práctica de pruebas, el acto que resuelve espera al concepto de pruebas.
+            motivo = None if r.acto_admin_id else V.flujo_resuelve_recurso(e)
+            rec = self.nodo_acto("recurso", "Recurso de reposición", "recurso_reposicion", r, r.encargado_acto_id, motivo)
+            if motivo:
+                rec["motivos_bloqueo"].append(motivo)
+                rec["acciones_disponibles"] = [a for a in rec["acciones_disponibles"] if a != "cargar_version_final"]
+            if self.gestor and V.motivo_cambio_requiere_pruebas(e, not r.requiere_pruebas) is None:
+                rec["acciones_disponibles"].append("editar_requiere_pruebas")
+                if r.requiere_pruebas and e.pruebas is not None:
+                    rec["aviso_eliminar_pruebas"] = V.aviso_eliminar_practica_pruebas(e.pruebas)
         rec["datos"] = {
             "radicado": r.radicado if r else None,
             "fecha_radicado": _iso(r.fecha_radicado) if r else None,
             "doc_recurso_id": r.doc_recurso_id if r else None,
+            "requiere_pruebas": bool(r.requiere_pruebas) if r else None,
             "resultado": _valor(r.resultado) if r else None,
         }
+        rec["pruebas"] = self.practica_pruebas()
         n["recurso"] = self.cerrar(rec)
         return n
+
+    def practica_pruebas(self) -> Optional[dict]:
+        """Auto que admite y decreta práctica de pruebas + su concepto técnico.
+        Solo si el recurso requiere pruebas (o quedó la fila de un cargue)."""
+        e = self.e
+        p = e.pruebas
+        if e.recurso is None or (not e.recurso.requiere_pruebas and p is None):
+            return None
+        enc = p.encargado_acto_id if p else None
+        n = self.nodo_acto("pruebas", ETIQUETA_AUTO_PRUEBAS, "practica_pruebas", p, enc, V.flujo_auto_pruebas(e),
+                           asignable=p is None)
+        n["concepto"] = self.nodo_concepto("pruebas", V.flujo_concepto_pruebas(e), False)
+        return self.cerrar(n)
 
     def aprobacion(self, codigo: str, etiqueta: str, etapa_tipo: str, fila, motivo: Optional[str]) -> dict:
         """Acto que aprueba memorias / obras: vive en la fila de la etapa (su
@@ -453,7 +479,7 @@ async def _precargar(db: AsyncSession, lector: _Lector, permisos: frozenset[str]
             lector.notificaciones.setdefault(n.acto_admin_id, []).append(n)
 
     ids: set[int] = set()
-    for f in (e.admite, e.req3, e.decision, e.recurso, e.memorias, e.obras, *e.requerimientos.values()):
+    for f in (e.admite, e.req3, e.decision, e.recurso, e.pruebas, e.memorias, e.obras, *e.requerimientos.values()):
         if f is not None and f.encargado_acto_id:
             ids.add(f.encargado_acto_id)
     ids |= {c.tecnico_encargado_id for c in e.conceptos.values() if c.tecnico_encargado_id}

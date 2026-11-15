@@ -29,6 +29,8 @@ Desviación técnica del DBML: `concepto_tecnico.doc_concepto_tecnico_id` es **n
 
 Desviación del DBML (14/10/2026): `encargado_acto_id` de `acto_admite`, `requerimiento` y `decision` admite **NULL** (el DBML lo pone `not null`). Motivo: el cargue directo de super gestión (§2.1) de expedientes antiguos puede dejar la etapa **sin abogado encargado** si no se elige uno. Se aplica con `ALTER COLUMN ... DROP NOT NULL` en `db/migrations.py`. El flujo normal no cambia: "Asignarme" siempre crea la fila con el encargado. Con encargado NULL: no se crea proceso de revisión (`_sincronizar_proceso`), el árbol no ofrece "Asignarme" sobre la fila existente (`nodo_acto(asignable=False)`), y el acto lo gestiona solo super gestión (`puede_gestionar_acto`, V2). `etapa_de_acto`, `leer_etapas` y mis-documentos toleran el NULL.
 
+Práctica de pruebas del recurso de reposición (15/11/2026): `recurso_reposicion.requiere_pruebas` (BOOLEAN NOT NULL DEFAULT false; los recursos anteriores quedan en «No»), tabla nueva `practica_pruebas` (`recurso_id` único, `encargado_acto_id`, `acto_admin_id` único → acto `AUTO_PRUEBAS`, `concepto_tecnico_id` único) y valor `AUTO_PRUEBAS` en el enum `tipo_acto` (`ALTER TYPE ... ADD VALUE IF NOT EXISTS` en `db/migrations.py`). Flujo: con «Sí», cualquier abogado se asigna el auto que admite y decreta práctica de pruebas (solo se comunica); al cargar su versión final con técnico y fecha de visita nace el concepto técnico de pruebas (slug `pruebas`); con ese concepto firmado se habilita el acto que resuelve el recurso (`validaciones.flujo_resuelve_recurso`). Cambiar la respuesta: Sí → No se bloquea con el concepto de pruebas creado y, si la práctica está iniciada, la elimina previa confirmación (`services/eliminar_practica_pruebas.py`); No → Sí se bloquea con el acto que resuelve cargado. Estas reglas aplican también a super gestión.
+
 Columna añadida (14/10/2026): `comunicacion.fecha_creacion` (TIMESTAMPTZ, hora America/Bogota al crear; NULL en filas anteriores), mismo patrón que `acto_administrativo.fecha_creacion`.
 
 ## 3. Convenciones backend
@@ -56,9 +58,11 @@ Modelo: `documento_proceso` (+ version/revision/auditoria/revisor) con los mixin
 | `APRUEBA_MEMORIAS` | memorias_calculo | abogado | [{lider_juridico}], [{lider_proyecto}] |
 | `DECISION` | decision | abogado | [{lider_juridico}], [{lider_proyecto, asesora_subdireccion}] |
 | `RECURSO` | recurso_reposicion | abogado | [{lider_juridico}], [{lider_proyecto, asesora_subdireccion}] |
+| `AUTO_PRUEBAS` | practica_pruebas | abogado | igual que `RECURSO` |
 | `RECONOCE_TERCERO` | expediente_involucrado | abogado | `TODO(negocio)`: el plan no dice quién revisa. Provisional: igual que AUTO_ADMITE, configurable en un solo lugar |
 | `APRUEBA_OBRAS` | recibo_satisfaccion_obras | abogado | `TODO(negocio)` (plan §4-Etapa 6). Provisional: igual que AUTO_ADMITE |
 | `CONCEPTO_ETAPA2` | concepto_tecnico | técnico `tecnico_encargado_id` | [{lider_tecnico, sig}], [{lider_proyecto}] |
+| `CONCEPTO_PRUEBAS` | concepto_tecnico | técnico | igual que `CONCEPTO_ETAPA2` |
 | `CONCEPTO_ADICIONAL` | concepto_tecnico | técnico | [{lider_tecnico}] |
 | `CONCEPTO_MEMORIAS` / `CONCEPTO_SUBSANACION` / `CONCEPTO_OBRAS` / `CONCEPTO_OBRAS_SEGUNDO` | concepto_tecnico | técnico | [{lider_tecnico}] |
 
@@ -78,7 +82,7 @@ Modelo: `documento_proceso` (+ version/revision/auditoria/revisor) con los mixin
 
 1. "Asignarme para diligenciar" crea la fila de la etapa con `encargado_acto_id = yo` (unique de la etapa → 409 si otro llegó antes) o, si la fila ya existe sin encargado (recurso, memorias, obras), `asignar_encargado` atómico. Al asignarse se crea el `documento_proceso` en `pendiente_carga`.
 2. Proyección/revisión: endpoints genéricos `/revision-documentos/*`.
-3. "Cargar versión final" (por etapa): PDF firmado + datos que vienen escritos en el documento (numerado, fecha de numerado; en auto admite además técnico + fecha de visita → nace etapa 2). Crea `acto_administrativo` y lo enlaza.
+3. "Cargar versión final" (por etapa): PDF firmado + datos que vienen escritos en el documento (numerado, fecha de numerado; en auto admite además técnico + fecha de visita → nace etapa 2; en el auto de pruebas, técnico + fecha de visita → nace el concepto de pruebas). Crea `acto_administrativo` y lo enlaza.
 4. Notificación / comunicación: `/actos/*`.
 
 ## 6. Reparto de archivos (para no pisarse)

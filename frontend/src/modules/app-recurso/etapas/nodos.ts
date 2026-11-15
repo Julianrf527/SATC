@@ -13,6 +13,7 @@ export type RefNodo =
   | { clase: "requerimiento"; ambito: AmbitoRequerimiento }
   | { clase: "decision" }
   | { clase: "recurso" }
+  | { clase: "pruebas" }
   | { clase: "memorias" }
   | { clase: "subsanacion" }
   | { clase: "aprobacion_memorias" }
@@ -35,6 +36,8 @@ function rutaBase(ref: RefNodo): string | null {
       return "decision";
     case "recurso":
       return "recurso";
+    case "pruebas":
+      return "recurso/pruebas";
     case "aprobacion_memorias":
       return "memorias/aprobacion";
     case "aprobacion_obras":
@@ -58,9 +61,16 @@ export function urlVersionFinal(expedienteId: number, ref: RefNodo): string | nu
   return base ? RECURSO_ENDPOINTS.RECURSO_ETAPA_ACCION(expedienteId, `${base}/version-final`) : null;
 }
 
-/** POST seleccionar técnico de un concepto (no aplica a `etapa2`, C.4). */
+/** POST seleccionar técnico de un concepto (no aplica a `etapa2` ni a `pruebas`: nacen con su auto). */
 export function urlSeleccionarTecnico(expedienteId: number, tipo: TipoConcepto): string | null {
-  return tipo === "etapa2" ? null : RECURSO_ENDPOINTS.RECURSO_ETAPA_ACCION(expedienteId, `conceptos/${tipo}/tecnico`);
+  return tipo === "etapa2" || tipo === "pruebas"
+    ? null
+    : RECURSO_ENDPOINTS.RECURSO_ETAPA_ACCION(expedienteId, `conceptos/${tipo}/tecnico`);
+}
+
+/** PUT que cambia «¿Requiere práctica de pruebas?» del recurso. */
+export function urlRequierePruebas(expedienteId: number): string {
+  return RECURSO_ENDPOINTS.RECURSO_ETAPA_ACCION(expedienteId, "recurso/requiere-pruebas");
 }
 
 /** POST que registra un documento radicado por el usuario (`Radicado` → 201). */
@@ -100,6 +110,8 @@ export function urlSuperCargue(expedienteId: number, ref: RefNodo): string {
       return r("obras");
     case "nuevo_informe":
       return r("obras/nuevo-informe");
+    case "pruebas":
+      return r("recurso/pruebas");
     default:
       return r(ref.clase);
   }

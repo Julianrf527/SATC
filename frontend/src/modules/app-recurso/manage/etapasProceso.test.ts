@@ -19,6 +19,8 @@ describe("ETAPAS_RECURSO", () => {
 describe("pestanaDeDocumento", () => {
   it("usa la etapa_tipo del backend", () => {
     expect(pestanaDeDocumento("acto_admite", "AUTO_ADMITE")).toBe("auto-admite");
+    expect(pestanaDeDocumento("practica_pruebas", "AUTO_PRUEBAS")).toBe("decision");
+    expect(pestanaDeDocumento("concepto_tecnico", "CONCEPTO_PRUEBAS")).toBe("decision");
     expect(pestanaDeDocumento("recurso_reposicion", "RECURSO")).toBe("decision");
     expect(pestanaDeDocumento("expediente_involucrado")).toBe("info");
   });

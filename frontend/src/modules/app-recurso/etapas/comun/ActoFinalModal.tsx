@@ -6,6 +6,7 @@ import {
   bodyActoFinal,
   OPCIONES_DECISION,
   OPCIONES_RESULTADO,
+  conTecnicoVisita,
   validarActoFinal,
   type ActoFinalForm,
   type VarianteActoFinal,
@@ -31,6 +32,8 @@ const AYUDA: Record<VarianteActoFinal, string | null> = {
   simple: null,
   admite:
     "Diligencie el técnico y la fecha de visita escritos en el auto: con ellos nace la etapa 2 (concepto técnico) y el técnico recibe el aviso.",
+  pruebas:
+    "Diligencie el técnico y la fecha de visita escritos en el auto: con ellos nace el concepto técnico de la práctica de pruebas y el técnico recibe el aviso.",
   decision: "La decisión se toma una sola vez por expediente.",
   recurso: null,
 };
@@ -96,7 +99,7 @@ export default function ActoFinalModal({ expedienteId, url, titulo, variante, se
         requerido
       />
 
-      {variante === "admite" && (
+      {conTecnicoVisita(variante) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <CampoTecnico valor={form.tecnico_id} onChange={(v) => cambiar({ tecnico_id: v })} requerido />
           <CampoFecha

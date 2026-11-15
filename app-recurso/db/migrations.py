@@ -20,6 +20,11 @@ Cambios:
      y sin acción se completan una vez: REQUIERE si el expediente tiene
      requerimiento (etapa 3); si no, DECIDE si tiene decisión; si no tiene
      ninguno de los dos, REQUIERE.
+  5. Práctica de pruebas del recurso de reposición:
+     ``recurso_reposicion.requiere_pruebas`` (BOOLEAN NOT NULL DEFAULT false;
+     los recursos ya creados quedan en «No»), el valor ``AUTO_PRUEBAS`` del
+     tipo ``tipo_acto`` y la tabla ``practica_pruebas`` (la crea
+     ``create_all``).
 
 Corre en la transacción de ``init_db`` con ``pg_advisory_xact_lock`` para que
 varios workers de Gunicorn arrancando a la vez no ejecuten el DDL en paralelo.
@@ -67,6 +72,9 @@ _DDL = (
     END
     WHERE c.expediente_id IS NOT NULL AND c.doc_concepto_tecnico_id IS NOT NULL AND c.accion IS NULL
     """,
+    "ALTER TABLE recurso_reposicion ADD COLUMN IF NOT EXISTS requiere_pruebas BOOLEAN NOT NULL DEFAULT false",
+    # PG >= 12 admite ADD VALUE dentro de la transacción (el valor se usa tras el commit).
+    "ALTER TYPE tipo_acto ADD VALUE IF NOT EXISTS 'AUTO_PRUEBAS'",
 )
 
 

@@ -202,11 +202,12 @@ def _form_com(exp_id, acto_id, stubs):
 def test_regla_comunicar_notificar():
     from services.actos import ACTOS_SOLO_COMUNICACION, se_comunica, se_notifica
 
-    assert ACTOS_SOLO_COMUNICACION == {TipoActo.AUTO_ADMITE, TipoActo.RECONOCE_TERCERO}
+    assert ACTOS_SOLO_COMUNICACION == {TipoActo.AUTO_ADMITE, TipoActo.RECONOCE_TERCERO, TipoActo.AUTO_PRUEBAS}
     for tipo in TipoActo:
         assert se_comunica(tipo) != se_notifica(tipo)
         assert se_comunica(tipo.value) == se_comunica(tipo)
     assert se_comunica("RECONOCE_TERCERO") and not se_notifica("RECONOCE_TERCERO")
+    assert se_comunica("AUTO_PRUEBAS") and not se_notifica("AUTO_PRUEBAS")
     assert se_notifica("DECISION") and not se_comunica("DECISION")
 
 

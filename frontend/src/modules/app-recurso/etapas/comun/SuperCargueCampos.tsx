@@ -169,7 +169,7 @@ export default function SuperCargueCampos({ s, form, cambiar, existe, actuales }
       )}
 
       {s.tecnicoVisita && (
-        <Seccion titulo="Técnico y visita (nace el concepto de la etapa 2)">
+        <Seccion titulo={`Técnico y visita (nace ${s.tecnicoVisita.concepto})`}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <CampoTecnico valor={form.tecnico_id} onChange={(tecnico_id) => cambiar({ tecnico_id })} />
             <CampoFecha
@@ -180,7 +180,9 @@ export default function SuperCargueCampos({ s, form, cambiar, existe, actuales }
             />
           </div>
           {/* Con una sola fecha en el formulario, el backend avisa al guardar con la guardada. */}
-          <AvisoFechaVisita fechaNumerado={form.acto.fecha_numerado} fechaVisita={form.fecha_visita_tecnica} />
+          {s.tecnicoVisita.avisoVisita && (
+            <AvisoFechaVisita fechaNumerado={form.acto.fecha_numerado} fechaVisita={form.fecha_visita_tecnica} />
+          )}
         </Seccion>
       )}
 

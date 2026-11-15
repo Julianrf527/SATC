@@ -60,6 +60,7 @@ const POR_ETAPA_TIPO: Record<string, EtapaTabId> = {
   requerimiento: "requerimiento",
   decision: "decision",
   recurso_reposicion: "decision",
+  practica_pruebas: "decision",
   memorias_calculo: "memorias",
   recibo_satisfaccion_obras: "obras",
   expediente_involucrado: "info",
@@ -78,6 +79,8 @@ const POR_TIPO_DOCUMENTO: Record<string, EtapaTabId> = {
   APRUEBA_MEMORIAS: "memorias",
   CONCEPTO_OBRAS: "obras",
   CONCEPTO_OBRAS_SEGUNDO: "obras",
+  CONCEPTO_PRUEBAS: "decision",
+  AUTO_PRUEBAS: "decision",
   APRUEBA_OBRAS: "obras",
   RECONOCE_TERCERO: "info",
 };

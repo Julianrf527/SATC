@@ -4,9 +4,16 @@
 - ``POST /etapas/{expediente_id}/decision/version-final``: acto firmado +
   ``decision`` (OTORGADA/NEGADA/DESISTIDA, una sola vez) + ``requiere_memorias`` (V8)
 - ``PUT  /etapas/{expediente_id}/decision/ejecutoria``: fecha de ejecutoria
-- ``POST /etapas/{expediente_id}/recurso``: el usuario radica el recurso (V13)
+- ``POST /etapas/{expediente_id}/recurso``: el usuario radica el recurso (V13) y se
+  responde «¿Requiere práctica de pruebas?» (``requiere_pruebas``)
+- ``PUT  /etapas/{expediente_id}/recurso/requiere-pruebas``: cambia la respuesta
+- ``POST /etapas/{expediente_id}/recurso/pruebas/asignarme``: auto que admite y
+  decreta práctica de pruebas (solo si ``requiere_pruebas``)
+- ``POST /etapas/{expediente_id}/recurso/pruebas/version-final``: auto firmado +
+  técnico y fecha de visita → nace el concepto técnico de la práctica de pruebas
 - ``POST /etapas/{expediente_id}/recurso/asignarme``
 - ``POST /etapas/{expediente_id}/recurso/version-final``: acto que lo resuelve + ``resultado``
+  (si requiere pruebas, después del concepto técnico de pruebas firmado)
 
 La citación y notificación de cada acto se gestiona en ``/actos/notificaciones`` (B).
 """
@@ -20,25 +27,40 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.acceso import requiere_gestion
 from db.deps import get_db_managed
-from db.models import Decision, RecursoReposicion, ResultadoRecurso, TipoActo, TipoDecision
-from services.concurrencia import MSG_ASIGNADO, actualizar_versionado, bloquear_expediente, integridad_a_409
+from db.models import Decision, PracticaPruebas, RecursoReposicion, ResultadoRecurso, TipoActo, TipoDecision
+from services.concurrencia import MSG_ASIGNADO, MSG_MODIFICADO, actualizar_versionado, bloquear_expediente, integridad_a_409
+from services.eliminar_practica_pruebas import eliminar_practica_pruebas
 from services.etapas import (
+    MSG_NO_TECNICO,
     ActoFinalIn,
     RadicadoIn,
     asignar_fila_existente,
     auditar,
     cargar_acto_final,
     cargar_estado,
+    crear_concepto,
     crear_fila_asignada,
     datos_fila,
+    es_tecnico,
     exigir,
     exigir_encargado,
+    liberar_archivos,
     ok,
     registrar_archivos,
     validar_pdf,
 )
 from services.revision_documentos import Avisos
-from services.validaciones import flujo_ejecutoria, v7_decision, v8_requiere_memorias, v13_recurso
+from services.validaciones import (
+    MSG_SIN_RECURSO,
+    aviso_eliminar_practica_pruebas,
+    flujo_auto_pruebas,
+    flujo_ejecutoria,
+    flujo_resuelve_recurso,
+    motivo_cambio_requiere_pruebas,
+    v7_decision,
+    v8_requiere_memorias,
+    v13_recurso,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -61,6 +83,24 @@ class EjecutoriaIn(BaseModel):
 
 class RecursoFinalIn(ActoFinalIn):
     resultado: ResultadoRecurso
+
+
+class RecursoIn(RadicadoIn):
+    requiere_pruebas: bool = Field(..., description="«¿Requiere práctica de pruebas?»")
+
+
+class RequierePruebasIn(BaseModel):
+    version: int = Field(..., ge=1, description="Versión del recurso")
+    requiere_pruebas: bool
+    confirmar_eliminar_pruebas: bool = Field(
+        False, description="Sí → No con la práctica iniciada: confirma que se elimina")
+
+
+class AutoPruebasFinalIn(ActoFinalIn):
+    """Además del acto: técnico y fecha de visita del concepto de pruebas."""
+
+    tecnico_id: int = Field(..., gt=0, description="id de app-users con recurso_tecnico")
+    fecha_visita_tecnica: date
 
 
 @router.post("/{expediente_id}/decision/asignarme")
@@ -138,7 +178,7 @@ async def ejecutoria_decision(
 
 @router.post("/{expediente_id}/recurso", status_code=201)
 async def crear_recurso(
-    request: Request, expediente_id: int, body: RadicadoIn, db: AsyncSession = Depends(get_db_managed),
+    request: Request, expediente_id: int, body: RecursoIn, db: AsyncSession = Depends(get_db_managed),
 ):
     """El usuario radica el recurso dentro de los 10 días hábiles siguientes a
     la notificación (el plazo no se valida: el plan no lo pide). Se crea con
@@ -154,7 +194,7 @@ async def crear_recurso(
     await validar_pdf(body.file_id, "Escrito del recurso")
     fila = RecursoReposicion(
         decision_id=e.decision.id, radicado=body.radicado, fecha_radicado=body.fecha_radicado,
-        doc_recurso_id=body.file_id,
+        doc_recurso_id=body.file_id, requiere_pruebas=body.requiere_pruebas,
     )
     async with integridad_a_409(db, "El expediente ya tiene recurso de reposición"):
         db.add(fila)
@@ -162,9 +202,117 @@ async def crear_recurso(
     await registrar_archivos([body.file_id])
     await auditar(db, usuario, exp, "CREAR_RECURSO", f"Recurso de reposición radicado {body.radicado}",
                   body.model_dump(), request)
-    data = datos_fila(fila, "radicado", "fecha_radicado", "doc_recurso_id")
+    data = datos_fila(fila, "radicado", "fecha_radicado", "doc_recurso_id", "requiere_pruebas")
     await db.commit()
     return ok("Recurso de reposición registrado", data, status_code=201)
+
+
+@router.put("/{expediente_id}/recurso/requiere-pruebas")
+async def requiere_pruebas_recurso(
+    request: Request, expediente_id: int, body: RequierePruebasIn, db: AsyncSession = Depends(get_db_managed),
+):
+    """Cambia «¿Requiere práctica de pruebas?» (cualquier abogado). Sí → No con
+    la práctica iniciada la elimina previa confirmación (409 con el aviso);
+    con el concepto de pruebas ya creado se bloquea. No → Sí se bloquea si el
+    acto que resuelve ya está cargado; su asignación se conserva."""
+    usuario = await requiere_gestion(request)
+    exp = await bloquear_expediente(db, expediente_id)
+    e = await cargar_estado(db, exp)
+    if e.recurso is None:
+        raise HTTPException(status_code=404, detail=MSG_SIN_RECURSO)
+    if e.recurso.version != body.version:
+        raise HTTPException(status_code=409, detail=MSG_MODIFICADO)
+    motivo = motivo_cambio_requiere_pruebas(e, body.requiere_pruebas)
+    if motivo:
+        raise HTTPException(status_code=400, detail=motivo)
+    anterior = bool(e.recurso.requiere_pruebas)
+    if anterior == body.requiere_pruebas:
+        return ok("Sin cambios", datos_fila(e.recurso, "requiere_pruebas"))
+    eliminado, archivos = None, []
+    if not body.requiere_pruebas and e.pruebas is not None:
+        if not body.confirmar_eliminar_pruebas:
+            raise HTTPException(status_code=409, detail=aviso_eliminar_practica_pruebas(e.pruebas))
+        eliminado, archivos = await eliminar_practica_pruebas(db, e.pruebas)
+        e.pruebas = None
+    nueva = await actualizar_versionado(
+        db, RecursoReposicion, e.recurso.id, body.version, {"requiere_pruebas": body.requiere_pruebas},
+    )
+    texto = "Sí" if body.requiere_pruebas else "No"
+    await auditar(db, usuario, exp, "REQUIERE_PRUEBAS_RECURSO", f"¿Requiere práctica de pruebas?: {texto}",
+                  {"anterior": anterior, "requiere_pruebas": body.requiere_pruebas,
+                   **({"practica_eliminada": eliminado} if eliminado else {})}, request)
+    await db.commit()
+    await liberar_archivos(archivos)
+    return ok("Práctica de pruebas actualizada",
+              {"id": e.recurso.id, "version": nueva, "requiere_pruebas": body.requiere_pruebas,
+               "practica_eliminada": eliminado is not None})
+
+
+@router.post("/{expediente_id}/recurso/pruebas/asignarme")
+async def asignarme_auto_pruebas(request: Request, expediente_id: int, db: AsyncSession = Depends(get_db_managed)):
+    """Cualquier abogado se asigna el auto que admite y decreta práctica de pruebas."""
+    usuario = await requiere_gestion(request)
+    exp = await bloquear_expediente(db, expediente_id)
+    e = await cargar_estado(db, exp)
+    if e.recurso is None:
+        raise HTTPException(status_code=404, detail=MSG_SIN_RECURSO)
+    if e.pruebas is not None:
+        raise HTTPException(status_code=409, detail=MSG_ASIGNADO)
+    exigir(flujo_auto_pruebas(e), usuario)
+    avisos = Avisos()
+    fila = PracticaPruebas(recurso_id=e.recurso.id, encargado_acto_id=usuario.user_id)
+    proceso = await crear_fila_asignada(
+        db, fila, etapa_tipo="practica_pruebas", tipo_documento="AUTO_PRUEBAS", expediente_id=exp.id,
+        usuario=usuario, avisos=avisos,
+    )
+    await auditar(db, usuario, exp, "ASIGNAR_AUTO_PRUEBAS",
+                  "Asignación del auto que admite y decreta práctica de pruebas", request=request)
+    data = {**datos_fila(fila, "encargado_acto_id"), "proceso_id": proceso.id}
+    await db.commit()
+    await avisos.enviar()
+    return ok("Te asignaste el auto que admite y decreta práctica de pruebas", data)
+
+
+@router.post("/{expediente_id}/recurso/pruebas/version-final")
+async def version_final_auto_pruebas(
+    request: Request, expediente_id: int, body: AutoPruebasFinalIn, db: AsyncSession = Depends(get_db_managed),
+):
+    """Auto firmado + técnico y fecha de visita: nace el concepto técnico de la
+    práctica de pruebas (mismos revisores que el de la etapa 2)."""
+    usuario = await requiere_gestion(request)
+    exp = await bloquear_expediente(db, expediente_id)
+    e = await cargar_estado(db, exp)
+    if e.pruebas is None:
+        raise HTTPException(status_code=400, detail="Primero asígnate el auto que admite y decreta práctica de pruebas")
+    exigir(flujo_auto_pruebas(e), usuario)
+    exigir_encargado(e.pruebas.encargado_acto_id, usuario)
+    concepto_previo = e.concepto("pruebas")
+    # V3 antes de tocar app-docs.
+    if concepto_previo is None and not await es_tecnico(body.tecnico_id):
+        raise HTTPException(status_code=400, detail=MSG_NO_TECNICO)
+    avisos = Avisos()
+    acto = await cargar_acto_final(
+        db, fila=e.pruebas, etapa_tipo="practica_pruebas", tipo_acto=TipoActo.AUTO_PRUEBAS,
+        encargado_id=e.pruebas.encargado_acto_id, datos=body, usuario=usuario, avisos=avisos,
+    )
+    concepto_id = concepto_previo.id if concepto_previo is not None else None
+    if concepto_previo is None:
+        concepto, _ = await crear_concepto(
+            db, tipo="pruebas", tecnico_id=body.tecnico_id, expediente_id=exp.id, usuario=usuario,
+            avisos=avisos, padre=e.pruebas, columna="concepto_tecnico_id",
+            fecha_visita=body.fecha_visita_tecnica, validar_tecnico=False,
+        )
+        concepto_id = concepto.id
+    await auditar(
+        db, usuario, exp, "VERSION_FINAL_AUTO_PRUEBAS",
+        f"Auto que admite y decreta práctica de pruebas No. {acto.numerado} cargado",
+        {"acto_id": acto.id, "tecnico_id": body.tecnico_id, "fecha_visita_tecnica": body.fecha_visita_tecnica},
+        request,
+    )
+    data = {**datos_fila(e.pruebas), "acto_id": acto.id, "concepto_tecnico_id": concepto_id}
+    await db.commit()
+    await avisos.enviar()
+    return ok("Auto de pruebas cargado; nace el concepto técnico de la práctica de pruebas", data)
 
 
 @router.post("/{expediente_id}/recurso/asignarme")
@@ -176,6 +324,7 @@ async def asignarme_recurso(request: Request, expediente_id: int, db: AsyncSessi
         raise HTTPException(status_code=404, detail="El expediente no tiene recurso de reposición")
     if e.recurso.encargado_acto_id is not None:
         raise HTTPException(status_code=409, detail=MSG_ASIGNADO)
+    exigir(flujo_resuelve_recurso(e), usuario)
     avisos = Avisos()
     proceso = await asignar_fila_existente(
         db, RecursoReposicion, e.recurso, etapa_tipo="recurso_reposicion", tipo_documento="RECURSO",
@@ -196,7 +345,8 @@ async def version_final_recurso(
     exp = await bloquear_expediente(db, expediente_id)
     e = await cargar_estado(db, exp)
     if e.recurso is None:
-        raise HTTPException(status_code=404, detail="El expediente no tiene recurso de reposición")
+        raise HTTPException(status_code=404, detail=MSG_SIN_RECURSO)
+    exigir(flujo_resuelve_recurso(e), usuario)
     avisos = Avisos()
     acto = await cargar_acto_final(
         db, fila=e.recurso, etapa_tipo="recurso_reposicion", tipo_acto=TipoActo.RECURSO,

@@ -103,6 +103,7 @@ def buscar_concepto(arbol: dict, tipo: str) -> dict:
         "subsanacion": lambda a: a["memorias"]["subsanacion"]["concepto"],
         "obras": lambda a: a["obras"]["concepto"],
         "obras_segundo": lambda a: a["obras"]["concepto_segundo"],
+        "pruebas": lambda a: a["decision"]["recurso"]["pruebas"]["concepto"],
     }[tipo](arbol)
 
 
