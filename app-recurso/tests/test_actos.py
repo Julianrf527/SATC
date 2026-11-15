@@ -11,7 +11,6 @@ from db.models import (
     Decision,
     ExpedienteInvolucrado,
     RecursoReposicion,
-    TipoActo,
     TipoVinculo,
 )
 from tests.fixtures_revision import *  # noqa: F401,F403
@@ -29,7 +28,7 @@ def acto_admite(db_session, crear_expediente, vincular, rv_permisos):
         await vincular(exp.id, SOLICITANTE)
         await vincular(exp.id, TERCERO, tipo_vinculo=TipoVinculo.TERCERO_INTERVINIENTE)
         doc = rv_permisos.files.registrar()
-        acto = await crear_acto(db_session, clase_acto="AUTO", tipo_acto="AUTO_ADMITE", numerado=numerado,
+        acto = await crear_acto(db_session, clase_acto="AUTO", etapa_tipo="acto_admite", numerado=numerado,
                                 fecha_numerado="2026-04-01", documento_id=doc, user_id=ABOGADO)
         etapa = ActoAdmite(expediente_id=exp.id, encargado_acto_id=ABOGADO, acto_admin_id=acto.id)
         db_session.add(etapa)
@@ -50,7 +49,7 @@ def acto_decision(db_session, crear_expediente, vincular, rv_permisos):
         await vincular(exp.id, SOLICITANTE)
         await vincular(exp.id, TERCERO, tipo_vinculo=TipoVinculo.TERCERO_INTERVINIENTE)
         doc = rv_permisos.files.registrar()
-        acto = await crear_acto(db_session, clase_acto="AUTO", tipo_acto="DECISION", numerado=numerado,
+        acto = await crear_acto(db_session, clase_acto="AUTO", etapa_tipo="decision", numerado=numerado,
                                 fecha_numerado="2026-04-01", documento_id=doc, user_id=ABOGADO)
         db_session.add(Decision(expediente_id=exp.id, encargado_acto_id=ABOGADO, acto_admin_id=acto.id))
         await db_session.commit()
@@ -76,24 +75,30 @@ async def test_crear_acto_validaciones(db_session, rv_permisos, acto_admite):
     exp_id, acto_id, doc = await acto_admite()
     assert doc in rv_permisos.files.incrementados
     acto = await db_session.scalar(select(ActoAdministrativo).where(ActoAdministrativo.id == acto_id))
-    assert acto.tipo_acto == TipoActo.AUTO_ADMITE and acto.numerado == 12
+    assert acto.medio == "COMUNICA" and acto.numerado == 12
     for numerado in ("12345", "0", "-3", "abc"):
         with pytest.raises(HTTPException) as e:
-            await crear_acto(db_session, clase_acto="AUTO", tipo_acto="AUTO_ADMITE", numerado=numerado,
+            await crear_acto(db_session, clase_acto="AUTO", etapa_tipo="acto_admite", numerado=numerado,
                              fecha_numerado="2026-04-01", documento_id=1, user_id=ABOGADO)
         assert e.value.status_code == 400
-    with pytest.raises(HTTPException) as e:  # mismo numerado y fecha del mismo tipo
-        await crear_acto(db_session, clase_acto="AUTO", tipo_acto="AUTO_ADMITE", numerado="0012",
+    with pytest.raises(HTTPException) as e:  # mismo numerado y fecha en la misma clase (AUTO)
+        await crear_acto(db_session, clase_acto="AUTO", etapa_tipo="acto_admite", numerado="0012",
                          fecha_numerado="2026-04-01", documento_id=1, user_id=ABOGADO)
     assert e.value.status_code == 409
     with pytest.raises(HTTPException) as e:  # Auto/Resolución obligatorio y válido
-        await crear_acto(db_session, clase_acto="", tipo_acto="AUTO_ADMITE", numerado=5,
+        await crear_acto(db_session, clase_acto="", etapa_tipo="acto_admite", numerado=5,
                          fecha_numerado="2026-04-01", documento_id=1, user_id=ABOGADO)
     assert e.value.status_code == 400
+    # Autos y Resoluciones se numeran por separado: RES 12 con la misma fecha sí entra.
+    acto_res = await crear_acto(db_session, clase_acto="RES", etapa_tipo="decision", numerado=12,
+                                fecha_numerado="2026-04-01", documento_id=rv_permisos.files.registrar(),
+                                user_id=ABOGADO)
+    assert acto_res.medio == "NOTIFICA"
+    # Otro Auto (de otra etapa) con el mismo número y fecha choca: misma numeración de Autos.
     with pytest.raises(HTTPException) as e:
-        await crear_acto(db_session, clase_acto="AUTO", tipo_acto="AUTO", numerado=1, fecha_numerado="2026-04-01",
-                         documento_id=1, user_id=ABOGADO)
-    assert e.value.status_code == 400
+        await crear_acto(db_session, clase_acto="AUTO", etapa_tipo="practica_pruebas", numerado=12,
+                         fecha_numerado="2026-04-01", documento_id=1, user_id=ABOGADO)
+    assert e.value.status_code == 409
 
 
 async def test_etapa_de_acto_y_recurso(db_session, crear_expediente, rv_permisos, acto_admite):
@@ -107,7 +112,7 @@ async def test_etapa_de_acto_y_recurso(db_session, crear_expediente, rv_permisos
     decision = Decision(expediente_id=exp.id, encargado_acto_id=ABOGADO)
     db_session.add(decision)
     await db_session.flush()
-    acto_rec = await crear_acto(db_session, clase_acto="AUTO", tipo_acto=TipoActo.RECURSO, numerado=7,
+    acto_rec = await crear_acto(db_session, clase_acto="AUTO", etapa_tipo="recurso_reposicion", numerado=7,
                                 fecha_numerado=date(2026, 5, 1), documento_id=9, user_id=ABOGADO2)
     db_session.add(RecursoReposicion(decision_id=decision.id, encargado_acto_id=ABOGADO2, acto_admin_id=acto_rec.id,
                                      radicado="R1", fecha_radicado=date(2026, 4, 20), doc_recurso_id=3))
@@ -123,7 +128,7 @@ async def test_get_acto_y_tipos(client, rv_permisos, acto_admite):
     r = await client.get(f"/actos/administrativos/{acto_id}", headers=headers(ABOGADO))
     assert r.status_code == 200, r.text
     d = r.json()["data"]
-    assert d["tipo_acto"] == "AUTO_ADMITE" and d["etapa_tipo"] == "acto_admite"
+    assert d["medio"] == "COMUNICA" and d["etapa_tipo"] == "acto_admite" and "tipo_acto" not in d
     assert d["comunicacion"] is None and d["notificacion"]["involucrados"] == []
     assert {i["involucrado_id"] for i in d["involucrados_notificables"]} == {SOLICITANTE, TERCERO}
     # El auto que admite solo se comunica: nunca ofrece notificar.
@@ -182,7 +187,7 @@ def acto_tercero(db_session, crear_expediente, vincular, rv_permisos):
         exp = await crear_expediente()
         await vincular(exp.id, SOLICITANTE)
         v = await vincular(exp.id, TERCERO, tipo_vinculo=TipoVinculo.TERCERO_INTERVINIENTE)
-        acto = await crear_acto(db_session, clase_acto="AUTO", tipo_acto="RECONOCE_TERCERO", numerado=21,
+        acto = await crear_acto(db_session, clase_acto="AUTO", etapa_tipo="expediente_involucrado", numerado=21,
                                 fecha_numerado="2026-04-01", documento_id=rv_permisos.files.registrar(),
                                 user_id=SUPER_G)
         v = await db_session.get(ExpedienteInvolucrado, v.id)
@@ -200,15 +205,19 @@ def _form_com(exp_id, acto_id, stubs):
 
 
 def test_regla_comunicar_notificar():
-    from services.actos import ACTOS_SOLO_COMUNICACION, se_comunica, se_notifica
+    from services.actos import MEDIO_POR_ETAPA, TABLAS_CON_ACTO, medio_de_etapa, se_comunica, se_notifica
 
-    assert ACTOS_SOLO_COMUNICACION == {TipoActo.AUTO_ADMITE, TipoActo.RECONOCE_TERCERO, TipoActo.AUTO_PRUEBAS}
-    for tipo in TipoActo:
-        assert se_comunica(tipo) != se_notifica(tipo)
-        assert se_comunica(tipo.value) == se_comunica(tipo)
-    assert se_comunica("RECONOCE_TERCERO") and not se_notifica("RECONOCE_TERCERO")
-    assert se_comunica("AUTO_PRUEBAS") and not se_notifica("AUTO_PRUEBAS")
-    assert se_notifica("DECISION") and not se_comunica("DECISION")
+    # Toda tabla que expide actos tiene su medio, y solo esas.
+    assert set(MEDIO_POR_ETAPA) == {t for t, _ in TABLAS_CON_ACTO}
+    comunican = {t for t, m in MEDIO_POR_ETAPA.items() if m.value == "COMUNICA"}
+    assert comunican == {"acto_admite", "expediente_involucrado", "practica_pruebas"}
+    for medio in MEDIO_POR_ETAPA.values():
+        assert se_comunica(medio) != se_notifica(medio)
+        assert se_comunica(medio.value) == se_comunica(medio)
+    assert se_comunica("COMUNICA") and not se_notifica("COMUNICA")
+    assert se_notifica("NOTIFICA") and not se_comunica("NOTIFICA")
+    with pytest.raises(ValueError):
+        medio_de_etapa("concepto_tecnico")
 
 
 async def test_acto_tercero_solo_se_comunica(client, rv_permisos, acto_tercero):
@@ -343,8 +352,8 @@ async def test_corregir_y_eliminar_acto(client, db_session, rv_permisos, acto_ad
     r = await client.put(f"/actos/administrativos/{acto_id}", data=form, headers=headers(ABOGADO))
     assert r.status_code == 200, r.text
     d = r.json()["data"]
-    # El formulario manda Auto/Resolución en `tipo_acto`; la clase interna no cambia.
-    assert d["numerado"] == 14 and d["tipo_acto"] == "AUTO_ADMITE" and d["clase_acto"] == "AUTO"
+    # El formulario manda Auto/Resolución en `tipo_acto`; el medio no cambia.
+    assert d["numerado"] == 14 and d["medio"] == "COMUNICA" and d["clase_acto"] == "AUTO"
     r = await client.put(f"/actos/administrativos/{acto_id}", data={**form, "tipo_acto": "RES"}, headers=headers(ABOGADO))
     assert r.status_code == 200 and r.json()["data"]["clase_acto"] == "RES"
     r = await client.put(f"/actos/administrativos/{acto_id}", data={**form, "tipo_acto": "OTRO"}, headers=headers(ABOGADO))
@@ -360,3 +369,42 @@ async def test_corregir_y_eliminar_acto(client, db_session, rv_permisos, acto_ad
     etapa = await db_session.scalar(select(ActoAdmite).where(ActoAdmite.expediente_id == exp_id))
     assert etapa.acto_admin_id is None
     assert await db_session.scalar(select(ActoAdministrativo).where(ActoAdministrativo.id == acto_id)) is None
+
+
+async def test_migracion_tipo_acto_a_medio(db_session):
+    """Simula el esquema anterior (ENUM tipo_acto): la migración llena ``medio``
+    (AUTO_ADMITE, RECONOCE_TERCERO y AUTO_PRUEBAS → COMUNICA; el resto →
+    NOTIFICA), elimina la columna y el tipo, y cambia el índice a (clase, numerado)."""
+    from sqlalchemy import text
+
+    from db.migrations import aplicar_migraciones
+    from tests.conftest import engine
+
+    tipos = ["AUTO_ADMITE", "RECONOCE_TERCERO", "AUTO_PRUEBAS", "REQUERIMIENTO", "DECISION", "RECURSO",
+             "APRUEBA_MEMORIAS", "APRUEBA_OBRAS"]
+    async with engine.begin() as conn:
+        await conn.execute(text("ALTER TABLE acto_administrativo ALTER COLUMN medio DROP NOT NULL"))
+        await conn.execute(text("DROP TYPE IF EXISTS tipo_acto"))
+        await conn.execute(text("CREATE TYPE tipo_acto AS ENUM (" + ", ".join(f"'{t}'" for t in tipos) + ")"))
+        await conn.execute(text("ALTER TABLE acto_administrativo ADD COLUMN tipo_acto tipo_acto"))
+        await conn.execute(text("CREATE INDEX ix_acto_admin_tipo_numerado ON acto_administrativo (tipo_acto, numerado)"))
+        for i, t in enumerate(tipos, start=1):
+            await conn.execute(text(
+                "INSERT INTO acto_administrativo (tipo_acto, clase_acto, numerado, fecha_numerado, "
+                "documento_acto_administrativo_id, fecha_creacion) "
+                "VALUES (CAST(:t AS tipo_acto), 'AUTO', :n, DATE '2026-04-01', 1, now())"), {"t": t, "n": i})
+    async with engine.begin() as conn:
+        await aplicar_migraciones(conn)
+    async with engine.begin() as conn:  # idempotente
+        await aplicar_migraciones(conn)
+
+    medios = dict((await db_session.execute(text(
+        "SELECT numerado, medio FROM acto_administrativo ORDER BY numerado"))).all())
+    assert [medios[i] for i in range(1, len(tipos) + 1)] == ["COMUNICA"] * 3 + ["NOTIFICA"] * 5
+    columnas = (await db_session.execute(text(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'acto_administrativo'"))).scalars().all()
+    assert "tipo_acto" not in columnas and "medio" in columnas
+    assert await db_session.scalar(text("SELECT count(*) FROM pg_type WHERE typname = 'tipo_acto'")) == 0
+    indices = (await db_session.execute(text(
+        "SELECT indexname FROM pg_indexes WHERE tablename = 'acto_administrativo'"))).scalars().all()
+    assert "ix_acto_admin_clase_numerado" in indices and "ix_acto_admin_tipo_numerado" not in indices

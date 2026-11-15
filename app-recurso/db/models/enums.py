@@ -6,16 +6,12 @@ from sqlalchemy import Enum
 # agregar un valor después requiere: ALTER TYPE <tipo> ADD VALUE '<VALOR>'.
 
 
-class TipoActo(str, enum.Enum):
-    AUTO_ADMITE = "AUTO_ADMITE"
-    REQUERIMIENTO = "REQUERIMIENTO"
-    RECONOCE_TERCERO = "RECONOCE_TERCERO"
-    DECISION = "DECISION"
-    RECURSO = "RECURSO"
-    # Auto que admite y decreta práctica de pruebas (dentro del recurso).
-    AUTO_PRUEBAS = "AUTO_PRUEBAS"
-    APRUEBA_MEMORIAS = "APRUEBA_MEMORIAS"
-    APRUEBA_OBRAS = "APRUEBA_OBRAS"
+class MedioActo(str, enum.Enum):
+    """Cómo se da a conocer un acto administrativo. Qué acto es lo dice la
+    etapa que lo referencia (``services.actos.etapa_de_acto``); qué medio le
+    toca a cada etapa, ``services.actos.MEDIO_POR_ETAPA``."""
+    COMUNICA = "COMUNICA"
+    NOTIFICA = "NOTIFICA"
 
 
 class TipoVinculo(str, enum.Enum):
@@ -56,7 +52,6 @@ class ResultadoRecurso(str, enum.Enum):
     ADICIONA = "ADICIONA"
 
 
-tipo_acto_enum = Enum(TipoActo, name="tipo_acto")
 tipo_vinculo_enum = Enum(TipoVinculo, name="tipo_vinculo")
 uso_agua_enum = Enum(UsoAgua, name="uso_agua")
 tipo_decision_enum = Enum(TipoDecision, name="tipo_decision")

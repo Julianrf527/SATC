@@ -74,7 +74,7 @@ async def test_requerimiento_etapa3_completo(client, rv_permisos, expediente, db
     assert arbol["etapa_actual"] == "requerimiento"
     assert arbol["requerimiento"]["datos"]["radicado_oficio_entrada"] == "2026ER777"
     assert arbol["requerimiento"]["concepto_adicional"]["datos"]["fecha_aceptacion"] == "2026-05-20"
-    assert arbol["requerimiento"]["acto"]["tipo_acto"] == "REQUERIMIENTO"
+    assert arbol["requerimiento"]["acto"]["medio"] == "NOTIFICA"
 
 
 async def test_tipo_concepto_desconocido(client, rv_permisos, expediente):

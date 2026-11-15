@@ -518,7 +518,7 @@ envía `"0012"`). Fechas `AAAA-MM-DD`.
 |---|---|---|---|
 | GET | `/actos/tipos-notificacion` | autenticado | — |
 | GET | `/actos/administrativos/{acto_id}` | lectura | — |
-| PUT | `/actos/administrativos/{acto_id}` | escritura | multipart: `expediente_id?`, `tipo_acto?` (se ignora), `numerado`, `fecha_numerado`, `documento_acto_administrativo_id?` |
+| PUT | `/actos/administrativos/{acto_id}` | escritura | multipart: `expediente_id?`, `tipo_acto?` (AUTO/RES: se guarda en `clase_acto`), `numerado`, `fecha_numerado`, `documento_acto_administrativo_id?` |
 | DELETE | `/actos/administrativos/{acto_id}?expediente_id=` | **solo super gestión** | — |
 | POST | `/actos/comunicaciones` | escritura | multipart: `expediente_id`, `acto_admin_id`, `numerado`, `fecha_numerado`, `fecha_envio`, `documento_comunicacion_id` |
 | PUT | `/actos/comunicaciones/{id}` | escritura | multipart: `expediente_id`, `numerado`, `fecha_numerado`, `fecha_envio`, `documento_comunicacion_id` |
@@ -533,7 +533,7 @@ envía `"0012"`). Fechas `AAAA-MM-DD`.
 
 ```json
 {"ok": true, "data": {
-  "id": 4, "tipo_acto": "AUTO_ADMITE", "numerado": 12, "fecha_numerado": "2026-04-01",
+  "id": 4, "medio": "COMUNICA", "clase_acto": "AUTO", "numerado": 12, "fecha_numerado": "2026-04-01",
   "documento_acto_administrativo_id": 345, "documento_acto_id": 345, "fecha_creacion": "...",
   "etapa_tipo": "acto_admite", "etapa_id": 2, "expediente_id": 3,
   "comunicacion": {"id": 1, "acto_administrativo_id": 4, "numerado": 3, "fecha_numerado": "2026-04-02",
@@ -547,12 +547,14 @@ envía `"0012"`). Fechas `AAAA-MM-DD`.
 }}
 ```
 
-**Comunicar vs. notificar** (regla del área, 14/10/2026; una sola definición:
-`ACTOS_SOLO_COMUNICACION` en `services/actos.py`, replicada en el front por
-`seComunica` de `etapas/comun/actoFeature.ts`): **solo se comunican** —y nunca se
-notifican— `AUTO_ADMITE`, `RECONOCE_TERCERO` y `AUTO_PRUEBAS` (auto que admite y
-decreta práctica de pruebas); todos los demás actos **solo se
-notifican** y no llevan comunicación. `POST /actos/notificaciones` sobre un acto que
+**Comunicar vs. notificar** (regla del área, 14/10/2026). Qué acto es lo dice la
+etapa que lo referencia (`etapa_tipo`); el acto solo guarda **cómo se da a conocer**
+en `medio` (`COMUNICA` | `NOTIFICA`), que se fija al crearlo según la etapa (una sola
+definición: `MEDIO_POR_ETAPA` en `services/actos.py`; el front solo lee `acto.medio`).
+**Solo se comunican** —y nunca se notifican— el auto que admite (`acto_admite`), el acto
+que reconoce al tercero (`expediente_involucrado`) y el auto que admite y decreta
+práctica de pruebas (`practica_pruebas`); todos los demás actos **solo se notifican** y
+no llevan comunicación. Un acto conserva el medio con el que se expidió. `POST /actos/notificaciones` sobre un acto que
 solo se comunica → 400 "Este acto solo se comunica; no se notifica";
 `POST /actos/comunicaciones` sobre un acto que solo se notifica → 400 "Este acto
 solo se notifica; no se comunica".
@@ -566,8 +568,10 @@ solicitante/tercero sin notificación), `editar_notificacion`, `eliminar_notific
 (cargue histórico, C.9) solo super gestión gestiona el acto.
 
 `PUT /actos/administrativos/{id}` (corrección) → `{"ok": true, "data": <acto como arriba sin notificables/acciones>}`.
-El `tipo_acto` lo fija la etapa (el formulario heredado manda AUTO/RES y se ignora).
-Errores: 409 numerado + fecha ya usados por otro acto del mismo tipo; 403; 400.
+El `medio` lo fija la etapa y no cambia; el formulario heredado manda Auto/Resolución en
+`tipo_acto` y se guarda en `clase_acto`.
+Errores: 409 numerado + fecha ya usados por otro acto de la misma clase (los Autos y las
+Resoluciones se numeran por separado; los actos antiguos sin clase no se comparan); 403; 400.
 
 `DELETE /actos/administrativos/{id}`: solo super gestión (403 al encargado:
 "…para corregirlo usa editar"); desenlaza la etapa y borra comunicación y
@@ -633,8 +637,8 @@ respuesta conserva el error original). Un error posterior al commit no resta nad
 
 | Función | Uso |
 |---|---|
-| `crear_acto(db, *, tipo_acto, numerado, fecha_numerado, documento_id, user_id)` | Crea el acto (valida tipo, numerado 1..9999, fecha, documento; 409 numerado+fecha repetido del mismo tipo) e incrementa el uso del PDF. C enlaza `acto.id` en la etapa. `TODO(negocio)`: numeración por año |
-| `etapa_de_acto(db, acto_id) -> EtapaActo \| None` | `etapa_tipo`, fila, `expediente_id`, `encargado_id` (busca en acto_admite, requerimiento, decision, recurso_reposicion, memorias_calculo, recibo_satisfaccion_obras, expediente_involucrado) |
+| `crear_acto(db, *, etapa_tipo, clase_acto, numerado, fecha_numerado, documento_id, user_id)` | Crea el acto con el `medio` de su etapa (valida clase AUTO/RES, numerado 1..9999, fecha, documento; 409 numerado+fecha repetido en la misma clase) e incrementa el uso del PDF. C enlaza `acto.id` en la etapa. `TODO(negocio)`: numeración por año |
+| `etapa_de_acto(db, acto_id) -> EtapaActo \| None` | `etapa_tipo`, fila, `expediente_id`, `encargado_id` (busca en acto_admite, requerimiento, decision, recurso_reposicion, practica_pruebas, memorias_calculo, recibo_satisfaccion_obras, expediente_involucrado) |
 | `involucrados_notificables(db, expediente_id)` | Solicitantes y terceros del expediente |
 | `notificaciones_completas(db, acto_id)` → `{total, exitosas, notificado}` / `acto_notificado(db, acto_id)` | V13. `TODO(negocio)`: "notificado" = hay al menos una notificación y todas son exitosas |
 | `serializar_acto(db, acto, etapa=None)` | Forma `ActoAdministrativo` del front (con comunicación y notificaciones) para el payload de la etapa |
@@ -678,7 +682,7 @@ Reglas comunes de la sección C:
 {"file_id": 345, "numerado": "0012", "fecha_numerado": "2026-04-01"}
 ```
 
-   → el proceso queda `aprobado`, se crea el `acto_administrativo` con su `tipo_acto` y
+   → el proceso queda `aprobado`, se crea el `acto_administrativo` con el `medio` de la etapa y
    se enlaza en la etapa. Comunicación y notificaciones: `/actos/*` (B).
 
 ### C.2 Árbol de etapas — `GET /recurso/etapas/{expediente_id}` (lectura)
@@ -700,7 +704,7 @@ Misma información que `etapas` en `GET /recurso/expedientes/{id}`. `data`:
     "proceso": {"proceso_id": 7, "tipo_documento": "AUTO_ADMITE",
                 "estado_proceso": {"codigo": "aprobado", "etiqueta": "Aprobado", "tono": "success"},
                 "paso_actual": 2, "total_pasos": 2, "permisos_pendientes": [], "...": "resumen de B"},
-    "acto": {"id": 4, "tipo_acto": "AUTO_ADMITE", "numerado": 12, "fecha_numerado": "2026-04-01",
+    "acto": {"id": 4, "medio": "COMUNICA", "clase_acto": "AUTO", "numerado": 12, "fecha_numerado": "2026-04-01",
              "documento_acto_administrativo_id": 345, "comunicacion": null,
              "notificacion": {"id": 4, "involucrados": []}, "notificado": false,
              "acciones_disponibles": ["editar_acto", "crear_comunicacion"]},

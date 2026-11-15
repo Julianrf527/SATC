@@ -9,17 +9,6 @@ Enum resultado_recurso {
   ADICIONA
 }
 
-Enum tipo_acto {
-  AUTO_ADMITE
-  REQUERIMIENTO
-  RECONOCE_TERCERO
-  DECISION
-  RECURSO
-  AUTO_PRUEBAS
-  APRUEBA_MEMORIAS
-  APRUEBA_OBRAS
-}
-
 Enum tipo_decision {
   OTORGADA
   NEGADA
@@ -138,8 +127,8 @@ Table expediente_involucrado {
 // ===== Actos, comunicación y notificación =====
 Table acto_administrativo {
   id integer [pk, increment]
-  tipo_acto tipo_acto [not null]
-  clase_acto varchar(4) [note: 'AUTO o RES (check)']
+  medio varchar(10) [not null, note: 'COMUNICA o NOTIFICA (check); qué acto es lo dice la etapa que lo referencia']
+  clase_acto varchar(4) [note: 'AUTO o RES (check); cada clase tiene su numeración']
   numerado integer [not null]
   fecha_numerado date [not null]
   documento_acto_administrativo_id integer [not null, note: 'archivo en app-docs (FK lógica)']
@@ -147,7 +136,7 @@ Table acto_administrativo {
 
   indexes {
     fecha_numerado
-    (tipo_acto, numerado)
+    (clase_acto, numerado)
   }
 }
 

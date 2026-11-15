@@ -123,14 +123,13 @@ async def actualizar_acto(
     """Corrección de Auto/Resolución, numerado, fecha de numerado y/o documento
     firmado. El formulario del front manda la forma (AUTO/RES) en el campo
     ``tipo_acto`` (contrato de infraction); aquí se guarda en ``clase_acto``.
-    La clase interna (``acto.tipo_acto``: AUTO_ADMITE, DECISION…) la fija la
-    etapa y no cambia."""
+    El medio (``acto.medio``: comunica o notifica) lo fija la etapa y no cambia."""
     usuario, acto, etapa = await _contexto_escritura(db, request, acto_id, expediente_id)
     clase = validar_clase_acto(tipo_acto) if tipo_acto else acto.clase_acto
     numero = validar_numerado(numerado)
     fecha = validar_fecha(fecha_numerado, "fecha de numerado")
     await validar_numerado_disponible(
-        db, ActoAdministrativo, numero, fecha, excluir_id=acto.id, tipo_acto=acto.tipo_acto,
+        db, ActoAdministrativo, numero, fecha, excluir_id=acto.id, clase_acto=clase,
     )
     nuevo_doc = documento_acto_administrativo_id
     if nuevo_doc and nuevo_doc != acto.documento_acto_administrativo_id:
@@ -199,9 +198,9 @@ async def crear_comunicacion(
     db: AsyncSession = Depends(get_db_managed),
 ):
     """Una comunicación por acto (plan Etapa 1 paso 6): 409 si ya existe.
-    Solo para los actos que se comunican (``ACTOS_SOLO_COMUNICACION``); 400 si no."""
+    Solo para los actos que se comunican (``MEDIO_POR_ETAPA``); 400 si no."""
     _, acto, _ = await _contexto_escritura(db, request, acto_admin_id, expediente_id)
-    if not se_comunica(acto.tipo_acto):
+    if not se_comunica(acto.medio):
         raise HTTPException(status_code=400, detail=MSG_SIN_COMUNICACION)
     numero = validar_numerado(numerado)
     f_numerado = validar_fecha(fecha_numerado, "fecha de numerado")
@@ -328,7 +327,7 @@ async def crear_notificacion(
     (numerado, fechas de envío y constancia, documento); la entrega (exitosa,
     tipo, fecha, documento) puede llenarse después con PUT."""
     _, acto, etapa = await _contexto_escritura(db, request, acto_admin_id, expediente_id)
-    if not se_notifica(acto.tipo_acto):
+    if not se_notifica(acto.medio):
         raise HTTPException(status_code=400, detail=MSG_SIN_NOTIFICACION)
     numero = validar_numerado(numerado)
     f_numerado = validar_fecha(fecha_numerado, "fecha de numerado")

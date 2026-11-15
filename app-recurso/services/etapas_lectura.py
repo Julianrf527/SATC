@@ -115,7 +115,7 @@ class _Lector:
         exitosas = sum(1 for n in notifs if n.notificacion_exitosa)
         data = {
             "id": acto.id,
-            "tipo_acto": _valor(acto.tipo_acto),
+            "medio": acto.medio,
             "clase_acto": acto.clase_acto,
             "numerado": acto.numerado,
             "fecha_numerado": _iso(acto.fecha_numerado),
@@ -139,8 +139,8 @@ class _Lector:
             if self.u.super_gestion:
                 acciones.append("eliminar_acto")
             notificados = {n.involucrado_id for n in notifs}
-            notificables = self.notificables if se_notifica(acto.tipo_acto) else set()
-            acciones += acciones_comunicacion_notificacion(acto.tipo_acto, com is not None, notificados, notificables)
+            notificables = self.notificables if se_notifica(acto.medio) else set()
+            acciones += acciones_comunicacion_notificacion(acto.medio, com is not None, notificados, notificables)
         data["acciones_disponibles"] = acciones
         return data
 

@@ -179,11 +179,14 @@ export type NotificacionActoRecurso = {
   version?: number;
 };
 
+/** Medio del acto: solo se comunica o solo se notifica (regla del área, backend `MEDIO_POR_ETAPA`). */
+export type MedioActo = "COMUNICA" | "NOTIFICA";
+
 /** Acto del nodo (forma de GET /actos/administrativos/{id} sin notificables). */
 export type ActoEtapa = {
   id: number;
-  /** Clase interna según la etapa (AUTO_ADMITE, DECISION…). */
-  tipo_acto: string;
+  /** Cómo se da a conocer (lo fija la etapa que lo expide). */
+  medio: MedioActo;
   /** Lo que se muestra: Auto o Resolución. `null` en actos cargados antes de existir el dato. */
   clase_acto: "AUTO" | "RES" | null;
   numerado: number | string;

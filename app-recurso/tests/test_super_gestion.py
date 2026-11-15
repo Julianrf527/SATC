@@ -69,7 +69,7 @@ async def test_cargue_historico_completo_salta_validaciones(client, rv_permisos,
     arbol = await etapas(client, exp_id, S)
     assert arbol["etapa_actual"] == "obras"
     assert "super_cargar" in arbol["admite"]["acciones_disponibles"]
-    assert arbol["memorias"]["aprobacion"]["acto"]["tipo_acto"] == "APRUEBA_MEMORIAS"
+    assert arbol["memorias"]["aprobacion"]["acto"]["medio"] == "NOTIFICA"
     # La descarga (A) ve todos los documentos cargados
     docs = (await client.get(f"/expedientes/{exp_id}/documentos", headers=headers(S))).json()["data"]
     assert len(docs) >= 10

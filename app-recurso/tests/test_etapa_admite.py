@@ -68,7 +68,7 @@ async def test_version_final_admite_nace_concepto(client, rv_permisos, expedient
 
     arbol = await etapas(client, expediente.id)
     assert arbol["etapa_actual"] == "concepto"
-    assert arbol["admite"]["acto"]["tipo_acto"] == "AUTO_ADMITE"
+    assert arbol["admite"]["acto"]["medio"] == "COMUNICA"
     assert "crear_comunicacion" in arbol["admite"]["acto"]["acciones_disponibles"]
     assert "cargar_constancia_fijacion" in arbol["admite"]["acciones_disponibles"]
     assert arbol["concepto"]["tecnico"]["id"] == TECNICO

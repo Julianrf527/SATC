@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.acceso import requiere_gestion, requiere_lectura
 from db.deps import get_db_managed
-from db.models import TipoActo, TipoVinculo
+from db.models import TipoVinculo
 from services.concurrencia import MSG_ASIGNADO, bloquear_expediente, integridad_a_409
 from services.etapas import (
     ActoFinalIn,
@@ -169,7 +169,7 @@ async def version_final_reconocimiento(
         raise HTTPException(status_code=409, detail=MSG_SIN_PROCESO)
     avisos = Avisos()
     acto = await cargar_acto_final(
-        db, fila=vinculo, etapa_tipo=ETAPA_TIPO, tipo_acto=TipoActo.RECONOCE_TERCERO,
+        db, fila=vinculo, etapa_tipo=ETAPA_TIPO,
         encargado_id=proceso.creador_id if proceso else None, datos=body, usuario=usuario, avisos=avisos,
     )
     await auditar(db, usuario, exp, "VERSION_FINAL_RECONOCE_TER",

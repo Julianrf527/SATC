@@ -19,11 +19,11 @@ type Props = {
  * `ActoAdmin` de la feature sin cambios. El acto lo crea "Cargar versión
  * final" de la etapa: aquí solo se corrige, comunica, notifica y (super
  * gestión) elimina. Editable solo si el backend manda `editar_acto`.
- * Comunicación o notificación lo decide el tipo del acto (`seComunica`).
+ * Comunicación o notificación lo decide el medio del acto (`seComunica`).
  */
 export default function ActoNodo({ entorno, acto, vinculos }: Props) {
   const { expediente, catalogos, setToast, isEditable } = entorno;
-  const conComunicacion = seComunica(acto.tipo_acto);
+  const conComunicacion = seComunica(acto.medio);
   const tipoActo: TipoActo = conComunicacion ? "comunicacion" : "notificacion";
   const recargar = useInvalidarExpediente(expediente.id);
   const { ejecutar } = useEscritura(expediente.id, setToast);

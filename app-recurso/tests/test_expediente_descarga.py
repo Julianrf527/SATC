@@ -11,14 +11,13 @@ from db.models import (
     Notificacion,
     RecursoReposicion,
     Requerimiento,
-    TipoActo,
     TipoDecision,
     TipoVinculo,
 )
 
 
-async def _acto(db, files, tipo, numero):
-    acto = ActoAdministrativo(tipo_acto=tipo, numerado=numero, fecha_numerado=date(2026, 4, 1),
+async def _acto(db, files, medio, numero):
+    acto = ActoAdministrativo(medio=medio, numerado=numero, fecha_numerado=date(2026, 4, 1),
                               documento_acto_administrativo_id=files.registrar())
     db.add(acto)
     await db.flush()
@@ -29,7 +28,7 @@ async def test_descarga_en_orden_del_proceso(client, h_consultor, crear_expedien
     f = stubs.files
     exp = await crear_expediente()
 
-    admite_acto = await _acto(db_session, f, TipoActo.AUTO_ADMITE, 1)
+    admite_acto = await _acto(db_session, f, "COMUNICA", 1)
     com = Comunicacion(numerado=1, fecha_numerado=date(2026, 4, 1), fecha_envio=date(2026, 4, 2),
                        documento_comunicacion_id=f.registrar(), acto_administrativo_id=admite_acto.id)
     notif = Notificacion(acto_admin_id=admite_acto.id, numerado=2, involucrado_id=1,
@@ -44,22 +43,22 @@ async def test_descarga_en_orden_del_proceso(client, h_consultor, crear_expedien
     anexo_admite = DocumentoAnexo(etapa_tipo="acto_admite", etapa_ref_id=admite.id, nombre="Foto",
                                   documento_anexo_id=f.registrar())
 
-    tercero_acto = await _acto(db_session, f, TipoActo.RECONOCE_TERCERO, 2)
+    tercero_acto = await _acto(db_session, f, "COMUNICA", 2)
     concepto = ConceptoTecnico(expediente_id=exp.id, tecnico_encargado_id=20, doc_concepto_tecnico_id=f.registrar())
     adicional = ConceptoTecnico(tecnico_encargado_id=20, doc_concepto_tecnico_id=f.registrar())
     db_session.add_all([anexo_admite, concepto, adicional])
     await db_session.flush()
     anexo_concepto = DocumentoAnexo(etapa_tipo="concepto_tecnico", etapa_ref_id=concepto.id, nombre="Aforo",
                                     documento_anexo_id=f.registrar())
-    req_acto = await _acto(db_session, f, TipoActo.REQUERIMIENTO, 3)
+    req_acto = await _acto(db_session, f, "NOTIFICA", 3)
     req = Requerimiento(expediente_id=exp.id, encargado_acto_id=10, acto_admin_id=req_acto.id,
                         doc_oficio_entrada_id=f.registrar(), concepto_tecnico_id=adicional.id)
-    dec_acto = await _acto(db_session, f, TipoActo.DECISION, 4)
+    dec_acto = await _acto(db_session, f, "NOTIFICA", 4)
     decision = Decision(expediente_id=exp.id, encargado_acto_id=10, acto_admin_id=dec_acto.id,
                         decision=TipoDecision.OTORGADA)
     db_session.add_all([anexo_concepto, req, decision])
     await db_session.flush()
-    recurso_acto = await _acto(db_session, f, TipoActo.RECURSO, 5)
+    recurso_acto = await _acto(db_session, f, "NOTIFICA", 5)
     recurso = RecursoReposicion(decision_id=decision.id, radicado="2026ER55555", fecha_radicado=date(2026, 5, 1),
                                 doc_recurso_id=f.registrar(), acto_admin_id=recurso_acto.id)
     db_session.add(recurso)

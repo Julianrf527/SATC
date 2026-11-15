@@ -2,7 +2,7 @@
 // `@features/acto-administrativo` (tipos heredados de sancionatorio). Lógica pura.
 import type { Involucrado } from "@shared/types/involucrado";
 import type { ActoAdministrativo } from "@shared/types/sancionatorio";
-import type { ActoEtapa, VinculoInvolucrado } from "../../types";
+import type { ActoEtapa, MedioActo, VinculoInvolucrado } from "../../types";
 
 /** Acto del nodo → `ActoAdministrativo` de la feature (numerados como texto). */
 export function actoParaFeature(acto: ActoEtapa): ActoAdministrativo {
@@ -12,7 +12,7 @@ export function actoParaFeature(acto: ActoEtapa): ActoAdministrativo {
     fecha_numerado: acto.fecha_numerado,
     documento_acto_administrativo_id: acto.documento_acto_administrativo_id,
     // La feature muestra y edita "Tipo de acto" como AUTO/RES (contrato de
-    // infraction): se le pasa la forma del acto, no la clase interna.
+    // infraction): se le pasa la forma del acto (`clase_acto`).
     tipo_acto: acto.clase_acto ?? "",
     fecha_creacion: acto.fecha_creacion ?? "",
     etapa_id: acto.etapa_id,
@@ -91,15 +91,10 @@ export function vinculosNotificables(
 }
 
 /**
- * Regla del área (14/10/2026): SOLO se comunican —y nunca se notifican— el auto
- * que admite, el acto que reconoce a un tercero y el auto que admite y decreta
- * práctica de pruebas; todos los demás actos solo
- * se notifican. Misma regla que `ACTOS_SOLO_COMUNICACION` del backend
- * (services/actos.py), que además la valida.
+ * Regla del área (14/10/2026): cada acto SOLO se comunica o SOLO se notifica.
+ * Lo decide el backend según la etapa que lo expide (`MEDIO_POR_ETAPA` en
+ * services/actos.py) y llega en `acto.medio`; el front no guarda la regla.
  */
-export const ACTOS_SOLO_COMUNICACION: readonly string[] = ["AUTO_ADMITE", "RECONOCE_TERCERO", "AUTO_PRUEBAS"];
-
-/** ¿El acto (por su clase interna `tipo_acto`) se comunica en vez de notificarse? */
-export function seComunica(tipoActo: string): boolean {
-  return ACTOS_SOLO_COMUNICACION.includes(tipoActo);
+export function seComunica(medio: MedioActo): boolean {
+  return medio === "COMUNICA";
 }

@@ -42,7 +42,7 @@ async def test_decision_v8_y_una_sola_vez(client, rv_permisos, expediente, db_se
     await post(client, url, json=acto_body(stubs, decision="OTORGADA", requiere_memorias=False), esperado=409)
     arbol = await etapas(client, exp_id)
     assert arbol["etapa_actual"] == "decision"
-    assert arbol["decision"]["acto"]["clase_acto"] == "RES" and arbol["decision"]["acto"]["tipo_acto"] == "DECISION"
+    assert arbol["decision"]["acto"]["clase_acto"] == "RES" and arbol["decision"]["acto"]["medio"] == "NOTIFICA"
     assert any("V9" in m for m in arbol["memorias"]["motivos_bloqueo"])
     assert any("V10" in m for m in arbol["obras"]["motivos_bloqueo"])
 
@@ -85,5 +85,5 @@ async def test_recurso_v13_y_acto(client, rv_permisos, con_decision, catalogo, d
     rec = await db_session.scalar(select(RecursoReposicion))
     assert rec.encargado_acto_id == ABOGADO2 and rec.acto_admin_id == datos["acto_id"]
     arbol = await etapas(client, exp_id, ABOGADO2)
-    assert arbol["decision"]["recurso"]["acto"]["tipo_acto"] == "RECURSO"
+    assert arbol["decision"]["recurso"]["acto"]["medio"] == "NOTIFICA"
     assert arbol["decision"]["recurso"]["datos"]["resultado"] == "CONFIRMA"

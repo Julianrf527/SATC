@@ -22,9 +22,16 @@ Cambios:
      ninguno de los dos, REQUIERE.
   5. Práctica de pruebas del recurso de reposición:
      ``recurso_reposicion.requiere_pruebas`` (BOOLEAN NOT NULL DEFAULT false;
-     los recursos ya creados quedan en «No»), el valor ``AUTO_PRUEBAS`` del
-     tipo ``tipo_acto`` y la tabla ``practica_pruebas`` (la crea
-     ``create_all``).
+     los recursos ya creados quedan en «No») y la tabla ``practica_pruebas``
+     (la crea ``create_all``).
+  6. ``acto_administrativo.medio`` (VARCHAR(10) NOT NULL, CHECK
+     COMUNICA/NOTIFICA) reemplaza a ``tipo_acto`` (ENUM): qué acto es lo dice
+     la etapa que lo referencia; la columna solo guarda cómo se da a conocer.
+     Si ``tipo_acto`` existe se convierte una vez (AUTO_ADMITE,
+     RECONOCE_TERCERO y AUTO_PRUEBAS → COMUNICA; el resto → NOTIFICA) y se
+     elimina con su tipo ENUM. El índice ``(tipo_acto, numerado)`` pasa a
+     ``(clase_acto, numerado)``: cada clase (Auto / Resolución) tiene su
+     propia numeración.
 
 Corre en la transacción de ``init_db`` con ``pg_advisory_xact_lock`` para que
 varios workers de Gunicorn arrancando a la vez no ejecuten el DDL en paralelo.
@@ -73,8 +80,35 @@ _DDL = (
     WHERE c.expediente_id IS NOT NULL AND c.doc_concepto_tecnico_id IS NOT NULL AND c.accion IS NULL
     """,
     "ALTER TABLE recurso_reposicion ADD COLUMN IF NOT EXISTS requiere_pruebas BOOLEAN NOT NULL DEFAULT false",
-    # PG >= 12 admite ADD VALUE dentro de la transacción (el valor se usa tras el commit).
-    "ALTER TYPE tipo_acto ADD VALUE IF NOT EXISTS 'AUTO_PRUEBAS'",
+    "ALTER TABLE acto_administrativo ADD COLUMN IF NOT EXISTS medio VARCHAR(10)",
+    # Conversión única desde tipo_acto (EXECUTE: la columna puede ya no existir).
+    """
+    DO $$ BEGIN
+        IF EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name = 'acto_administrativo' AND column_name = 'tipo_acto') THEN
+            EXECUTE $q$
+                UPDATE acto_administrativo SET medio = CASE
+                    WHEN tipo_acto::text IN ('AUTO_ADMITE', 'RECONOCE_TERCERO', 'AUTO_PRUEBAS') THEN 'COMUNICA'
+                    ELSE 'NOTIFICA'
+                END
+                WHERE medio IS NULL
+            $q$;
+            ALTER TABLE acto_administrativo DROP COLUMN tipo_acto;
+        END IF;
+    END $$
+    """,
+    "DROP TYPE IF EXISTS tipo_acto",
+    "ALTER TABLE acto_administrativo ALTER COLUMN medio SET NOT NULL",
+    """
+    DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_acto_admin_medio') THEN
+            ALTER TABLE acto_administrativo
+                ADD CONSTRAINT ck_acto_admin_medio CHECK (medio IN ('COMUNICA', 'NOTIFICA'));
+        END IF;
+    END $$
+    """,
+    "DROP INDEX IF EXISTS ix_acto_admin_tipo_numerado",
+    "CREATE INDEX IF NOT EXISTS ix_acto_admin_clase_numerado ON acto_administrativo (clase_acto, numerado)",
 )
 
 
