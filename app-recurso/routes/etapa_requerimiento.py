@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.acceso import requiere_gestion
 from db.deps import get_db_managed
-from db.models import Requerimiento, TipoActo
+from db.models import Requerimiento
 from services.concurrencia import MSG_ASIGNADO, actualizar_versionado, bloquear_expediente
 from services.etapas import (
     AMBITOS_REQUERIMIENTO,
@@ -111,7 +111,7 @@ async def version_final_requerimiento(
         raise HTTPException(status_code=404, detail="Este requerimiento aún no tiene encargado")
     avisos = Avisos()
     acto = await cargar_acto_final(
-        db, fila=req, etapa_tipo="requerimiento", tipo_acto=TipoActo.REQUERIMIENTO,
+        db, fila=req, etapa_tipo="requerimiento",
         encargado_id=req.encargado_acto_id, datos=body, usuario=usuario, avisos=avisos,
     )
     await auditar(db, usuario, exp, "VERSION_FINAL_REQUERIMIENTO",

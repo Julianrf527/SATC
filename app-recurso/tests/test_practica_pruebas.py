@@ -83,7 +83,7 @@ async def test_flujo_con_pruebas(client, rv_permisos, con_decision, catalogo, db
     await post(client, f"/etapas/{exp_id}/recurso/pruebas/asignarme", ABOGADO, esperado=409)
     fila = await db_session.scalar(select(PracticaPruebas))
     acto = await db_session.get(ActoAdministrativo, fila.acto_admin_id)
-    assert fila.encargado_acto_id == ABOGADO2 and acto.tipo_acto.value == "AUTO_PRUEBAS"
+    assert fila.encargado_acto_id == ABOGADO2 and acto.medio == "COMUNICA"
     concepto = await db_session.get(ConceptoTecnico, fila.concepto_tecnico_id)
     assert concepto.tecnico_encargado_id == TECNICO and str(concepto.fecha_visita_tecnica) == "2026-06-20"
     assert concepto.expediente_id is None
@@ -229,14 +229,15 @@ async def test_super_gestion_si_a_no_con_confirmacion(client, rv_permisos, con_d
     acto = {"clase_acto": "AUTO", "numerado": numerado(), "fecha_numerado": "2026-06-15",
             "file_id": stubs.files.registrar()}
     await post(client, f"/super-gestion/{exp_id}/recurso/pruebas", SUPER_G, {"acto": acto})
+    acto_id = (await db_session.scalar(select(PracticaPruebas))).acto_admin_id
+    db_session.expire_all()
     await post(client, f"/super-gestion/{exp_id}/recurso", SUPER_G, {"requiere_pruebas": False}, esperado=409)
     stubs.files.decrementados.clear()
     r = await post(client, f"/super-gestion/{exp_id}/recurso", SUPER_G,
                    {"requiere_pruebas": False, "confirmar_eliminar_pruebas": True})
     assert r.json()["data"]["practica_eliminada"] is True
     assert await db_session.scalar(select(func.count(PracticaPruebas.id))) == 0
-    assert await db_session.scalar(select(func.count(ActoAdministrativo.id)).where(
-        ActoAdministrativo.tipo_acto == "AUTO_PRUEBAS")) == 0
+    assert await db_session.get(ActoAdministrativo, acto_id) is None
     assert acto["file_id"] in stubs.files.decrementados
 
 
@@ -258,7 +259,7 @@ async def test_descarga_incluye_la_practica(client, rv_permisos, con_decision, c
 
 async def test_migracion_recursos_existentes_quedan_en_no(con_decision, db_session):
     """Simula el esquema anterior (sin la columna): la migración la agrega con
-    «No» en los recursos ya creados y el tipo_acto tiene AUTO_PRUEBAS."""
+    «No» en los recursos ya creados."""
     from sqlalchemy import text
 
     from db.migrations import aplicar_migraciones
@@ -273,5 +274,3 @@ async def test_migracion_recursos_existentes_quedan_en_no(con_decision, db_sessi
     async with engine.begin() as conn:
         await aplicar_migraciones(conn)
     assert (await db_session.execute(text("SELECT requiere_pruebas FROM recurso_reposicion"))).scalar_one() is False
-    valores = (await db_session.execute(text("SELECT unnest(enum_range(NULL::tipo_acto))::text"))).scalars().all()
-    assert "AUTO_PRUEBAS" in valores

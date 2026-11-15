@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.acceso import requiere_gestion
 from db.deps import get_db_managed
-from db.models import InformeUsuario, ReciboSatisfaccionObras, TipoActo
+from db.models import InformeUsuario, ReciboSatisfaccionObras
 from services.concurrencia import MSG_ASIGNADO, bloquear_expediente, integridad_a_409
 from services.etapas import (
     ActoFinalIn,
@@ -129,7 +129,7 @@ async def version_final_aprobacion_obras(
         raise HTTPException(status_code=400, detail=MSG_SIN_OBRAS)
     avisos = Avisos()
     acto = await cargar_acto_final(
-        db, fila=e.obras, etapa_tipo="recibo_satisfaccion_obras", tipo_acto=TipoActo.APRUEBA_OBRAS,
+        db, fila=e.obras, etapa_tipo="recibo_satisfaccion_obras",
         encargado_id=e.obras.encargado_acto_id, datos=body, usuario=usuario, avisos=avisos,
     )
     await auditar(db, usuario, exp, "VERSION_FINAL_APRUEBA_OBRAS", f"Acto que aprueba la obra No. {acto.numerado}",

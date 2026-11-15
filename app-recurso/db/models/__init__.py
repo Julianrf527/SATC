@@ -1,5 +1,5 @@
 from .base import Base, VersionadoMixin
-from .enums import AccionConcepto, TipoActo, TipoVinculo, UsoAgua, TipoDecision, ResultadoRecurso
+from .enums import AccionConcepto, MedioActo, TipoVinculo, UsoAgua, TipoDecision, ResultadoRecurso
 from .municipio import Municipio
 from .vereda import Vereda
 from .tipo_fuente import TipoFuente
@@ -36,7 +36,7 @@ from .auditoria import Auditoria
 __all__ = [
     "Base",
     "VersionadoMixin",
-    "TipoActo",
+    "MedioActo",
     "TipoVinculo",
     "UsoAgua",
     "TipoDecision",

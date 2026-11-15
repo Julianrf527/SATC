@@ -5,7 +5,7 @@ import { actoParaFeature, claveActo, notificablesDe, seComunica } from "./actoFe
 
 const acto: ActoEtapa = {
   id: 4,
-  tipo_acto: "AUTO_ADMITE",
+  medio: "COMUNICA",
   clase_acto: "AUTO",
   numerado: 12,
   fecha_numerado: "2026-04-01",
@@ -93,13 +93,9 @@ describe("documentos del auto que admite", () => {
 });
 
 describe("seComunica (regla del área 14/10/2026)", () => {
-  it("solo el auto que admite y el acto que reconoce al tercero se comunican", () => {
-    expect(seComunica("AUTO_ADMITE")).toBe(true);
-    expect(seComunica("RECONOCE_TERCERO")).toBe(true);
-    expect(seComunica("AUTO_PRUEBAS")).toBe(true);
-    for (const tipo of ["REQUERIMIENTO", "DECISION", "RECURSO", "APRUEBA_MEMORIAS", "APRUEBA_OBRAS"]) {
-      expect(seComunica(tipo)).toBe(false);
-    }
+  it("lo decide el medio que manda el backend", () => {
+    expect(seComunica("COMUNICA")).toBe(true);
+    expect(seComunica("NOTIFICA")).toBe(false);
   });
 
   it("pasa la fecha de registro de la comunicación a la feature", () => {

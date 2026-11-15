@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.acceso import requiere_gestion
 from db.deps import get_db_managed
-from db.models import Decision, PracticaPruebas, RecursoReposicion, ResultadoRecurso, TipoActo, TipoDecision
+from db.models import Decision, PracticaPruebas, RecursoReposicion, ResultadoRecurso, TipoDecision
 from services.concurrencia import MSG_ASIGNADO, MSG_MODIFICADO, actualizar_versionado, bloquear_expediente, integridad_a_409
 from services.eliminar_practica_pruebas import eliminar_practica_pruebas
 from services.etapas import (
@@ -140,7 +140,7 @@ async def version_final_decision(
     exigir(v8_requiere_memorias(body.decision, body.requiere_memorias), usuario)
     avisos = Avisos()
     acto = await cargar_acto_final(
-        db, fila=e.decision, etapa_tipo="decision", tipo_acto=TipoActo.DECISION,
+        db, fila=e.decision, etapa_tipo="decision",
         encargado_id=e.decision.encargado_acto_id, datos=body, usuario=usuario, avisos=avisos,
     )
     e.decision.decision = body.decision
@@ -292,7 +292,7 @@ async def version_final_auto_pruebas(
         raise HTTPException(status_code=400, detail=MSG_NO_TECNICO)
     avisos = Avisos()
     acto = await cargar_acto_final(
-        db, fila=e.pruebas, etapa_tipo="practica_pruebas", tipo_acto=TipoActo.AUTO_PRUEBAS,
+        db, fila=e.pruebas, etapa_tipo="practica_pruebas",
         encargado_id=e.pruebas.encargado_acto_id, datos=body, usuario=usuario, avisos=avisos,
     )
     concepto_id = concepto_previo.id if concepto_previo is not None else None
@@ -349,7 +349,7 @@ async def version_final_recurso(
     exigir(flujo_resuelve_recurso(e), usuario)
     avisos = Avisos()
     acto = await cargar_acto_final(
-        db, fila=e.recurso, etapa_tipo="recurso_reposicion", tipo_acto=TipoActo.RECURSO,
+        db, fila=e.recurso, etapa_tipo="recurso_reposicion",
         encargado_id=e.recurso.encargado_acto_id, datos=body, usuario=usuario, avisos=avisos,
     )
     e.recurso.resultado = body.resultado

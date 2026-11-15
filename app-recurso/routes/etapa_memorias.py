@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.acceso import requiere_gestion
 from db.deps import get_db_managed
-from db.models import MemoriasCalculo, Subsanacion, TipoActo
+from db.models import MemoriasCalculo, Subsanacion
 from services.concurrencia import MSG_ASIGNADO, bloquear_expediente, integridad_a_409
 from services.etapas import (
     ActoFinalIn,
@@ -133,7 +133,7 @@ async def version_final_aprobacion_memorias(
         raise HTTPException(status_code=400, detail=MSG_SIN_MEMORIAS)
     avisos = Avisos()
     acto = await cargar_acto_final(
-        db, fila=e.memorias, etapa_tipo="memorias_calculo", tipo_acto=TipoActo.APRUEBA_MEMORIAS,
+        db, fila=e.memorias, etapa_tipo="memorias_calculo",
         encargado_id=e.memorias.encargado_acto_id, datos=body, usuario=usuario, avisos=avisos,
     )
     await auditar(db, usuario, exp, "VERSION_FINAL_APRUEBA_MEM", f"Acto que aprueba las memorias No. {acto.numerado}",

@@ -38,7 +38,7 @@ async def test_tercero_vincular_reconocer(client, rv_permisos, expediente, db_se
     vinculo = await db_session.get(ExpedienteInvolucrado, vid)
     assert vinculo.acto_admin_id == data["acto_id"]
     lista = (await client.get(f"/terceros/expediente/{exp_id}", headers=headers(LECTOR))).json()["data"]
-    assert lista[0]["acto"]["tipo_acto"] == "RECONOCE_TERCERO" and lista[0]["acciones_disponibles"] == []
+    assert lista[0]["acto"]["medio"] == "COMUNICA" and lista[0]["acciones_disponibles"] == []
     arbol = await etapas(client, exp_id)
     # Regla del área (14/10/2026): el acto que reconoce al tercero solo se comunica.
     acciones_acto = arbol["terceros"][0]["acto"]["acciones_disponibles"]

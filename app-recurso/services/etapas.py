@@ -44,7 +44,6 @@ from db.models import (
     RecursoReposicion,
     Requerimiento,
     Subsanacion,
-    TipoActo,
     TipoVinculo,
 )
 from db.models.documento_proceso import DocumentoProceso
@@ -603,15 +602,15 @@ async def crear_concepto(
 
 # ───────────────────────────────────────────────────── versión final
 
-async def preparar_acto(db: AsyncSession, tipo_acto: TipoActo, datos: ActoFinalIn) -> None:
+async def preparar_acto(db: AsyncSession, datos: ActoFinalIn) -> None:
     """Valida numerado/fecha/duplicado ANTES de tocar app-docs."""
     numero = validar_numerado(datos.numerado)
     fecha = validar_fecha(datos.fecha_numerado, "fecha de numerado")
-    await validar_numerado_disponible(db, ActoAdministrativo, numero, fecha, tipo_acto=tipo_acto)
+    await validar_numerado_disponible(db, ActoAdministrativo, numero, fecha, clase_acto=datos.clase_acto)
 
 
 async def cargar_acto_final(
-    db: AsyncSession, *, fila, etapa_tipo: str, tipo_acto: TipoActo, encargado_id: Optional[int],
+    db: AsyncSession, *, fila, etapa_tipo: str, encargado_id: Optional[int],
     datos: ActoFinalIn, usuario: Usuario, avisos: Avisos,
 ) -> ActoAdministrativo:
     """"Cargar versión final" de una etapa con acto (plan §4-E.3): el encargado
@@ -620,7 +619,7 @@ async def cargar_acto_final(
     if fila.acto_admin_id:
         raise HTTPException(status_code=409, detail=MSG_YA_TIENE_ACTO)
     exigir_encargado(encargado_id, usuario)
-    await preparar_acto(db, tipo_acto, datos)
+    await preparar_acto(db, datos)
     proceso = await proceso_vigente(db, etapa_tipo, fila.id, para_actualizar=True)
     if proceso is None:
         raise HTTPException(status_code=409, detail=MSG_SIN_PROCESO)
@@ -630,7 +629,7 @@ async def cargar_acto_final(
     except ReviewError as e:
         raise http_error(e)
     acto = await crear_acto(
-        db, tipo_acto=tipo_acto, clase_acto=datos.clase_acto, numerado=datos.numerado,
+        db, etapa_tipo=etapa_tipo, clase_acto=datos.clase_acto, numerado=datos.numerado,
         fecha_numerado=datos.fecha_numerado, documento_id=datos.file_id, user_id=usuario.user_id,
     )
     fila.acto_admin_id = acto.id

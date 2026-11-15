@@ -55,8 +55,8 @@ async def test_memorias_ciclo_completo(client, rv_permisos, con_decision, db_ses
     assert m.acto_admin_id == data["acto_id"] and m.requerimiento_id and m.subsanacion_id
     arbol = await etapas(client, exp_id)
     mem = arbol["memorias"]
-    assert mem["aprobacion"]["acto"]["tipo_acto"] == "APRUEBA_MEMORIAS"
-    assert mem["requerimiento"]["acto"]["tipo_acto"] == "REQUERIMIENTO"
+    assert mem["aprobacion"]["acto"]["medio"] == "NOTIFICA"
+    assert mem["requerimiento"]["acto"]["medio"] == "NOTIFICA"
     assert mem["subsanacion"]["datos"]["radicado"] == "2026ER102"
     assert mem["subsanacion"]["concepto"]["datos"]["cumple"] is True
     # Ahora sí V10
@@ -91,7 +91,7 @@ async def test_obras_ciclo_completo(client, rv_permisos, con_decision, db_sessio
     assert arbol["etapa_actual"] == "obras"
     assert ob["datos"]["radicado"] == "2026ER900" and ob["nuevo_informe"]["datos"]["radicado"] == "2026ER901"
     assert ob["concepto_segundo"]["datos"]["fecha_visita_tecnica"] == "2026-09-10"
-    assert ob["aprobacion"]["acto"]["tipo_acto"] == "APRUEBA_OBRAS"
+    assert ob["aprobacion"]["acto"]["medio"] == "NOTIFICA"
 
 
 async def test_obras_v10_decision_negada(client, rv_permisos, con_decision):

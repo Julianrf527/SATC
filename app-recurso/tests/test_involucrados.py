@@ -10,7 +10,6 @@ from db.models import (
     Auditoria,
     ExpedienteInvolucrado,
     Notificacion,
-    TipoActo,
     TipoVinculo,
 )
 from tests.conftest import TestSessionLocal
@@ -215,7 +214,7 @@ async def test_no_se_gestiona_tercero_por_esta_ruta(client, h_gestor, crear_expe
 async def test_desvincular_con_notificaciones_409(client, h_gestor, crear_expediente, vincular, db_session, stubs):
     exp = await crear_expediente()
     v = await vincular(exp.id, 60)
-    acto = ActoAdministrativo(tipo_acto=TipoActo.AUTO_ADMITE, numerado=1, fecha_numerado=date(2026, 4, 1),
+    acto = ActoAdministrativo(medio="COMUNICA", numerado=1, fecha_numerado=date(2026, 4, 1),
                               documento_acto_administrativo_id=stubs.files.registrar())
     db_session.add(acto)
     await db_session.flush()

@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.acceso import requiere_gestion, requiere_lectura
 from db.deps import get_db_managed
-from db.models import ActoAdmite, TipoActo
+from db.models import ActoAdmite
 from services.concurrencia import MSG_ASIGNADO, actualizar_versionado, bloquear_expediente
 from services.etapas import (
     MSG_NO_TECNICO,
@@ -114,7 +114,7 @@ async def version_final_admite(
         raise HTTPException(status_code=400, detail=MSG_NO_TECNICO)
     avisos = Avisos()
     acto = await cargar_acto_final(
-        db, fila=e.admite, etapa_tipo="acto_admite", tipo_acto=TipoActo.AUTO_ADMITE,
+        db, fila=e.admite, etapa_tipo="acto_admite",
         encargado_id=e.admite.encargado_acto_id, datos=body, usuario=usuario, avisos=avisos,
     )
     # Nace la etapa 2 (V5) con el técnico y la fecha de visita escritos en el auto.

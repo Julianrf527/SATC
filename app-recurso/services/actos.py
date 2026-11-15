@@ -3,7 +3,7 @@ Etapa 4 "Citación y notificación", transversal tercero).
 
 API interna para las etapas (agente C) — ninguna función hace commit:
 
-- ``crear_acto(db, *, tipo_acto, clase_acto, numerado, fecha_numerado, documento_id, user_id)``:
+- ``crear_acto(db, *, etapa_tipo, clase_acto, numerado, fecha_numerado, documento_id, user_id)``:
   lo llama C al "Cargar versión final", en la misma transacción que
   ``revision_documentos.cargar_version_final``; C enlaza ``acto.id`` en la etapa.
 - ``etapa_de_acto(db, acto_id)``: etapa dueña del acto (tabla, fila, expediente, encargado).
@@ -37,8 +37,8 @@ from db.models import (
     ReciboSatisfaccionObras,
     PracticaPruebas,
     RecursoReposicion,
+    MedioActo,
     Requerimiento,
-    TipoActo,
 )
 from db.models.documento_proceso import DocumentoProceso
 import services.docs as docs_svc
@@ -48,33 +48,48 @@ logger = logging.getLogger(__name__)
 NUMERADO_MAX_DIGITOS = 4  # como infraction (el front exige 4 dígitos)
 ANIO_CONTROL_DUPLICADOS = 2012  # infraction solo controla duplicados desde 2013
 
-# Comunicar vs. notificar (regla del área, aclarada el 2026-10-14). ÚNICA
-# definición en el backend; el front la replica en ``etapas/comun/actoFeature.ts``.
-# - SOLO se comunican (nunca se notifican): el auto que admite y el acto que
-#   reconoce a un tercero. La comunicación es pública (llega a todos, sin
-#   distinguir), así que no hay notificaciones por persona.
+# Comunicar vs. notificar (regla del área, aclarada el 2026-10-14). ÚNICO lugar
+# donde se decide: etapa que expide el acto (``etapa_tipo`` = tabla) → medio. Se
+# guarda en ``acto_administrativo.medio`` al crearlo (el acto conserva el medio
+# con el que se expidió aunque la regla cambie después).
+# - SOLO se comunican (nunca se notifican): el auto que admite, el acto que
+#   reconoce a un tercero y el auto que admite y decreta práctica de pruebas.
+#   La comunicación es pública (llega a todos), sin notificaciones por persona.
 # - Todos los demás actos SOLO se notifican (una fila por persona) y no tienen
 #   comunicación.
-ACTOS_SOLO_COMUNICACION = frozenset({TipoActo.AUTO_ADMITE, TipoActo.RECONOCE_TERCERO, TipoActo.AUTO_PRUEBAS})
+MEDIO_POR_ETAPA: dict[str, MedioActo] = {
+    "acto_admite": MedioActo.COMUNICA,
+    "expediente_involucrado": MedioActo.COMUNICA,
+    "practica_pruebas": MedioActo.COMUNICA,
+    "requerimiento": MedioActo.NOTIFICA,
+    "decision": MedioActo.NOTIFICA,
+    "recurso_reposicion": MedioActo.NOTIFICA,
+    "memorias_calculo": MedioActo.NOTIFICA,
+    "recibo_satisfaccion_obras": MedioActo.NOTIFICA,
+}
 MSG_SIN_NOTIFICACION = "Este acto solo se comunica; no se notifica"
 MSG_SIN_COMUNICACION = "Este acto solo se notifica; no se comunica"
 
 
-def _tipo(tipo_acto: Any) -> Optional[TipoActo]:
-    try:
-        return TipoActo(tipo_acto.value if isinstance(tipo_acto, TipoActo) else tipo_acto)
-    except ValueError:
-        return None
+def medio_de_etapa(etapa_tipo: str) -> MedioActo:
+    medio = MEDIO_POR_ETAPA.get(etapa_tipo)
+    if medio is None:  # error de programación: toda tabla con acto debe estar en el mapa
+        raise ValueError(f"La etapa {etapa_tipo} no expide actos administrativos")
+    return medio
 
 
-def se_comunica(tipo_acto: Any) -> bool:
-    """¿El acto lleva comunicación? (acepta el enum o su valor en texto)."""
-    return _tipo(tipo_acto) in ACTOS_SOLO_COMUNICACION
+def _valor_medio(medio: Any) -> Optional[str]:
+    return medio.value if isinstance(medio, MedioActo) else medio
 
 
-def se_notifica(tipo_acto: Any) -> bool:
+def se_comunica(medio: Any) -> bool:
+    """¿El acto lleva comunicación? (``acto.medio``: enum o texto)."""
+    return _valor_medio(medio) == MedioActo.COMUNICA.value
+
+
+def se_notifica(medio: Any) -> bool:
     """¿El acto admite notificaciones? Exactamente los que no se comunican."""
-    return not se_comunica(tipo_acto)
+    return _valor_medio(medio) == MedioActo.NOTIFICA.value
 
 
 # ═══════════════════════════════════════════════════════════ validaciones
@@ -116,15 +131,6 @@ def validar_clase_acto(clase_acto: Any) -> str:
     return valor
 
 
-def validar_tipo_acto(tipo_acto: Any) -> TipoActo:
-    try:
-        return TipoActo(tipo_acto.value if isinstance(tipo_acto, TipoActo) else str(tipo_acto))
-    except ValueError:
-        raise HTTPException(
-            status_code=400, detail=f"Tipo de acto inválido. Permitidos: {', '.join(t.value for t in TipoActo)}",
-        )
-
-
 async def _incrementar(file_ids: list[int]) -> None:
     file_ids = [f for f in file_ids if f]
     if not file_ids:
@@ -145,16 +151,19 @@ async def _decrementar(file_ids: list[int]) -> None:
 
 async def validar_numerado_disponible(
     db: AsyncSession, modelo: type, numerado: int, fecha_numerado: date, *, excluir_id: int | None = None,
-    tipo_acto: TipoActo | None = None,
+    clase_acto: str | None = None,
 ) -> None:
     """Replica infraction: mismo ``numerado`` + misma ``fecha_numerado`` (desde
-    2013) → 409. TODO(negocio): si la numeración se reinicia cada año, incluir el
-    año en el índice ``(tipo_acto, numerado)`` y volverlo único (plan §7)."""
+    2013) → 409. ``clase_acto``: la entidad numera los Autos y las Resoluciones
+    por separado, así que solo choca con actos de la misma clase (los actos
+    antiguos sin clase no se comparan). TODO(negocio): si la numeración se
+    reinicia cada año, incluir el año en el índice ``(clase_acto, numerado)`` y
+    volverlo único (plan §7)."""
     if fecha_numerado.year <= ANIO_CONTROL_DUPLICADOS:
         return
     stmt = select(modelo.id).where(modelo.numerado == numerado, modelo.fecha_numerado == fecha_numerado)
-    if tipo_acto is not None:
-        stmt = stmt.where(modelo.tipo_acto == tipo_acto)
+    if clase_acto is not None:
+        stmt = stmt.where(modelo.clase_acto == clase_acto)
     if excluir_id is not None:
         stmt = stmt.where(modelo.id != excluir_id)
     if await db.scalar(stmt.limit(1)):
@@ -169,7 +178,7 @@ async def validar_numerado_disponible(
 async def crear_acto(
     db: AsyncSession,
     *,
-    tipo_acto: TipoActo | str,
+    etapa_tipo: str,
     clase_acto: str,
     numerado: int | str,
     fecha_numerado: date | str,
@@ -180,26 +189,27 @@ async def crear_acto(
     plan §4-E.3) e incrementa ``numero_usos`` del PDF firmado. C lo llama al
     cargar la versión final y enlaza ``acto.id`` en ``etapa.acto_admin_id``.
 
-    Validaciones: tipo de ``TipoActo``; numerado entero positivo de máx. 4
-    dígitos; fecha AAAA-MM-DD; ``documento_id`` > 0; numerado+fecha no repetido
-    para el mismo tipo de acto (409). TODO(negocio): numeración por año (plan §7,
-    el índice ``(tipo_acto, numerado)`` no es único). Errores como
-    ``HTTPException`` (400/409/502). No hace commit."""
-    tipo = validar_tipo_acto(tipo_acto)
+    ``etapa_tipo`` (tabla que expide el acto) fija el ``medio`` (comunica o
+    notifica, ``MEDIO_POR_ETAPA``). Validaciones: clase AUTO/RES; numerado
+    entero positivo de máx. 4 dígitos; fecha AAAA-MM-DD; ``documento_id`` > 0;
+    numerado+fecha no repetido en la misma clase (409). TODO(negocio):
+    numeración por año (plan §7, el índice ``(clase_acto, numerado)`` no es
+    único). Errores como ``HTTPException`` (400/409/502). No hace commit."""
+    medio = medio_de_etapa(etapa_tipo)
     clase = validar_clase_acto(clase_acto)
     numero = validar_numerado(numerado)
     fecha = validar_fecha(fecha_numerado, "fecha de numerado")
     if not documento_id or int(documento_id) <= 0:
         raise HTTPException(status_code=400, detail="El documento del acto es obligatorio")
-    await validar_numerado_disponible(db, ActoAdministrativo, numero, fecha, tipo_acto=tipo)
+    await validar_numerado_disponible(db, ActoAdministrativo, numero, fecha, clase_acto=clase)
     acto = ActoAdministrativo(
-        tipo_acto=tipo, clase_acto=clase, numerado=numero, fecha_numerado=fecha,
+        medio=medio.value, clase_acto=clase, numerado=numero, fecha_numerado=fecha,
         documento_acto_administrativo_id=int(documento_id),
     )
     db.add(acto)
     await db.flush()
     await _incrementar([int(documento_id)])
-    logger.info(f"Acto {tipo.value} {numero} creado por {user_id} (id {acto.id})")
+    logger.info(f"Acto {clase} {numero} ({etapa_tipo}, {medio.value}) creado por {user_id} (id {acto.id})")
     return acto
 
 
@@ -385,10 +395,9 @@ async def serializar_acto(db: AsyncSession, acto: ActoAdministrativo, etapa: Eta
         select(Notificacion).where(Notificacion.acto_admin_id == acto.id).order_by(Notificacion.id)
     )).scalars().all()
     estado_notif = await notificaciones_completas(db, acto.id)
-    tipo = acto.tipo_acto.value if isinstance(acto.tipo_acto, TipoActo) else acto.tipo_acto
     return {
         "id": acto.id,
-        "tipo_acto": tipo,
+        "medio": _valor_medio(acto.medio),
         "clase_acto": acto.clase_acto,
         "numerado": acto.numerado,
         "fecha_numerado": _iso(acto.fecha_numerado),
@@ -419,30 +428,30 @@ async def acciones_acto(db: AsyncSession, acto_id: int, usuario: Usuario, etapa:
     acciones = ["editar_acto"]
     if usuario.super_gestion:
         acciones.append("eliminar_acto")
-    tipo_acto = await db.scalar(select(ActoAdministrativo.tipo_acto).where(ActoAdministrativo.id == acto_id))
+    medio = await db.scalar(select(ActoAdministrativo.medio).where(ActoAdministrativo.id == acto_id))
     tiene_com = await db.scalar(select(Comunicacion.id).where(Comunicacion.acto_administrativo_id == acto_id))
     notificados = set((await db.execute(
         select(Notificacion.involucrado_id).where(Notificacion.acto_admin_id == acto_id)
     )).scalars().all())
     notificables: set[int] = set()
-    if etapa.expediente_id is not None and se_notifica(tipo_acto):
+    if etapa.expediente_id is not None and se_notifica(medio):
         notificables = {i.involucrado_id for i in await involucrados_notificables(db, etapa.expediente_id)}
-    return acciones + acciones_comunicacion_notificacion(tipo_acto, bool(tiene_com), notificados, notificables)
+    return acciones + acciones_comunicacion_notificacion(medio, bool(tiene_com), notificados, notificables)
 
 
 def acciones_comunicacion_notificacion(
-    tipo_acto: Any, tiene_comunicacion: bool, notificados: set[int], notificables: set[int],
+    medio: Any, tiene_comunicacion: bool, notificados: set[int], notificables: set[int],
 ) -> list[str]:
-    """Acciones de comunicación/notificación según el tipo del acto (ver
-    ``ACTOS_SOLO_COMUNICACION``). Datos heredados que no cumplen la regla
+    """Acciones de comunicación/notificación según el ``medio`` del acto (ver
+    ``MEDIO_POR_ETAPA``). Datos heredados que no cumplen la regla
     (comunicación en un acto que solo se notifica, o al revés) se pueden
     editar y eliminar, pero no se ofrece crear más."""
     acciones: list[str] = []
     if tiene_comunicacion:
         acciones += ["editar_comunicacion", "eliminar_comunicacion"]
-    elif se_comunica(tipo_acto):
+    elif se_comunica(medio):
         acciones.append("crear_comunicacion")
-    if se_notifica(tipo_acto) and notificables - notificados:
+    if se_notifica(medio) and notificables - notificados:
         acciones.append("crear_notificacion")
     if notificados:
         acciones += ["editar_notificacion", "eliminar_notificacion"]

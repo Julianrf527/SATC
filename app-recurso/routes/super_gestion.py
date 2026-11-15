@@ -67,7 +67,6 @@ from db.models import (
     Requerimiento,
     ResultadoRecurso,
     Subsanacion,
-    TipoActo,
     TipoDecision,
     TipoVinculo,
 )
@@ -219,7 +218,7 @@ class Cargue:
                     self.anteriores.append(anterior)
             setattr(fila, campo, v)
 
-    async def acto(self, fila, etapa_tipo: str, tipo_acto: TipoActo, datos: Optional[ActoSuper]) -> None:
+    async def acto(self, fila, etapa_tipo: str, datos: Optional[ActoSuper]) -> None:
         if datos is None:
             return
         if fila.acto_admin_id:
@@ -228,11 +227,11 @@ class Cargue:
                 detail="Esta etapa ya tiene acto administrativo; corrígelo con PUT /actos/administrativos/{id}",
             )
         await validar_pdf(datos.file_id, "Acto administrativo")
-        await preparar_acto(self.db, tipo_acto, datos)  # type: ignore[arg-type]
+        await preparar_acto(self.db, datos)  # type: ignore[arg-type]
         await self.db.flush()
         await cerrar_proceso_vigente(self.db, etapa_tipo, fila.id, usuario_id=self.usuario.user_id,
                                      descripcion=DESCRIPCION_CIERRE)
-        acto = await crear_acto(self.db, tipo_acto=tipo_acto, clase_acto=datos.clase_acto, numerado=datos.numerado,
+        acto = await crear_acto(self.db, etapa_tipo=etapa_tipo, clase_acto=datos.clase_acto, numerado=datos.numerado,
                                 fecha_numerado=datos.fecha_numerado, documento_id=datos.file_id,
                                 user_id=self.usuario.user_id)
         fila.acto_admin_id = acto.id
@@ -337,7 +336,7 @@ async def super_admite(request: Request, expediente_id: int, body: AdmiteSuper,
         "doc_oficio_alcaldia_id": "Oficio a la Alcaldía", "doc_fijacion_aviso_id": "Fijación del aviso",
         "doc_constancia_fijacion_aviso_id": "Constancia de fijación de la Alcaldía",
     })
-    await c.acto(fila, "acto_admite", TipoActo.AUTO_ADMITE, body.acto)
+    await c.acto(fila, "acto_admite", body.acto)
     avisos = Avisos()
     await _sincronizar_acto(db, usuario, exp, fila, "acto_admite", "AUTO_ADMITE", avisos)
     if e.concepto2 is None and body.tecnico_id:
@@ -463,7 +462,7 @@ async def super_requerimiento(request: Request, expediente_id: int, ambito: str,
         await c.campos(req, {"encargado_acto_id": body.encargado_acto_id})
         subir_version(req)
     await c.campos(req, respuesta, {"doc_oficio_entrada_id": "Oficio de respuesta del usuario"})
-    await c.acto(req, "requerimiento", TipoActo.REQUERIMIENTO, body.acto)
+    await c.acto(req, "requerimiento", body.acto)
     avisos = Avisos()
     await _sincronizar_acto(db, usuario, exp, req, "requerimiento", "REQUERIMIENTO", avisos)
     await db.flush()
@@ -488,7 +487,7 @@ async def super_decision(request: Request, expediente_id: int, body: DecisionSup
         await c.campos(fila, {"encargado_acto_id": body.encargado_acto_id})
         subir_version(fila)
     await c.campos(fila, body.model_dump(include={"decision", "requiere_memorias", "fecha_ejecutoria"}))
-    await c.acto(fila, "decision", TipoActo.DECISION, body.acto)
+    await c.acto(fila, "decision", body.acto)
     avisos = Avisos()
     await _sincronizar_acto(db, usuario, exp, fila, "decision", "DECISION", avisos)
     await db.flush()
@@ -531,7 +530,7 @@ async def super_recurso(request: Request, expediente_id: int, body: RecursoSuper
                           "resultado": body.resultado}, {"doc_recurso_id": "Escrito del recurso"})
     if nueva:
         await _guardar_nueva(db, fila, "El expediente ya tiene recurso de reposición")
-    await c.acto(fila, "recurso_reposicion", TipoActo.RECURSO, body.acto)
+    await c.acto(fila, "recurso_reposicion", body.acto)
     avisos = Avisos()
     await _sincronizar_acto(db, usuario, exp, fila, "recurso_reposicion", "RECURSO", avisos)
     await db.flush()
@@ -569,7 +568,7 @@ async def super_auto_pruebas(request: Request, expediente_id: int, body: Pruebas
     else:
         await c.campos(fila, {"encargado_acto_id": body.encargado_acto_id})
         subir_version(fila)
-    await c.acto(fila, "practica_pruebas", TipoActo.AUTO_PRUEBAS, body.acto)
+    await c.acto(fila, "practica_pruebas", body.acto)
     avisos = Avisos()
     await _sincronizar_acto(db, usuario, exp, fila, "practica_pruebas", "AUTO_PRUEBAS", avisos)
     if concepto is None and body.tecnico_id:
@@ -608,7 +607,7 @@ async def super_memorias(request: Request, expediente_id: int, body: RadicadoAct
                    {"doc_planos_id": "Planos"})
     if nueva:
         await _guardar_nueva(db, fila, "Ya existe, o el radicado ya está registrado")
-    await c.acto(fila, "memorias_calculo", TipoActo.APRUEBA_MEMORIAS, body.acto)
+    await c.acto(fila, "memorias_calculo", body.acto)
     avisos = Avisos()
     await _sincronizar_acto(db, usuario, exp, fila, "memorias_calculo", "APRUEBA_MEMORIAS", avisos)
     await db.flush()
@@ -671,7 +670,7 @@ async def super_obras(request: Request, expediente_id: int, body: RadicadoActoSu
     else:
         await c.campos(fila, {"encargado_acto_id": body.encargado_acto_id})
         subir_version(fila)
-    await c.acto(fila, "recibo_satisfaccion_obras", TipoActo.APRUEBA_OBRAS, body.acto)
+    await c.acto(fila, "recibo_satisfaccion_obras", body.acto)
     avisos = Avisos()
     await _sincronizar_acto(db, usuario, exp, fila, "recibo_satisfaccion_obras", "APRUEBA_OBRAS", avisos)
     await db.flush()
@@ -705,7 +704,7 @@ async def super_acto_tercero(request: Request, vinculo_id: int, body: TerceroAct
     exp = await bloquear_expediente(db, vinculo.expediente_id)
     vinculo = await obtener_vinculo(db, vinculo_id)
     c = Cargue(db, usuario)
-    await c.acto(vinculo, "expediente_involucrado", TipoActo.RECONOCE_TERCERO, body.acto)
+    await c.acto(vinculo, "expediente_involucrado", body.acto)
     subir_version(vinculo)
     await db.flush()
     data = _resp(vinculo, c)
