@@ -1,4 +1,4 @@
-from sqlalchemy import CheckConstraint, Column, Integer, Boolean, Float, ForeignKey, Date, Index, String
+from sqlalchemy import CheckConstraint, Column, DateTime, Integer, Boolean, Float, ForeignKey, Date, Index, String
 from sqlalchemy.orm import relationship
 from .base import Base, VersionadoMixin
 
@@ -23,6 +23,10 @@ class ConceptoTecnico(VersionadoMixin, Base):
     # (antes de que exista el concepto firmado, plan §4-E): se llena al cargar
     # la versión final.
     doc_concepto_tecnico_id = Column(Integer)
+    # Cuándo se cargó la versión final (alertas). La llena un trigger de la BD
+    # (db/migrations.py) la primera vez que se pone ``doc_concepto_tecnico_id``;
+    # reemplazar el PDF no la cambia y quitarlo la deja en NULL.
+    fecha_version_final = Column(DateTime(timezone=True))
     # Solo etapa 2: DECIDE (no procede requerimiento) o REQUIERE (habilita la etapa 3).
     accion = Column(String(10))
 

@@ -20,6 +20,19 @@ export const TIPO_LABELS: Record<string, string> = {
   admite_aviso_publicado: "Aviso publicado",
   concepto_primera_version: "Concepto: 1.ª versión",
   concepto_version_final: "Concepto: versión final",
+  requerimiento_primera_version: "Requerimiento: 1.ª versión",
+  requerimiento_revision: "Requerimiento: revisión",
+  requerimiento_version_final: "Requerimiento: versión final",
+  concepto_adicional_tecnico: "Concepto adicional: técnico",
+  concepto_adicional_primera_version: "Concepto adicional: 1.ª versión",
+  concepto_adicional_revision: "Concepto adicional: revisión",
+  concepto_adicional_version_final: "Concepto adicional: versión final",
+  decision_primera_version: "Decisión: 1.ª versión",
+  decision_revision: "Decisión: revisión",
+  decision_version_final: "Decisión: versión final",
+  recurso_acto: "Recurso: acto",
+  recurso_concepto_pruebas: "Recurso: concepto de pruebas",
+  recurso_acto_tras_pruebas: "Recurso: acto tras pruebas",
 };
 
 export const URGENCIA_ORDER: Record<string, number> = { critico: 0, alta: 1, media: 2, baja: 3 };

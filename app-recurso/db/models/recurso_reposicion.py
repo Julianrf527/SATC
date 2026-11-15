@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, ForeignKey, Date, Index, text
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, ForeignKey, Date, Index, func, text
 from sqlalchemy.orm import relationship
 from .base import Base, VersionadoMixin
 from .enums import resultado_recurso_enum
@@ -16,6 +16,9 @@ class RecursoReposicion(VersionadoMixin, Base):
     resultado = Column(resultado_recurso_enum)
     doc_recurso_id = Column(Integer, nullable=False)
     requiere_pruebas = Column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # Cuándo se registró el recurso en el sistema (inicio de los plazos en días
+    # calendario de las alertas). ``fecha_radicado`` es la fecha del escrito del usuario.
+    fecha_creacion = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     decision = relationship("Decision", back_populates="recurso_reposicion")
     acto_administrativo = relationship("ActoAdministrativo")
