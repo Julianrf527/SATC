@@ -205,6 +205,7 @@ Table concepto_tecnico {
   num_usuarios integer
   cumple boolean
   doc_concepto_tecnico_id integer [note: 'archivo en app-docs (FK lógica)']
+  fecha_version_final timestamptz [note: 'cuándo se cargó la versión final (trigger al poner el primer PDF; alertas)']
   version integer [not null, default: `1`]
 
   indexes {
@@ -220,6 +221,7 @@ Table requerimiento {
   radicado_oficio_entrada varchar(15)
   fecha_oficio_entrada date
   doc_oficio_entrada_id integer [note: 'archivo en app-docs (FK lógica)']
+  fecha_registro_respuesta timestamptz [note: 'cuándo se registró la respuesta del usuario (trigger al poner el primer PDF; alertas)']
   concepto_tecnico_id integer [unique]
   version integer [not null, default: `1`]
 
@@ -254,6 +256,7 @@ Table recurso_reposicion {
   resultado resultado_recurso
   doc_recurso_id integer [not null, note: 'archivo en app-docs (FK lógica)']
   requiere_pruebas boolean [not null, default: false, note: '¿Requiere práctica de pruebas? (se responde al crear el recurso)']
+  fecha_creacion timestamptz [not null, default: `now()`, note: 'cuándo se registró el recurso (alertas en días calendario)']
   version integer [not null, default: `1`]
 
   indexes {

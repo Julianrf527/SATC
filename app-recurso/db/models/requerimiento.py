@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Date, Index
+from sqlalchemy import Column, DateTime, Integer, String, ForeignKey, Date, Index
 from sqlalchemy.orm import relationship
 from .base import Base, VersionadoMixin
 
@@ -17,6 +17,9 @@ class Requerimiento(VersionadoMixin, Base):
     radicado_oficio_entrada = Column(String(15))
     fecha_oficio_entrada = Column(Date)
     doc_oficio_entrada_id = Column(Integer)
+    # Cuándo se registró la respuesta del usuario (alertas). La llena un trigger
+    # de la BD (db/migrations.py) la primera vez que se pone ``doc_oficio_entrada_id``.
+    fecha_registro_respuesta = Column(DateTime(timezone=True))
     concepto_tecnico_id = Column(Integer, ForeignKey('concepto_tecnico.id', onupdate="CASCADE"), unique=True)
 
     expediente = relationship("Expediente", back_populates="requerimiento")

@@ -1,6 +1,7 @@
 """Alertas de vencimiento (prefijo ``/alertas``). Reglas en ``services/alertas.py``.
 
-- ``GET /alertas/todas``: pestaña Alertas (``recurso_gestionar``).
+- ``GET /alertas/todas``: pestaña Alertas (``recurso_gestionar`` o
+  ``recurso_consultar``: también la ven, p. ej., los técnicos y los líderes).
   ``alcance=mios`` → alertas cuyo encargado es el usuario; ``alcance=todos`` →
   todas. Mismo contrato que infraction (``satc_shared.alertas``); cada alerta
   trae ``es_responsable`` y ``expediente_id``.
@@ -15,7 +16,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from core.acceso import requiere_gestion, requiere_lectura
+from core.acceso import requiere_gestion, requiere_lectura, requiere_permiso
+from core.permission import Permission
 from db.deps import get_db_managed
 from db.models.expediente import Expediente
 from satc_shared.alertas import LIMITE_MAXIMO, paginar_alertas
@@ -42,7 +44,7 @@ async def alertas_todas(
     tipo: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db_managed),
 ):
-    usuario = await requiere_gestion(request)
+    usuario = await requiere_permiso(request, Permission.MANAGE, Permission.CONSULT)
     por_expediente = await calcular_alertas(db, hoy_bogota())
 
     radicados = {}

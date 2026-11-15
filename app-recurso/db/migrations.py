@@ -32,6 +32,18 @@ Cambios:
      elimina con su tipo ENUM. El índice ``(tipo_acto, numerado)`` pasa a
      ``(clase_acto, numerado)``: cada clase (Auto / Resolución) tiene su
      propia numeración.
+  7. Fechas para las alertas de las etapas 3, 4 y del recurso:
+     ``recurso_reposicion.fecha_creacion`` (TIMESTAMPTZ NOT NULL DEFAULT now()),
+     ``concepto_tecnico.fecha_version_final`` y
+     ``requerimiento.fecha_registro_respuesta`` (TIMESTAMPTZ, NULL). Las dos
+     últimas las llena un trigger la primera vez que se pone el PDF
+     (``doc_concepto_tecnico_id`` / ``doc_oficio_entrada_id``) por cualquier
+     camino (ORM o UPDATE directo); reemplazar el PDF no las cambia y quitarlo
+     las deja en NULL. Las filas existentes se completan una vez: el recurso con
+     su auditoría ``CREAR_RECURSO`` o, si no hay, ``fecha_radicado``; el concepto
+     con su última versión subida o, si no hay, ``fecha_aceptacion``; la
+     respuesta con su auditoría ``RESPUESTA_REQUERIMIENTO`` o, si no hay,
+     ``fecha_oficio_entrada``.
 
 Corre en la transacción de ``init_db`` con ``pg_advisory_xact_lock`` para que
 varios workers de Gunicorn arrancando a la vez no ejecuten el DDL en paralelo.
@@ -109,6 +121,68 @@ _DDL = (
     """,
     "DROP INDEX IF EXISTS ix_acto_admin_tipo_numerado",
     "CREATE INDEX IF NOT EXISTS ix_acto_admin_clase_numerado ON acto_administrativo (clase_acto, numerado)",
+    # 7. Fechas de las alertas. Sin DEFAULT al agregar: las filas existentes se completan abajo.
+    "ALTER TABLE recurso_reposicion ADD COLUMN IF NOT EXISTS fecha_creacion TIMESTAMP WITH TIME ZONE",
+    """
+    UPDATE recurso_reposicion r SET fecha_creacion = COALESCE(
+        (SELECT min(a.fecha) FROM auditoria a JOIN decision d ON d.expediente_id = a.expediente_id
+          WHERE d.id = r.decision_id AND a.tipo_evento = 'CREAR_RECURSO'),
+        r.fecha_radicado::timestamp AT TIME ZONE 'America/Bogota')
+    WHERE r.fecha_creacion IS NULL
+    """,
+    "ALTER TABLE recurso_reposicion ALTER COLUMN fecha_creacion SET DEFAULT now()",
+    "ALTER TABLE recurso_reposicion ALTER COLUMN fecha_creacion SET NOT NULL",
+    "ALTER TABLE concepto_tecnico ADD COLUMN IF NOT EXISTS fecha_version_final TIMESTAMP WITH TIME ZONE",
+    """
+    UPDATE concepto_tecnico c SET fecha_version_final = COALESCE(
+        (SELECT max(v.fecha_subida) FROM documento_proceso_version v
+           JOIN documento_proceso p ON p.id = v.proceso_id
+          WHERE p.etapa_tipo = 'concepto_tecnico' AND p.etapa_ref_id = c.id),
+        c.fecha_aceptacion::timestamp AT TIME ZONE 'America/Bogota')
+    WHERE c.doc_concepto_tecnico_id IS NOT NULL AND c.fecha_version_final IS NULL
+    """,
+    "ALTER TABLE requerimiento ADD COLUMN IF NOT EXISTS fecha_registro_respuesta TIMESTAMP WITH TIME ZONE",
+    """
+    UPDATE requerimiento r SET fecha_registro_respuesta = COALESCE(
+        (SELECT min(a.fecha) FROM auditoria a
+          WHERE r.expediente_id IS NOT NULL AND a.expediente_id = r.expediente_id
+            AND a.tipo_evento = 'RESPUESTA_REQUERIMIENTO'),
+        r.fecha_oficio_entrada::timestamp AT TIME ZONE 'America/Bogota')
+    WHERE r.doc_oficio_entrada_id IS NOT NULL AND r.fecha_registro_respuesta IS NULL
+    """,
+    # Triggers: la fecha nace con el primer PDF (también vía UPDATE directo, que no pasa por el ORM).
+    """
+    CREATE OR REPLACE FUNCTION trg_concepto_fecha_version_final() RETURNS trigger AS $$
+    BEGIN
+        IF NEW.doc_concepto_tecnico_id IS NULL THEN
+            NEW.fecha_version_final := NULL;
+        ELSIF TG_OP = 'INSERT' OR OLD.doc_concepto_tecnico_id IS NULL THEN
+            NEW.fecha_version_final := COALESCE(NEW.fecha_version_final, now());
+        END IF;
+        RETURN NEW;
+    END $$ LANGUAGE plpgsql
+    """,
+    """
+    CREATE OR REPLACE TRIGGER concepto_fecha_version_final
+        BEFORE INSERT OR UPDATE OF doc_concepto_tecnico_id ON concepto_tecnico
+        FOR EACH ROW EXECUTE FUNCTION trg_concepto_fecha_version_final()
+    """,
+    """
+    CREATE OR REPLACE FUNCTION trg_requerimiento_fecha_respuesta() RETURNS trigger AS $$
+    BEGIN
+        IF NEW.doc_oficio_entrada_id IS NULL THEN
+            NEW.fecha_registro_respuesta := NULL;
+        ELSIF TG_OP = 'INSERT' OR OLD.doc_oficio_entrada_id IS NULL THEN
+            NEW.fecha_registro_respuesta := COALESCE(NEW.fecha_registro_respuesta, now());
+        END IF;
+        RETURN NEW;
+    END $$ LANGUAGE plpgsql
+    """,
+    """
+    CREATE OR REPLACE TRIGGER requerimiento_fecha_respuesta
+        BEFORE INSERT OR UPDATE OF doc_oficio_entrada_id ON requerimiento
+        FOR EACH ROW EXECUTE FUNCTION trg_requerimiento_fecha_respuesta()
+    """,
 )
 
 
