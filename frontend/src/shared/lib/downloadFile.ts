@@ -1,5 +1,5 @@
 import { BASE_URL } from "./api";
-import { toastService } from "./toastService";
+import { MENSAJE_SESION_EXPIRADA, sesionService } from "./sesionService";
 
 /**
  * Descarga un archivo binario (PDF unificado, etc.) desde un endpoint que
@@ -16,16 +16,9 @@ export async function downloadBlobFile(
   });
 
   if (response.status === 401) {
-    toastService.showToast({
-      id: Date.now(),
-      message: "Tu sesión ha expirado. Por favor, inicia sesión nuevamente.",
-      type: "error",
-    });
     document.cookie =
       "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    setTimeout(() => {
-      window.location.href = "/login";
-    }, 500);
+    sesionService.cerrada(MENSAJE_SESION_EXPIRADA);
     return { ok: false };
   }
 
