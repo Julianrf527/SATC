@@ -20,7 +20,13 @@ from .oficio_remite import OficioRemite
 from .solicitud_informacion import SolicitudInformacion
 from .tipo_notificacion import TipoNotificacion
 from .notificacion import Notificacion
-from .informe_documento import InformeDocumento
+from .informe_proceso import (
+    InformeProceso,
+    InformeProcesoAuditoria,
+    InformeProcesoRevision,
+    InformeProcesoRevisor,
+    InformeProcesoVersion,
+)
 from .informe_recurso_afectado import InformeRecursoAfectado
 from .tipo_medida import TipoMedida
 from .medida_preventiva import MedidaPreventiva
@@ -48,7 +54,11 @@ __all__ = [
     "SolicitudInformacion",
     "TipoNotificacion",
     "Notificacion",
-    "InformeDocumento",
+    "InformeProceso",
+    "InformeProcesoVersion",
+    "InformeProcesoRevision",
+    "InformeProcesoAuditoria",
+    "InformeProcesoRevisor",
     "InformeRecursoAfectado",
     "TipoMedida",
     "MedidaPreventiva",

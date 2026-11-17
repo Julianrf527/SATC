@@ -62,6 +62,9 @@ TEST_PASSWORD_HASH = hash_password(TEST_PASSWORD)
 async def _crear_esquema():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Igual que init_db: columnas nuevas en una users_test_db ya creada.
+        from db.permission_sync import asegurar_esquema_permisos
+        await asegurar_esquema_permisos(conn)
     yield
     await engine.dispose()
 
@@ -152,10 +155,11 @@ def fake_redis():
 
 @pytest_asyncio.fixture
 async def make_permiso(db_session):
-    async def _make(nombre: str = None, menu_path: str = "") -> Permiso:
+    async def _make(nombre: str = None, menu_path: str = "",
+                    descripcion: str = "Desbloquea algo. Sirve para pruebas.") -> Permiso:
         if nombre is None:
             nombre = f"perm_{next(_perm_counter)}"
-        p = Permiso(nombre=nombre, menu_path=menu_path)
+        p = Permiso(nombre=nombre, menu_path=menu_path, descripcion=descripcion)
         db_session.add(p)
         await db_session.flush()
         return p
