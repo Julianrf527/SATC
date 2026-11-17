@@ -8,7 +8,7 @@ const menuBase = [
   { iconName: "contact-book", title: "Administracion", prefix: "admin_" },
   { iconName: "file-detail", title: "Sancionatorio", prefix: "sancionatorio_" },
   { iconName: "gavel", title: "Infracciones", prefix: "infraccion_" },
-  { iconName: "water", title: "Concesiones de Aguas", prefix: "recurso_" },
+  { iconName: "water", title: "Con. de Aguas", prefix: "recurso_" },
   { iconName: "book-alt", title: "Documentos", prefix: "documento_" },
   { iconName: "user-circle", title: "Involucrados", prefix: "involucrado_" },
   { iconName: "calendar-alt", title: "Auditoría", prefix: "auditoria_" },
