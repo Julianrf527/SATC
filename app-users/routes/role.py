@@ -86,7 +86,10 @@ from utils.permission_crud import (
 )
 from utils.permission_dependencies import (
     dependencias_faltantes,
+    excluidos_por_permiso,
+    incompatibles_presentes,
     mensaje_dependencias_faltantes,
+    mensaje_incompatibles,
     requeridos_por_permiso,
     roles_que_incumplen,
 )
@@ -99,14 +102,18 @@ async def _get_user_perm_names(rol_id: int, db: AsyncSession) -> set[str]:
 
 
 async def _exigir_dependencias(permiso_ids: list[int], db: AsyncSession) -> None:
-    """422 si el set de permisos del rol deja algún permiso sin sus requeridos.
+    """422 si el set de permisos del rol deja algún permiso sin sus requeridos
+    o junta dos permisos incompatibles (salvo si el rol administra roles).
 
     Solo se exige al guardar: los roles que ya incumplen siguen funcionando
-    (login y verificación de permisos no miran permiso_requiere).
+    (login y verificación de permisos no miran permiso_requiere ni permiso_excluye).
     """
     faltantes = await dependencias_faltantes(permiso_ids, db)
     if faltantes:
         raise HTTPException(status_code=422, detail=mensaje_dependencias_faltantes(faltantes))
+    incompatibles = await incompatibles_presentes(permiso_ids, db)
+    if incompatibles:
+        raise HTTPException(status_code=422, detail=mensaje_incompatibles(incompatibles))
 
 
 # ---------- ENDPOINTS ----------
@@ -148,16 +155,19 @@ async def cargar_permisos(
     permission = await get_permissions_by_rol_id(token_data["rol_id"], db)
 
     # Campos añadidos (retrocompatible) para la pantalla de roles: descripción
-    # corta y nombres de los permisos que cada uno exige en el mismo rol.
+    # corta, nombres de los permisos que cada uno exige en el mismo rol y de los
+    # que no pueden ir con él (salvo en un rol que administra roles).
     ids = [p["id"] for p in permission]
     descripciones = {}
     if ids:
         rows = await db.execute(select(Permiso.id, Permiso.descripcion).where(Permiso.id.in_(ids)))
         descripciones = {pid: desc for pid, desc in rows.all()}
     requeridos = await requeridos_por_permiso(ids, db)
+    excluidos = await excluidos_por_permiso(ids, db)
     for p in permission:
         p["descripcion"] = descripciones.get(p["id"])
         p["requiere"] = requeridos.get(p["id"], [])
+        p["excluye"] = excluidos.get(p["id"], [])
 
     return JSONResponse(content={"ok": True, "data": permission}, status_code=200)
 
@@ -167,7 +177,8 @@ async def roles_con_dependencias_incumplidas(
     request: Request,
     db: AsyncSession = Depends(get_db_managed),
     ):
-    """Reporte de solo lectura: roles que hoy tienen un permiso sin sus requeridos.
+    """Reporte de solo lectura: roles que hoy tienen un permiso sin sus requeridos
+    o dos permisos incompatibles.
 
     No corrige nada; sirve para que el administrador los ajuste a mano desde la
     pantalla de roles (que no deja guardar un rol que incumpla).

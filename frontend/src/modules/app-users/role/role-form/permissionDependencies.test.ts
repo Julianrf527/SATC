@@ -3,6 +3,7 @@ import {
   agregarPermiso,
   alternarCategoria,
   estaBloqueado,
+  incompatiblesMarcados,
   incumplimientos,
   quitarConDependientes,
   requisitosFaltantes,
@@ -109,9 +110,50 @@ describe("Todos de una categoría", () => {
 describe("incumplimientos", () => {
   it("lista los marcados sin sus requeridos", () => {
     expect(incumplimientos([2, 5, 1], catalogo)).toEqual([
-      { permiso: catalogo[4], faltan: ["infraccion_gestionar"] },
+      { permiso: catalogo[4], faltan: ["infraccion_gestionar"], chocan: [] },
     ]);
     expect(incumplimientos([1, 2, 4, 5], catalogo)).toEqual([]);
+  });
+});
+
+// Técnico y gestionar de concesiones no pueden ir juntos (salvo un rol que administra roles).
+const conIncompatibles: PermisoDependiente[] = [
+  { id: 20, nombre: "recurso_consultar", requiere: [] },
+  { id: 21, nombre: "recurso_gestionar", excluye: ["recurso_tecnico"] },
+  { id: 22, nombre: "recurso_tecnico", requiere: ["recurso_consultar"], excluye: ["recurso_gestionar"] },
+  { id: 23, nombre: "recurso_super_gestion", requiere: ["recurso_gestionar"] },
+  { id: 24, nombre: "admin_roles_y_permisos" },
+];
+const [rConsultar, rGestionar, rTecnico, , admin] = conIncompatibles;
+
+describe("incompatibilidades", () => {
+  it("con gestionar marcado, técnico queda bloqueado (y al revés)", () => {
+    expect(estaBloqueado(rTecnico, [20, 21], conIncompatibles)).toBe(true);
+    expect(incompatiblesMarcados(rTecnico, [20, 21], conIncompatibles)).toEqual(["recurso_gestionar"]);
+    expect(agregarPermiso([20, 21], 22, conIncompatibles)).toEqual([20, 21]);
+    expect(estaBloqueado(rGestionar, [20, 22], conIncompatibles)).toBe(true);
+    expect(agregarPermiso([20, 22], 21, conIncompatibles)).toEqual([20, 22]);
+    expect(estaBloqueado(rConsultar, [22], conIncompatibles)).toBe(false);
+  });
+
+  it("un rol que administra roles no tiene incompatibilidades", () => {
+    expect(estaBloqueado(rTecnico, [24, 20, 21], conIncompatibles)).toBe(false);
+    expect(agregarPermiso([24, 20, 21], 22, conIncompatibles)).toEqual([24, 20, 21, 22]);
+    expect(incumplimientos([24, 20, 21, 22, 23], conIncompatibles)).toEqual([]);
+    expect(estaBloqueado(admin, [20, 21, 22], conIncompatibles)).toBe(false);
+  });
+
+  it("Todos de la categoría no marca los incompatibles", () => {
+    const r = alternarCategoria([], [20, 21, 22, 23], conIncompatibles);
+    expect(r.seleccion.sort()).toEqual([20, 21, 23]);
+  });
+
+  it("un rol viejo con los dos se reporta una sola vez y se puede desmarcar", () => {
+    expect(incumplimientos([20, 21, 22], conIncompatibles)).toEqual([
+      { permiso: rGestionar, faltan: [], chocan: ["recurso_tecnico"] },
+    ]);
+    // Marcado no queda bloqueado: se puede desmarcar para corregir.
+    expect(estaBloqueado(rTecnico, [20, 21, 22], conIncompatibles)).toBe(false);
   });
 });
 

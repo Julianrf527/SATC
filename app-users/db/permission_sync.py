@@ -21,8 +21,13 @@ lo hace sola y se puede correr N veces con el mismo resultado:
    verlos ni asignarlos: la pantalla de roles solo lista y deja otorgar
    permisos que el propio rol tiene. Es la única escritura sobre roles y solo
    ocurre la vez en que el permiso nace; no aplica a permisos ya existentes.
-5. permiso_requiere = DEPENDENCIAS (agrega las que falten, quita las que sobren).
-6. Reporta en el log los roles que incumplen dependencias. No los modifica.
+5. permiso_requiere = DEPENDENCIAS y permiso_excluye = INCOMPATIBLES (en los dos
+   sentidos): agrega las que falten y quita las que sobren.
+6. Descripciones por defecto anteriores (DESCRIPCIONES_ANTERIORES): si la
+   guardada sigue siendo una de ellas, se reemplaza por la actual del catálogo.
+   Las editadas desde la pantalla no se tocan.
+7. Reporta en el log los roles que incumplen dependencias o incompatibilidades.
+   No los modifica.
 
 Concurrencia: varios workers de Gunicorn arrancan a la vez; todo va en una sola
 transacción tomada con pg_advisory_xact_lock, así que corren en serie y el
@@ -33,7 +38,7 @@ import logging
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from db.permission_catalog import DEPENDENCIAS, PERMISOS, RENOMBRES
+from db.permission_catalog import DEPENDENCIAS, DESCRIPCIONES_ANTERIORES, INCOMPATIBLES, PERMISOS, RENOMBRES
 from utils.permission_dependencies import roles_que_incumplen
 
 logger = logging.getLogger(__name__)
@@ -48,6 +53,13 @@ _DDL_ESQUEMA = (
         permiso_id  INTEGER NOT NULL REFERENCES permiso(id) ON DELETE CASCADE ON UPDATE CASCADE,
         requiere_id INTEGER NOT NULL REFERENCES permiso(id) ON DELETE CASCADE ON UPDATE CASCADE,
         PRIMARY KEY (permiso_id, requiere_id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS permiso_excluye (
+        permiso_id INTEGER NOT NULL REFERENCES permiso(id) ON DELETE CASCADE ON UPDATE CASCADE,
+        excluye_id INTEGER NOT NULL REFERENCES permiso(id) ON DELETE CASCADE ON UPDATE CASCADE,
+        PRIMARY KEY (permiso_id, excluye_id)
     )
     """,
 )
@@ -118,6 +130,9 @@ async def _upsert_permisos(conn: AsyncConnection, resumen: dict) -> list[int]:
         cambios = {}
         if not (actual["descripcion"] or "").strip() and p["descripcion"]:
             cambios["descripcion"] = p["descripcion"]
+        elif actual["descripcion"] in DESCRIPCIONES_ANTERIORES.get(p["nombre"], ()):
+            # Texto por defecto viejo que nadie editó: pasa al actual del catálogo.
+            cambios["descripcion"] = p["descripcion"]
         if not actual["menu_path"] and p["menu_path"]:
             cambios["menu_path"] = p["menu_path"]
         if cambios:
@@ -159,6 +174,33 @@ async def _sincronizar_dependencias(conn: AsyncConnection, resumen: dict) -> Non
     resumen["dependencias_quitadas"] = len(actuales - deseadas)
 
 
+async def _sincronizar_incompatibles(conn: AsyncConnection, resumen: dict) -> None:
+    ids = {
+        nombre: pid for pid, nombre in
+        (await conn.execute(text("SELECT id, nombre FROM permiso"))).all()
+    }
+    deseadas = set()
+    for a, b in INCOMPATIBLES:
+        if a in ids and b in ids:
+            deseadas |= {(ids[a], ids[b]), (ids[b], ids[a])}
+    actuales = {
+        (a, b) for a, b in
+        (await conn.execute(text("SELECT permiso_id, excluye_id FROM permiso_excluye"))).all()
+    }
+    for permiso_id, excluye_id in sorted(deseadas - actuales):
+        await conn.execute(
+            text("INSERT INTO permiso_excluye (permiso_id, excluye_id) VALUES (:p, :e)"),
+            {"p": permiso_id, "e": excluye_id},
+        )
+    for permiso_id, excluye_id in sorted(actuales - deseadas):
+        await conn.execute(
+            text("DELETE FROM permiso_excluye WHERE permiso_id = :p AND excluye_id = :e"),
+            {"p": permiso_id, "e": excluye_id},
+        )
+    resumen["incompatibles_agregadas"] = len(deseadas - actuales)
+    resumen["incompatibles_quitadas"] = len(actuales - deseadas)
+
+
 async def _descripcion_obligatoria(conn: AsyncConnection, resumen: dict) -> None:
     """La descripción es obligatoria. Los permisos fuera del catálogo que aún no
     tengan (creados antes de existir la columna) reciben un texto provisional
@@ -185,6 +227,8 @@ async def sincronizar_permisos(conn: AsyncConnection) -> dict:
         "otorgados_a_roles": [],
         "dependencias_agregadas": 0,
         "dependencias_quitadas": 0,
+        "incompatibles_agregadas": 0,
+        "incompatibles_quitadas": 0,
         "roles_incumplen": [],
         "advertencias": [],
     }
@@ -217,15 +261,17 @@ async def sincronizar_permisos(conn: AsyncConnection) -> dict:
             )
 
     await _sincronizar_dependencias(conn, resumen)
+    await _sincronizar_incompatibles(conn, resumen)
     await _descripcion_obligatoria(conn, resumen)
 
     resumen["roles_incumplen"] = await roles_que_incumplen(conn)
     for rol in resumen["roles_incumplen"]:
         detalle = "; ".join(
-            f"{f['permiso']} requiere {', '.join(f['requiere'])}" for f in rol["faltantes"]
+            [f"{f['permiso']} requiere {', '.join(f['requiere'])}" for f in rol["faltantes"]]
+            + [f"{i['permiso']} no puede ir con {i['con']}" for i in rol["incompatibles"]]
         )
         logger.warning(
-            "[permisos] El rol %s ('%s') incumple dependencias (no se modifica): %s",
+            "[permisos] El rol %s ('%s') incumple dependencias o incompatibilidades (no se modifica): %s",
             rol["rol_id"], rol["rol_nombre"], detalle,
         )
 

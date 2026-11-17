@@ -16,8 +16,8 @@ type Props = {
   onSubmit: () => void;
   onDelete: () => void;
   onClear: () => void;
-  /** Permisos marcados sin sus requeridos: se listan y bloquean el guardado. */
-  incumplimientos: { permiso: string; faltan: string[] }[];
+  /** Permisos marcados sin sus requeridos o incompatibles: se listan y bloquean el guardado. */
+  incumplimientos: { permiso: string; faltan: string[]; chocan: string[] }[];
 };
 
 export default function RoleConfigPanel({
@@ -159,17 +159,22 @@ export default function RoleConfigPanel({
             <div role="alert" className="alert alert-warning alert-soft text-sm items-start mb-2">
               <div>
                 <p className="font-semibold">
-                  El rol no cumple las dependencias de permisos
+                  El rol no cumple las reglas de permisos
                 </p>
                 <ul className="list-disc ml-4 mt-1">
-                  {incumplimientos.map((i) => (
-                    <li key={i.permiso}>
-                      {i.permiso} requiere {i.faltan.join(", ")}
-                    </li>
-                  ))}
+                  {incumplimientos.flatMap((i) => [
+                    ...(i.faltan.length > 0
+                      ? [<li key={`${i.permiso}-r`}>{i.permiso} requiere {i.faltan.join(", ")}</li>]
+                      : []),
+                    ...i.chocan.map((c) => (
+                      <li key={`${i.permiso}-${c}`}>
+                        {i.permiso} no puede ir con {c}
+                      </li>
+                    )),
+                  ])}
                 </ul>
                 <p className="mt-1">
-                  Marque lo que falta o desmarque esos permisos para poder guardar.
+                  Marque lo que falta o desmarque los permisos que sobran para poder guardar.
                 </p>
               </div>
             </div>

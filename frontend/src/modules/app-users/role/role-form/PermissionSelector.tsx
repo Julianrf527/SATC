@@ -155,7 +155,7 @@ export default function PermissionSelector({
                   <div className="collapse-content">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
                       {categoryPerms.map((permission) => {
-                        const { bloqueado, faltan } = getEstadoPermiso(permission);
+                        const { bloqueado, faltan, chocan } = getEstadoPermiso(permission);
                         const marcado = selectedPermissions.includes(permission.id);
                         return (
                           <label
@@ -197,6 +197,13 @@ export default function PermissionSelector({
                                   className={`text-xs mt-1 ${marcado ? "text-error" : "text-warning"}`}
                                 >
                                   Requiere: {faltan.join(", ")}
+                                </div>
+                              )}
+                              {chocan.length > 0 && (
+                                <div
+                                  className={`text-xs mt-1 ${marcado ? "text-error" : "text-warning"}`}
+                                >
+                                  No puede ir con: {chocan.join(", ")}
                                 </div>
                               )}
                             </div>
