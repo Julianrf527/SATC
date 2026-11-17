@@ -30,6 +30,11 @@ export type ProcesoDetalleModalProps<D extends ProcesoDetalle> = {
   extraAcciones?: SlotProceso<D>;
   /** Contenido propio del módulo, antes de versiones/revisiones. */
   children?: SlotProceso<D>;
+  /**
+   * Solo lectura (p. ej. abierto desde una pantalla de consulta): no ofrece
+   * revisar ni subir versión aunque el backend lo permita al usuario.
+   */
+  soloLectura?: boolean;
 };
 
 const pintar = <D,>(slot: SlotProceso<D> | undefined, detalle: D): ReactNode =>
@@ -62,6 +67,7 @@ export function ProcesoDetalleModal<D extends ProcesoDetalle>({
   extraHeader,
   extraAcciones,
   children,
+  soloLectura = false,
 }: ProcesoDetalleModalProps<D>) {
   const proceso = useProcesoRevision(adapter, isOpen ? id : null, { onCambio });
   const [form, setForm] = useState<"revision" | "version" | null>(null);
@@ -84,8 +90,8 @@ export function ProcesoDetalleModal<D extends ProcesoDetalle>({
     [adapter, detalleId],
   );
 
-  const puedeRevisar = (detalle?.acciones_disponibles.length ?? 0) > 0;
-  const subida = detalle?.subida_version ?? null;
+  const puedeRevisar = !soloLectura && (detalle?.acciones_disponibles.length ?? 0) > 0;
+  const subida = soloLectura ? null : (detalle?.subida_version ?? null);
   const ocupado = proceso.revisar.isPending || proceso.subirVersion.isPending;
 
   return (

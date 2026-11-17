@@ -29,6 +29,8 @@ type Props = {
   datos?: ReactNode;
   /** Botones propios del nodo (registrar respuesta, ejecutoria...). */
   acciones?: ReactNode;
+  /** Sub-procesos que en el flujo van ANTES del acto propio (p. ej. la práctica de pruebas del recurso). */
+  previo?: ReactNode;
   /** Contenido extra al final (sub-procesos anidados). */
   children?: ReactNode;
   anidada?: boolean;
@@ -36,6 +38,8 @@ type Props = {
   actuales?: Record<string, number | null>;
   /** Texto cuando el nodo aún no existe y no está bloqueado. */
   pendiente?: string;
+  /** Sin bloque de documentos anexos (sub-procesos: los anexos van en la etapa). */
+  sinAnexos?: boolean;
 };
 
 /**
@@ -53,10 +57,12 @@ export default function NodoActo({
   vinculos,
   datos,
   acciones,
+  previo,
   children,
   anidada,
   actuales,
   pendiente = "Pendiente de que un abogado se asigne para diligenciarlo.",
+  sinAnexos,
 }: Props) {
   const { expediente, setToast, isEditable } = entorno;
   const [cargarFinal, setCargarFinal] = useState(false);
@@ -120,12 +126,15 @@ export default function NodoActo({
           </div>
         )}
 
+        {previo}
+
         {!nodo.acto && (
           <ProcesoResumen
             expedienteId={expediente.id}
             proceso={nodo.proceso}
             puedeSubir={puede("subir_version")}
-            puedeRevisar={nodo.acciones_disponibles.includes("revisar")}
+            puedeRevisar={puede("revisar")}
+            soloLectura={!isEditable}
           />
         )}
 
@@ -133,7 +142,7 @@ export default function NodoActo({
           <ActoNodo entorno={entorno} acto={nodo.acto} vinculos={vinculos} />
         )}
 
-        {nodo.existe && nodo.id !== null && (nodo.anexos.length > 0 || puede("gestionar_anexos")) && (
+        {!sinAnexos && nodo.existe && nodo.id !== null && (nodo.anexos.length > 0 || puede("gestionar_anexos")) && (
           <DocumentosAnexos
             expedienteId={expediente.id}
             etapaTipo={nodo.etapa_tipo}

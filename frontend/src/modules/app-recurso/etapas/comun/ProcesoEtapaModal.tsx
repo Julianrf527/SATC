@@ -10,6 +10,8 @@ type Props = {
   /** `proceso.proceso_id` del nodo. `null` = cerrado. */
   procesoId: number | null;
   onClose: () => void;
+  /** Abierto desde Consulta: solo ver (sin revisar ni subir versión). */
+  soloLectura?: boolean;
 };
 
 /**
@@ -18,7 +20,7 @@ type Props = {
  * `acciones_disponibles` / `subida_version`; al cambiar algo se recargan el
  * árbol de etapas y Mis informes.
  */
-export default function ProcesoEtapaModal({ expedienteId, procesoId, onClose }: Props) {
+export default function ProcesoEtapaModal({ expedienteId, procesoId, onClose, soloLectura = false }: Props) {
   const invalidarExpediente = useInvalidarExpediente(expedienteId);
   const invalidarMisDocumentos = useInvalidarMisDocumentos();
 
@@ -28,6 +30,7 @@ export default function ProcesoEtapaModal({ expedienteId, procesoId, onClose }: 
       id={procesoId}
       isOpen={procesoId !== null}
       onClose={onClose}
+      soloLectura={soloLectura}
       onCambio={() => {
         void invalidarExpediente();
         void invalidarMisDocumentos();
@@ -49,7 +52,7 @@ export default function ProcesoEtapaModal({ expedienteId, procesoId, onClose }: 
               Paso {d.paso_actual} de {d.total_pasos}
             </span>
           </div>
-          {d.estado.codigo === "aprobado_firma" && d.subida_version !== null && (
+          {!soloLectura && d.estado.codigo === "aprobado_firma" && d.subida_version !== null && (
             <div role="status" className="alert alert-success py-2 text-sm">
               <FileSignature size={16} />
               <span>
