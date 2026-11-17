@@ -2,7 +2,7 @@
 //  - `recursoKeys.expediente(id)` invalida todo lo de un expediente (detalle,
 //    involucrados y etapas: el árbol de etapas llega en el detalle).
 //  - `recursoKeys.listaExpedientes()` agrupa los listados paginados.
-//  - `recursoKeys.misDocumentos()` agrupa Mis informes y los procesos de revisión.
+//  - `recursoKeys.misDocumentos()` agrupa Mis actuaciones y los procesos de revisión.
 export const recursoKeys = {
   all: ["app-recurso"] as const,
 
@@ -18,7 +18,7 @@ export const recursoKeys = {
   misDocumentos: () => [...recursoKeys.all, "mis-documentos"] as const,
   misDocumentosLista: (filtros: Record<string, unknown>) => [...recursoKeys.misDocumentos(), "lista", filtros] as const,
   proceso: (procesoId: number) => [...recursoKeys.misDocumentos(), "proceso", procesoId] as const,
-  /** Concepto del técnico (Mis informes, C.4): cuelga de Mis informes. */
+  /** Concepto del técnico (Mis actuaciones, C.4): cuelga de Mis actuaciones. */
   concepto: (conceptoId: number) => [...recursoKeys.misDocumentos(), "concepto", conceptoId] as const,
   tecnicos: () => [...recursoKeys.all, "tecnicos"] as const,
   abogados: () => [...recursoKeys.all, "abogados"] as const,

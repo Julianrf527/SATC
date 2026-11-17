@@ -14,7 +14,7 @@ Un concepto se identifica por expediente + tipo (slug):
   seleccionado carga el concepto firmado y los datos escritos en él.
 - ``GET  /etapas/conceptos/{concepto_id}`` y
   ``POST /etapas/conceptos/{concepto_id}/version-final``: lo mismo por id (lo
-  que trae Mis informes en ``etapa_ref_id``) para el técnico, que solo tiene
+  que trae Mis actuaciones en ``etapa_ref_id``) para el técnico, que solo tiene
   ``recurso_tecnico`` y no entra a Gestionar (V3 manda sobre V1).
 """
 import logging
@@ -219,7 +219,7 @@ async def version_final_concepto(
     return await _cargar_final(db, request, usuario, exp, concepto, tipo, body)
 
 
-# ─────────────────────────────── acceso del técnico por id (Mis informes)
+# ─────────────────────────────── acceso del técnico por id (Mis actuaciones)
 
 async def _acceso_concepto(request: Request, concepto) -> tuple:
     """El técnico encargado (con ``recurso_tecnico``) o quien tenga lectura."""
@@ -231,7 +231,7 @@ async def _acceso_concepto(request: Request, concepto) -> tuple:
 
 @router.get("/conceptos/{concepto_id}")
 async def obtener_concepto(request: Request, concepto_id: int, db: AsyncSession = Depends(get_db_managed)):
-    """Lo mínimo para que el técnico diligencie su concepto desde Mis informes
+    """Lo mínimo para que el técnico diligencie su concepto desde Mis actuaciones
     (``etapa_tipo = concepto_tecnico``, ``etapa_ref_id = concepto_id``)."""
     concepto, exp, e, tipo = await ubicar_concepto(db, concepto_id)
     usuario = await _acceso_concepto(request, concepto)
@@ -272,7 +272,7 @@ async def version_final_concepto_por_id(
     request: Request, concepto_id: int, body: ConceptoFinalIn, db: AsyncSession = Depends(get_db_managed),
 ):
     """Igual que ``/{expediente_id}/conceptos/{tipo}/version-final`` pero por id
-    del concepto (el que trae Mis informes en ``etapa_ref_id``)."""
+    del concepto (el que trae Mis actuaciones en ``etapa_ref_id``)."""
     usuario = await requiere_permiso(request, Permission.TECNICO)  # V3
     concepto, exp, _, _ = await ubicar_concepto(db, concepto_id)
     exp = await bloquear_expediente(db, exp.id)

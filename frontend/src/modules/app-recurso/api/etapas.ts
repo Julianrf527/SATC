@@ -54,7 +54,7 @@ async function subirArchivos(expedienteId: number, archivos: EscrituraEtapa["arc
 /**
  * Toda escritura de etapas (asignarme, versión final, documentos, radicados,
  * técnico, anexos, terceros, super gestión): sube los PDF, envía la petición
- * y recarga el árbol (GET /expedientes/{id}) y Mis informes. Ante 409
+ * y recarga el árbol (GET /expedientes/{id}) y Mis actuaciones. Ante 409
  * (versión vieja, ya asignado...) también recarga.
  */
 export function useEscrituraEtapaMutation(expedienteId: number) {
@@ -98,7 +98,7 @@ export function useAbogadosQuery(enabled = true) {
   });
 }
 
-/** GET /etapas/conceptos/{id}: concepto del técnico desde Mis informes (C.4). */
+/** GET /etapas/conceptos/{id}: concepto del técnico desde Mis actuaciones (C.4). */
 export function useConceptoTecnicoQuery(conceptoId: number | null) {
   return useQuery({
     queryKey: recursoKeys.concepto(conceptoId ?? 0),
@@ -110,8 +110,8 @@ export function useConceptoTecnicoQuery(conceptoId: number | null) {
 }
 
 /**
- * POST /etapas/conceptos/{id}/version-final (técnico, desde Mis informes).
- * Sube el PDF firmado y recarga Mis informes y el concepto.
+ * POST /etapas/conceptos/{id}/version-final (técnico, desde Mis actuaciones).
+ * Sube el PDF firmado y recarga Mis actuaciones y el concepto.
  */
 export function useVersionFinalConceptoMutation(conceptoId: number) {
   const queryClient = useQueryClient();

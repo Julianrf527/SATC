@@ -1,31 +1,30 @@
 import { AlertasExpediente, type AlertaPaginada } from "@features/alertas";
 import { API_CONFIG } from "@shared/lib/api";
 import { useAuth } from "@shared/context/AuthContext";
-import type { NavegacionExpediente, SetToast } from "../types";
-import { pestanaDeAlerta, rutaExpedienteAlertas } from "./alertasRecurso";
+import type { SetToast } from "../types";
+import { destinoAlertaRecurso, estadoExpedienteAlerta } from "./alertasRecurso";
 
 /**
  * Pestaña Alertas (/recurso/alerts, `recurso_gestionar` o `recurso_consultar`):
  * "Mías" son las alertas en las que el usuario es el encargado; "Todos", todas.
  * Las reglas y plazos viven en el backend (app-recurso/services/alertas.py).
  *
- * El clic abre el expediente por id en la pestaña de la etapa de la alerta:
- * en Gestionar si el usuario gestiona y en Consulta si solo consulta.
+ * El botón de cada alerta lo decide `destinoAlertaRecurso`: al técnico le abre
+ * su proceso en Mis actuaciones; a quien gestiona, el expediente en Gestionar;
+ * a los demás, en Consulta (en la pestaña de la etapa de la alerta).
  */
-function estadoNavegacion(alerta: AlertaPaginada): NavegacionExpediente {
-  return { expedienteIdToSelect: alerta.expediente_id, pestanaToSelect: pestanaDeAlerta(alerta.tipo) };
-}
-
 export default function AlertasRecursoLayout({ setToast }: { setToast: SetToast }) {
   const { user } = useAuth();
-  const ruta = rutaExpedienteAlertas((user?.permisos ?? []).map((p) => p?.name));
+  const permisos = (user?.permisos ?? []).map((p) => p?.name);
+  const destino = (alerta: AlertaPaginada) => destinoAlertaRecurso(alerta, permisos);
   return (
     <AlertasExpediente
       alertsAllEndpoint={API_CONFIG.ENDPOINTS.RECURSO_ALERTAS_ALL}
-      rutas={{ gestion: ruta, consulta: ruta }}
+      rutas={{ gestion: "/recurso/manage", consulta: "/recurso/consult" }}
       processName="Concesiones de Aguas"
       setToast={setToast}
-      estadoNavegacion={estadoNavegacion}
+      estadoNavegacion={estadoExpedienteAlerta}
+      destino={destino}
     />
   );
 }

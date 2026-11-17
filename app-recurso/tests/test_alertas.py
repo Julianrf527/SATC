@@ -98,11 +98,13 @@ async def test_flujo_auto_admite_y_concepto(client, stubs, expediente):
     assert list(alertas) == ["admite_primera_version"]
     a = alertas["admite_primera_version"]
     assert a["encargado_id"] == ABOGADO and a["expediente_id"] == exp_id and a["es_responsable"] is True
+    # proceso_id: el proceso donde se hace la tarea (para abrirlo desde Mis actuaciones).
+    assert a["proceso_id"] == pid
     assert a["semaforo"]["dias_totales"] == 4 and a["semaforo"]["estado"] == "verde"
 
     # Primera versión → 3 días para la revisión completa.
     assert (await subir(client, pid)).status_code == 200
-    assert list(await _del_expediente(client, exp_id)) == ["admite_revision"]
+    assert (await _del_expediente(client, exp_id))["admite_revision"]["proceso_id"] == pid
 
     # Aprobado para firma → 3 días para la versión final.
     await _aprobar_pasos(client, pid, ABOGADO)
@@ -120,8 +122,10 @@ async def test_flujo_auto_admite_y_concepto(client, stubs, expediente):
 
     # Primera versión del concepto → 5 días hasta la versión final.
     cpid = buscar_concepto(await etapas(client, exp_id), "etapa2")["proceso"]["proceso_id"]
+    assert c["proceso_id"] == cpid
     assert (await subir(client, cpid, user=TECNICO)).status_code == 200
-    assert list(await _del_expediente(client, exp_id)) == ["concepto_version_final"]
+    alertas = await _del_expediente(client, exp_id)
+    assert list(alertas) == ["concepto_version_final"] and alertas["concepto_version_final"]["proceso_id"] == cpid
 
     # Versión final del concepto → sin alertas del concepto.
     await _aprobar_pasos(client, cpid, TECNICO)
@@ -353,6 +357,7 @@ async def test_recurso_sin_pruebas_60_dias_calendario(client, rv_permisos, con_d
     # La fecha del escrito (2026-06-10) no importa: cuenta desde que se registró el recurso.
     assert a["fecha_inicio"] == hoy.isoformat() and a["fecha_limite"] == (hoy + timedelta(days=60)).isoformat()
     assert a["semaforo"]["dias_totales"] == 60 and "calendario" in a["plazo_legal"] and a["encargado_id"] is None
+    assert a["proceso_id"] is None  # nadie ha tomado el acto: aún no hay proceso
     assert a["etapa"] == "Recurso de reposición"
 
     for dias, estado in [(30, "amarillo"), (48, "rojo"), (61, "vencido")]:
@@ -375,6 +380,7 @@ async def test_recurso_con_pruebas_30_y_30_y_cambio_de_respuesta(client, rv_perm
     assert await _claves(client, exp_id, "recurso_") == ["recurso_concepto_pruebas"]
     a = (await _del_expediente(client, exp_id))["recurso_concepto_pruebas"]
     assert a["fecha_inicio"] == hoy and a["semaforo"]["dias_totales"] == 30 and a["encargado_id"] is None
+    assert a["proceso_id"] is None
 
     # Asignado el auto de pruebas: a cargo del abogado; cargado el auto: del técnico del concepto.
     await post(client, f"/etapas/{exp_id}/recurso/pruebas/asignarme", ABOGADO2)
@@ -382,11 +388,16 @@ async def test_recurso_con_pruebas_30_y_30_y_cambio_de_respuesta(client, rv_perm
     await _cambiar(client, exp_id, False, esperado=409)  # (práctica iniciada: pide confirmar)
     arbol = await etapas(client, exp_id)
     pid = arbol["decision"]["recurso"]["pruebas"]["proceso"]["proceso_id"]
+    # Sin concepto de pruebas aún, la tarea vive en el proceso del auto.
+    assert (await _del_expediente(client, exp_id))["recurso_concepto_pruebas"]["proceso_id"] == pid
     await aprobar_para_firma(client, pid, ABOGADO2)
     await post(client, f"/etapas/{exp_id}/recurso/pruebas/version-final", ABOGADO2,
                acto_body(stubs, tecnico_id=TECNICO, fecha_visita_tecnica="2026-06-20"))
     a = (await _del_expediente(client, exp_id))["recurso_concepto_pruebas"]
     assert a["encargado_id"] == TECNICO and a["fecha_inicio"] == hoy
+    concepto = buscar_concepto(await etapas(client, exp_id), "pruebas")
+    # Ya existe el concepto de pruebas: la tarea pasa a su proceso.
+    assert concepto["proceso"] and a["proceso_id"] == concepto["proceso"]["proceso_id"] != pid
 
     # Concepto de pruebas cargado → 30 días desde su versión final para el acto que resuelve.
     await concepto_firmado(client, stubs, exp_id, "pruebas")

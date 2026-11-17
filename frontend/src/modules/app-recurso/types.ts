@@ -397,7 +397,7 @@ export type EtapasExpediente = {
 /** Técnico seleccionable (GET /etapas/tecnicos). */
 export type TecnicoRecurso = { id: number; nombre: string | null; correo: string | null };
 
-/** GET /etapas/conceptos/{id}: lo que necesita el técnico desde Mis informes (C.4). */
+/** GET /etapas/conceptos/{id}: lo que necesita el técnico desde Mis actuaciones (C.4). */
 export type ConceptoParaTecnico = {
   id: number;
   version: number;
@@ -411,7 +411,7 @@ export type ConceptoParaTecnico = {
   acciones_disponibles: AccionEtapa[];
 };
 
-/** Contexto de etapa en Mis informes y en el detalle del proceso (C.12). */
+/** Contexto de etapa en Mis actuaciones y en el detalle del proceso (C.12). */
 export type ContextoEtapa = {
   etapa_padre?: string | null;
   etapa_padre_etiqueta?: string | null;
@@ -502,7 +502,7 @@ export type ProcesoDocumentoDetalle = ProcesoDetalle & ContextoEtapa & {
   pasos: PasoRevision[];
 };
 
-// ─── B.2 Mis informes ───────────────────────────────────────────────────────
+// ─── B.2 Mis actuaciones ───────────────────────────────────────────────────────
 
 export type EstadoProcesoRecurso = { codigo: string; etiqueta: string; tono: TonoRecurso };
 
@@ -563,7 +563,7 @@ export type MisDocumentosResponse = {
 
 /**
  * `location.state` para abrir un expediente (y opcionalmente una etapa) en
- * Gestionar / Consulta desde otra pantalla (Mis informes, notificaciones).
+ * Gestionar / Consulta desde otra pantalla (Mis actuaciones, notificaciones).
  */
 export type NavegacionExpediente = {
   expedienteIdToSelect?: number;

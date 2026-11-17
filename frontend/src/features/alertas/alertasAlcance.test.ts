@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { destinoAlerta, endpointConAlcance } from "./alertasAlcance";
+import { destinoAlerta, endpointConAlcance, resolverDestino } from "./alertasAlcance";
 
 const rutas = { gestion: "/x/manage", consulta: "/x/consult" };
 
@@ -14,6 +14,50 @@ describe("destinoAlerta", () => {
 
   it("sin es_responsable (backend anterior) se asume propio: Gestionar", () => {
     expect(destinoAlerta({}, rutas)).toEqual({ ruta: "/x/manage", accion: "Gestionar" });
+  });
+});
+
+describe("resolverDestino", () => {
+  const porRadicado = (a: { radicado: string }) => ({ radicadoToSelect: a.radicado });
+
+  it("sin destino del módulo se comporta como siempre", () => {
+    expect(resolverDestino({ es_responsable: true, radicado: "R1" }, rutas, porRadicado)).toEqual({
+      ruta: "/x/manage",
+      accion: "Gestionar",
+      principal: true,
+      title: "Expediente a su cargo",
+      estado: { radicadoToSelect: "R1" },
+    });
+    expect(resolverDestino({ es_responsable: false, radicado: "R2" }, rutas, porRadicado)).toEqual({
+      ruta: "/x/consult",
+      accion: "Consultar",
+      principal: false,
+      title: "Expediente de otro responsable (solo lectura)",
+      estado: { radicadoToSelect: "R2" },
+    });
+  });
+
+  it("si el módulo devuelve null usa el destino de siempre", () => {
+    const r = resolverDestino({ es_responsable: true, radicado: "R1" }, rutas, porRadicado, () => null);
+    expect(r.ruta).toBe("/x/manage");
+    expect(r.accion).toBe("Gestionar");
+  });
+
+  it("el destino del módulo manda en ruta, texto, estilo y estado", () => {
+    const r = resolverDestino({ es_responsable: true, radicado: "R1" }, rutas, porRadicado, () => ({
+      ruta: "/x/mine",
+      accion: "Actuación",
+      principal: true,
+      title: "Abrir",
+      estado: { procesoIdToSelect: 7 },
+    }));
+    expect(r).toEqual({
+      ruta: "/x/mine",
+      accion: "Actuación",
+      principal: true,
+      title: "Abrir",
+      estado: { procesoIdToSelect: 7 },
+    });
   });
 });
 

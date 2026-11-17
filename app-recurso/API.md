@@ -271,7 +271,7 @@ versiones en revisión). Un archivo repetido aparece una vez.
 Errores: `403`, `404` (expediente inexistente o sin documentos), `502`
 (app-docs no generó el PDF).
 
-## B — Revisión de documentos, Mis informes y actos
+## B — Revisión de documentos, Mis actuaciones y actos
 
 Reglas comunes:
 
@@ -424,7 +424,7 @@ proceso): a los usuarios con los permisos pendientes cuando el documento entra
 a revisión o avanza de paso; al encargado cuando lo devuelven o queda aprobado
 para firma.
 
-### B.2 Mis informes — `GET /recurso/mis-documentos`
+### B.2 Mis actuaciones — `GET /recurso/mis-documentos`
 
 Cualquier usuario autenticado (ve solo lo suyo; sin nada a cargo → lista vacía).
 Igual que "Mis Informes" de infraction: UNA lista con TODOS los documentos del
@@ -628,7 +628,7 @@ respuesta conserva el error original). Un error posterior al commit no resta nad
 | `procesos_vigentes(db, [(etapa_tipo, id), ...])` | Batch para el árbol de etapas → `{(etapa_tipo, id): proceso}` |
 | `cargar_version_final(db, proceso, archivo: ArchivoRef, user_id, avisos, comentario=...)` | Dentro de la transacción de "Cargar versión final": exige `aprobado_firma`, PDF y que `user_id` sea el encargado; deja `aprobado` e incrementa el uso del archivo. 403/409/400/502 |
 | `subir_a_docs(upload_file) -> ArchivoRef` / `archivo_ref_por_id(file_id, nombre=None)` | Construir el `ArchivoRef` desde un `UploadFile` o desde un `file_id` ya subido por el front |
-| `resumen_proceso(db, proceso, user_id, permisos_usuario=None)` / `resumenes_procesos(db, procesos, user_id, permisos_usuario)` | Campos para el payload de cada etapa (misma forma que una fila de Mis informes sin datos de expediente; `RESUMEN_VACIO` si no hay proceso) |
+| `resumen_proceso(db, proceso, user_id, permisos_usuario=None)` / `resumenes_procesos(db, procesos, user_id, permisos_usuario)` | Campos para el payload de cada etapa (misma forma que una fila de Mis actuaciones sin datos de expediente; `RESUMEN_VACIO` si no hay proceso) |
 | `permisos_de_usuario(user_id)` | Permisos de revisor del usuario (resolver una vez por petición y pasarlo a `resumenes_procesos`) |
 | `cerrar_proceso_vigente(db, etapa_tipo, etapa_ref_id, *, usuario_id, descripcion)` | Finaliza y desactiva el proceso (super gestión carga directo, borrar etapa) |
 | `CADENAS`, `cadena_de(tipo)`, `etiqueta_tipo_documento`, `etiqueta_etapa`, `etiqueta_permiso` | Catálogo de cadenas y etiquetas |
@@ -833,7 +833,7 @@ Los campos que no aplican al tipo se ignoran.
 **Campos del concepto** (una sola fuente: `CAMPOS_CONCEPTO` / `definicion_campos_concepto`
 en `services/etapas.py`). Vienen en `campos` del nodo de concepto del árbol (C.2) y de
 `GET /etapas/conceptos/{id}`; el front arma con ellos el formulario de versión final, el
-de Mis informes y el del cargue directo (no guarda copia):
+de Mis actuaciones y el del cargue directo (no guarda copia):
 
 ```json
 {"obligatorios": ["file_id", "fecha_aceptacion", "cumple", "fecha_visita_tecnica"],
@@ -854,7 +854,7 @@ Condición para seleccionar técnico: `adicional` tras la respuesta del usuario 
 requerimiento; `memorias` tras el radicado de planos; `subsanacion` tras la subsanación;
 `obras` tras el informe; `obras_segundo` tras el nuevo informe.
 
-**Técnico desde Mis informes** (no entra a Gestionar): la fila de `GET /mis-documentos`
+**Técnico desde Mis actuaciones** (no entra a Gestionar): la fila de `GET /mis-documentos`
 con `etapa_tipo = "concepto_tecnico"` trae `etapa_ref_id` = id del concepto. El front
 llama `GET /etapas/conceptos/{etapa_ref_id}`:
 
@@ -1024,7 +1024,7 @@ ofrecen `gestionar_anexos`.
 | PUT | `/documentos-anexos/{id}` | `{expediente_id, nombre, documento_anexo_id?}`: cambia el nombre y, si llega `documento_anexo_id` distinto, reemplaza el PDF (validado; +1 uso al nuevo antes del commit, −1 al anterior después). La tabla no tiene `version` |
 | DELETE | `/documentos-anexos/{id}?expediente_id=` | — |
 
-### C.12 Contexto de etapa en Mis informes y en el detalle del proceso
+### C.12 Contexto de etapa en Mis actuaciones y en el detalle del proceso
 
 Las filas de `GET /mis-documentos` y el detalle `GET /revision-documentos/{id}` traen además:
 

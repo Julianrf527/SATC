@@ -82,7 +82,7 @@ async def test_tipo_concepto_desconocido(client, rv_permisos, expediente):
     await post(client, f"/etapas/{expediente.id}/requerimientos/otro/asignarme", esperado=404)
 
 
-async def test_tecnico_sin_gestionar_desde_mis_informes(client, rv_permisos, expediente, db_session):
+async def test_tecnico_sin_gestionar_desde_mis_actuaciones(client, rv_permisos, expediente, db_session):
     """El técnico (solo recurso_tecnico) ve y carga SU concepto por id (V3 manda sobre V1)."""
     stubs = rv_permisos
     exp_id = expediente.id

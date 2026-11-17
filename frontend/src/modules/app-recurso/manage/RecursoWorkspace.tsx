@@ -19,7 +19,7 @@ type Seleccion = { id: number; pestana: EtapaTabId; clave: number };
  * Pantalla lista + detalle de Gestionar y Consulta. Reutiliza
  * `ExpedientesWorkspace` de `@features/expedientes` tal cual; la lista y el
  * detalle son del módulo. Acepta `location.state` (`NavegacionExpediente`)
- * para abrir un expediente y una pestaña desde Mis informes.
+ * para abrir un expediente y una pestaña desde Mis actuaciones.
  */
 export default function RecursoWorkspace({ setToast, isEditable }: Props) {
   const location = useLocation();

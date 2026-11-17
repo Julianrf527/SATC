@@ -15,7 +15,7 @@ import {
 } from "../../etapas/formularios/conceptoFinal";
 
 type Props = {
-  /** `etapa_ref_id` de la fila de Mis informes = id del concepto (C.4). */
+  /** `etapa_ref_id` de la fila de Mis actuaciones = id del concepto (C.4). */
   conceptoId: number;
   onCargado: () => void;
 };

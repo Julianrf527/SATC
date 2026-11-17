@@ -26,7 +26,7 @@ type Props = {
   setToast: SetToast;
   /** `false` en Consulta: solo lectura + descarga del expediente completo. */
   isEditable: boolean;
-  /** Pestaña a abrir (navegación desde Mis informes). */
+  /** Pestaña a abrir (navegación desde Mis actuaciones). */
   pestanaInicial?: EtapaTabId;
 };
 

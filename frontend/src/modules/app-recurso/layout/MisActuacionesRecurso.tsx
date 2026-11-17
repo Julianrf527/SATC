@@ -7,11 +7,11 @@ import { documentoAdapter } from "../api/documentoAdapter";
 import { FILTROS_MIS_DOCUMENTOS, useMisDocumentosQuery, type FiltrosMisDocumentos } from "../api/misDocumentos";
 import { hayFiltrosActivos } from "../api/misDocumentosParams";
 import type { MiDocumento, SetToast } from "../types";
-import MisDocumentosFiltros from "./mis-informes/MisDocumentosFiltros";
-import MisDocumentosTabla from "./mis-informes/MisDocumentosTabla";
-import PaginacionMisDocumentos from "./mis-informes/PaginacionMisDocumentos";
-import ProcesoDocumentoModal from "./mis-informes/ProcesoDocumentoModal";
-import { useIrAlExpediente } from "./mis-informes/useIrAlExpediente";
+import MisDocumentosFiltros from "./mis-actuaciones/MisDocumentosFiltros";
+import MisDocumentosTabla from "./mis-actuaciones/MisDocumentosTabla";
+import PaginacionMisDocumentos from "./mis-actuaciones/PaginacionMisDocumentos";
+import ProcesoDocumentoModal from "./mis-actuaciones/ProcesoDocumentoModal";
+import { useIrAlExpediente } from "./mis-actuaciones/useIrAlExpediente";
 
 const SIN_DOCUMENTOS: MiDocumento[] = [];
 
@@ -22,12 +22,12 @@ function procesoDesdeNotificacion(state: unknown): number | null {
 }
 
 /**
- * Mis informes (/recurso/my-reports), B.2: como "Mis Informes" de infraction,
+ * Mis actuaciones (/recurso/my-reports), B.2: como "Mis Informes" de infraction,
  * una sola tabla paginada con todos mis documentos (encargado o revisor, en
  * cualquier estado) y la casilla "Solo los que requieren mi acción". Al abrir
  * una fila se muestra el proceso con `@features/proceso-revision`.
  */
-export default function MisInformesRecurso({ setToast }: { setToast: SetToast }) {
+export default function MisActuacionesRecurso({ setToast }: { setToast: SetToast }) {
   const location = useLocation();
   const precargar = usePrecargarProceso(documentoAdapter);
   const { puedeIr, ir } = useIrAlExpediente();
@@ -72,7 +72,7 @@ export default function MisInformesRecurso({ setToast }: { setToast: SetToast })
           </div>
           <div>
             <p className="text-[10px] font-semibold text-base-content/60 uppercase tracking-wider">Concesiones de Aguas</p>
-            <h1 className="text-lg font-bold text-base-content">Mis Informes</h1>
+            <h1 className="text-lg font-bold text-base-content">Mis actuaciones</h1>
           </div>
         </div>
       </div>

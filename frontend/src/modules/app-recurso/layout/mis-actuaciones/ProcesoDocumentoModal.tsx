@@ -9,7 +9,7 @@ import PasosRevision from "./PasosRevision";
 import { useIrAlExpediente } from "./useIrAlExpediente";
 
 type Props = {
-  /** `proceso_id` (Mis informes / notificación). `null` = cerrado. */
+  /** `proceso_id` (Mis actuaciones / notificación). `null` = cerrado. */
   procesoId: number | null;
   onClose: () => void;
 };

@@ -13,7 +13,7 @@ type Props = {
   actualizando: boolean;
 };
 
-/** Filtros de Mis informes (mismo aspecto que los de infraction). */
+/** Filtros de Mis actuaciones (mismo aspecto que los de infraction). */
 export default function MisDocumentosFiltros({ filtros, onChange, opciones, onActualizar, actualizando }: Props) {
   const activos = hayFiltrosActivos(filtros);
   const set = (parcial: Partial<FiltrosMisDocumentos>) => onChange({ ...filtros, ...parcial });

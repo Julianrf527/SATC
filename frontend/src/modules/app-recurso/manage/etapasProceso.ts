@@ -42,7 +42,7 @@ export function pestanaConDatos(id: EtapaTabId, etapas: EtapasExpediente | null 
   }
 }
 
-/** `etapa_padre` (C.12, Mis informes / detalle del proceso) → pestaña. */
+/** `etapa_padre` (C.12, Mis actuaciones / detalle del proceso) → pestaña. */
 const POR_ETAPA_PADRE: Record<string, EtapaTabId> = {
   acto_admite: "auto-admite",
   concepto_tecnico: "concepto",

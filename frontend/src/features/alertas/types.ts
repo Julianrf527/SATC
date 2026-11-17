@@ -25,6 +25,8 @@ export type Alerta = {
   es_responsable?: boolean;
   /** app-recurso: expediente de la alerta (para abrirlo al navegar). */
   expediente_id?: number;
+  /** app-recurso: proceso de revisión donde se hace la tarea (null si aún no existe). */
+  proceso_id?: number | null;
 };
 
 /** Respuesta del endpoint de alertas de un expediente. */

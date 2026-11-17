@@ -6,8 +6,9 @@ import { TIPO_LABELS, formatFechaCorta } from "./alertasConfig";
 import { useAlertasPaginadasQuery, useErrorToast } from "./api/alertas";
 import {
   ALCANCE_OPCIONES,
-  destinoAlerta,
+  resolverDestino,
   type AlcanceAlertas,
+  type DestinoAlerta,
   type RutasAlertas,
 } from "./alertasAlcance";
 import {
@@ -31,6 +32,12 @@ type Props = {
    * por id y pestaña.
    */
   estadoNavegacion?: (alerta: AlertaPaginada) => Record<string, unknown>;
+  /**
+   * Destino propio del botón de cada alerta (ruta, texto, estilo, estado). Si
+   * no se pasa o devuelve null, el de siempre: Gestionar o Consultar según
+   * `rutas` y `es_responsable`.
+   */
+  destino?: (alerta: AlertaPaginada) => DestinoAlerta | null;
 };
 
 const porRadicado = (alerta: AlertaPaginada) => ({ radicadoToSelect: alerta.radicado });
@@ -58,6 +65,7 @@ export default function AlertasExpediente({
   processName,
   setToast,
   estadoNavegacion = porRadicado,
+  destino: destinoModulo,
 }: Props) {
   const navigate = useNavigate();
   const [alcance, setAlcance] = useState<AlcanceAlertas>("mios");
@@ -280,7 +288,7 @@ export default function AlertasExpediente({
                         ) : (
                           alertas.map((alerta) => {
                             const badge = SEMAFORO_BADGE[alerta.semaforo.estado];
-                            const destino = destinoAlerta(alerta, rutas);
+                            const destino = resolverDestino(alerta, rutas, estadoNavegacion, destinoModulo);
                             return (
                               <tr key={`${alerta.radicado}-${alerta.clave}`} className="hover">
                                 <td>
@@ -345,12 +353,10 @@ export default function AlertasExpediente({
                                 </td>
                                 <td>
                                   <button
-                                    className={`btn btn-xs gap-1 ${destino.accion === "Gestionar" ? "btn-success text-white" : "btn-outline btn-info"}`}
-                                    title={destino.accion === "Gestionar"
-                                      ? "Expediente a su cargo"
-                                      : "Expediente de otro responsable (solo lectura)"}
+                                    className={`btn btn-xs gap-1 ${destino.principal ? "btn-success text-white" : "btn-outline btn-info"}`}
+                                    title={destino.title}
                                     onClick={() => navigate(destino.ruta, {
-                                      state: { ...estadoNavegacion(alerta), timestamp: Date.now() }
+                                      state: { ...destino.estado, timestamp: Date.now() }
                                     })}
                                   >
                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -115,7 +115,7 @@ PADRES_CONCEPTO: dict[str, tuple[str, str]] = {
 
 # ─── Campos que el técnico diligencia en cada concepto (UNA sola fuente) ───
 # La usan la validación de "Cargar versión final" (routes/etapa_concepto.py),
-# GET /etapas/conceptos/{id} (Mis informes) y el nodo de concepto del árbol
+# GET /etapas/conceptos/{id} (Mis actuaciones) y el nodo de concepto del árbol
 # GET /etapas/{exp} (services/etapas_lectura.py). El front arma sus formularios
 # con ``definicion_campos_concepto`` y no guarda copia.
 # TODO(negocio): plan §4-Etapa 2 — confirmar si los 4 datos de caudal son suficientes.

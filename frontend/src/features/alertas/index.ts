@@ -1,6 +1,6 @@
 // API pública de la feature alertas (alertas de vencimiento de expedientes).
 export { default as Alertas } from "./Alertas";
 export { default as AlertasExpediente } from "./AlertasExpediente";
-export type { RutasAlertas } from "./alertasAlcance";
+export type { DestinoAlerta, RutasAlertas } from "./alertasAlcance";
 export type { AlertaPaginada } from "./types";
 export { alertasKeys } from "./api/queryKeys";

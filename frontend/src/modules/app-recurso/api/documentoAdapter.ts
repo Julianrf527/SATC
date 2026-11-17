@@ -14,7 +14,7 @@ export type ResultadoDocumento = ResultadoAccion & {
 /**
  * Conecta el proceso de revisión de app-recurso (/recurso/revision-documentos)
  * con `@features/proceso-revision`, igual que `informeAdapter` de infraction.
- * El `id` es el **proceso_id** (Mis informes lo trae en `proceso_id`).
+ * El `id` es el **proceso_id** (Mis actuaciones lo trae en `proceso_id`).
  */
 export const documentoAdapter: ProcesoAdapter<ProcesoDocumentoDetalle> = {
   queryKey: (procesoId) => recursoKeys.proceso(procesoId),

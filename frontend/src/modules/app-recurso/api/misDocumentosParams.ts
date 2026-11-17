@@ -1,4 +1,4 @@
-/** Filtros y paginación de Mis informes (B.2). Se resuelven en el backend. */
+/** Filtros y paginación de Mis actuaciones (B.2). Se resuelven en el backend. */
 export type RolMisDocumentos = "" | "encargado" | "revisor";
 
 export type FiltrosMisDocumentos = {

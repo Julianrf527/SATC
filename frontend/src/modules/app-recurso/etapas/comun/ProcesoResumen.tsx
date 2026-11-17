@@ -30,7 +30,7 @@ export function EstadoProcesoBadge({ proceso }: { proceso: ResumenProceso | null
 /**
  * Bloque "Documento en revisión" de un nodo: tipo de documento, paso,
  * pendientes y botón al proceso (subir versión / revisar se hacen dentro del
- * modal, como en Mis informes).
+ * modal, como en Mis actuaciones).
  */
 export default function ProcesoResumen({ expedienteId, proceso, puedeSubir, puedeRevisar, soloLectura }: Props) {
   const [abierto, setAbierto] = useState<number | null>(null);

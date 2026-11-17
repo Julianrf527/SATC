@@ -14,7 +14,7 @@ describe("rutas del adapter de revisión", () => {
     expect(RECURSO_ENDPOINTS.RECURSO_VINCULO_DELETE(15, 2)).toBe("/recurso/involucrados/vinculos/15?version=2");
   });
 
-  it("la clave del proceso cuelga de Mis informes (se invalida con la lista)", () => {
+  it("la clave del proceso cuelga de Mis actuaciones (se invalida con la lista)", () => {
     expect(recursoKeys.proceso(7)).toEqual(["app-recurso", "mis-documentos", "proceso", 7]);
     expect(recursoKeys.proceso(7).slice(0, 2)).toEqual(recursoKeys.misDocumentos());
   });

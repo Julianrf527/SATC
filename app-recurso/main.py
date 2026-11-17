@@ -69,7 +69,7 @@ app.include_router(expediente_descarga.router, prefix="/expedientes", tags=["Exp
 app.include_router(involucrados.router, prefix="/involucrados", tags=["Involucrados"])
 app.include_router(actos.router, prefix="/actos", tags=["Actos, comunicación y notificación"])
 app.include_router(revision_documentos.router, prefix="/revision-documentos", tags=["Documentos - Revisión"])
-app.include_router(mis_documentos.router, prefix="/mis-documentos", tags=["Mis informes"])
+app.include_router(mis_documentos.router, prefix="/mis-documentos", tags=["Mis actuaciones"])
 app.include_router(etapa_admite.router, prefix="/etapas", tags=["Etapa 1 - Auto admite"])
 app.include_router(etapa_concepto.router, prefix="/etapas", tags=["Etapa 2 - Concepto técnico"])
 app.include_router(etapa_requerimiento.router, prefix="/etapas", tags=["Etapa 3 - Requerimiento"])

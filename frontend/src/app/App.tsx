@@ -38,7 +38,7 @@ const AlertasInfraccionLayout = lazy(() => import("@modules/app-infraccion/layou
 // === app-recurso (Concesiones de Aguas Superficiales) ===
 const GestionRecursoLayout = lazy(() => import("@modules/app-recurso/layout/GestionRecursoLayout"));
 const ConsultaRecursoLayout = lazy(() => import("@modules/app-recurso/layout/ConsultaRecursoLayout"));
-const MisInformesRecurso = lazy(() => import("@modules/app-recurso/layout/MisInformesRecurso"));
+const MisActuacionesRecurso = lazy(() => import("@modules/app-recurso/layout/MisActuacionesRecurso"));
 const AlertasRecursoLayout = lazy(() => import("@modules/app-recurso/layout/AlertasRecursoLayout"));
 // === app-involved ===
 const InvolucradoLogLayout = lazy(() => import("@modules/app-involved/layout/InvolucradoLogLayout"));
@@ -193,7 +193,7 @@ function App() {
     // === CONCESIONES DE AGUAS ===
     { path: "/recurso/manage", component: GestionRecursoLayout },
     { path: "/recurso/consult", component: ConsultaRecursoLayout },
-    { path: "/recurso/my-reports", component: MisInformesRecurso },
+    { path: "/recurso/my-reports", component: MisActuacionesRecurso },
     { path: "/recurso/alerts", component: AlertasRecursoLayout },
   ];
 
