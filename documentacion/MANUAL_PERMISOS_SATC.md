@@ -85,10 +85,12 @@ Detalles del armado:
 - **Infracciones:** `infraccion_informes_subir` e `infraccion_informes_revisar`
   llevan a la misma pantalla y se muestran como una sola entrada, **Mis informes**.
 - **Concesiones de Aguas:** todos los permisos de revisor y el de técnico llevan
-  a **Mis informes**, que aparece una sola vez. Quien tiene `recurso_gestionar`
-  también ve Mis informes (allí suben sus documentos los abogados).
+  a **Mis actuaciones** (actos y conceptos en los que el usuario actúa), que
+  aparece una sola vez. Quien tiene `recurso_gestionar` también ve Mis
+  actuaciones (allí suben sus documentos los abogados). La pestaña **Alertas**
+  aparece con `recurso_gestionar` o `recurso_consultar`.
 - Orden de las entradas: Gestionar → Consultar → Alertas → Asignar → Asignar
-  informes → Mis informes (según lo que tenga cada usuario).
+  informes → Mis informes / Mis actuaciones (según lo que tenga cada usuario).
 
 ---
 
@@ -145,12 +147,12 @@ En la pantalla Informes solo se pueden elegir como profesional usuarios con
 | `recurso_gestionar`             | `/recurso/manage`      | Desbloquea la pantalla Gestionar de concesiones. Sirve para crear y editar expedientes, asignarse procesos y proyectar los documentos de cada etapa. |
 | `recurso_consultar`             | `/recurso/consult`     | Desbloquea la pantalla Consulta de concesiones. Sirve para ver cualquier expediente en solo lectura y descargarlo completo. |
 | `recurso_super_gestion`         | —                      | Desbloquea el cargue histórico de concesiones. Sirve para cargar directamente cualquier etapa de expedientes viejos sin revisión ni asignación. |
-| `recurso_lider_juridico`        | `/recurso/my-reports`  | Desbloquea Mis informes de concesiones como líder jurídico. Sirve para revisar los actos administrativos en el primer paso de su cadena. |
-| `recurso_lider_proyecto`        | `/recurso/my-reports`  | Desbloquea Mis informes de concesiones como líder del proyecto. Sirve para revisar tras el líder jurídico o técnico/SIG y aprobar para firma. |
-| `recurso_asesora_subdireccion`  | `/recurso/my-reports`  | Desbloquea Mis informes de concesiones como asesora de subdirección. Sirve para revisar la decisión y el acto del recurso con el líder del proyecto. |
-| `recurso_lider_tecnico`         | `/recurso/my-reports`  | Desbloquea Mis informes de concesiones como líder técnico. Sirve para revisar los conceptos técnicos. |
-| `recurso_sig`                   | `/recurso/my-reports`  | Desbloquea Mis informes de concesiones como SIG. Sirve para revisar el concepto técnico de la etapa 2 junto con el líder técnico. |
-| `recurso_tecnico`               | `/recurso/my-reports`  | Desbloquea Mis informes de concesiones como técnico. Sirve para que el abogado lo elija como técnico y cargar su concepto técnico. |
+| `recurso_lider_juridico`        | `/recurso/my-reports`  | Desbloquea Mis actuaciones de concesiones como líder jurídico. Sirve para revisar los actos administrativos en el primer paso de su cadena. |
+| `recurso_lider_proyecto`        | `/recurso/my-reports`  | Desbloquea Mis actuaciones de concesiones como líder del proyecto. Sirve para revisar tras el líder jurídico o técnico/SIG y aprobar para firma. |
+| `recurso_asesora_subdireccion`  | `/recurso/my-reports`  | Desbloquea Mis actuaciones de concesiones como asesora de subdirección. Sirve para revisar la decisión y el acto del recurso con el líder del proyecto. |
+| `recurso_lider_tecnico`         | `/recurso/my-reports`  | Desbloquea Mis actuaciones de concesiones como líder técnico. Sirve para revisar los conceptos técnicos. |
+| `recurso_sig`                   | `/recurso/my-reports`  | Desbloquea Mis actuaciones de concesiones como SIG. Sirve para revisar el concepto técnico de la etapa 2 junto con el líder técnico. |
+| `recurso_tecnico`               | `/recurso/my-reports`  | Desbloquea Mis actuaciones de concesiones como técnico. Sirve para que el abogado lo elija como técnico y cargar su concepto técnico. |
 
 Detalle en la sección 6.
 
@@ -234,6 +236,25 @@ solo sentido: tener el permiso requerido no obliga a tener el dependiente.
   `admin_roles_y_permisos` y lista cada rol con los permisos que le faltan.
   Además, al arrancar, app-users deja esos roles anotados en su log.
 
+### 4.3 Permisos incompatibles
+
+Algunos permisos **no pueden ir juntos** en el mismo rol (en los dos sentidos):
+
+| Permiso            | No puede ir con      | Por qué |
+| ------------------ | -------------------- | ------- |
+| `recurso_tecnico`  | `recurso_gestionar`  | El técnico no gestiona expedientes: carga sus conceptos desde Mis actuaciones. Como `recurso_super_gestion` exige gestionar, tampoco puede tener super gestión. |
+
+- **Excepción:** un rol con `admin_roles_y_permisos` (administra roles) no tiene
+  incompatibilidades. Solo se pueden otorgar permisos que el propio rol tiene,
+  así que el administrador necesita todos para poder repartirlos, y es quien
+  recibe los permisos nuevos del catálogo.
+- En la pantalla de roles, con uno de los dos marcado el otro queda **bloqueado**
+  y debajo se indica "No puede ir con: …". El botón "Todos" no marca permisos
+  incompatibles.
+- El servidor rechaza el guardado (por ejemplo: «recurso_gestionar» no puede ir
+  con «recurso_tecnico»). Los roles que ya los tienen juntos siguen funcionando,
+  se listan en el mismo reporte (`incompatibles`) y en el log al arrancar.
+
 ---
 
 ## 5. REGLAS DE ALCANCE: QUÉ EXPEDIENTES VE Y MODIFICA CADA USUARIO
@@ -271,8 +292,9 @@ solo sentido: tener el permiso requerido no obliga a tener el dependiente.
 - **Gestionar** (`recurso_gestionar`): crea y edita la información base de los
   expedientes. En cada etapa, el abogado usa **"Asignarme para diligenciar"** y
   desde ese momento solo él (el encargado) gestiona el documento de esa etapa.
-- Los permisos de revisor y de técnico solo dan acceso a **Mis informes** y a la
-  consulta (por eso exigen `recurso_consultar`).
+- Los permisos de revisor y de técnico solo dan acceso a **Mis actuaciones** y a
+  la consulta (por eso exigen `recurso_consultar`). El técnico no puede tener
+  gestionar (sección 4.3).
 
 ---
 
@@ -282,7 +304,7 @@ Los documentos que se proyectan en Concesiones de Aguas pasan por una **cadena
 de revisión** según el tipo de documento. Cada paso lo deben revisar **todas**
 las personas del paso (en cualquier orden) antes de avanzar al siguiente. El
 sistema envía cada documento a quienes tengan el permiso de revisor del paso
-pendiente y se les muestra en **Mis informes**.
+pendiente y se les muestra en **Mis actuaciones**.
 
 | Documento | Lo sube | Paso 1 | Paso 2 |
 | --------- | ------- | ------ | ------ |
@@ -311,9 +333,9 @@ Otros roles:
 
 - **Técnico** (`recurso_tecnico`): solo los usuarios con este permiso aparecen
   cuando el abogado elige el técnico encargado de un concepto técnico. El técnico
-  sube su concepto desde Mis informes.
+  sube su concepto desde Mis actuaciones. No puede tener `recurso_gestionar`.
 - **Abogado** (`recurso_gestionar`): proyecta y sube los actos de las etapas que
-  se asignó, y los ve en Mis informes.
+  se asignó, y los ve en Mis actuaciones.
 
 ---
 
@@ -423,7 +445,7 @@ un expediente, la alerta lo lleva a Consultar.
 `infraccion_consultar`, `infraccion_informes_revisar`
 
 ### Técnico de Concesiones de Aguas
-`recurso_consultar`, `recurso_tecnico`
+`recurso_consultar`, `recurso_tecnico` (sin `recurso_gestionar`: son incompatibles)
 
 ### Revisores de Concesiones de Aguas
 Siempre `recurso_consultar` más el permiso del cargo:
@@ -454,19 +476,25 @@ automáticamente a los roles que ya tenían todos los permisos.
 ## 10. NOTA PARA EL EQUIPO TÉCNICO: SINCRONIZACIÓN DEL CATÁLOGO
 
 - Los permisos se definen en `app-users/db/permission_catalog.py`:
-  `PERMISOS` (nombre, ruta de menú y descripción), `DEPENDENCIAS` y `RENOMBRES`.
+  `PERMISOS` (nombre, ruta de menú y descripción), `DEPENDENCIAS`,
+  `INCOMPATIBLES` (con la excepción `EXENTO_INCOMPATIBLES`),
+  `DESCRIPCIONES_ANTERIORES` y `RENOMBRES`.
 - Cada vez que arranca app-users se sincroniza el catálogo con la base de datos
   (`db/permission_sync.py`), sin SQL manual en la VM:
   - Crea los permisos nuevos y los otorga a los roles que tenían todos los
     permisos (superadministradores).
   - Llena la ruta de menú y la descripción **solo si están vacías**: lo editado
     desde la pantalla de permisos no se pisa. Cambiar una descripción en el
-    catálogo no modifica la que ya existe en la base.
+    catálogo no modifica la que ya existe en la base, salvo que la guardada
+    siga siendo un texto por defecto anterior listado en
+    `DESCRIPCIONES_ANTERIORES` (nadie la editó): entonces pasa al texto actual.
   - Aplica los **renombres** sobre la misma fila, así los roles conservan el
     permiso (ejemplo: `infraccion_cargue` → `infraccion_super_gestion`).
-  - Deja la tabla de dependencias igual a `DEPENDENCIAS`.
+  - Deja la tabla de dependencias igual a `DEPENDENCIAS` y la de
+    incompatibilidades (`permiso_excluye`, en los dos sentidos) igual a
+    `INCOMPATIBLES`.
   - Nunca borra permisos ni corrige roles; solo informa en el log los que
-    incumplen dependencias.
+    incumplen dependencias o incompatibilidades.
 - La descripción es obligatoria (máx. 200 caracteres) y editable desde la
   pantalla de permisos.
 - Los servicios validan los permisos **por su nombre**. No cambie el nombre ni
