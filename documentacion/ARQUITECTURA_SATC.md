@@ -902,9 +902,11 @@ cd satc
 cp .env.example .env
 nano .env  # Editar valores de producción
 
-# 3. Inicializar bases de datos (opcional)
-cd db-script
-./apply_all_migrations.ps1
+# 3. Bases de datos (opcional): cada app crea su esquema y sus datos
+#    iniciales al arrancar. Para crearlas a mano, db-script/ tiene un
+#    <base>_db.sql por app (user_db, expedientes_db, documentos_db,
+#    involucrados_db, infracciones_db, recurso_db), p. ej.:
+docker exec -i satc-postgres-recurso psql -U postgres -d recurso_db < db-script/recurso_db.sql
 
 # 4. Construir y levantar servicios
 docker-compose build
