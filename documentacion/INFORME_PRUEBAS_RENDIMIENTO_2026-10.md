@@ -38,7 +38,7 @@ Fuera de alcance: pruebas de carga contra producción (prohibidas expresamente) 
 
 | Entorno | Descripción | Uso en este informe |
 | --- | --- | --- |
-| Producción | VM 192.168.254.222: 4 CPU, 5.931 MiB de RAM y 4.095 MiB de swap. Compose propio en `~/satc-deploy`. Encendida hace 25 días; los servicios actualizados corren desde el despliegue del 16/10. | **Solo observación** (lecturas por SSH, 19/10 de 12:49 a 13:21). No se generó carga ni se cambió configuración. |
+| Producción | VM de producción: 4 CPU, 5.931 MiB de RAM y 4.095 MiB de swap. Compose propio en `~/satc-deploy`. Encendida hace 25 días; los servicios actualizados corren desde el despliegue del 16/10. | **Solo observación** (lecturas por SSH, 19/10 de 12:49 a 13:21). No se generó carga ni se cambió configuración. |
 | Local | Docker Desktop 29.8.2 en Windows 11 Pro. 16 CPU y 15,6 GiB asignados a Docker. 19 contenedores con los límites de `docker-compose.yml`. | Carga, concurrencia y consumo de recursos. |
 | BD de pruebas | PostgreSQL portable en 127.0.0.1:55432 (BD `*_test_db`). | Benchmark de alertas y suites automatizadas. |
 
@@ -88,7 +88,7 @@ Carpeta: `C:\Users\julia\AppData\Local\Temp\claude\c--Users-julia-Escritorio-SAT
 
 ### 3.1 Cómo se midió
 
-- **Entre las 12:49 y las 13:21 se hicieron solo lecturas por SSH** (`administrador@192.168.254.222`, sin contraseña, con `BatchMode`). No se generó carga, no se reinició nada y no se cambió configuración.
+- **Entre las 12:49 y las 13:21 se hicieron solo lecturas por SSH** (al servidor de producción, sin contraseña, con `BatchMode`). No se generó carga, no se reinició nada y no se cambió configuración.
 - **`docker stats --no-stream` cada 30 s durante 15 minutos.** Son 30 muestras, de 13:06:14 a 13:20:44, de los 19 contenedores (`resultados\prod_19-10.csv`).
 - **Estado del sistema al inicio (12:49) y al final (13:21).** Se tomaron `free -m`, `uptime` y `vmstat`, más `docker inspect` (límite y reserva efectivos, reinicios, OOMKilled y salud).
 - **Contadores del cgroup de cada contenedor.** `memory.peak` es el pico desde que arrancó el contenedor, `memory.events` cuenta las veces que tocó el tope y las muertes por OOM, y `memory.stat` separa la memoria de procesos (anónima) de la caché de archivos. Para los servicios actualizados, el período cubierto va del 16/10 al 19/10.

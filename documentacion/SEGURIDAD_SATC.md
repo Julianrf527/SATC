@@ -985,8 +985,7 @@ Líder de Seguridad:
   Disponibilidad: 24/7 para P1–P2
 
 Desarrollador:
-  Email: julianrf527@gmail.com
-  Teléfono: +57 321 497 5446
+  Contacto: ver directorio interno del equipo SATC
   Disponibilidad: Horario laboral + on-call
 ```
 

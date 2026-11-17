@@ -3,9 +3,24 @@ $ErrorActionPreference = "Stop"
 # El script vive en scripts/: las rutas de abajo son relativas a la raíz del repositorio.
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
-# Configuración
-$ServerIp = "192.168.254.222"
-$ServerUser = "administrador"
+# Servidor de despliegue: variables de entorno SATC_VM_IP / SATC_VM_USER o el
+# archivo .env.deploy de la raíz (ver .env.deploy.example; no se versiona).
+if (Test-Path ".env.deploy") {
+    Get-Content ".env.deploy" | Where-Object { $_ -match '^\s*(SATC_VM_[A-Z]+)\s*=\s*(.*)$' } | ForEach-Object {
+        if (-not [Environment]::GetEnvironmentVariable($Matches[1])) {
+            [Environment]::SetEnvironmentVariable($Matches[1], $Matches[2].Trim())
+        }
+    }
+}
+$ServerIp = $env:SATC_VM_IP
+$ServerUser = $env:SATC_VM_USER
+if (-not $ServerIp -or -not $ServerUser) {
+    Write-Host "Error: faltan SATC_VM_IP y/o SATC_VM_USER (variables de entorno o .env.deploy)." -ForegroundColor Red
+    exit 1
+}
+if (-not (Test-Path ".env.user_admin")) {
+    Write-Host "Aviso: no existe .env.user_admin; si la base de la VM no tiene usuarios no se creará el administrador." -ForegroundColor Yellow
+}
 $TarName = "satc_images.tar"
 $PkgDir = "deploy_vm"
 
@@ -37,6 +52,7 @@ if (Test-Path $PkgDir) { Remove-Item -Recurse -Force $PkgDir }
 New-Item -ItemType Directory -Path $PkgDir | Out-Null
 Copy-Item "deploy\docker-compose.prod.yml" -Destination "$PkgDir\docker-compose.yml"
 Copy-Item "deploy\env-produccion.txt" -Destination "$PkgDir\.env"
+if (Test-Path ".env.user_admin") { Copy-Item ".env.user_admin" -Destination "$PkgDir\.env.user_admin" }
 Copy-Item "db-script" -Destination "$PkgDir\db-script" -Recurse
 Copy-Item "nginx" -Destination "$PkgDir\nginx" -Recurse
 Copy-Item "scripts" -Destination "$PkgDir\scripts" -Recurse
@@ -54,6 +70,9 @@ ssh -n @SshKeepalive ${ServerUser}@${ServerIp} "sudo rm -rf ~/satc-deploy && mkd
 scp @SshKeepalive -r ${PkgDir}/* ${ServerUser}@${ServerIp}:~/satc-deploy/
 # El glob '*' de scp.exe (Windows) no incluye archivos que empiezan con punto -> .env se transfiere aparte
 scp @SshKeepalive ${PkgDir}/.env ${ServerUser}@${ServerIp}:~/satc-deploy/.env
+if (Test-Path "$PkgDir\.env.user_admin") {
+    scp @SshKeepalive ${PkgDir}/.env.user_admin ${ServerUser}@${ServerIp}:~/satc-deploy/.env.user_admin
+}
 scp @SshKeepalive $TarName ${ServerUser}@${ServerIp}:~/satc-deploy/
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Error: la transferencia de ${TarName} falló (conexión interrumpida). Abortando antes de tocar la VM." -ForegroundColor Red

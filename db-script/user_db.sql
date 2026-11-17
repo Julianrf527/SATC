@@ -3,6 +3,7 @@
 -- Generado desde los modelos actuales (create_all + db/migrations.py + db/seeds.py + db/permission_sync.py) sobre una BD vacía, el 2026-11-17.
 -- Uso: createdb user_db && psql -U postgres -d user_db -f user_db.sql
 -- La app también crea y actualiza todo esto sola al arrancar.
+-- Sin usuarios: el administrador inicial lo crea app-users desde .env.user_admin.
 -- ============================================================
 
 --
@@ -481,7 +482,6 @@ COPY public.seed_lock (id, locked_at) FROM stdin;
 --
 
 COPY public.usuario (id, numero_documento, primer_nombre, segundo_nombre, primer_apellido, segundo_apellido, correo, hash_contrasena, activo, fecha_registro, rol_id) FROM stdin;
-1	1233506795	Julian	\N	Rodriguez	\N	julianrf527@gmail.com	$2b$12$zRj0wuQfYsr7VWDjT6A34.qPh6PtrhlQv9zH1dReZRamRwmGXKXGW	t	2026-11-17 00:40:00.200297-05	1
 \.
 
 
@@ -524,7 +524,7 @@ SELECT pg_catalog.setval('public.rol_id_seq', 1, false);
 -- Name: usuario_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.usuario_id_seq', 1, true);
+SELECT pg_catalog.setval('public.usuario_id_seq', 1, false);
 
 
 --
