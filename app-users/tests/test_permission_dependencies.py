@@ -110,6 +110,7 @@ async def test_dependencias_incumplidas_reporta_roles(client, escenario, make_ro
         "rol_id": roto.id,
         "rol_nombre": "roto",
         "faltantes": [{"permiso": "infraccion_alertas", "requiere": ["infraccion_consultar"]}],
+        "incompatibles": [],
     }]
 
 
