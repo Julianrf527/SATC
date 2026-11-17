@@ -6,7 +6,7 @@ Postgres real y separado: ``TEST_DATABASE_URL`` (default
 ``postgres-recurso:5432/recurso_test_db``, como el resto de servicios en
 Docker). En esta máquina (DISENO_TECNICO §7)::
 
-    TEST_DATABASE_URL='postgresql+asyncpg://postgres:CAMBIAR_POSTGRES_PASSWORD@127.0.0.1:55432/recurso_test_db' \
+    TEST_DATABASE_URL='postgresql+asyncpg://postgres:<POSTGRES_PASSWORD con # como %23>@127.0.0.1:55432/recurso_test_db' \
         ../.venv/Scripts/python.exe -m pytest -q
 
 - El esquema se crea una vez por sesión (``create_all``) y los catálogos
@@ -67,10 +67,13 @@ Fixtures de uso común
   ``refresh`` según el caso; usa ``expire_on_commit=False``).
 """
 import os
+from urllib.parse import quote
 
+# Clave de Postgres desde POSTGRES_PASSWORD (la del .env); nunca escrita aquí.
+_PG_PASSWORD = quote(os.getenv("POSTGRES_PASSWORD", ""), safe="")
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:CAMBIAR_POSTGRES_PASSWORD@postgres-recurso:5432/recurso_test_db",
+    f"postgresql+asyncpg://postgres:{_PG_PASSWORD}@postgres-recurso:5432/recurso_test_db",
 )
 # db/database.py crea su engine al importarse con DATABASE_URL: se apunta a la
 # BD de pruebas (lo usa solo el seed de catálogos de la sesión).

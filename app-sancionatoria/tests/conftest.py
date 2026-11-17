@@ -12,10 +12,13 @@ progreso"); en vez de eso, se limpian las tablas con TRUNCATE al terminar
 cada test.
 """
 import os
+from urllib.parse import quote
 
+# Clave de Postgres desde POSTGRES_PASSWORD (la del .env); nunca escrita aquí.
+_PG_PASSWORD = quote(os.getenv("POSTGRES_PASSWORD", ""), safe="")
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:CAMBIAR_POSTGRES_PASSWORD@postgres-sanctioning:5432/expedientes_test_db",
+    f"postgresql+asyncpg://postgres:{_PG_PASSWORD}@postgres-sanctioning:5432/expedientes_test_db",
 )
 # db/database.py lee DATABASE_URL al importarse (crea un engine a nivel de
 # módulo). No se usa para los tests (get_db queda sobreescrito), pero debe
