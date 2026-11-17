@@ -27,8 +27,12 @@ logger = logging.getLogger(__name__)
 
 from utils.verify_token import verify_gateway_token
 from services.etapas import build_acto_for_frontend as _build_acto_for_frontend
-from services.etapas import get_expediente_con_permiso
+from services.etapas import get_expediente_con_permiso, exigir_lectura_expediente, puede_leer_expediente
+from services.users import verify_permission
 from utils.log import insert_log
+from core.permission import Permission
+
+SANCIONATORIO_GESTIONAR = "sancionatorio_gestionar"
 
 
 async def _build_cierre_response(db: AsyncSession, etapa: EtapaCierre) -> dict:
@@ -58,7 +62,8 @@ async def obtener_cierre(
     expediente_id: int = PathParam(...),
     db: AsyncSession = Depends(get_db_managed),
 ):
-    verify_gateway_token(request)
+    user_id = verify_gateway_token(request)["user_id"]
+    await exigir_lectura_expediente(db, expediente_id, user_id)
 
     etapa = await db.scalar(
         select(EtapaCierre).where(EtapaCierre.expediente_id == expediente_id)
@@ -183,7 +188,7 @@ async def crear_cierre(
 
 # ── MIGRACIÓN A SANCIONATORIO ──────────────────────────────────────────────────
 
-@router.get("/migration/medida/{radicado}", status_code=200)
+@router.get("/migracion/medida/{radicado}", status_code=200)
 async def obtener_datos_migracion_medida(
     request: Request,
     radicado: str,
@@ -195,11 +200,25 @@ async def obtener_datos_migracion_medida(
     Usado por sancionatorio para importar datos al crear su medida preventiva.
     """
     try:
-        verify_gateway_token(request)
+        user_id = verify_gateway_token(request)["user_id"]
+
+        # Lo consume la gestión de sancionatorio: sancionatorio_gestionar ve
+        # cualquier radicado, igual que infraccion_consultar; infraccion_gestionar
+        # solo los suyos. Sin ninguno: 403 antes de buscar (no revela radicados).
+        ve_todos = (
+            await verify_permission(user_id, SANCIONATORIO_GESTIONAR)
+            or await verify_permission(user_id, Permission.FILE_CONSULT)
+        )
+        if not ve_todos and not await verify_permission(user_id, Permission.FILE_MANAGE):
+            raise HTTPException(status_code=403, detail="Sin permisos")
 
         expediente = await db.scalar(
             select(Expediente).where(Expediente.radicado == radicado)
         )
+        if not ve_todos and (
+            not expediente or not await puede_leer_expediente(user_id, expediente.abogado_responsable_id)
+        ):
+            raise HTTPException(status_code=403, detail="Sin permisos sobre este expediente")
         if not expediente:
             return JSONResponse(content={"ok": False, "detail": "Expediente de infracciones no encontrado"}, status_code=200)
 

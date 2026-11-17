@@ -33,6 +33,8 @@ from utils.verify_token import verify_gateway_token
 from services.auditoria import insert_auditoria
 from services.involucrado import get_involucrado_by_id, get_involucrados_by_ids
 from services.etapas import get_expediente_con_permiso
+from services.permisos import exigir_alguno, exigir_lectura_expediente
+from core.permission import Permission
 
 @router.post("/involved-file")
 async def vincular_involucrado_a_expediente(
@@ -128,6 +130,12 @@ async def desvincular_involucrado_a_expediente(
     if dec:
         if dec[0]: acto_ids.add(dec[0])
         if dec[1]: acto_ids.add(dec[1])
+    # Probatoria de recurso: acto de decisión del recurso (acto auxiliar)
+    acto_decision = await db.scalar(
+        select(EtapaProbatoriaRecurso.acto_decision_id).where(EtapaProbatoriaRecurso.expediente_id == expediente_id)
+    )
+    if acto_decision:
+        acto_ids.add(acto_decision)
     # Filtra por involucrado_id: sin ese filtro se borrarían también notificaciones
     # de otros involucrados vinculados a los mismos actos administrativos
     if acto_ids:
@@ -195,8 +203,10 @@ async def obtener_involucrados_por_expediente(
     expediente_id: int,
     db: AsyncSession = Depends(get_db_managed),
 ):
-    """Obtener todos los involucrados de un expediente (consulta centralizada al microservicio involved)"""
-    verify_gateway_token(request)
+    """Obtener todos los involucrados de un expediente (consulta centralizada al microservicio involved).
+    Datos personales: consultar, o gestionar + encargado."""
+    user_id = verify_gateway_token(request)["user_id"]
+    await exigir_lectura_expediente(db, expediente_id, user_id)
 
     stmt = select(ExpedienteInvolucrado).where(ExpedienteInvolucrado.expediente_id == expediente_id)
     result = await db.execute(stmt)
@@ -230,9 +240,11 @@ async def obtener_expedientes_por_involucrado(
     involved_id: int,
     db: AsyncSession = Depends(get_db_managed),
 ):
-    """Obtener todos los expedientes donde está involucrada una persona."""
+    """Obtener todos los expedientes donde está involucrada una persona.
+    Lista expedientes de cualquier encargado: consultar o involucrado_gestionar."""
     token_data = verify_gateway_token(request)
     usuario_id = token_data["user_id"]
+    await exigir_alguno(usuario_id, Permission.FILE_CONSULT, Permission.INVOLVED_MANAGE)
     stmt = (
         select(ExpedienteInvolucrado).where(ExpedienteInvolucrado.involucrado_id == involved_id)
     )

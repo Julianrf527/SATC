@@ -19,6 +19,7 @@ from services.docs import increment_file_usage, decrement_file_usage
 from services.auditoria import insert_auditoria
 from services.etapas import (
     ETAPA_MODELS as STAGE_MAP,
+    columna_acto_auxiliar,
     find_stage_by_id as _find_stage_by_id_acto,
     get_expediente_con_permiso,
 )
@@ -38,8 +39,9 @@ async def _update_stage_acto(db, etapa_tipo, etapa_ref_id, acto_id, is_recurso=F
     Model = STAGE_MAP.get(etapa_tipo)
     if not Model:
         return
-    if is_recurso and hasattr(Model, 'acto_recurso_id'):
-        await db.execute(update(Model).where(Model.id == etapa_ref_id).values(acto_recurso_id=acto_id))
+    col_aux = columna_acto_auxiliar(Model)
+    if is_recurso and col_aux is not None:
+        await db.execute(update(Model).where(Model.id == etapa_ref_id).values({col_aux: acto_id}))
     else:
         await db.execute(update(Model).where(Model.id == etapa_ref_id).values(acto_administrativo_id=acto_id))
 
@@ -47,8 +49,9 @@ async def _clear_stage_acto(db, acto_id):
     for Model in STAGE_MAP.values():
         if hasattr(Model, 'acto_administrativo_id'):
             await db.execute(update(Model).where(Model.acto_administrativo_id == acto_id).values(acto_administrativo_id=None))
-        if hasattr(Model, 'acto_recurso_id'):
-            await db.execute(update(Model).where(Model.acto_recurso_id == acto_id).values(acto_recurso_id=None))
+        col_aux = columna_acto_auxiliar(Model)
+        if col_aux is not None:
+            await db.execute(update(Model).where(col_aux == acto_id).values({col_aux: None}))
 
 
 @router.post("/acto-admin")
@@ -96,8 +99,11 @@ async def crear_acto_admin(
     is_recurso = nivel_auxiliar == "true"
 
     Model = STAGE_MAP[etapa_tipo]
-    if is_recurso and hasattr(Model, 'acto_recurso_id'):
-        existing_id = await db.scalar(select(Model.acto_recurso_id).where(Model.id == etapa_ref_id))
+    col_aux = columna_acto_auxiliar(Model)
+    if is_recurso and col_aux is None:
+        raise HTTPException(status_code=400, detail="Esta etapa no admite acto administrativo auxiliar")
+    if is_recurso:
+        existing_id = await db.scalar(select(col_aux).where(Model.id == etapa_ref_id))
     else:
         existing_id = await db.scalar(select(Model.acto_administrativo_id).where(Model.id == etapa_ref_id))
 
@@ -123,8 +129,9 @@ async def crear_acto_admin(
                 if eid:
                     existing_exp = await db.scalar(select(Expediente.radicado).where(Expediente.id == eid))
                     break
-            if hasattr(M, 'acto_recurso_id'):
-                eid = await db.scalar(select(M.expediente_id).where(M.acto_recurso_id == existing_acto))
+            col_aux = columna_acto_auxiliar(M)
+            if col_aux is not None:
+                eid = await db.scalar(select(M.expediente_id).where(col_aux == existing_acto))
                 if eid:
                     existing_exp = await db.scalar(select(Expediente.radicado).where(Expediente.id == eid))
                     break
@@ -140,8 +147,9 @@ async def crear_acto_admin(
                 if eid and eid != expediente_id:
                     other_exp = await db.scalar(select(Expediente.radicado).where(Expediente.id == eid))
                     break
-            if hasattr(M, 'acto_recurso_id'):
-                eid = await db.scalar(select(M.expediente_id).where(M.acto_recurso_id == existing_acto))
+            col_aux = columna_acto_auxiliar(M)
+            if col_aux is not None:
+                eid = await db.scalar(select(M.expediente_id).where(col_aux == existing_acto))
                 if eid and eid != expediente_id:
                     other_exp = await db.scalar(select(Expediente.radicado).where(Expediente.id == eid))
                     break
@@ -289,8 +297,9 @@ async def actualizar_acto_admin(
                 if eid and eid != expediente_id:
                     other_exp = await db.scalar(select(Expediente.radicado).where(Expediente.id == eid))
                     break
-            if hasattr(M, 'acto_recurso_id'):
-                eid = await db.scalar(select(M.expediente_id).where(M.acto_recurso_id == existing_acto))
+            col_aux = columna_acto_auxiliar(M)
+            if col_aux is not None:
+                eid = await db.scalar(select(M.expediente_id).where(col_aux == existing_acto))
                 if eid and eid != expediente_id:
                     other_exp = await db.scalar(select(Expediente.radicado).where(Expediente.id == eid))
                     break
@@ -303,7 +312,7 @@ async def actualizar_acto_admin(
     is_recurso = nivel_auxiliar == "true"
     if is_recurso:
         Model = STAGE_MAP[etapa_tipo]
-        if hasattr(Model, 'acto_recurso_id'):
+        if columna_acto_auxiliar(Model) is not None:
             base_acto = await db.scalar(select(Model.acto_administrativo_id).where(Model.id == etapa_ref_id))
             if not base_acto or base_acto == acto_id:
                 raise HTTPException(

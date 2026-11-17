@@ -12,7 +12,7 @@ echo "Frecuencia: cada 30 minutos"
 echo "Retención: 48x30min (~24h) / 30 daily (~1 mes) / 12 weekly (~3 meses)"
 echo "========================================="
 
-for svc in postgres-users postgres-sanctioning postgres-docs postgres-involved postgres-infraction; do
+for svc in postgres-users postgres-sanctioning postgres-docs postgres-involved postgres-infraction postgres-recurso; do
   mkdir -p "/backups/$svc/30min" "/backups/$svc/daily" "/backups/$svc/weekly"
 done
 mkdir -p /backups/minio/30min /backups/minio/daily /backups/minio/weekly

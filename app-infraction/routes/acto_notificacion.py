@@ -32,7 +32,7 @@ from services.actos import (
 from utils.log import insert_log
 
 
-@router.post("/notificacion")
+@router.post("/notificaciones")
 async def crear_notificacion(
     request: Request,
     expediente_id: int = Form(...),
@@ -191,7 +191,7 @@ async def crear_notificacion(
     )
 
 
-@router.put("/notificacion/{notificacion_id}")
+@router.put("/notificaciones/{notificacion_id}")
 async def actualizar_notificacion(
     request: Request,
     notificacion_id: int,
@@ -381,7 +381,7 @@ async def actualizar_notificacion(
     )
 
 
-@router.delete("/notificacion/{notificacion_id}")
+@router.delete("/notificaciones/{notificacion_id}")
 async def eliminar_notificacion(
     request: Request,
     notificacion_id: int,
@@ -465,7 +465,7 @@ async def eliminar_notificacion(
 
 # ── TIPO NOTIFICACIÓN ─────────────────────────────────────────────────────────
 
-@router.get("/tipo-notificacion", status_code=200)
+@router.get("/tipos-notificacion", status_code=200)
 async def listar_tipos_notificacion(
     request: Request,
     db: AsyncSession = Depends(get_db_managed),

@@ -32,6 +32,7 @@ from sqlalchemy.orm import sessionmaker
 
 from db.deps import get_db
 from db.models import Base
+from db.migrations import aplicar_migraciones
 from db.models.expediente import Expediente
 from db.models.tipo_medida import TipoMedida
 from db.models.tipo_cesacion import TipoCesacion
@@ -49,6 +50,9 @@ _radicado_counter = itertools.count(1)
 async def _crear_esquema():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # La BD de tests persiste entre corridas: create_all no agrega columnas
+        # nuevas a tablas existentes, la migración sí (como en producción).
+        await aplicar_migraciones(conn)
     yield
     await engine.dispose()
 
@@ -83,6 +87,51 @@ async def client(db_session):
     async with AsyncClient(transport=transport, base_url="http://test/stage") as ac:
         yield ac
     main_module.app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def api(db_session):
+    """Cliente sin prefijo: para los routers que no son /stage
+    (/expediente, /involved, /alerts)."""
+    async def _override_get_db():
+        yield db_session
+
+    main_module.app.dependency_overrides[get_db] = _override_get_db
+    transport = ASGITransport(app=main_module.app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+    main_module.app.dependency_overrides.clear()
+
+
+# Todos los permisos del módulo. Por defecto el usuario de la petición los
+# tiene todos (los tests de contrato de etapas no tratan de permisos); los
+# tests de permisos los restringen con permisos({...}).
+TODOS_LOS_PERMISOS = frozenset({
+    "sancionatorio_gestionar", "sancionatorio_consultar", "sancionatorio_asignar",
+    "sancionatorio_alertas", "auditoria_expedientes", "involucrado_gestionar",
+})
+
+
+@pytest.fixture(autouse=True)
+def permisos(monkeypatch):
+    """permisos({...}) fija los permisos del usuario de la petición. Sustituye
+    services.permisos.verify_permission (lo usan los endpoints de lectura,
+    anexos, alta de expediente, involucrados y alertas), así no se llama a
+    app-users."""
+    import services.permisos as permisos_mod
+
+    concedidos = set(TODOS_LOS_PERMISOS)
+
+    async def _verify(user_id, permission):
+        return permission in concedidos
+
+    monkeypatch.setattr(permisos_mod, "verify_permission", _verify)
+
+    def _set(nuevos):
+        concedidos.clear()
+        concedidos.update(nuevos)
+
+    return _set
 
 
 def gateway_headers(user_id: int, rol_id: int = 1) -> dict:

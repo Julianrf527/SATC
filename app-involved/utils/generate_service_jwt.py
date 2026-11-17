@@ -1,11 +1,6 @@
-from datetime import datetime, timedelta
-from jose import jwt
+"""Service JWT (x-service-token): la implementación vive en el paquete
+compartido satc_shared.auth. Este módulo se mantiene para no romper los
+imports existentes (`from utils.generate_service_jwt import generate_service_jwt`)."""
+from satc_shared.auth import generate_service_jwt
 
-
-def generate_service_jwt(service_name: str, secret_key: str) -> str:
-    payload = {
-        "service": service_name,
-        "exp": datetime.utcnow() + timedelta(minutes=5),
-        "iat": datetime.utcnow(),
-    }
-    return jwt.encode(payload, secret_key, algorithm="HS256")
+__all__ = ["generate_service_jwt"]

@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "satc-shared"
+version = "0.1.0"
+description = "Código compartido entre microservicios SATC: service JWT, clientes HTTP tipados y helper de proceso de revisión de documentos."
+requires-python = ">=3.11"
+# Mismas librerías (y pisos de versión) que ya usan los servicios en sus
+# requirements.txt. El service JWT se firma con python-jose, no con pyjwt,
+# porque es lo que usan todos los servicios para verificarlo.
+#
+# sqlalchemy[asyncio]: desde SQLAlchemy 2.1 greenlet ya no se instala por
+# defecto y sin él AsyncSession falla al importar (los servicios piden
+# sqlalchemy>=2.0.0, que hoy resuelve a 2.1.x).
+dependencies = [
+    "sqlalchemy[asyncio]>=2.0.0",
+    "pydantic>=2.0.0",
+    "httpx>=0.24.0",
+    "python-jose[cryptography]>=3.3.0",
+    "tzdata>=2023.3; sys_platform == 'win32'",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7",
+    "pytest-asyncio>=0.23",
+    "aiosqlite>=0.19",
+]
+
+[tool.setuptools.packages.find]
+include = ["satc_shared*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
