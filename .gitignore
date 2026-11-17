@@ -165,12 +165,3 @@ backups/
 
 # Config local de Claude Code (contiene rutas/IPs/permisos específicos de esta máquina)
 .claude/
-
-# PDFs de la documentación (se generan desde los .md)
-documentacion/*.pdf
-documentacion/**/*.pdf
-
-# Scripts locales de despliegue, respaldo y reconstrucción (no van al repositorio)
-scripts/
-rebuild-changed.ps1
-desplegar_vm.ps1
