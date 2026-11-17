@@ -11,10 +11,13 @@ entre el setup del fixture y las queries que dispara la app vía el cliente
 HTTP sin choques de "otra operación en progreso").
 """
 import os
+from urllib.parse import quote
 
+# Clave de Postgres desde POSTGRES_PASSWORD (la del .env); nunca escrita aquí.
+_PG_PASSWORD = quote(os.getenv("POSTGRES_PASSWORD", ""), safe="")
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:Satc2026#Secure@postgres-infraction:5432/infraction_test_db",
+    f"postgresql+asyncpg://postgres:{_PG_PASSWORD}@postgres-infraction:5432/infraction_test_db",
 )
 # db/database.py lee DATABASE_URL al importarse (crea un engine a nivel de
 # módulo). No se usa en los tests (get_db queda sobreescrito), pero debe

@@ -11,10 +11,13 @@ Los servicios externos (users, notifications, MinIO, ClamAV) se monkeypatchean:
 no hay red hacia otros contenedores dentro del test.
 """
 import os
+from urllib.parse import quote
 
+# Clave de Postgres desde POSTGRES_PASSWORD (la del .env); nunca escrita aquí.
+_PG_PASSWORD = quote(os.getenv("POSTGRES_PASSWORD", ""), safe="")
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:Satc2026#Secure@postgres-docs:5432/docs_test_db",
+    f"postgresql+asyncpg://postgres:{_PG_PASSWORD}@postgres-docs:5432/docs_test_db",
 )
 # db/database.py crea un engine a nivel de módulo al importarse. No se usa en los
 # tests (get_db queda sobreescrito), pero DATABASE_URL debe apuntar a algo válido.
