@@ -319,7 +319,7 @@ Servicios accesibles tras el arranque (esperar a que todos los healthchecks pase
 - Aplicación completa: `http://localhost:8000` (vía `nginx-lb`)
 - Swagger de cada microservicio: disponible internamente en su puerto (no expuesto al host por defecto; usar `docker compose exec` o exponer temporalmente para depurar)
 
-Para cambios de solo código en desarrollo, sincronizar con `docker cp` + `docker restart` es más rápido que rebuild; para cambios de dependencias o variables de entorno, `docker compose up -d --no-deps <service>` o rebuild completo. Ver `documentacion/REFACTOR_PLAYBOOK.md` para el detalle del flujo usado durante el desarrollo.
+Para cambios de solo código en desarrollo, sincronizar con `docker cp` + `docker restart` es más rápido que rebuild; para cambios de dependencias o variables de entorno, `docker compose up -d --no-deps <service>` o rebuild completo.
 
 ### 4.3 Variables de Entorno
 
@@ -401,8 +401,7 @@ npx eslint src
 
 ## 📚 Documentación Adicional
 
-- **`documentacion/REFACTOR_PLAYBOOK.md`**: playbook reusable de refactor aplicado a cada microservicio.
-- **`documentacion/`**: toda la documentación (arquitectura, seguridad, historias de usuario, manual de permisos, manual de usuario e informes de pruebas). Los PDF no se versionan.
+- **`documentacion/`**: toda la documentación (arquitectura, seguridad, historias de usuario, manual de permisos, manual de usuario e informes de pruebas).
 
 ---
 
