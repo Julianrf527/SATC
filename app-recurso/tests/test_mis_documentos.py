@@ -1,4 +1,4 @@
-"""Mis informes (/mis-documentos): una lista con todos mis documentos (encargado y revisor)."""
+"""Mis actuaciones (/mis-documentos): una lista con todos mis documentos (encargado y revisor)."""
 from core.permission import Permission
 from tests.fixtures_revision import *  # noqa: F401,F403
 

@@ -20,7 +20,7 @@ export function useMisDocumentosQuery(filtros: FiltrosMisDocumentos, page: numbe
   });
 }
 
-/** Recarga Mis informes (lista y procesos abiertos) tras revisar o subir versión. */
+/** Recarga Mis actuaciones (lista y procesos abiertos) tras revisar o subir versión. */
 export function useInvalidarMisDocumentos() {
   const queryClient = useQueryClient();
   return useCallback(

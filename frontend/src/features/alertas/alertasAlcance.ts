@@ -18,7 +18,23 @@ export type RutasAlertas = {
   consulta: string;
 };
 
-export type DestinoAlerta = { ruta: string; accion: "Gestionar" | "Consultar" };
+/**
+ * A dónde lleva el botón de una alerta. `accion` es el texto del botón. Un
+ * módulo puede dar su propio destino (prop `destino` de AlertasExpediente);
+ * lo que no indique se completa como siempre (ver `resolverDestino`).
+ */
+export type DestinoAlerta = {
+  ruta: string;
+  accion: string;
+  /** Botón resaltado (verde). Por defecto, solo si `accion` es "Gestionar". */
+  principal?: boolean;
+  /** Tooltip del botón. */
+  title?: string;
+  /** `location.state` al navegar. Por defecto, el `estadoNavegacion` del módulo. */
+  estado?: Record<string, unknown>;
+};
+
+export type DestinoResuelto = Required<DestinoAlerta>;
 
 /**
  * Endpoint de "todas las alertas" según el alcance. Con `mios` se deja tal
@@ -43,4 +59,26 @@ export function destinoAlerta(
   return alerta.es_responsable === false
     ? { ruta: rutas.consulta, accion: "Consultar" }
     : { ruta: rutas.gestion, accion: "Gestionar" };
+}
+
+/**
+ * Destino completo del botón de una alerta. Sin `personalizado` (o si
+ * devuelve null) es el de siempre: `destinoAlerta` con las rutas del módulo,
+ * resaltado si es Gestionar y con el `estadoNavegacion` del módulo.
+ */
+export function resolverDestino<A extends { es_responsable?: boolean }>(
+  alerta: A,
+  rutas: RutasAlertas,
+  estadoNavegacion: (alerta: A) => Record<string, unknown>,
+  personalizado?: (alerta: A) => DestinoAlerta | null,
+): DestinoResuelto {
+  const d = personalizado?.(alerta) ?? destinoAlerta(alerta, rutas);
+  const principal = d.principal ?? d.accion === "Gestionar";
+  return {
+    ruta: d.ruta,
+    accion: d.accion,
+    principal,
+    title: d.title ?? (principal ? "Expediente a su cargo" : "Expediente de otro responsable (solo lectura)"),
+    estado: d.estado ?? estadoNavegacion(alerta),
+  };
 }

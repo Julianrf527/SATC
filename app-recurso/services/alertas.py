@@ -66,7 +66,8 @@ del auto" NO es una alerta de esta pestaña: es un aviso que no bloquea al
 cargar el auto (``advertencia_visita``).
 
 Cada alerta trae ``encargado_id`` (de quién es la tarea; None si aún nadie la
-tomó) y ``expediente_id``. Las alertas las ve todo el que abre la pestaña; el
+tomó), ``expediente_id`` y ``proceso_id`` (el proceso de revisión donde se hace
+la tarea, para abrirlo desde Mis actuaciones; None si aún no existe). Las alertas las ve todo el que abre la pestaña; el
 encargado solo decide "Mis alertas" y si el botón es Gestionar o Consultar.
 """
 from __future__ import annotations
@@ -102,7 +103,11 @@ TIPO_CONCEPTO = "CONCEPTO_ETAPA2"
 TIPO_REQUERIMIENTO = "REQUERIMIENTO"
 TIPO_ADICIONAL = "CONCEPTO_ADICIONAL"
 TIPO_DECISION = "DECISION"
-TIPOS_PROCESO = (TIPO_ADMITE, TIPO_CONCEPTO, TIPO_REQUERIMIENTO, TIPO_ADICIONAL, TIPO_DECISION)
+TIPO_RECURSO = "RECURSO"
+TIPO_AUTO_PRUEBAS = "AUTO_PRUEBAS"
+TIPO_CONCEPTO_PRUEBAS = "CONCEPTO_PRUEBAS"
+TIPOS_PROCESO = (TIPO_ADMITE, TIPO_CONCEPTO, TIPO_REQUERIMIENTO, TIPO_ADICIONAL, TIPO_DECISION,
+                 TIPO_RECURSO, TIPO_AUTO_PRUEBAS, TIPO_CONCEPTO_PRUEBAS)
 ACCIONES_APROBADO_FIRMA = ("aprobar_firma", "aprobar_firma_automatico")
 
 PLAZO_ADMITE_PRIMERA = 4
@@ -217,7 +222,7 @@ def semaforo(inicio: date, plazo: int, hoy: date, calendario: bool = False) -> d
 
 def _alerta(tipo: str, etapa: str, accion: str, plazo_legal: str, inicio: date, plazo: int, hoy: date, *,
             expediente_id: int, encargado_id: Optional[int], msg: Optional[str] = None,
-            calendario: bool = False) -> dict:
+            calendario: bool = False, proceso_id: Optional[int] = None) -> dict:
     return {
         "tipo": tipo,
         "etapa": etapa,
@@ -229,6 +234,7 @@ def _alerta(tipo: str, etapa: str, accion: str, plazo_legal: str, inicio: date, 
         "semaforo": semaforo(inicio, plazo, hoy, calendario),
         "expediente_id": expediente_id,
         "encargado_id": encargado_id,
+        "proceso_id": proceso_id,
     }
 
 
@@ -264,6 +270,7 @@ def _reglas_admite(p: Optional[_Proceso], admite, comunicacion: Optional[date], 
                 "Cargar la primera versión del auto que admite",
                 f"{PLAZO_ADMITE_PRIMERA} días hábiles desde la asignación del encargado",
                 p.fecha_creacion, PLAZO_ADMITE_PRIMERA, hoy, expediente_id=exp_id, encargado_id=enc,
+                proceso_id=p.id,
             )
         elif p.aprobado_firma is None:
             alertas["admite_revision"] = _alerta(
@@ -271,6 +278,7 @@ def _reglas_admite(p: Optional[_Proceso], admite, comunicacion: Optional[date], 
                 "Completar la revisión del auto que admite hasta aprobarlo para firma",
                 f"{PLAZO_ADMITE_REVISION} días hábiles desde la primera versión",
                 p.primera_version, PLAZO_ADMITE_REVISION, hoy, expediente_id=exp_id, encargado_id=enc,
+                proceso_id=p.id,
             )
         else:
             alertas["admite_version_final"] = _alerta(
@@ -278,6 +286,7 @@ def _reglas_admite(p: Optional[_Proceso], admite, comunicacion: Optional[date], 
                 "Cargar la versión final firmada del auto que admite",
                 f"{PLAZO_ADMITE_FINAL} días hábiles desde la aprobación para firma",
                 p.aprobado_firma, PLAZO_ADMITE_FINAL, hoy, expediente_id=exp_id, encargado_id=enc,
+                proceso_id=p.id,
             )
 
     if admite.acto_admin_id is not None and comunicacion is not None:
@@ -301,6 +310,7 @@ def _reglas_concepto(p: Optional[_Proceso], concepto, hoy: date) -> dict:
     exp_id = concepto.expediente_id
     enc = p.creador_id if p is not None else concepto.tecnico_encargado_id
     primera = p.primera_version if p is not None else None
+    pid = p.id if p is not None else None
 
     if primera is None:
         if concepto.fecha_visita_tecnica is not None:
@@ -309,6 +319,7 @@ def _reglas_concepto(p: Optional[_Proceso], concepto, hoy: date) -> dict:
                 "Cargar la primera versión del concepto técnico",
                 f"{PLAZO_CONCEPTO_PRIMERA} días hábiles desde la visita técnica",
                 concepto.fecha_visita_tecnica, PLAZO_CONCEPTO_PRIMERA, hoy, expediente_id=exp_id, encargado_id=enc,
+                proceso_id=pid,
             )
     else:
         alertas["concepto_version_final"] = _alerta(
@@ -316,6 +327,7 @@ def _reglas_concepto(p: Optional[_Proceso], concepto, hoy: date) -> dict:
             "Cargar la versión final del concepto técnico",
             f"{PLAZO_CONCEPTO_FINAL} días hábiles desde la primera versión",
             primera, PLAZO_CONCEPTO_FINAL, hoy, expediente_id=exp_id, encargado_id=enc,
+            proceso_id=pid,
         )
     return alertas
 
@@ -327,7 +339,8 @@ def _tres_hitos(prefijo: str, etapa: str, documento: str, plazos: tuple[int, int
     versión final. Sin proceso o sin versión 1, cuenta desde ``inicio`` (si
     no hay ``inicio`` no hay alerta)."""
     primera, revision, final = plazos
-    comun = {"expediente_id": expediente_id, "encargado_id": encargado_id}
+    comun = {"expediente_id": expediente_id, "encargado_id": encargado_id,
+             "proceso_id": p.id if p is not None else None}
     if p is None or p.primera_version is None:
         if inicio is None:
             return {}
@@ -401,32 +414,41 @@ def _reglas_etapas_3_y_4(concepto, req, decision, por_etapa: dict, hoy: date) ->
     return alertas
 
 
-def _reglas_recurso(d, hoy: date) -> dict:
+def _reglas_recurso(d, por_etapa: dict, hoy: date) -> dict:
     """Recurso de reposición (días calendario desde que se registró)."""
     if d.recurso_id is None or d.recurso_acto is not None:
         return {}
     creacion = fecha_local(d.recurso_creacion)
     comun = {"expediente_id": d.expediente_id, "calendario": True}
     acto = "Cargar la versión final del acto que resuelve el recurso de reposición"
+    p_recurso = por_etapa.get((TIPO_RECURSO, d.recurso_id))
+    pid_recurso = p_recurso.id if p_recurso is not None else None
     if not d.requiere_pruebas:
         return {"recurso_acto": _alerta(
             "recurso_acto", ETAPA_RECURSO, acto,
             f"{PLAZO_RECURSO_SIN_PRUEBAS} días calendario desde el registro del recurso",
-            creacion, PLAZO_RECURSO_SIN_PRUEBAS, hoy, encargado_id=d.recurso_encargado, **comun)}
+            creacion, PLAZO_RECURSO_SIN_PRUEBAS, hoy, encargado_id=d.recurso_encargado,
+            proceso_id=pid_recurso, **comun)}
     if d.pruebas_doc is None:
+        # La tarea vive en el proceso del concepto de pruebas o, mientras no
+        # exista, en el del auto que lo decreta.
+        p_pruebas = (por_etapa.get((TIPO_CONCEPTO_PRUEBAS, d.pruebas_concepto_id))
+                     or por_etapa.get((TIPO_AUTO_PRUEBAS, d.practica_id)))
         return {"recurso_concepto_pruebas": _alerta(
             "recurso_concepto_pruebas", ETAPA_RECURSO,
             "Cargar la versión final del concepto técnico de la práctica de pruebas",
             f"{PLAZO_RECURSO_CONCEPTO_PRUEBAS} días calendario desde el registro del recurso",
             creacion, PLAZO_RECURSO_CONCEPTO_PRUEBAS, hoy,
-            encargado_id=d.pruebas_tecnico if d.pruebas_tecnico is not None else d.pruebas_encargado, **comun)}
+            encargado_id=d.pruebas_tecnico if d.pruebas_tecnico is not None else d.pruebas_encargado,
+            proceso_id=p_pruebas.id if p_pruebas is not None else None, **comun)}
     final_pruebas = fecha_local(d.pruebas_final)
     if final_pruebas is None:
         return {}
     return {"recurso_acto_tras_pruebas": _alerta(
         "recurso_acto_tras_pruebas", ETAPA_RECURSO, acto,
         f"{PLAZO_RECURSO_TRAS_PRUEBAS} días calendario desde la versión final del concepto técnico de pruebas",
-        final_pruebas, PLAZO_RECURSO_TRAS_PRUEBAS, hoy, encargado_id=d.recurso_encargado, **comun)}
+        final_pruebas, PLAZO_RECURSO_TRAS_PRUEBAS, hoy, encargado_id=d.recurso_encargado,
+        proceso_id=pid_recurso, **comun)}
 
 
 # ────────────────────────────────────────────────────────── carga en bloque
@@ -516,7 +538,8 @@ async def calcular_alertas(
             RecursoReposicion.id.label("recurso_id"), RecursoReposicion.fecha_creacion.label("recurso_creacion"),
             RecursoReposicion.requiere_pruebas, RecursoReposicion.acto_admin_id.label("recurso_acto"),
             RecursoReposicion.encargado_acto_id.label("recurso_encargado"),
-            PracticaPruebas.encargado_acto_id.label("pruebas_encargado"),
+            PracticaPruebas.id.label("practica_id"), PracticaPruebas.encargado_acto_id.label("pruebas_encargado"),
+            pruebas.id.label("pruebas_concepto_id"),
             pruebas.doc_concepto_tecnico_id.label("pruebas_doc"), pruebas.fecha_version_final.label("pruebas_final"),
             pruebas.tecnico_encargado_id.label("pruebas_tecnico"),
         ).outerjoin(RecursoReposicion, RecursoReposicion.decision_id == Decision.id)
@@ -539,7 +562,7 @@ async def calcular_alertas(
         if alertas:
             resultado.setdefault(c.expediente_id, {}).update(alertas)
     for d in decisiones:
-        alertas = _reglas_recurso(d, hoy)
+        alertas = _reglas_recurso(d, por_etapa, hoy)
         if alertas:
             resultado.setdefault(d.expediente_id, {}).update(alertas)
     return resultado

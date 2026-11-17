@@ -1,4 +1,4 @@
-"""/mis-documentos — pestaña "Mis informes" (plan §1 y §5.5).
+"""/mis-documentos — pestaña "Mis actuaciones" (plan §1 y §5.5).
 
 Una sola lista paginada ``documentos`` con TODOS los procesos del usuario
 actual, en cualquier estado y vigentes o no (``activo = false``: cerrados o

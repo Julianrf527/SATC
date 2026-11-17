@@ -13,7 +13,7 @@ Este documento fija las decisiones **técnicas** comunes. Si algo de negocio no 
 | BD de tests | `recurso_test_db` (mismo servidor) |
 | Identidad este-oeste | `recurso-service`, secreto `RECURSO_SERVICE_SECRET` (app-users, app-docs y app-involved deben aceptarlo como caller) |
 | Gateway | prefijo **`recurso`** → `http://app-recurso:8006` (`RECURSO_ROUTE`). El front llama `/recurso/<ruta del servicio>` |
-| Rutas SPA | `/recurso/manage` (Gestionar), `/recurso/consult` (Consulta), `/recurso/my-reports` (Mis informes). nginx debe mandarlas al frontend como hace con `/infraction/(manage|…)` |
+| Rutas SPA | `/recurso/manage` (Gestionar), `/recurso/consult` (Consulta), `/recurso/my-reports` (Mis actuaciones). nginx debe mandarlas al frontend como hace con `/infraction/(manage|…)` |
 | Advisory lock init_db | 815123003 |
 | Notificaciones app-users | `tipo = "recurso_doc"`, `id_vinculada = str(documento_proceso.id)` |
 
@@ -80,7 +80,7 @@ Modelo: `documento_proceso` (+ version/revision/auditoria/revisor) con los mixin
 6. Para `puede_ver`: encargado, quien tenga algún permiso de revisor de la cadena, `recurso_consultar`/`recurso_gestionar`.
 7. Notificaciones (best-effort tras commit, como `Avisos` de infraction) a los usuarios con el permiso del paso que queda pendiente y al encargado cuando devuelven / aprueban para firma.
 
-**Mis informes**: por subir = procesos activos donde soy creador y estado ∈ {pendiente_carga, rechazado, aprobado_firma} + etapas donde soy encargado/técnico y aún no hay proceso; por revisar = procesos `en_revision` cuyo paso actual tiene un permiso que tengo y que no ha revisado.
+**Mis actuaciones**: por subir = procesos activos donde soy creador y estado ∈ {pendiente_carga, rechazado, aprobado_firma} + etapas donde soy encargado/técnico y aún no hay proceso; por revisar = procesos `en_revision` cuyo paso actual tiene un permiso que tengo y que no ha revisado.
 
 ## 5. Ciclo de vida de etapas (§4-E)
 

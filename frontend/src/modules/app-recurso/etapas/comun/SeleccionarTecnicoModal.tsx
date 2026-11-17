@@ -41,7 +41,7 @@ export default function SeleccionarTecnicoModal({ expedienteId, url, titulo, set
       size="md"
     >
       <p className="text-sm text-base-content/70">
-        El técnico seleccionado es el único que puede proyectar y cargar este concepto. Recibirá el aviso en Mis informes.
+        El técnico seleccionado es el único que puede proyectar y cargar este concepto. Recibirá el aviso en Mis actuaciones.
       </p>
       <CampoTecnico valor={tecnico} onChange={setTecnico} requerido />
     </ModalFormulario>

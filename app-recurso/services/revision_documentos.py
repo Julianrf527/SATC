@@ -598,7 +598,7 @@ def http_error(e: ReviewError) -> HTTPException:
 class Avisos:
     """Notificaciones a app-users pendientes de enviar DESPUÉS del commit
     (best-effort: nunca abortan la operación). ``tipo="recurso_doc"``,
-    ``id_vinculada = str(documento_proceso.id)`` (el front abre Mis informes).
+    ``id_vinculada = str(documento_proceso.id)`` (el front abre Mis actuaciones).
 
     ``agregar(usuario_id, mensaje, proceso_id=...)`` a un usuario concreto;
     ``agregar_permiso(permiso, mensaje, proceso_id=...)`` a todos los usuarios

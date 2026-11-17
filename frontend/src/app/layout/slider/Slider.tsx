@@ -38,15 +38,15 @@ const ordenInfracciones = [
 const NOMBRES_MIS_INFORMES = ["informes subir", "informes revisar"];
 
 // Concesiones de Aguas: los permisos de revisor y técnico apuntan todos a
-// /recurso/my-reports (una sola entrada "Mis Informes"); recurso_gestionar
-// también ve Mis Informes y recurso_super_gestion (sin menu_path) entra a
+// /recurso/my-reports (una sola entrada "Mis actuaciones"); recurso_gestionar
+// también ve Mis actuaciones y recurso_super_gestion (sin menu_path) entra a
 // Gestionar. Alertas: recurso_gestionar o recurso_consultar (no tiene
 // menu_path propio).
 const RECURSO_RUTAS = {
   gestionar: "/recurso/manage",
   consultar: "/recurso/consult",
   alertas: "/recurso/alerts",
-  misInformes: "/recurso/my-reports",
+  misActuaciones: "/recurso/my-reports",
 };
 
 function menuRecurso(permission: { name: string; path: string }[]) {
@@ -62,8 +62,8 @@ function menuRecurso(permission: { name: string; path: string }[]) {
     items.push({ name: "Consultar", url: RECURSO_RUTAS.consultar, originalName: "recurso_consultar" });
   if (nombres.has("recurso_gestionar") || nombres.has("recurso_consultar"))
     items.push({ name: "Alertas", url: RECURSO_RUTAS.alertas, originalName: "recurso_alertas" });
-  if (nombres.has("recurso_gestionar") || urls.has(RECURSO_RUTAS.misInformes))
-    items.push({ name: "Mis Informes", url: RECURSO_RUTAS.misInformes, originalName: "recurso_mis_informes" });
+  if (nombres.has("recurso_gestionar") || urls.has(RECURSO_RUTAS.misActuaciones))
+    items.push({ name: "Mis actuaciones", url: RECURSO_RUTAS.misActuaciones, originalName: "recurso_mis_actuaciones" });
   return items;
 }
 

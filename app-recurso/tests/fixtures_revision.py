@@ -1,4 +1,4 @@
-"""Fixtures de los tests de revisión, Mis informes y actos (agente B).
+"""Fixtures de los tests de revisión, Mis actuaciones y actos (agente B).
 
 Se apoyan en ``tests/conftest.py`` (BD, ``client`` con una sesión por petición,
 ``stubs`` de users/docs/involved, ``crear_expediente``, ``vincular``). Se

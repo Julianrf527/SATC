@@ -12,7 +12,7 @@ type Props = {
   onExpediente?: (doc: MiDocumento) => void;
 };
 
-/** Tabla de Mis informes: todos mis documentos; resalta los que requieren mi acción. Todo viene del backend. */
+/** Tabla de Mis actuaciones: todos mis documentos; resalta los que requieren mi acción. Todo viene del backend. */
 export default function MisDocumentosTabla({ documentos, onProceso, onPrecargarProceso, onExpediente }: Props) {
   return (
     <div className="overflow-x-auto">

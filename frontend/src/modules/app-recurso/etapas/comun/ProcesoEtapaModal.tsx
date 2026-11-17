@@ -3,7 +3,7 @@ import { ProcesoDetalleModal } from "@features/proceso-revision";
 import { documentoAdapter } from "../../api/documentoAdapter";
 import { useInvalidarExpediente } from "../../api/invalidar";
 import { useInvalidarMisDocumentos } from "../../api/misDocumentos";
-import PasosRevision from "../../layout/mis-informes/PasosRevision";
+import PasosRevision from "../../layout/mis-actuaciones/PasosRevision";
 
 type Props = {
   expedienteId: number;
@@ -18,7 +18,7 @@ type Props = {
  * Proceso de revisión de un documento abierto desde su etapa (como el modal
  * del informe en infraction). Revisar, devolver y subir versión salen de
  * `acciones_disponibles` / `subida_version`; al cambiar algo se recargan el
- * árbol de etapas y Mis informes.
+ * árbol de etapas y Mis actuaciones.
  */
 export default function ProcesoEtapaModal({ expedienteId, procesoId, onClose, soloLectura = false }: Props) {
   const invalidarExpediente = useInvalidarExpediente(expedienteId);
