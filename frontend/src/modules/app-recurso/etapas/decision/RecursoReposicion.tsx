@@ -53,6 +53,7 @@ export default function RecursoReposicion({ entorno, nodo, vinculos }: Props) {
         que="el acto que resuelve el recurso"
         vinculos={vinculos}
         anidada
+        sinAnexos
         actuales={{ radicado: d.doc_recurso_id }}
         pendiente={
           nodo.id === null
@@ -94,9 +95,8 @@ export default function RecursoReposicion({ entorno, nodo, vinculos }: Props) {
             </>
           ) : undefined
         }
-      >
-        {nodo.pruebas && <PracticaPruebas entorno={entorno} nodo={nodo.pruebas} vinculos={vinculos} />}
-      </NodoActo>
+        previo={nodo.pruebas && <PracticaPruebas entorno={entorno} nodo={nodo.pruebas} vinculos={vinculos} />}
+      />
 
       {modal === "registrar" && urlCrear && (
         <RadicadoModal
@@ -145,12 +145,14 @@ function PracticaPruebas({ entorno, nodo, vinculos }: { entorno: EntornoEtapa; n
       que="el auto que admite y decreta práctica de pruebas"
       vinculos={vinculos}
       anidada
+      sinAnexos
       pendiente="Pendiente de que un abogado se asigne el auto que admite y decreta práctica de pruebas."
     >
       <NodoConcepto
         entorno={entorno}
         nodo={nodo.concepto}
         anidada
+        sinAnexos
         pendiente="Nace al cargar el auto firmado con el técnico y la fecha de visita."
       />
     </NodoActo>

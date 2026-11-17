@@ -5,6 +5,7 @@ import { EstadoBadge } from "@shared/ui";
 import type { EtapaProps } from "../tipos";
 import { vinculosNotificables } from "../comun/actoFeature";
 import BotonAsignarme from "../comun/BotonAsignarme";
+import DocumentosAnexos from "../comun/DocumentosAnexos";
 import { BotonSuperCargue } from "../comun/BotonesNodo";
 import { Dato, SinDato } from "../comun/Dato";
 import EtapaRaiz from "../comun/EtapaRaiz";
@@ -21,6 +22,8 @@ const TONO_DECISION = { OTORGADA: "success", NEGADA: "error", DESISTIDA: "neutra
  * Etapa 4 · Decisión (plan §4): acto con revisión de líder jurídico → líder
  * del proyecto y asesora de subdirección; versión firmada con la decisión y
  * si exige memorias; notificación; fecha de ejecutoria; recurso de reposición.
+ * Los documentos anexos son de la etapa y van una sola vez, al final (los
+ * sub-procesos del recurso no tienen anexos propios).
  */
 export default function Decision({ expediente, etapas, catalogos, setToast, isEditable }: EtapaProps) {
   const [ejecutoria, setEjecutoria] = useState(false);
@@ -66,6 +69,7 @@ export default function Decision({ expediente, etapas, catalogos, setToast, isEd
           variante="decision"
           que="la decisión"
           vinculos={vinculos}
+          sinAnexos
           acciones={
             puede("registrar_ejecutoria") && nodo.version !== null ? (
               <button type="button" className="btn btn-outline btn-sm gap-1.5" onClick={() => setEjecutoria(true)}>
@@ -93,6 +97,17 @@ export default function Decision({ expediente, etapas, catalogos, setToast, isEd
         />
 
         <RecursoReposicion entorno={entorno} nodo={nodo.recurso} vinculos={vinculos} />
+
+        {nodo.existe && nodo.id !== null && (nodo.anexos.length > 0 || puede("gestionar_anexos")) && (
+          <DocumentosAnexos
+            expedienteId={expediente.id}
+            etapaTipo={nodo.etapa_tipo}
+            etapaRefId={nodo.id}
+            anexos={nodo.anexos}
+            puedeGestionar={puede("gestionar_anexos")}
+            setToast={setToast}
+          />
+        )}
       </div>
 
       {ejecutoria && nodo.version !== null && (

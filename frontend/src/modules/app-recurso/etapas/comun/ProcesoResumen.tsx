@@ -10,6 +10,8 @@ type Props = {
   /** El backend manda `subir_version` / `revisar` en el nodo. */
   puedeSubir: boolean;
   puedeRevisar: boolean;
+  /** Pantalla de consulta: el modal del proceso abre en solo lectura. */
+  soloLectura?: boolean;
 };
 
 /** Estado del documento en revisión (badge del backend) + botón para abrir su proceso. */
@@ -30,7 +32,7 @@ export function EstadoProcesoBadge({ proceso }: { proceso: ResumenProceso | null
  * pendientes y botón al proceso (subir versión / revisar se hacen dentro del
  * modal, como en Mis informes).
  */
-export default function ProcesoResumen({ expedienteId, proceso, puedeSubir, puedeRevisar }: Props) {
+export default function ProcesoResumen({ expedienteId, proceso, puedeSubir, puedeRevisar, soloLectura }: Props) {
   const [abierto, setAbierto] = useState<number | null>(null);
   if (!proceso?.proceso_id) return null;
 
@@ -64,7 +66,12 @@ export default function ProcesoResumen({ expedienteId, proceso, puedeSubir, pued
         <Icono size={14} />
         {etiquetaBoton}
       </button>
-      <ProcesoEtapaModal expedienteId={expedienteId} procesoId={abierto} onClose={() => setAbierto(null)} />
+      <ProcesoEtapaModal
+        expedienteId={expedienteId}
+        procesoId={abierto}
+        onClose={() => setAbierto(null)}
+        soloLectura={soloLectura}
+      />
     </div>
   );
 }

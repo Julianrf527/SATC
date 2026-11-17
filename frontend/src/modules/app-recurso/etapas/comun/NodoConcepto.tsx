@@ -20,6 +20,8 @@ type Props = {
   anidada?: boolean;
   /** Texto cuando aún no existe y no hay motivo de bloqueo. */
   pendiente?: string;
+  /** Sin bloque de documentos anexos (sub-procesos: los anexos van en la etapa). */
+  sinAnexos?: boolean;
   children?: ReactNode;
 };
 
@@ -31,7 +33,7 @@ const num = (v: number | null | undefined) => (v === null || v === undefined ? <
  * Concepto técnico (C.4): técnico seleccionado, proyección y revisión,
  * versión firmada con sus datos (caudales, cumple, visita según el tipo).
  */
-export default function NodoConcepto({ entorno, nodo, anidada, pendiente, children }: Props) {
+export default function NodoConcepto({ entorno, nodo, anidada, pendiente, sinAnexos, children }: Props) {
   const { expediente, setToast, isEditable } = entorno;
   const [modal, setModal] = useState<"tecnico" | "final" | null>(null);
   const puede = accionesNodo(nodo, isEditable);
@@ -151,11 +153,12 @@ export default function NodoConcepto({ entorno, nodo, anidada, pendiente, childr
             expedienteId={expediente.id}
             proceso={nodo.proceso}
             puedeSubir={puede("subir_version")}
-            puedeRevisar={nodo.acciones_disponibles.includes("revisar")}
+            puedeRevisar={puede("revisar")}
+            soloLectura={!isEditable}
           />
         )}
 
-        {nodo.existe && nodo.id !== null && (nodo.anexos.length > 0 || puede("gestionar_anexos")) && (
+        {!sinAnexos && nodo.existe && nodo.id !== null && (nodo.anexos.length > 0 || puede("gestionar_anexos")) && (
           <DocumentosAnexos
             expedienteId={expediente.id}
             etapaTipo={nodo.etapa_tipo}
