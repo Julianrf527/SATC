@@ -1,16 +1,23 @@
 /**
- * Dependencias obligatorias entre permisos en el editor de roles.
+ * Dependencias obligatorias e incompatibilidades entre permisos en el editor de roles.
  *
  * Lógica pura (sin React ni API): las reglas llegan del backend en
- * `Permiso.requiere` (nombres de los permisos que exige en el mismo rol) y aquí
- * solo se calcula qué está bloqueado, qué se quita en cascada y qué incumple
- * un rol. El backend repite la validación al guardar (422).
+ * `Permiso.requiere` (nombres de los permisos que exige en el mismo rol) y
+ * `Permiso.excluye` (con los que no puede ir), y aquí solo se calcula qué está
+ * bloqueado, qué se quita en cascada y qué incumple un rol. El backend repite
+ * la validación al guardar (422).
+ *
+ * Un rol que administra roles (`PERMISO_ADMIN_ROLES`) no tiene
+ * incompatibilidades: necesita todos los permisos para poder repartirlos.
  */
+
+export const PERMISO_ADMIN_ROLES = "admin_roles_y_permisos";
 
 export type PermisoDependiente = {
   id: number;
   nombre: string;
   requiere?: string[];
+  excluye?: string[];
 };
 
 type Catalogo = readonly PermisoDependiente[];
@@ -30,13 +37,34 @@ export function requisitosFaltantes(
   return (permiso.requiere ?? []).filter((r) => !nombres.has(r));
 }
 
-/** Un permiso no marcado está bloqueado mientras le falte algún requerido. */
+/**
+ * Nombres marcados con los que `permiso` no puede ir. Vacío si el rol (la
+ * selección) administra roles o si `permiso` es el de administrar roles.
+ */
+export function incompatiblesMarcados(
+  permiso: PermisoDependiente,
+  seleccion: readonly number[],
+  catalogo: Catalogo,
+): string[] {
+  const nombres = nombresSeleccionados(seleccion, catalogo);
+  if (nombres.has(PERMISO_ADMIN_ROLES) || permiso.nombre === PERMISO_ADMIN_ROLES) return [];
+  return (permiso.excluye ?? []).filter((e) => nombres.has(e));
+}
+
+/**
+ * Un permiso no marcado está bloqueado mientras le falte algún requerido o
+ * choque con alguno marcado.
+ */
 export function estaBloqueado(
   permiso: PermisoDependiente,
   seleccion: readonly number[],
   catalogo: Catalogo,
 ): boolean {
-  return !seleccion.includes(permiso.id) && requisitosFaltantes(permiso, seleccion, catalogo).length > 0;
+  return (
+    !seleccion.includes(permiso.id) &&
+    (requisitosFaltantes(permiso, seleccion, catalogo).length > 0 ||
+      incompatiblesMarcados(permiso, seleccion, catalogo).length > 0)
+  );
 }
 
 /**
@@ -49,7 +77,7 @@ export function agregarPermiso(
 ): number[] {
   const permiso = catalogo.find((p) => p.id === id);
   if (!permiso || seleccion.includes(id)) return [...seleccion];
-  if (requisitosFaltantes(permiso, seleccion, catalogo).length > 0) return [...seleccion];
+  if (estaBloqueado(permiso, seleccion, catalogo)) return [...seleccion];
   return [...seleccion, id];
 }
 
@@ -128,9 +156,14 @@ function marcarCategoria(
 export type Incumplimiento = {
   permiso: PermisoDependiente;
   faltan: string[];
+  /** Marcados con los que no puede ir (cada par se reporta una sola vez). */
+  chocan: string[];
 };
 
-/** Permisos marcados a los que les falta algún requerido (rol que no se puede guardar). */
+/**
+ * Permisos marcados a los que les falta algún requerido o que chocan con otro
+ * marcado (rol que no se puede guardar).
+ */
 export function incumplimientos(
   seleccion: readonly number[],
   catalogo: Catalogo,
@@ -138,6 +171,11 @@ export function incumplimientos(
   const ids = new Set(seleccion);
   return catalogo
     .filter((p) => ids.has(p.id))
-    .map((permiso) => ({ permiso, faltan: requisitosFaltantes(permiso, seleccion, catalogo) }))
-    .filter((i) => i.faltan.length > 0);
+    .map((permiso) => ({
+      permiso,
+      faltan: requisitosFaltantes(permiso, seleccion, catalogo),
+      // La regla va en los dos sentidos: se reporta desde el de nombre menor.
+      chocan: incompatiblesMarcados(permiso, seleccion, catalogo).filter((e) => e > permiso.nombre),
+    }))
+    .filter((i) => i.faltan.length > 0 || i.chocan.length > 0);
 }

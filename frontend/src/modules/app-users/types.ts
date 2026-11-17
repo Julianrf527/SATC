@@ -11,6 +11,8 @@ export type Permiso = {
   descripcion?: string | null;
   /** Nombres de los permisos que este exige en el mismo rol (vienen del backend). */
   requiere?: string[];
+  /** Nombres de los permisos con los que no puede ir en el mismo rol (vienen del backend). */
+  excluye?: string[];
 };
 
 export type Rol = {

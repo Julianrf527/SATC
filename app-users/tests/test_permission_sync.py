@@ -3,10 +3,11 @@ import pytest
 from sqlalchemy import text
 
 from conftest import engine
-from db.permission_catalog import DEPENDENCIAS, PERMISOS
+from db.permission_catalog import DEPENDENCIAS, DESCRIPCIONES_ANTERIORES, INCOMPATIBLES, PERMISOS
 from db.permission_sync import sincronizar_permisos
 
 TOTAL_DEPENDENCIAS = sum(len(r) for r in DEPENDENCIAS.values())
+TOTAL_INCOMPATIBLES = 2 * len(INCOMPATIBLES)  # se guardan en los dos sentidos
 
 
 async def _sync() -> dict:
@@ -22,10 +23,13 @@ async def _estado() -> dict:
         deps = (await conn.execute(text(
             "SELECT permiso_id, requiere_id FROM permiso_requiere ORDER BY 1, 2"
         ))).all()
+        excl = (await conn.execute(text(
+            "SELECT permiso_id, excluye_id FROM permiso_excluye ORDER BY 1, 2"
+        ))).all()
         roles = (await conn.execute(text(
             "SELECT rol_id, permiso_id FROM rol_permiso ORDER BY 1, 2"
         ))).all()
-    return {"permisos": permisos, "deps": deps, "roles": roles}
+    return {"permisos": permisos, "deps": deps, "excl": excl, "roles": roles}
 
 
 async def _ids_por_nombre() -> dict[str, int]:
@@ -47,9 +51,11 @@ async def test_sync_base_vacia_y_segunda_corrida_identica():
     r1 = await _sync()
     assert len(r1["insertados"]) == len(PERMISOS)
     assert r1["dependencias_agregadas"] == TOTAL_DEPENDENCIAS
+    assert r1["incompatibles_agregadas"] == TOTAL_INCOMPATIBLES
     estado1 = await _estado()
     assert all(p.descripcion for p in estado1["permisos"])
     assert len(estado1["deps"]) == TOTAL_DEPENDENCIAS
+    assert len(estado1["excl"]) == TOTAL_INCOMPATIBLES
 
     r2 = await _sync()
     assert r2["insertados"] == []
@@ -57,6 +63,7 @@ async def test_sync_base_vacia_y_segunda_corrida_identica():
     assert r2["renombrados"] == []
     assert r2["dependencias_agregadas"] == 0
     assert r2["dependencias_quitadas"] == 0
+    assert r2["incompatibles_agregadas"] == 0 and r2["incompatibles_quitadas"] == 0
     assert await _estado() == estado1
 
 
@@ -169,3 +176,60 @@ async def test_sync_no_modifica_roles_que_incumplen_y_los_reporta(db_session, ma
     r2 = await _sync()
     assert r2["otorgados_a_roles"] == []
     assert (await _estado())["roles"] == roles_antes
+
+
+@pytest.mark.asyncio
+async def test_sync_incompatibles_en_los_dos_sentidos_y_quita_sobrantes(db_session, make_permiso):
+    a = await make_permiso("admin_gestionar_usuarios")
+    b = await make_permiso("admin_registrar_usuarios")
+    await db_session.commit()
+    async with engine.begin() as conn:
+        await conn.execute(
+            text("INSERT INTO permiso_excluye (permiso_id, excluye_id) VALUES (:a, :b)"),
+            {"a": a.id, "b": b.id},
+        )
+
+    r = await _sync()
+    assert r["incompatibles_quitadas"] == 1
+    ids = await _ids_por_nombre()
+    excl = set((await _estado())["excl"])
+    assert (a.id, b.id) not in excl
+    for x, y in INCOMPATIBLES:
+        assert (ids[x], ids[y]) in excl and (ids[y], ids[x]) in excl
+
+
+@pytest.mark.asyncio
+async def test_sync_reemplaza_descripcion_anterior_solo_si_nadie_la_edito(db_session, make_permiso):
+    anterior = DESCRIPCIONES_ANTERIORES["recurso_tecnico"][0]
+    await make_permiso("recurso_tecnico", "/recurso/my-reports", descripcion=anterior)
+    await make_permiso("recurso_sig", "/recurso/my-reports", descripcion="Texto propio del área.")
+    await db_session.commit()
+
+    r = await _sync()
+    catalogo = {p["nombre"]: p for p in PERMISOS}
+    async with engine.connect() as conn:
+        filas = dict((await conn.execute(text(
+            "SELECT nombre, descripcion FROM permiso WHERE nombre IN ('recurso_tecnico', 'recurso_sig')"
+        ))).all())
+    assert filas["recurso_tecnico"] == catalogo["recurso_tecnico"]["descripcion"]
+    assert "Mis actuaciones" in filas["recurso_tecnico"]
+    assert filas["recurso_sig"] == "Texto propio del área."
+    assert "recurso_tecnico" in r["actualizados"]
+    assert (await _sync())["actualizados"] == []  # idempotente
+
+
+@pytest.mark.asyncio
+async def test_sync_reporta_rol_con_incompatibles_y_no_lo_modifica(db_session, make_permiso, make_rol):
+    tecnico = await make_permiso("recurso_tecnico", "/recurso/my-reports")
+    gestionar = await make_permiso("recurso_gestionar", "/recurso/manage")
+    consultar = await make_permiso("recurso_consultar", "/recurso/consult")
+    # Un permiso que el rol no tiene: si tuviera todos, el sync lo trataría como
+    # superadministrador (le daría admin_roles_y_permisos y quedaría exento).
+    await make_permiso("recurso_sig", "/recurso/my-reports")
+    mezcla = await make_rol("mezcla", [tecnico, gestionar, consultar])
+    await db_session.commit()
+
+    r = await _sync()
+    reporte = {x["rol_id"]: x for x in r["roles_incumplen"]}
+    assert reporte[mezcla.id]["incompatibles"] == [{"permiso": "recurso_gestionar", "con": "recurso_tecnico"}]
+    assert await _permisos_de_rol(mezcla.id) == {"recurso_tecnico", "recurso_gestionar", "recurso_consultar"}
