@@ -102,7 +102,7 @@ Modelo: `documento_proceso` (+ version/revision/auditoria/revisor) con los mixin
 
 Docker/WSL no arranca en esta máquina. Hay un Postgres 15 local en el scratchpad de la sesión:
 
-- Host `127.0.0.1`, puerto `55432`, usuario `postgres`, clave `Satc2026#Secure`. BDs: `recurso_test_db`, `recurso_db`.
-- Correr tests: `cd app-recurso && TEST_DATABASE_URL='postgresql+asyncpg://postgres:Satc2026%23Secure@127.0.0.1:55432/recurso_test_db' ../.venv/Scripts/python.exe -m pytest -q`
+- Host `127.0.0.1`, puerto `55432`, usuario `postgres`, clave: la de `POSTGRES_PASSWORD` en `.env`. BDs: `recurso_test_db`, `recurso_db`.
+- Correr tests: `cd app-recurso && TEST_DATABASE_URL='postgresql+asyncpg://postgres:<POSTGRES_PASSWORD con # como %23>@127.0.0.1:55432/recurso_test_db' ../.venv/Scripts/python.exe -m pytest -q`
 - El default de `TEST_DATABASE_URL` en `conftest.py` sigue apuntando a `postgres-recurso:5432` (Docker), como los demás servicios.
 - Node portable para el frontend: `/c/Users/julia/AppData/Local/Temp/claude/c--Users-julia-Escritorio-SATC/55e567c5-80ff-45c2-9776-85db605c9193/scratchpad/node-v22.11.0-win-x64` (agregar al PATH; usar `npm.cmd`/`npx.cmd`).

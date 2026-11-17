@@ -11,11 +11,14 @@ Cada endpoint valida permisos consultando la BD en tiempo real, así que los
 tests siembran roles/permisos/usuarios reales según lo que necesiten.
 """
 import os
+from urllib.parse import quote
 from datetime import datetime, timedelta
 
+# Clave de Postgres desde POSTGRES_PASSWORD (la del .env); nunca escrita aquí.
+_PG_PASSWORD = quote(os.getenv("POSTGRES_PASSWORD", ""), safe="")
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:Satc2026#Secure@postgres-users:5432/users_test_db",
+    f"postgresql+asyncpg://postgres:{_PG_PASSWORD}@postgres-users:5432/users_test_db",
 )
 # db/database.py crea un engine a nivel de módulo leyendo DATABASE_URL al
 # importarse. get_db queda sobreescrito en los tests, pero el import no debe
