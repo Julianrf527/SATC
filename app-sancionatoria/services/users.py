@@ -1,11 +1,14 @@
+"""Consultas/notificaciones a app-users vía satc_shared.clients.UsersClient.
+
+Directo a app-users (sin gateway) con x-service-token de sanctioning-service.
+Los wrappers conservan firmas, caché y política ante fallo (nunca lanzan).
+"""
 from dotenv import load_dotenv
-import httpx
 import logging
-import os
+
+from satc_shared.clients import UsersClient
 
 load_dotenv()
-USERS_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://app-users:8001")
-SERVICE_SECRET_KEY = os.getenv("SERVICE_SECRET_KEY")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -13,8 +16,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-from utils.generate_service_jwt import generate_service_jwt
 from utils.cache import permission_cache, users_cache
+
+users_client = UsersClient.from_env("sanctioning-service")
 
 
 async def get_users_by_permission(permission_name: str) -> dict:
@@ -28,39 +32,24 @@ async def get_users_by_permission(permission_name: str) -> dict:
     cached_result = await users_cache.get(cache_key)
     if cached_result is not None:
         return cached_result
-    
+
     try:
-        service_token = generate_service_jwt("sanctioning-service", SERVICE_SECRET_KEY)
-
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                f"{USERS_SERVICE_URL}/user/permission/{permission_name}",
-                headers={"X-Service-Token": service_token}
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                result = {
-                    user["id"]: {
-                        "nombre": user.get("nombre"),
-                        "correo": user.get("correo", ""),
-                        "numero_documento": user.get("numero_documento"),
-                        "documento": user.get("numero_documento"),
-                    }
-                    for user in data.get("data", [])
-                }
-                await users_cache.set(cache_key, result)
-                return result
-            else:
-                logger.warning(
-                    f"Error al obtener usuarios por permiso '{permission_name}': "
-                    f"{response.status_code}"
-                )
-                return {}
-    
+        usuarios = await users_client.users_by_permission(permission_name)
     except Exception as e:
-        logger.error(f"Error llamando al servicio de usuarios por permiso: {e}")
+        logger.error(f"Error llamando al servicio de usuarios por permiso '{permission_name}': {e}")
         return {}
+
+    result = {
+        u.id: {
+            "nombre": u.nombre,
+            "correo": u.correo or "",
+            "numero_documento": u.numero_documento,
+            "documento": u.numero_documento,
+        }
+        for u in usuarios
+    }
+    await users_cache.set(cache_key, result)
+    return result
 
 async def get_user_info(user_ids: list[int]) -> dict:
     """
@@ -75,80 +64,42 @@ async def get_user_info(user_ids: list[int]) -> dict:
     if cached_result is not None:
         logger.info(f"Usuarios obtenidos de caché: {len(cached_result)}")
         return cached_result
-    
+
     try:
-        service_token = generate_service_jwt("sanctioning-service", SERVICE_SECRET_KEY)
-
-        users_url = f"{USERS_SERVICE_URL}/user/batch"
-        logger.info(f"Llamando a {users_url} con {len(user_ids)} IDs: {user_ids}")
-
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                users_url,
-                headers={
-                    "X-Service-Token": service_token,
-                    "Content-Type": "application/json"
-                },
-                json={"user_ids": user_ids}
-            )
-            
-            logger.info(f"Respuesta del servicio de usuarios: status={response.status_code}")
-
-            if response.status_code == 200:
-                data = response.json()
-                logger.info(f"Datos recibidos: {data}")
-                result = {
-                    user["id"]: {
-                        "nombre": user["nombre"],
-                        "correo": user["correo"],
-                        "numero_documento": user.get("numero_documento", ""),
-                    }
-                    for user in data.get("data", [])
-                }
-                logger.info(f"Usuarios procesados: {len(result)}")
-                await users_cache.set(cache_key, result)
-                return result
-            else:
-                logger.warning(
-                    f"Error al obtener usuarios batch: {response.status_code} - {response.text}"
-                )
-                return {}
-    
+        usuarios = await users_client.users_batch(user_ids)
     except Exception as e:
         logger.error(f"Error llamando al servicio de usuarios batch: {e}", exc_info=True)
         return {}
 
+    result = {
+        u.id: {
+            "nombre": u.nombre,
+            "correo": u.correo,
+            "numero_documento": u.numero_documento if u.numero_documento is not None else "",
+        }
+        for u in usuarios
+    }
+    logger.info(f"Usuarios procesados: {len(result)}")
+    await users_cache.set(cache_key, result)
+    return result
+
 async def verify_permission(user_id: int, permission: str):
     """
-    Verifica si un usuario tiene un permiso específico.
+    Verifica si un usuario tiene un permiso específico. Fail-closed.
     """
+    cache_key = f"permission:{user_id}:{permission}"
+    cached_result = await permission_cache.get(cache_key)
+    if cached_result is not None:
+        return cached_result
+
     try:
-        service_token = generate_service_jwt("sanctioning-service", SERVICE_SECRET_KEY)
-
-        cache_key = f"permission:{user_id}:{permission}"
-        cached_result = await permission_cache.get(cache_key)
-        if cached_result is not None:
-            return cached_result
-
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                f"{USERS_SERVICE_URL}/role/verify",
-                headers={"X-Service-Token": service_token},
-                json={"user_id": user_id, "permission_name": permission}
-            )
-
-        if resp.status_code != 200:
-            logger.error(f"verify_permission status {resp.status_code} para usuario {user_id}: {resp.text}")
-            return False
-
-        result: bool = resp.json().get("tiene_permiso", False)
-
-        await permission_cache.set(cache_key, result)
-
-        return result
+        result = await users_client.verify_permission(user_id, permission)
     except Exception as e:
         logger.error(f"verify_permission error usuario {user_id}: {e}")
         return False
+
+    await permission_cache.set(cache_key, result)
+    return result
 
 async def create_user_notification(
     mensaje: str,
@@ -163,29 +114,10 @@ async def create_user_notification(
     para construir la ruta de navegación de la notificación.
     """
     try:
-        service_token = generate_service_jwt("sanctioning-service", SERVICE_SECRET_KEY)
-
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.post(
-                f"{USERS_SERVICE_URL}/notification/add",
-                headers={"X-Service-Token": service_token},
-                json={
-                    "mensaje": mensaje,
-                    "id_vinculada": id_vinculada,
-                    "tipo": tipo,
-                    "usuario_id": usuario_id
-                },
-            )
-            
-            if response.status_code in [200, 201]:
-                return {"ok": True, "message": "Notificación creada"}
-            else:
-                logger.warning(
-                    f"Error al crear notificación: {response.status_code} - {response.text}"
-                )
-                return {"ok": False, "message": "Error al crear notificación"}
-    
+        await users_client.create_notification(
+            mensaje=mensaje, id_vinculada=id_vinculada, tipo=tipo, usuario_id=usuario_id
+        )
+        return {"ok": True, "message": "Notificación creada"}
     except Exception as e:
         logger.error(f"Error llamando al servicio de notificaciones: {e}")
         return {"ok": False, "message": str(e)}
-

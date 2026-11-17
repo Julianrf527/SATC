@@ -1,0 +1,373 @@
+// ===== Enums =====
+Enum tipo_acto {
+  AUTO_ADMITE
+  REQUERIMIENTO
+  RECONOCE_TERCERO
+  DECISION
+  RECURSO
+  APRUEBA_MEMORIAS
+  APRUEBA_OBRAS
+}
+
+Enum tipo_vinculo {
+  SOLICITANTE
+  TERCERO_INTERVINIENTE
+}
+
+Enum uso_agua {
+  DOMESTICO
+  PECUARIO
+  ABREVADERO
+  AGRICOLA
+  RIEGO
+  INDUSTRIAL
+  ACUICULTURA
+  SILVICULTURA
+  RECREATIVO
+  INSTITUCIONAL
+  OTRO
+}
+
+Enum tipo_decision {
+  OTORGADA
+  NEGADA
+  DESISTIDA
+}
+
+Enum resultado_recurso {
+  REPONE
+  CONFIRMA
+  MODIFICA
+  ADICIONA
+}
+
+// ===== Información base =====
+Table expediente {
+  id integer [pk, increment]
+  radicado varchar(15) [unique, not null, note: 'Radicado del expediente']
+  fecha_radicado date [not null]
+  expediente varchar(9) [unique, not null]
+  numero_vital varchar(20) [not null]
+  nombre_predio varchar(50) [not null]
+  matricula_inmobiliaria varchar(20) [not null]
+  codigo_catastral varchar(30) [not null]
+  radicado_oficio_entrada varchar(20) [not null, note: 'Radicado de la solicitud; su documento es doc_comprobante_pago_id']
+  fecha_oficio_entrada date [not null]
+  doc_comprobante_pago_id integer [not null]
+  vereda_id integer [not null]
+  tipo_fuente_id integer [not null]
+  nombre_fuente varchar(50) [not null, note: 'Nombre propio de la fuente (input libre)']
+  fecha_creacion timestamp [default: `now()`]
+
+  indexes {
+    numero_vital
+    vereda_id
+    fecha_radicado
+  }
+}
+
+Table expediente_fuente {
+  id integer [pk, increment]
+  expediente_id integer [not null]
+  fuente_id integer [not null]
+
+  indexes {
+    (expediente_id, fuente_id) [unique]
+    fuente_id
+  }
+}
+
+Table expediente_uso {
+  id integer [pk, increment]
+  expediente_id integer [not null]
+  uso uso_agua [not null]
+
+  indexes {
+    (expediente_id, uso) [unique]
+    uso
+  }
+}
+
+Table expediente_involucrado {
+  id integer [pk, increment]
+  expediente_id integer [not null]
+  involucrado_id integer [not null, note: 'app-involved']
+  tipo_vinculo tipo_vinculo [not null, default: 'SOLICITANTE']
+  representante_id integer [null, note: 'app-involved. Obligatorio si el involucrado tiene tipo de documento NIT']
+  acto_admin_id integer [unique, null, note: 'Solo TERCERO_INTERVINIENTE: acto que lo reconoce']
+  fecha_vinculacion timestamp [default: `now()`]
+
+  indexes {
+    (expediente_id, involucrado_id) [unique]
+    involucrado_id
+  }
+}
+
+Table vereda {
+  id integer [pk, increment]
+  nombre varchar(25) [not null]
+  municipio_id integer [not null]
+
+  indexes {
+    (municipio_id, nombre) [unique]
+  }
+}
+
+Table municipio {
+  id integer [pk, increment]
+  nombre varchar(20) [not null]
+
+  indexes {
+    nombre [unique]
+  }
+}
+
+Table tipo_fuente {
+  id integer [pk, increment]
+  nombre varchar(20) [not null]
+
+  indexes {
+    nombre [unique]
+  }
+}
+
+Table fuente {
+  id integer [pk, increment]
+  nombre varchar(30) [not null, note: 'Clase de fuente: NACIMIENTO, QUEBRADA, RÍO… (seed §3.1)']
+
+  indexes {
+    nombre [unique]
+  }
+}
+
+// Documentos, versiones y revisiones: replicar las tablas de infraction-app.
+// app-docs solo almacena el archivo (doc_*_id).
+
+// ===== Actos, comunicación y notificación =====
+Table acto_administrativo {
+  id integer [pk, increment]
+  tipo_acto tipo_acto [not null]
+  numerado integer [not null]
+  fecha_numerado date [not null]
+  documento_acto_administrativo_id integer [not null]
+  fecha_creacion timestamp [default: `now()`]
+
+  indexes {
+    (tipo_acto, numerado)
+    fecha_numerado
+  }
+}
+
+Table comunicacion {
+  id integer [pk, increment]
+  numerado integer [not null]
+  fecha_numerado date [not null]
+  fecha_envio date [not null]
+  documento_comunicacion_id integer [not null]
+  acto_administrativo_id integer [unique, not null]
+}
+
+Table notificacion {
+  id integer [pk, increment]
+  acto_admin_id integer [not null]
+  numerado integer [not null]
+  involucrado_id integer [not null, note: 'app-involved']
+  fecha_numerado date [not null]
+  fecha_envio_citacion date [not null]
+  fecha_constancia_citacion date [not null]
+  documento_citacion_id integer
+  notificacion_exitosa boolean
+  tipo_notificacion_id integer
+  fecha_notificacion date
+  documento_notificacion_id integer
+  fecha_creacion timestamptz [default: `now()`]
+
+  indexes {
+    (acto_admin_id, involucrado_id)
+    involucrado_id
+  }
+}
+
+Table tipo_notificacion {
+  id integer [pk, increment]
+  nombre varchar(15)
+
+  indexes {
+    nombre [unique]
+  }
+}
+
+// ===== Etapas =====
+Table acto_admite {
+  id integer [pk, increment]
+  expediente_id integer [unique, not null]
+  encargado_acto_id integer [not null, note: 'app-users. Abogado que se asignó (Asignarme)']
+  acto_admin_id integer [unique, null, note: 'Se llena al numerar el acto']
+  doc_oficio_alcaldia_id integer
+  doc_fijacion_aviso_id integer
+  doc_constancia_fijacion_aviso_id integer
+
+  indexes {
+    encargado_acto_id
+  }
+}
+
+Table concepto_tecnico {
+  id integer [pk, increment]
+  expediente_id integer [unique]
+  fecha_visita_tecnica date
+  tecnico_encargado_id integer [not null, note: 'app-users con permiso recurso_tecnico. Lo selecciona el abogado']
+  fecha_aceptacion date
+  caudal_fuente float
+  caudal_disponible float
+  caudal_otorgado float
+  num_usuarios integer
+  cumple boolean
+  doc_concepto_tecnico_id integer [not null]
+
+  indexes {
+    tecnico_encargado_id
+  }
+}
+
+Table documentos_anexos {
+  id integer [pk, increment]
+  etapa_tipo varchar(50) [not null]
+  etapa_ref_id integer [not null]
+  nombre varchar(100) [not null]
+  documento_anexo_id integer [not null]
+  fecha_subida timestamp [default: `now()`]
+
+  indexes {
+    (etapa_tipo, etapa_ref_id)
+  }
+}
+
+Table requerimiento {
+  id integer [pk, increment]
+  expediente_id integer [unique]
+  encargado_acto_id integer [not null, note: 'app-users. Abogado que se asignó (Asignarme)']
+  acto_admin_id integer [unique, null, note: 'Se llena al numerar el acto']
+  radicado_oficio_entrada varchar(15)
+  fecha_oficio_entrada date
+  doc_oficio_entrada_id integer
+  concepto_tecnico_id integer [unique]
+
+  indexes {
+    encargado_acto_id
+  }
+}
+
+Table decision {
+  id integer [pk, increment]
+  expediente_id integer [unique, not null]
+  encargado_acto_id integer [not null, note: 'app-users. Abogado que se asignó (Asignarme)']
+  acto_admin_id integer [unique, null, note: 'Se llena al numerar el acto']
+  decision tipo_decision
+  requiere_memorias boolean
+  fecha_ejecutoria date
+
+  indexes {
+    encargado_acto_id
+    decision
+  }
+}
+
+Table recurso_reposicion {
+  id integer [pk, increment]
+  decision_id integer [unique]
+  encargado_acto_id integer
+  acto_admin_id integer [unique]
+  radicado varchar(15) [not null]
+  fecha_radicado date [not null]
+  resultado resultado_recurso
+  doc_recurso_id integer [not null]
+
+  indexes {
+    encargado_acto_id
+  }
+}
+
+Table memorias_calculo {
+  id integer [pk, increment]
+  expediente_id integer [unique, not null]
+  radicado varchar(15) [unique, not null]
+  fecha_radicado date [not null]
+  doc_planos_id integer [not null]
+  concepto_tecnico_id integer [unique]
+  requerimiento_id integer [unique]
+  subsanacion_id integer [unique]
+  encargado_acto_id integer
+  acto_admin_id integer [unique]
+
+  indexes {
+    encargado_acto_id
+  }
+}
+
+Table subsanacion {
+  id integer [pk, increment]
+  radicado varchar(15) [unique, not null]
+  fecha_radicado date [not null]
+  doc_planos_ajustados_id integer [not null]
+  concepto_tecnico_id integer [unique]
+}
+
+Table informe_usuario {
+  id integer [pk, increment]
+  radicado varchar(15) [unique, not null]
+  fecha_radicado date [not null]
+  doc_informe_usuario_id integer [not null]
+}
+
+Table recibo_satisfaccion_obras {
+  id integer [pk, increment]
+  expediente_id integer [unique, not null]
+  informe_usuario_id integer [unique, not null]
+  concepto_tecnico_id integer [unique]
+  requerimiento_id integer [unique]
+  nuevo_informe_usuario_id integer [unique]
+  concepto_tecnico_segundo_id integer [unique]
+  encargado_acto_id integer
+  acto_admin_id integer [unique]
+
+  indexes {
+    encargado_acto_id
+  }
+}
+
+// ===== Refs =====
+Ref: expediente.id < expediente_involucrado.expediente_id
+Ref: expediente_involucrado.acto_admin_id - acto_administrativo.id
+Ref: expediente.id < expediente_fuente.expediente_id
+Ref: expediente.id < expediente_uso.expediente_id
+Ref: expediente_fuente.fuente_id > fuente.id
+Ref: expediente.vereda_id > vereda.id
+Ref: vereda.municipio_id > municipio.id
+Ref: expediente.tipo_fuente_id > tipo_fuente.id
+Ref: acto_administrativo.id - comunicacion.acto_administrativo_id
+Ref: notificacion.tipo_notificacion_id > tipo_notificacion.id
+Ref: notificacion.acto_admin_id > acto_administrativo.id
+Ref: acto_admite.expediente_id - expediente.id
+Ref: acto_admite.acto_admin_id - acto_administrativo.id
+Ref: concepto_tecnico.expediente_id - expediente.id
+Ref: requerimiento.concepto_tecnico_id - concepto_tecnico.id
+Ref: requerimiento.expediente_id - expediente.id
+Ref: requerimiento.acto_admin_id - acto_administrativo.id
+Ref: decision.expediente_id - expediente.id
+Ref: decision.acto_admin_id - acto_administrativo.id
+Ref: recurso_reposicion.decision_id - decision.id
+Ref: recurso_reposicion.acto_admin_id - acto_administrativo.id
+Ref: memorias_calculo.expediente_id - expediente.id
+Ref: memorias_calculo.concepto_tecnico_id - concepto_tecnico.id
+Ref: memorias_calculo.requerimiento_id - requerimiento.id
+Ref: memorias_calculo.subsanacion_id - subsanacion.id
+Ref: memorias_calculo.acto_admin_id - acto_administrativo.id
+Ref: subsanacion.concepto_tecnico_id - concepto_tecnico.id
+Ref: recibo_satisfaccion_obras.expediente_id - expediente.id
+Ref: recibo_satisfaccion_obras.informe_usuario_id - informe_usuario.id
+Ref: recibo_satisfaccion_obras.concepto_tecnico_id - concepto_tecnico.id
+Ref: recibo_satisfaccion_obras.requerimiento_id - requerimiento.id
+Ref: recibo_satisfaccion_obras.nuevo_informe_usuario_id - informe_usuario.id
+Ref: recibo_satisfaccion_obras.concepto_tecnico_segundo_id - concepto_tecnico.id
+Ref: recibo_satisfaccion_obras.acto_admin_id - acto_administrativo.id

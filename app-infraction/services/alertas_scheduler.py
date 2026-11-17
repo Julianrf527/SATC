@@ -4,20 +4,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import date
 from dotenv import load_dotenv
-import httpx
 import os
 import logging
 
 
 #DB MODELS Y PERMISOS
 from db.models.expediente import Expediente
-from services.users import get_users_by_permission
-from routes.file_alerts import _calcular_alertas_expediente_infraccion
+from services.users import get_users_by_permission, users_client
+from services.alertas import calcular_alertas_expedientes
 from core.permission import Permission
 
 load_dotenv()
-USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://app-users:8001")
-SERVICE_SECRET_KEY = os.getenv("SERVICE_SECRET_KEY")
 FILE_MANAGE = Permission.FILE_MANAGE
 scheduler = AsyncIOScheduler()
 
@@ -25,7 +22,6 @@ scheduler = AsyncIOScheduler()
 logger = logging.getLogger(__name__)
 
 #FUNCIONES HELPER
-from utils.generate_service_jwt import generate_service_jwt
 
 
 async def obtener_alertas_usuario(user_id: int, db: AsyncSession) -> dict:
@@ -35,7 +31,7 @@ async def obtener_alertas_usuario(user_id: int, db: AsyncSession) -> dict:
     try:
         stmt = select(Expediente.id, Expediente.radicado).where(
             Expediente.abogado_responsable_id == user_id
-        )
+        ).order_by(Expediente.id)
         result = await db.execute(stmt)
         expedientes = result.all()
 
@@ -45,8 +41,9 @@ async def obtener_alertas_usuario(user_id: int, db: AsyncSession) -> dict:
         alertas_totales = {}
         fecha_hoy = date.today()
 
+        por_expediente = await calcular_alertas_expedientes([e[0] for e in expedientes], db, fecha_hoy)
         for expediente_id, radicado in expedientes:
-            alertas = await _calcular_alertas_expediente_infraccion(expediente_id, db, fecha_hoy)
+            alertas = por_expediente.get(expediente_id)
             if alertas:
                 alertas_totales[radicado] = alertas
 
@@ -80,25 +77,14 @@ async def obtener_alertas_usuario(user_id: int, db: AsyncSession) -> dict:
 async def enviar_reporte_alertas(email: str, alertas_data: dict) -> bool:
     """Envía el reporte de alertas llamando directo a app-users (east-west, sin pasar por el gateway)"""
     try:
-        service_token = generate_service_jwt("infraction-service", SERVICE_SECRET_KEY)
-
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{USER_SERVICE_URL}/email/send-alert-report",
-                params={"title": "Reporte Semanal de Alertas - Sistema de Infracciones"},
-                headers={"X-Service-Token": service_token},
-                json={
-                    "emails": [email],
-                    "alertas_data": alertas_data
-                }
-            )
-
-            return response.status_code == 200
-
+        await users_client.send_alert_report(
+            [email], alertas_data,
+            title="Reporte Semanal de Alertas - Sistema de Infracciones",
+        )
+        return True
     except Exception as e:
         logger.error(f"Error enviando email a {email}: {e}")
         return False
-
 
 async def tarea_envio_alertas_semanal(db: AsyncSession):
 

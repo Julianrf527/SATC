@@ -32,7 +32,6 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXP_DAYS = os.getenv("JWT_EXP_DAYS")
-GATEWAY_URL = os.getenv("GATEWAY_URL", "http://api-gateway:8000")
 
 bogota_tz = pytz.timezone("America/Bogota")
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -45,12 +44,14 @@ from .models.file_models import (
     ExpedienteSchema,
     QuejosoSchema,
     BulkEncargadoRequest,
+    RadicadoInicialSchema,
 )
 
 from utils.verify_token import verify_gateway_token
 from utils.log import insert_log
 from services.notification import create_notification
 from services.users import get_user_info, verify_permission
+from services.docs import get_file_info, increment_file_usage, decrement_file_usage
 
 
 def normalize_radicados_asociados(radicados: List[str]) -> List[str]:
@@ -68,7 +69,18 @@ def normalize_radicados_asociados(radicados: List[str]) -> List[str]:
     return normalized
 
 
-@router.post("/complainer/add")
+MSG_ENCARGADO_SIN_PERMISO = "El usuario elegido no tiene el permiso de abogado (infraccion_gestionar)"
+
+
+async def _validar_encargado_elegido(encargado_id: int | None) -> None:
+    """El abogado elegido como responsable tiene ``infraccion_gestionar``: el
+    mismo criterio con que la pantalla arma su lista (``usuarios_disponibles``
+    de ``GET /expedientes``). Fail-closed. ``None``/0 (quitar encargado) no se valida."""
+    if encargado_id and not await verify_permission(encargado_id, FILE_MANAGE):
+        raise HTTPException(status_code=400, detail=MSG_ENCARGADO_SIN_PERMISO)
+
+
+@router.post("/denunciantes")
 async def crear_quejoso(
     request: Request,
     quejoso: QuejosoSchema,
@@ -123,7 +135,7 @@ async def crear_quejoso(
     return JSONResponse(content={"ok": True, "data": data}, status_code=201)
 
 
-@router.put("/{expediente_id}/basic-data")
+@router.put("/{expediente_id}/datos-basicos")
 async def actualizar_informacion_expediente(
     request: Request,
     expediente_id: int,
@@ -400,7 +412,89 @@ async def actualizar_informacion_expediente(
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 
-@router.post("/add")
+@router.put("/{expediente_id}/radicado-inicial")
+async def fijar_radicado_inicial(
+    request: Request,
+    expediente_id: int,
+    body: RadicadoInicialSchema,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    """
+    Adjunta o reemplaza el documento "Radicado inicial" del expediente.
+
+    Recibe el `file_id` de un PDF ya subido a /files/upload (mismo patrón que
+    oficio remite / solicitud de información). Mismos permisos que editar los
+    datos básicos: `infraccion_gestionar` y ser el encargado. Al reemplazar,
+    +1 uso al nuevo archivo y -1 al anterior.
+    """
+    user_id = verify_gateway_token(request)["user_id"]
+    if not await verify_permission(user_id, FILE_MANAGE):
+        raise HTTPException(status_code=403, detail="No cuenta con permisos")
+
+    expediente_actual = await db.scalar(select(Expediente).where(Expediente.id == expediente_id))
+    # 403 tanto si no existe como si no es suyo (no revela qué IDs existen).
+    if expediente_actual is None or expediente_actual.abogado_responsable_id != user_id:
+        raise HTTPException(status_code=403, detail="No tiene permisos para actualizar este expediente")
+
+    anterior_id = expediente_actual.radicado_inicial_file_id
+    if anterior_id == body.file_id:
+        return JSONResponse(
+            content={"ok": True, "message": "El radicado inicial no cambió", "file_id": body.file_id},
+            status_code=200,
+        )
+
+    # Se une al PDF del expediente completo: debe ser PDF.
+    file_info = await get_file_info(body.file_id)
+    if not file_info.get("ok"):
+        raise HTTPException(status_code=400, detail="No se encontró el archivo cargado")
+    if file_info["data"].get("content_type") != "application/pdf":
+        raise HTTPException(status_code=400, detail="El radicado inicial debe cargarse en PDF")
+
+    expediente_actual.radicado_inicial_file_id = body.file_id
+    await db.flush()
+
+    audit_result = await insert_log(
+        db=db,
+        tipo_evento="UPDATE_RADICADO_INICIAL",
+        resultado="OK",
+        usuario_id=user_id,
+        detalle=(
+            f"{'Reemplazo' if anterior_id else 'Carga'} del radicado inicial del expediente "
+            f"'{expediente_actual.radicado}'"
+        ),
+        expediente_id=expediente_actual.id,
+        expediente_radicado=expediente_actual.radicado,
+        datos_anteriores={"radicado_inicial_file_id": anterior_id},
+        datos_nuevos={"radicado_inicial_file_id": body.file_id},
+    )
+    if not audit_result["ok"]:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
+
+    # Contadores de uso antes del commit (como el resto de etapas): si el
+    # nuevo no se puede registrar, no se guarda el cambio.
+    inc = await increment_file_usage([body.file_id])
+    if not inc.get("ok"):
+        await db.rollback()
+        raise HTTPException(status_code=502, detail="No se pudo registrar el uso del archivo")
+    if anterior_id:
+        dec = await decrement_file_usage([anterior_id])
+        if not dec.get("ok"):
+            logger.warning(f"No se pudo decrementar el uso del archivo {anterior_id}: {dec.get('message')}")
+
+    await db.commit()
+
+    return JSONResponse(
+        content={
+            "ok": True,
+            "message": "Radicado inicial actualizado" if anterior_id else "Radicado inicial adjuntado",
+            "file_id": body.file_id,
+        },
+        status_code=200,
+    )
+
+
+@router.post("")
 async def agregar_expediente(
     request: Request,
     expediente: ExpedienteSchema,
@@ -411,6 +505,9 @@ async def agregar_expediente(
 
     if not await verify_permission(user_id, FILE_MANAGE):
         raise HTTPException(status_code=403, detail="No cuenta con permisos")
+    # La pantalla envía al propio usuario (ya validado arriba); otro id debe ser abogado.
+    if expediente.abogado_responsable_id != user_id:
+        await _validar_encargado_elegido(expediente.abogado_responsable_id)
 
     # Validar radicado duplicado
     duplicado = await db.execute(
@@ -418,6 +515,16 @@ async def agregar_expediente(
     )
     if duplicado.scalar_one_or_none() is not None:
         raise HTTPException(status_code=400, detail="El radicado ya existe")
+
+    # Radicado inicial (opcional en la API; la pantalla de alta lo exige).
+    # Mismas validaciones que PUT /{id}/radicado-inicial: debe ser PDF.
+    radicado_inicial_id = expediente.radicado_inicial_file_id
+    if radicado_inicial_id is not None:
+        file_info = await get_file_info(radicado_inicial_id)
+        if not file_info.get("ok"):
+            raise HTTPException(status_code=400, detail="No se encontró el archivo del radicado inicial")
+        if file_info["data"].get("content_type") != "application/pdf":
+            raise HTTPException(status_code=400, detail="El radicado inicial debe cargarse en PDF")
 
     # Crear expediente
     nuevo_expediente = Expediente(
@@ -427,6 +534,7 @@ async def agregar_expediente(
         abogado_responsable_id=expediente.abogado_responsable_id,
         direccion=expediente.direccion,
         descripcion=expediente.descripcion,
+        radicado_inicial_file_id=radicado_inicial_id,
     )
     db.add(nuevo_expediente)
     await db.flush()
@@ -519,12 +627,21 @@ async def agregar_expediente(
             "tipos_afectacion": list(tipos_audit),
             "quejosos": quejosos_audit,
             "radicados_asociados": radicados_normalizados,
+            "radicado_inicial_file_id": radicado_inicial_id,
         }
     )
 
     if not audit_result["ok"]:
         await db.rollback()
         raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
+
+    # Uso del archivo antes del commit: si no se puede registrar, no se crea
+    # el expediente (igual que al adjuntarlo después).
+    if radicado_inicial_id is not None:
+        inc = await increment_file_usage([radicado_inicial_id])
+        if not inc.get("ok"):
+            await db.rollback()
+            raise HTTPException(status_code=502, detail="No se pudo registrar el uso del archivo")
 
     await db.commit()
 
@@ -534,7 +651,7 @@ async def agregar_expediente(
     )
 
 
-@router.patch("/{expediente_id}/charge/{encargado_id}")
+@router.patch("/{expediente_id}/encargado/{encargado_id}")
 async def actualizar_encargado_de_expediente(
     request: Request,
     expediente_id: int,
@@ -546,6 +663,7 @@ async def actualizar_encargado_de_expediente(
 
     if not await verify_permission(user_id, ASSIGN_PERMISSION):
         raise HTTPException(status_code=403, detail="No cuenta con permisos")
+    await _validar_encargado_elegido(encargado_id)
 
     # Obtener datos anteriores
     stmt_check = select(Expediente).where(Expediente.id == expediente_id)
@@ -615,8 +733,9 @@ async def actualizar_encargado_de_expediente(
     if encargado_id != 0:
         notif_result = await create_notification(
             mensaje=f"Expediente {expediente.radicado}\nTe han asignado este expediente de infracción",
-            id_vinculada=str(expediente_id),
-            tipo="expediente",
+            # El frontend selecciona el expediente por radicado (ver notificationTypes.ts).
+            id_vinculada=expediente.radicado,
+            tipo="exp_infraccion",  # <= 15 caracteres: columna notificacion.tipo de app-users
             usuario_id=encargado_id
         )
         
@@ -632,7 +751,7 @@ async def actualizar_encargado_de_expediente(
     )
 
 
-@router.patch("/charge/bulk")
+@router.patch("/encargado/masivo")
 async def actualizar_encargado_bulk(
     request: Request,
     data: BulkEncargadoRequest,
@@ -649,6 +768,7 @@ async def actualizar_encargado_bulk(
         raise HTTPException(status_code=400, detail="Debe enviar al menos un expediente_id")
 
     new_value = None if data.encargado_id == 0 else data.encargado_id
+    await _validar_encargado_elegido(new_value)
     updated = []
 
     # Cargar expedientes existentes en una sola consulta.
@@ -708,8 +828,8 @@ async def actualizar_encargado_bulk(
         for expediente_actualizado in updated:
             await create_notification(
                 mensaje=f"Expediente {expediente_actualizado['radicado']}\nTe han asignado este expediente de infracción",
-                id_vinculada=str(expediente_actualizado['id']),
-                tipo="expediente",
+                id_vinculada=expediente_actualizado['radicado'],
+                tipo="exp_infraccion",  # <= 15 caracteres: columna notificacion.tipo de app-users
                 usuario_id=new_value
             )
 
@@ -720,7 +840,7 @@ async def actualizar_encargado_bulk(
 
 
 # Archivar expediente
-@router.patch("/{expediente_id}/archive")
+@router.patch("/{expediente_id}/archivar")
 async def archivar_expediente(
     request: Request,
     expediente_id: int,

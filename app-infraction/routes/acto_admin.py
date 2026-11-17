@@ -37,7 +37,7 @@ from services.actos import (
 from utils.log import insert_log
 
 
-@router.post("/acto-admin")
+@router.post("/administrativos")
 async def crear_acto_admin(
     request: Request,
     expediente_id: int = Form(...),
@@ -177,7 +177,7 @@ async def crear_acto_admin(
     )
 
 
-@router.put("/acto-admin/{acto_id}")
+@router.put("/administrativos/{acto_id}")
 async def actualizar_acto_admin(
     request: Request,
     acto_id: int,
@@ -285,7 +285,7 @@ async def actualizar_acto_admin(
     )
 
 
-@router.delete("/acto-admin/{acto_id}")
+@router.delete("/administrativos/{acto_id}")
 async def eliminar_acto_admin(
     request: Request,
     acto_id: int,

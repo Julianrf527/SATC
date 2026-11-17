@@ -1,23 +1,20 @@
-from sqlalchemy import Column, Integer, ForeignKey, String, TIMESTAMP, BigInteger, Text
-from datetime import datetime
-from zoneinfo import ZoneInfo
-from sqlalchemy.orm import relationship
+"""Versiones de un documento (tabla existente ``versiones_documento``).
+
+    proceso_id      -> documento_id   (vía __proceso_fk_columna__)
+    archivo_nombre  -> archivo_nombre_original
+    file_id         -> columna nueva (id en file_hash), agregada por db/migrations.py
+"""
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from satc_shared.review_process import VersionRevisionMixin
+
 from .base import Base
 
-class VersionDocumento(Base):
+
+class VersionDocumento(VersionRevisionMixin, Base):
     __tablename__ = "versiones_documento"
+    __proceso_tabla__ = "documentos"
+    __proceso_fk_columna__ = "documento_id"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    documento_id = Column(Integer, ForeignKey("documentos.id", ondelete="CASCADE"), index=True)
-    numero_version = Column(Integer)
-    archivo_url = Column(String(500))
-    archivo_nombre_original = Column(String(255))
-    archivo_size = Column(BigInteger)
-    usuario_subida_id = Column(Integer)
-    fecha_subida = Column(
-        TIMESTAMP(timezone=True),
-        default=lambda: datetime.now(ZoneInfo("America/Bogota"))
-    )
-    comentario = Column(Text)
-
-    documento = relationship("Documento", back_populates="versiones")
+    archivo_nombre: Mapped[str] = mapped_column("archivo_nombre_original", String(255))

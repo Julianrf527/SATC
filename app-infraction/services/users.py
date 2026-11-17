@@ -1,29 +1,28 @@
-import httpx
+"""Consultas a app-users vía satc_shared.clients.UsersClient.
+
+Llamadas directas a app-users (sin pasar por gateway) con x-service-token de
+infraction-service. Los wrappers conservan firmas, caché y la política ante
+fallo (``{}`` / ``False``, nunca lanzan).
+"""
 import logging
-import os
 from dotenv import load_dotenv
 
+from satc_shared.clients import UsersClient
+
 load_dotenv()
-USERS_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://app-users:8001")
-SERVICE_SECRET_KEY = os.getenv("SERVICE_SECRET_KEY")
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-from utils.generate_service_jwt import generate_service_jwt
 from utils.cache import permission_cache, users_cache
 
-def _service_headers() -> dict:
-    if not SERVICE_SECRET_KEY:
-        raise RuntimeError("SERVICE_SECRET_KEY no configurado, no se puede autenticar contra app-users")
-    token = generate_service_jwt("infraction-service", SERVICE_SECRET_KEY)
-    return {"X-Service-Token": token}
+users_client = UsersClient.from_env("infraction-service")
+
 
 async def get_users_by_permission(permission_name: str) -> dict:
     """
     Obtiene usuarios que tienen un permiso específico.
-    Retorna {user_id: {nombre, correo, ...}}
-    Llamada directa a app-users (sin pasar por gateway).
+    Retorna {user_id: {nombre, correo, numero_documento, documento}}
     """
     if not permission_name:
         return {}
@@ -34,38 +33,28 @@ async def get_users_by_permission(permission_name: str) -> dict:
         return cached
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                f"{USERS_SERVICE_URL}/user/permission/{permission_name}",
-                headers=_service_headers(),
-            )
-
-        if response.status_code == 200:
-            data = response.json()
-            result = {
-                user["id"]: {
-                    "nombre": user.get("nombre"),
-                    "correo": user.get("correo", ""),
-                    "numero_documento": user.get("numero_documento"),
-                    "documento": user.get("numero_documento"),
-                }
-                for user in data.get("data", [])
-            }
-            await users_cache.set(cache_key, result)
-            return result
-        else:
-            logger.warning(f"get_users_by_permission '{permission_name}': status {response.status_code}")
-            return {}
-
+        usuarios = await users_client.users_by_permission(permission_name)
     except Exception as e:
-        logger.error(f"get_users_by_permission error: {e}")
+        logger.error(f"get_users_by_permission '{permission_name}' error: {e}")
         return {}
+
+    result = {
+        u.id: {
+            "nombre": u.nombre,
+            "correo": u.correo or "",
+            "numero_documento": u.numero_documento,
+            "documento": u.numero_documento,
+        }
+        for u in usuarios
+    }
+    await users_cache.set(cache_key, result)
+    return result
+
 
 async def get_user_info(user_ids: list[int]) -> dict:
     """
     Obtiene info de múltiples usuarios por IDs.
-    Retorna {user_id: {nombre, correo}}
-    Llamada directa a app-users (sin pasar por gateway).
+    Retorna {user_id: {nombre, correo, numero_documento}}
     """
     if not user_ids:
         return {}
@@ -76,38 +65,27 @@ async def get_user_info(user_ids: list[int]) -> dict:
         return cached
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                f"{USERS_SERVICE_URL}/user/batch",
-                headers=_service_headers(),
-                json={"user_ids": user_ids},
-            )
-
-        if response.status_code == 200:
-            data = response.json()
-            result = {
-                user["id"]: {
-                    "nombre": user["nombre"],
-                    "correo": user["correo"],
-                    "numero_documento": user.get("numero_documento", ""),
-                }
-                for user in data.get("data", [])
-            }
-            await users_cache.set(cache_key, result)
-            return result
-        else:
-            logger.warning(f"get_user_info batch: status {response.status_code} - {response.text}")
-            return {}
-
+        usuarios = await users_client.users_batch(user_ids)
     except Exception as e:
         logger.error(f"get_user_info error: {e}", exc_info=True)
         return {}
 
+    result = {
+        u.id: {
+            "nombre": u.nombre,
+            "correo": u.correo,
+            "numero_documento": u.numero_documento if u.numero_documento is not None else "",
+        }
+        for u in usuarios
+    }
+    await users_cache.set(cache_key, result)
+    return result
+
+
 async def verify_permission(user_id: int, permission: str) -> bool:
     """
-    Verifica si un usuario tiene un permiso específico.
-    Llamada directa a app-users (sin pasar por gateway).
-    Retorna True/False.
+    Verifica si un usuario tiene un permiso específico. Fail-closed: cualquier
+    error devuelve False.
     """
     cache_key = f"permission:{user_id}:{permission}"
     cached = await permission_cache.get(cache_key)
@@ -115,21 +93,10 @@ async def verify_permission(user_id: int, permission: str) -> bool:
         return cached
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                f"{USERS_SERVICE_URL}/role/verify",
-                headers=_service_headers(),
-                json={"user_id": user_id, "permission_name": permission},
-            )
-
-        if resp.status_code != 200:
-            logger.error(f"verify_permission status {resp.status_code} para usuario {user_id}: {resp.text}")
-            return False
-
-        result: bool = resp.json().get("tiene_permiso", False)
-        await permission_cache.set(cache_key, result)
-        return result
-
+        result = await users_client.verify_permission(user_id, permission)
     except Exception as e:
         logger.error(f"verify_permission error usuario {user_id}: {e}")
         return False
+
+    await permission_cache.set(cache_key, result)
+    return result

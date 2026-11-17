@@ -1,39 +1,22 @@
-from sqlalchemy import Column, Integer, String, Text, TIMESTAMP
-from datetime import datetime
-from zoneinfo import ZoneInfo
-from sqlalchemy.orm import relationship
+"""Proceso de revisión del módulo Documentos (tabla existente ``documentos``).
+
+Columnas del mixin ``ProcesoRevisionMixin`` mapeadas a los nombres reales de la
+tabla en producción (no se renombra nada en BD):
+    creador_id  -> usuario_creador_id
+"""
+from sqlalchemy import Integer, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from satc_shared.review_process import ProcesoRevisionMixin
+
 from .base import Base
 
-class Documento(Base):
+
+class Documento(ProcesoRevisionMixin, Base):
     __tablename__ = "documentos"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    nombre = Column(String(255))
-    descripcion = Column(Text)
-    tipo_archivo = Column(String(10))
-    # Se filtra por creador en /list y /stats
-    usuario_creador_id = Column(Integer, index=True)
-    # Se ordena por fecha en /list
-    fecha_creacion = Column(
-        TIMESTAMP(timezone=True),
-        default=lambda: datetime.now(ZoneInfo("America/Bogota")),
-        index=True
-    )
-    # Se filtra por estado en /list y /stats
-    estado = Column(String(20), index=True)
-    # Null = documento genérico (visible en el listado principal de Documentos).
-    # "informe_tecnico" = creado por app-infraction vía /docs/create-service
-    # para el flujo de informes técnicos — se oculta de ese listado, se
-    # gestiona desde "Mis Informes".
-    origen = Column(String(30), nullable=True, index=True)
-    version_actual = Column(Integer)
-    numero_devoluciones = Column(Integer, default=0)
-    fecha_ultima_actualizacion = Column(
-        TIMESTAMP(timezone=True),
-        default=lambda: datetime.now(ZoneInfo("America/Bogota"))
-    )
-
-    versiones = relationship("VersionDocumento", back_populates="documento", lazy="select")
-    revisiones = relationship("Revision", back_populates="documento", lazy="select")
-    asignaciones_revisores = relationship("AsignacionRevisor", back_populates="documento", lazy="select")
-    auditoria = relationship("AuditoriaDocumento", back_populates="documento", lazy="select")
+    # Ancho real de la columna en producción (el mixin usa 30).
+    estado: Mapped[str] = mapped_column(String(20), index=True)
+    creador_id: Mapped[int] = mapped_column("usuario_creador_id", Integer, index=True)
+    # Propio de app-docs: tipo declarado al crear (pdf/doc/docx).
+    tipo_archivo: Mapped[str | None] = mapped_column(String(10), nullable=True)

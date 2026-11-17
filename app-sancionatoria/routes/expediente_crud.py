@@ -23,6 +23,7 @@ from services.involucrado import get_involucrados_by_expedientes_ids
 from services.users import get_users_by_permission, get_user_info
 from services.etapas import ETAPA_MODELS, ETAPA_LABELS, get_expediente_con_permiso
 from core.permission import Permission
+from services.permisos import exigir_alguno, exigir_lectura_expediente
 
 router = APIRouter()
 FILE_MANAGE = Permission.FILE_MANAGE
@@ -81,7 +82,10 @@ async def obtener_expedientes(
     fecha_creacion: str = Query(None),
     encargado_id: int = Query(None),
 ):
-    verify_gateway_token(request)
+    # Todos los expedientes + usuarios con documento: solo la pantalla de
+    # asignación de encargados (/file/assign_manage).
+    user_id = verify_gateway_token(request)["user_id"]
+    await exigir_alguno(user_id, Permission.ASSIGN_PERMISSION)
 
     fecha = None
     if fecha_creacion:
@@ -296,7 +300,10 @@ async def obtener_expediente_completo_por_expediente_id(
     expediente_id: int = PathParam(..., description="ID del expediente"),
     db: AsyncSession = Depends(get_db_managed)
 ):
-    verify_gateway_token(request)
+    # Sin consumidor en el frontend; misma regla que /stage/full/{id}:
+    # consultar, o gestionar + encargado (403 si es ajeno o no existe).
+    user_id = verify_gateway_token(request)["user_id"]
+    await exigir_lectura_expediente(db, expediente_id, user_id)
 
     all_etapas_sq = _etapa_union_subq()
     latest_etapa_subq = (
@@ -523,7 +530,9 @@ async def obtener_expedientes_para_vista(
     request: Request,
     db: AsyncSession = Depends(get_db_managed),
 ):
-    verify_gateway_token(request)
+    # Todos los expedientes: pantalla de consulta (/file/consult).
+    user_id = verify_gateway_token(request)["user_id"]
+    await exigir_alguno(user_id, Permission.FILE_CONSULT)
 
     all_etapas_sq = _etapa_union_subq()
     latest_etapa_subq = (
@@ -714,8 +723,9 @@ async def agregar_expediente(
     expediente: ExpedienteSchema,
     db: AsyncSession = Depends(get_db_managed),
 ):
-    """Crea un nuevo expediente en el sistema."""
+    """Crea un nuevo expediente en el sistema (pantalla /file/manage)."""
     user_id = verify_gateway_token(request)["user_id"]
+    await exigir_alguno(user_id, Permission.FILE_MANAGE)
 
     stmt = select(Expediente).where(Expediente.radicado == expediente.radicado)
     result = await db.execute(stmt)
