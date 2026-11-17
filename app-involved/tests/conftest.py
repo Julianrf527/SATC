@@ -11,11 +11,14 @@ tests; se sustituye por un doble controlable en cada test (fixture `permisos`).
 """
 import itertools
 import os
+from urllib.parse import quote
 from datetime import datetime, timedelta
 
+# Clave de Postgres desde POSTGRES_PASSWORD (la del .env); nunca escrita aquí.
+_PG_PASSWORD = quote(os.getenv("POSTGRES_PASSWORD", ""), safe="")
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
-    "postgresql+asyncpg://postgres:CAMBIAR_POSTGRES_PASSWORD@postgres-involved:5432/involved_test_db",
+    f"postgresql+asyncpg://postgres:{_PG_PASSWORD}@postgres-involved:5432/involved_test_db",
 )
 # db/database.py crea el engine al importarse leyendo DATABASE_URL; get_db queda
 # sobreescrito en los tests, pero el import no debe fallar.
