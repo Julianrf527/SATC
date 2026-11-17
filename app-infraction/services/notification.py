@@ -1,18 +1,16 @@
-import os
-import httpx
+"""Notificaciones en app-users vía satc_shared.clients.UsersClient
+(directo, x-service-token de infraction-service)."""
 from dotenv import load_dotenv
 import logging
 
-from utils.generate_service_jwt import generate_service_jwt
+from satc_shared.clients import UsersClient
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://app-users:8001")
-SERVICE_SECRET_KEY = os.getenv("SERVICE_SECRET_KEY")
+users_client = UsersClient.from_env("infraction-service")
 
-logger.info("Servicio de notificaciones configurado")
 
 async def create_notification(
     mensaje: str,
@@ -30,43 +28,15 @@ async def create_notification(
         usuario_id: ID del usuario que recibirá la notificación
 
     Returns:
-        dict con 'ok' (bool) y 'message' (str)
+        dict con 'ok' (bool) y 'message' (str). Nunca lanza.
     """
-    if not SERVICE_SECRET_KEY:
-        logger.error("SERVICE_SECRET_KEY no configurado, no se puede autenticar contra app-users")
-        return {"ok": False, "message": "Servicio de notificaciones mal configurado"}
-
     try:
-        endpoint_url = f"{USER_SERVICE_URL}/notification/add"
-        logger.info(f"Intentando crear notificación en: {endpoint_url}")
-        logger.info(f"Datos: tipo={tipo}, usuario_id={usuario_id}, mensaje={mensaje[:50]}...")
-
-        headers = {
-            "X-Service-Token": generate_service_jwt("infraction-service", SERVICE_SECRET_KEY),
-            "Content-Type": "application/json"
-        }
-
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.post(
-                endpoint_url,
-                json={
-                    "mensaje": mensaje,
-                    "id_vinculada": id_vinculada,
-                    "tipo": tipo,
-                    "usuario_id": usuario_id
-                },
-                headers=headers
-            )
-
-            if response.status_code in [200, 201]:
-                logger.info(f"Notificación creada para usuario {usuario_id}: {mensaje}")
-                return {"ok": True, "message": "Notificación creada"}
-            else:
-                logger.warning(
-                    f"Error al crear notificación: {response.status_code} - {response.text}"
-                )
-                return {"ok": False, "message": "Error al crear notificación"}
-
+        logger.info(f"Datos notificación: tipo={tipo}, usuario_id={usuario_id}, mensaje={mensaje[:50]}...")
+        await users_client.create_notification(
+            mensaje=mensaje, id_vinculada=id_vinculada, tipo=tipo, usuario_id=usuario_id
+        )
+        logger.info(f"Notificación creada para usuario {usuario_id}: {mensaje}")
+        return {"ok": True, "message": "Notificación creada"}
     except Exception as e:
         logger.error(f"Error llamando al servicio de notificaciones: {e}")
         return {"ok": False, "message": str(e)}

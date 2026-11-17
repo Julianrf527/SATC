@@ -25,6 +25,8 @@ from utils.verify_token import verify_gateway_token
 from utils.insertLog import insert_auditoria
 
 # ---------- MODELOS ----------
+# Largo de la columna usuario.correo (db/models/usuario.py).
+CORREO_MAX = 100
 
 class CambiarContrasenaRequest(BaseModel):
     current_password: str
@@ -50,7 +52,11 @@ class UsuarioRequest(BaseModel):
 
     @validator('correo')
     def validate_email_lowercase(cls, v):
-        """Convierte el email a minúsculas"""
+        """Convierte el email a minúsculas y valida el largo de la columna
+        usuario.correo (varchar(100)); EmailStr admite hasta ~254 y un correo
+        más largo llegaba a la BD y respondía 500 en vez de 422."""
+        if v and len(v) > CORREO_MAX:
+            raise ValueError(f'El correo no puede exceder {CORREO_MAX} caracteres')
         return v.lower() if v else v
 
 # ---------- ENDPOINTS ----------

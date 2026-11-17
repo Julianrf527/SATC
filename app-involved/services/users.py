@@ -1,24 +1,17 @@
+"""Consultas a app-users vía satc_shared.clients.UsersClient (directo, con
+x-service-token de involved-service)."""
 import logging
-import os
 
-import httpx
 from dotenv import load_dotenv
 
-from utils.generate_service_jwt import generate_service_jwt
+from satc_shared.clients import UsersClient
 from utils.cache import permission_cache, users_cache
 
 load_dotenv()
-USERS_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://app-users:8001")
-SERVICE_SECRET_KEY = os.getenv("SERVICE_SECRET_KEY")
 
 logger = logging.getLogger(__name__)
 
-
-def _service_headers() -> dict:
-    if not SERVICE_SECRET_KEY:
-        raise RuntimeError("SERVICE_SECRET_KEY no configurado, no se puede autenticar contra app-users")
-    token = generate_service_jwt("involved-service", SERVICE_SECRET_KEY)
-    return {"X-Service-Token": token}
+users_client = UsersClient.from_env("involved-service")
 
 
 async def get_user_info(user_ids: list[int]) -> dict:
@@ -36,31 +29,21 @@ async def get_user_info(user_ids: list[int]) -> dict:
         return cached
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(
-                f"{USERS_SERVICE_URL}/user/batch",
-                headers=_service_headers(),
-                json={"user_ids": user_ids},
-            )
-
-        if response.status_code != 200:
-            logger.warning(f"get_user_info batch: status {response.status_code}")
-            return {}
-
-        result = {
-            user["id"]: {
-                "nombre": user.get("nombre", ""),
-                "correo": user.get("correo", ""),
-                "numero_documento": user.get("numero_documento"),
-            }
-            for user in response.json().get("data", [])
-        }
-        await users_cache.set(cache_key, result)
-        return result
-
+        usuarios = await users_client.users_batch(user_ids)
     except Exception as e:
         logger.error(f"get_user_info error: {e}", exc_info=True)
         return {}
+
+    result = {
+        u.id: {
+            "nombre": u.nombre or "",
+            "correo": u.correo or "",
+            "numero_documento": u.numero_documento,
+        }
+        for u in usuarios
+    }
+    await users_cache.set(cache_key, result)
+    return result
 
 
 async def verify_permission(user_id: int, permission: str) -> bool:
@@ -75,21 +58,10 @@ async def verify_permission(user_id: int, permission: str) -> bool:
         return cached
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                f"{USERS_SERVICE_URL}/role/verify",
-                headers=_service_headers(),
-                json={"user_id": user_id, "permission_name": permission},
-            )
-
-        if resp.status_code != 200:
-            logger.error(f"verify_permission status {resp.status_code} para usuario {user_id}")
-            return False
-
-        result: bool = resp.json().get("tiene_permiso", False)
-        await permission_cache.set(cache_key, result)
-        return result
-
+        result = await users_client.verify_permission(user_id, permission)
     except Exception as e:
         logger.error(f"verify_permission error usuario {user_id}: {e}")
         return False
+
+    await permission_cache.set(cache_key, result)
+    return result

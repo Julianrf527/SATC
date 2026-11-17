@@ -19,7 +19,8 @@ from core.permission import Permission
 from utils.verify_token import verify_gateway_token
 from services.users import get_user_info, verify_permission
 from services.docs import download_unified_pdf
-from services.etapas import ETAPA_MODELS, ETAPA_LABELS
+from services.permisos import exigir_lectura_expediente
+from services.etapas import ETAPA_MODELS, ETAPA_LABELS, ACTO_AUXILIAR_COLUMNA
 
 router = APIRouter()
 LOG_PERMISSION = Permission.LOG_PERMISSION
@@ -278,19 +279,13 @@ async def descargar_todos_documentos(
     Descarga todos los documentos de un expediente combinados en un único PDF.
     Los documentos se ordenan por etapa y se deduplican.
     """
-    verify_gateway_token(request)
-
-    # Endpoint intencionalmente público: no valida encargado_id, cualquier usuario
-    # autenticado puede descargar el expediente completo. No agregar chequeo de permisos.
-    row = (await db.execute(
-        select(Expediente.encargado_id, Expediente.radicado)
-        .where(Expediente.id == expediente_id)
-    )).fetchone()
-
-    if not row:
-        raise HTTPException(status_code=404, detail="Expediente no encontrado")
-
-    _, radicado = row
+    # Antes era público para cualquier usuario autenticado. Ahora sigue la regla
+    # de lectura del expediente (auditoría de permisos 2026-10, A15): lo
+    # descarga quien lo puede ver en DetalleExpediente, es decir
+    # sancionatorio_consultar, o sancionatorio_gestionar + encargado.
+    user_id = verify_gateway_token(request)["user_id"]
+    row = await exigir_lectura_expediente(db, expediente_id, user_id)
+    radicado = row.radicado
 
     logger.info(f"[DOWNLOAD-ALL] Iniciando descarga para expediente: {radicado}")
 
@@ -327,9 +322,11 @@ async def descargar_todos_documentos(
             acto_ids = []
             if hasattr(etapa, "acto_administrativo_id") and etapa.acto_administrativo_id:
                 acto_ids.append(etapa.acto_administrativo_id)
-            # EtapaDecisionFondo también tiene acto_recurso_id
-            if hasattr(etapa, "acto_recurso_id") and etapa.acto_recurso_id:
-                acto_ids.append(etapa.acto_recurso_id)
+            # Decisión de fondo (acto de recurso) y probatoria de recurso
+            # (acto de decisión) tienen además un acto auxiliar.
+            nombre_aux = ACTO_AUXILIAR_COLUMNA.get(Model)
+            if nombre_aux and getattr(etapa, nombre_aux):
+                acto_ids.append(getattr(etapa, nombre_aux))
 
             for acto_id in acto_ids:
                 res_acto = await db.execute(

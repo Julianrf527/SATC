@@ -24,6 +24,16 @@ async def startup_event():
         print(f"Error inicializando BD: {e}")
         print(f"Stacktrace completo: {traceback.format_exc()}")
 
+    # Catálogo de permisos (nuevos, descripciones, renombres, dependencias):
+    # idempotente y en cada arranque, así no hace falta SQL manual en la VM.
+    try:
+        from db.permission_sync import sync_permission_catalog
+        await sync_permission_catalog()
+    except Exception as e:
+        import traceback
+        print(f"Error sincronizando el catálogo de permisos: {e}")
+        print(f"Stacktrace completo: {traceback.format_exc()}")
+
     await init_redis()
 
 @app.on_event("shutdown")

@@ -31,7 +31,7 @@ async def test_cliente_no_puede_inyectar_identidad_en_ruta_publica(cliente, upst
     """El caso peligroso: en rutas públicas el gateway no declara usuario, así
     que una cabecera del cliente que sobreviva llegaría sin ninguna otra
     validación al microservicio."""
-    await cliente.post("/users/user/batch", json={}, headers=CABECERAS_FORJADAS)
+    await cliente.post("/users/auth/login", json={}, headers=CABECERAS_FORJADAS)
     assert "x-gateway-user-id" not in upstream.headers
     assert "x-gateway-role-id" not in upstream.headers
     assert "x-service-token" not in upstream.headers
@@ -68,3 +68,30 @@ async def test_cookie_cruda_no_se_reenvia_entera(cliente_autenticado, upstream):
 async def test_cabeceras_normales_del_cliente_se_reenvian(cliente_autenticado, upstream):
     await cliente_autenticado.get("/users/recurso", headers={"Accept-Language": "es-CO"})
     assert upstream.headers["accept-language"] == "es-CO"
+
+
+async def test_ip_del_cliente_sale_de_x_real_ip_de_nginx(cliente, upstream):
+    """El gateway reenvía la IP real (la que nginx fija en X-Real-IP) en su
+    propia cabecera, para que app-users no limite el login por la IP del
+    gateway (que es la misma para toda la entidad)."""
+    await cliente.post(
+        "/users/auth/login", json={}, headers={"X-Real-IP": "192.168.10.25"}
+    )
+    assert upstream.headers["X-Gateway-Client-IP"] == "192.168.10.25"
+
+
+async def test_cabecera_de_ip_del_cliente_se_sobreescribe(cliente, upstream):
+    """Un cliente no puede elegir su IP mandando X-Gateway-Client-IP: se
+    descarta y se reemplaza por la que calcula el gateway."""
+    await cliente.post(
+        "/users/auth/login",
+        json={},
+        headers={"X-Gateway-Client-IP": "6.6.6.6", "X-Real-IP": "192.168.10.25"},
+    )
+    assert upstream.headers.get_list("X-Gateway-Client-IP") == ["192.168.10.25"]
+
+
+async def test_ip_del_cliente_sin_nginx_usa_el_par_tcp(cliente, upstream):
+    await cliente.post("/users/auth/login", json={})
+    # ASGITransport simula el par TCP como 127.0.0.1.
+    assert upstream.headers["X-Gateway-Client-IP"] == "127.0.0.1"

@@ -1,4 +1,4 @@
-# Archivos de entorno
+# Archivos de entorno (las plantillas *.example sí se versionan)
 .env
 .env.*
 .env.local
@@ -6,6 +6,8 @@
 .env.test
 .env.production
 *.env
+!.env.user_admin.example
+!.env.deploy.example
 
 # Python
 __pycache__/
@@ -19,8 +21,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/

@@ -1,7 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="es" translate="no">
   <head>
     <meta charset="UTF-8" />
+    <!-- El traductor del navegador reescribe el DOM y React falla al actualizarlo
+         ("insertBefore ... is not a child of this node"). La app ya está en español. -->
+    <meta name="google" content="notranslate" />
     <link rel="icon" href="/static/Corpo.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SATC - Sistema de Administración de Trámites</title>

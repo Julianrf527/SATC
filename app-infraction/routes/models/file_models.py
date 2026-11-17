@@ -1,6 +1,6 @@
 from datetime import date
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 class ExpedienteSchema(BaseModel):
     radicado : str
@@ -13,6 +13,14 @@ class ExpedienteSchema(BaseModel):
     quejosos_ids: List[int]
     recursos_ids: List[int]
     radicados_asociados: List[str]
+    # Solo al crear: PDF "Radicado inicial" ya subido a app-docs (/files/upload).
+    # La edición de datos básicos no lo usa (tiene su propio endpoint).
+    radicado_inicial_file_id: Optional[int] = None
+
+class RadicadoInicialSchema(BaseModel):
+    """file_id de un PDF ya subido a app-docs (/files/upload)."""
+    file_id: int
+
 
 class QuejosoSchema(BaseModel):
     nombre: Optional[str] = None
@@ -30,4 +38,9 @@ class FiltroAvanzado(BaseModel):
     municipio_id: Optional[int] = None
     vereda_ids: Optional[List[int]] = None
     recurso_ids: Optional[List[int]] = None
+    tipo_afectacion_ids: Optional[List[int]] = None
     valor_exacto: bool = False
+    # "propios": expedientes del usuario (vista de gestión, GET /encargado/{id}).
+    # "todos": todos los expedientes (vista de consulta, GET /todos); solo se
+    # aplica si el usuario tiene infraccion_consultar, si no cae a "propios".
+    alcance: Literal["propios", "todos"] = "propios"

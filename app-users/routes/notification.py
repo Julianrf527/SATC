@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, insert
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from zoneinfo import ZoneInfo
 import logging
 import asyncio
@@ -15,11 +15,32 @@ from db.models.notificacion import Notificacion
 
 router = APIRouter()
 
+# Largos de las columnas notificacion.id_vinculada (varchar(20)) y
+# notificacion.tipo (varchar(15)) en db/models/notificacion.py.
+ID_VINCULADA_MAX = 20
+TIPO_MAX = 15
+
 class NotificacionRequest(BaseModel):
     mensaje: str
     id_vinculada: str
     tipo: str
     usuario_id: int
+
+    # Sin esto un valor más largo llegaba a la BD y respondía 500 en vez de 422.
+    # Se mide sin espacios laterales porque así se guarda (ver crear_notificacion).
+    @field_validator("id_vinculada")
+    @classmethod
+    def _largo_id_vinculada(cls, v: str) -> str:
+        if len(v.strip()) > ID_VINCULADA_MAX:
+            raise ValueError(f"El id_vinculada no puede exceder {ID_VINCULADA_MAX} caracteres")
+        return v
+
+    @field_validator("tipo")
+    @classmethod
+    def _largo_tipo(cls, v: str) -> str:
+        if len(v.strip()) > TIPO_MAX:
+            raise ValueError(f"El tipo no puede exceder {TIPO_MAX} caracteres")
+        return v
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,11 +80,14 @@ async def crear_notificacion(
             detail="El tipo no puede estar vacío"
         )
 
-    # Una entidad vinculada tiene a lo sumo una notificación viva por usuario:
-    # se borra la anterior antes de insertar la nueva.
+    # Una entidad vinculada tiene a lo sumo una notificación viva por usuario y
+    # tipo: se borra la anterior antes de insertar la nueva. El filtro por tipo
+    # evita que un aviso de otro módulo con el mismo id (p. ej. recurso vs.
+    # infraction) borre el que no le corresponde.
     stmt = delete(Notificacion).where(
         Notificacion.id_vinculada == data.id_vinculada,
-        Notificacion.usuario_id == data.usuario_id
+        Notificacion.usuario_id == data.usuario_id,
+        Notificacion.tipo == data.tipo.strip()
     )
     await db.execute(stmt)
     await db.commit()
@@ -155,10 +179,15 @@ async def borrar_notificacion_por_vinculada(
     linked_id: str,
     db: AsyncSession = Depends(get_db_managed),
 ):
-    """Elimina las notificaciones asociadas a un id_vinculada (entidad cerrada o borrada)."""
+    """Elimina las notificaciones del usuario autenticado asociadas a un
+    id_vinculada (entidad cerrada o borrada). Nunca las de otros usuarios."""
     token_data = verify_gateway_token(request)
+    user_id = token_data["user_id"]
 
-    query = select(Notificacion).where(Notificacion.id_vinculada == linked_id)
+    query = select(Notificacion).where(
+        Notificacion.id_vinculada == linked_id,
+        Notificacion.usuario_id == user_id,
+    )
     res = await db.execute(query)
     notificaciones = res.scalars().all()
 
@@ -186,7 +215,10 @@ async def borrar_notificacion_por_vinculada(
         )
         ids_eliminados.append(notificacion.id)
 
-    stmr = delete(Notificacion).where(Notificacion.id_vinculada == linked_id)
+    stmr = delete(Notificacion).where(
+        Notificacion.id_vinculada == linked_id,
+        Notificacion.usuario_id == user_id,
+    )
     result = await db.execute(stmr)
     await db.commit()
 

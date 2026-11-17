@@ -15,6 +15,8 @@ from db.models.file_hash import FileHash
 from utils.minio_client import upload_file_with_deduplication, get_file_from_minio
 from utils.file_validator import validate_file_complete
 from utils.antivirus import escanear_archivo
+from core.permission import PERMISOS_ARCHIVOS
+from services.users import verify_permission
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -25,14 +27,27 @@ class FilesBatchRequest(BaseModel):
 class FileStateUpdateRequest(BaseModel):
     file_ids: List[int]
 
-def verify_internal_access(request: Request) -> None:
+async def verify_internal_access(request: Request) -> None:
+    """
+    Service-token (otro microservicio, sin usuario) o gateway-token más AL
+    MENOS UN permiso de módulo con archivos (PERMISOS_ARCHIVOS).
+
+    Los IDs de archivo son secuenciales: sin el permiso, cualquier usuario
+    autenticado podría recorrer todos los archivos del sistema. Esto no
+    verifica a qué expediente pertenece el archivo (app-docs no lo sabe); es
+    el control provisional hasta tener URLs firmadas por el servicio dueño.
+    """
     service_token = request.headers.get("x-service-token")
     gateway_token = request.headers.get("x-gateway-token")
 
     if service_token:
         verify_service_token(request)
     elif gateway_token:
-        verify_gateway_token(request)
+        user_id = verify_gateway_token(request)["user_id"]
+        for permiso in PERMISOS_ARCHIVOS:
+            if await verify_permission(user_id, permiso):
+                return
+        raise HTTPException(status_code=403, detail="No tiene permisos para acceder a archivos")
     else:
         raise HTTPException(status_code=401, detail="No se proporcionó token de autenticación")
 
@@ -48,13 +63,18 @@ def verify_service_only_access(request: Request) -> None:
 
 @router.post("/upload")
 async def upload_file(
+    request: Request,
     archivo: UploadFile = File(...),
     db: AsyncSession = Depends(get_db_managed)
 ):
     """
     Sube un archivo con deduplicación por hash. Devuelve su ID y numero_usos
     actual (0 si es nuevo): quien lo asocie a un recurso debe incrementarlo.
+
+    Lo llaman el frontend (vía gateway) y app-infraction (service-token).
     """
+    await verify_internal_access(request)
+
     file_data = await archivo.read()
 
     max_size = int(os.getenv("MAX_FILE_SIZE_MB", "10"))
@@ -107,7 +127,7 @@ async def get_file_by_id(
     """
     Retorna la información de un documento por su ID unico.
     """
-    verify_internal_access(request)
+    await verify_internal_access(request)
 
     stmt = select(FileHash).where(FileHash.id == file_id)
     result = await db.execute(stmt)
@@ -168,7 +188,7 @@ async def download_file_by_id(
     """
     Descarga o visualiza un archivo desde MinIO dado su ID.
     """
-    verify_internal_access(request)
+    await verify_internal_access(request)
 
     file_record = (await db.execute(
         select(FileHash).where(FileHash.id == file_id)
