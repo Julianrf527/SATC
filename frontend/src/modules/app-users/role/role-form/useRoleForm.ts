@@ -12,6 +12,7 @@ import {
   agregarPermiso,
   alternarCategoria,
   estaBloqueado,
+  incompatiblesMarcados,
   incumplimientos as calcularIncumplimientos,
   quitarConDependientes,
   requisitosFaltantes,
@@ -22,10 +23,12 @@ export const ROL_NOMBRE_MAX = 20;
 
 /** Estado de un permiso en el selector según las dependencias. */
 export type EstadoPermiso = {
-  /** No marcado y le falta algún requerido: checkbox deshabilitado. */
+  /** No marcado y le falta algún requerido o choca con uno marcado: checkbox deshabilitado. */
   bloqueado: boolean;
   /** Etiquetas legibles de los requeridos que no están marcados. */
   faltan: string[];
+  /** Etiquetas legibles de los marcados con los que no puede ir. */
+  chocan: string[];
 };
 
 /** Lista legible "A, B y C". */
@@ -67,13 +70,14 @@ export function useRoleForm(permisoList: Permiso[], setToast: SetToast) {
     setExpandedCategories(categories.map((c) => c.prefix));
   }
 
-  // Permisos marcados sin todos sus requeridos (p. ej. un rol creado antes de
-  // existir las dependencias): se muestran y bloquean el guardado.
+  // Permisos marcados sin todos sus requeridos o con uno incompatible (p. ej.
+  // un rol creado antes de existir la regla): se muestran y bloquean el guardado.
   const incumplimientos = useMemo(
     () =>
       calcularIncumplimientos(selectedPermissions, permisoList).map((i) => ({
         permiso: permissionLabel(i.permiso.nombre),
         faltan: i.faltan.map(permissionLabel),
+        chocan: i.chocan.map(permissionLabel),
       })),
     [selectedPermissions, permisoList],
   );
@@ -81,6 +85,7 @@ export function useRoleForm(permisoList: Permiso[], setToast: SetToast) {
   const getEstadoPermiso = (permiso: Permiso): EstadoPermiso => ({
     bloqueado: estaBloqueado(permiso, selectedPermissions, permisoList),
     faltan: requisitosFaltantes(permiso, selectedPermissions, permisoList).map(permissionLabel),
+    chocan: incompatiblesMarcados(permiso, selectedPermissions, permisoList).map(permissionLabel),
   });
 
   const avisarQuitados = (quitados: number[]) => {
@@ -210,7 +215,7 @@ export function useRoleForm(permisoList: Permiso[], setToast: SetToast) {
     if (incumplimientos.length > 0) {
       setToast({
         id: Date.now(),
-        message: "Hay permisos sin sus requeridos: corrija el rol antes de guardar",
+        message: "Hay permisos sin sus requeridos o incompatibles: corrija el rol antes de guardar",
         type: "error",
       });
       return;

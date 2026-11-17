@@ -9,6 +9,13 @@ sincronización idempotente que corre en cada arranque (db/permission_sync.py).
   sentido: tener el requerido no obliga a tener el dependiente. Se validan al
   guardar un rol (POST /role/add, PUT /role/update/{id}); los roles existentes
   que incumplan siguen funcionando y se reportan (GET /role/dependencias-incumplidas).
+- INCOMPATIBLES: pares de permisos que no pueden ir en el mismo rol (en los dos
+  sentidos). Se validan al guardar un rol, igual que DEPENDENCIAS, salvo en los
+  roles que administran roles (EXENTO_INCOMPATIBLES): esos necesitan todos los
+  permisos para poder repartirlos (anti-escalada) y recibir los nuevos.
+- DESCRIPCIONES_ANTERIORES: textos por defecto que tuvo la descripción de un
+  permiso. Si la descripción guardada sigue siendo uno de ellos (nadie la editó),
+  la sincronización la reemplaza por la actual del catálogo.
 - RENOMBRES: (nombre_viejo, nombre_nuevo). La fila se renombra en sitio, así los
   roles que la tenían la conservan (rol_permiso va por id).
 
@@ -159,32 +166,32 @@ PERMISOS: list[dict] = [
     {
         "nombre": "recurso_lider_juridico",
         "menu_path": "/recurso/my-reports",
-        "descripcion": "Desbloquea Mis informes de concesiones como líder jurídico. Sirve para revisar los actos administrativos en el primer paso de su cadena.",
+        "descripcion": "Desbloquea Mis actuaciones de concesiones como líder jurídico. Sirve para revisar los actos administrativos en el primer paso de su cadena.",
     },
     {
         "nombre": "recurso_lider_proyecto",
         "menu_path": "/recurso/my-reports",
-        "descripcion": "Desbloquea Mis informes de concesiones como líder del proyecto. Sirve para revisar tras el líder jurídico o técnico/SIG y aprobar para firma.",
+        "descripcion": "Desbloquea Mis actuaciones de concesiones como líder del proyecto. Sirve para revisar tras el líder jurídico o técnico/SIG y aprobar para firma.",
     },
     {
         "nombre": "recurso_asesora_subdireccion",
         "menu_path": "/recurso/my-reports",
-        "descripcion": "Desbloquea Mis informes de concesiones como asesora de subdirección. Sirve para revisar la decisión y el acto del recurso con el líder del proyecto.",
+        "descripcion": "Desbloquea Mis actuaciones de concesiones como asesora de subdirección. Sirve para revisar la decisión y el acto del recurso con el líder del proyecto.",
     },
     {
         "nombre": "recurso_lider_tecnico",
         "menu_path": "/recurso/my-reports",
-        "descripcion": "Desbloquea Mis informes de concesiones como líder técnico. Sirve para revisar los conceptos técnicos.",
+        "descripcion": "Desbloquea Mis actuaciones de concesiones como líder técnico. Sirve para revisar los conceptos técnicos.",
     },
     {
         "nombre": "recurso_sig",
         "menu_path": "/recurso/my-reports",
-        "descripcion": "Desbloquea Mis informes de concesiones como SIG. Sirve para revisar el concepto técnico de la etapa 2 junto con el líder técnico.",
+        "descripcion": "Desbloquea Mis actuaciones de concesiones como SIG. Sirve para revisar el concepto técnico de la etapa 2 junto con el líder técnico.",
     },
     {
         "nombre": "recurso_tecnico",
         "menu_path": "/recurso/my-reports",
-        "descripcion": "Desbloquea Mis informes de concesiones como técnico. Sirve para que el abogado lo elija como técnico y cargar su concepto técnico.",
+        "descripcion": "Desbloquea Mis actuaciones de concesiones como técnico. Sirve para que el abogado lo elija como técnico y cargar su concepto técnico.",
     },
 ]
 
@@ -209,6 +216,38 @@ DEPENDENCIAS: dict[str, tuple[str, ...]] = {
     "recurso_sig": ("recurso_consultar",),
 }
 
+# Pares que no pueden ir en el mismo rol (decisión de negocio). El técnico de
+# concesiones no gestiona: carga sus conceptos desde Mis actuaciones (y, como
+# recurso_super_gestion exige gestionar, tampoco puede tener super gestión).
+INCOMPATIBLES: tuple[tuple[str, str], ...] = (
+    ("recurso_tecnico", "recurso_gestionar"),
+)
+
+# Los roles con este permiso (administran roles) no tienen incompatibilidades.
+EXENTO_INCOMPATIBLES = "admin_roles_y_permisos"
+
+# Permiso -> descripciones por defecto anteriores (se reemplazan si nadie las editó).
+DESCRIPCIONES_ANTERIORES: dict[str, tuple[str, ...]] = {
+    "recurso_lider_juridico": (
+        "Desbloquea Mis informes de concesiones como líder jurídico. Sirve para revisar los actos administrativos en el primer paso de su cadena.",
+    ),
+    "recurso_lider_proyecto": (
+        "Desbloquea Mis informes de concesiones como líder del proyecto. Sirve para revisar tras el líder jurídico o técnico/SIG y aprobar para firma.",
+    ),
+    "recurso_asesora_subdireccion": (
+        "Desbloquea Mis informes de concesiones como asesora de subdirección. Sirve para revisar la decisión y el acto del recurso con el líder del proyecto.",
+    ),
+    "recurso_lider_tecnico": (
+        "Desbloquea Mis informes de concesiones como líder técnico. Sirve para revisar los conceptos técnicos.",
+    ),
+    "recurso_sig": (
+        "Desbloquea Mis informes de concesiones como SIG. Sirve para revisar el concepto técnico de la etapa 2 junto con el líder técnico.",
+    ),
+    "recurso_tecnico": (
+        "Desbloquea Mis informes de concesiones como técnico. Sirve para que el abogado lo elija como técnico y cargar su concepto técnico.",
+    ),
+}
+
 # (nombre viejo, nombre nuevo), en orden de aplicación.
 RENOMBRES: tuple[tuple[str, str], ...] = (
     ("infraccion_cargue", "infraccion_super_gestion"),
@@ -230,6 +269,23 @@ def _validar_catalogo() -> None:
                 raise ValueError(f"DEPENDENCIAS menciona un permiso fuera del catálogo: {r}")
         if permiso in requeridos:
             raise ValueError(f"{permiso} no puede requerirse a sí mismo")
+    if EXENTO_INCOMPATIBLES not in conocidos:
+        raise ValueError(f"EXENTO_INCOMPATIBLES fuera del catálogo: {EXENTO_INCOMPATIBLES}")
+    for a, b in INCOMPATIBLES:
+        for r in (a, b):
+            if r not in conocidos:
+                raise ValueError(f"INCOMPATIBLES menciona un permiso fuera del catálogo: {r}")
+        if a == b:
+            raise ValueError(f"{a} no puede ser incompatible consigo mismo")
+        # Si uno exige al otro, el permiso dependiente no se podría otorgar nunca.
+        if b in DEPENDENCIAS.get(a, ()) or a in DEPENDENCIAS.get(b, ()):
+            raise ValueError(f"{a} y {b} no pueden ser incompatibles: uno exige al otro")
+    for permiso, anteriores in DESCRIPCIONES_ANTERIORES.items():
+        if permiso not in conocidos:
+            raise ValueError(f"DESCRIPCIONES_ANTERIORES menciona un permiso fuera del catálogo: {permiso}")
+        actual = next(p["descripcion"] for p in PERMISOS if p["nombre"] == permiso)
+        if actual in anteriores:
+            raise ValueError(f"La descripción actual de {permiso} está entre sus anteriores")
 
 
 _validar_catalogo()
