@@ -985,8 +985,7 @@ Líder de Seguridad:
   Disponibilidad: 24/7 para P1–P2
 
 Desarrollador:
-  Email: admin@example.com
-  Teléfono: TELEFONO_REMOVIDO
+  Contacto: ver directorio interno del equipo SATC
   Disponibilidad: Horario laboral + on-call
 ```
 

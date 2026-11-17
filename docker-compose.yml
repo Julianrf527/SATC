@@ -517,6 +517,10 @@ services:
       additional_contexts:
         shared: ./shared
     container_name: satc-app-users
+    # Datos del usuario administrador inicial (ver .env.user_admin.example).
+    env_file:
+      - path: .env.user_admin
+        required: false
     deploy:
       resources:
         limits:
