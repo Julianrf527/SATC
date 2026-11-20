@@ -9,7 +9,7 @@ async def test_listado_paginado(client, h_consultor, crear_expediente):
     r = await client.get("/expedientes?page=1&limit=2", headers=h_consultor)
     assert r.status_code == 200
     body = r.json()
-    assert body["totalCount"] == 3
+    assert (body["total"], body["page"], body["limit"], body["total_pages"]) == (3, 1, 2, 2)
     assert len(body["data"]) == 2
     r2 = await client.get("/expedientes?page=2&limit=2", headers=h_consultor)
     assert len(r2.json()["data"]) == 1
@@ -40,6 +40,16 @@ async def test_filtros(client, h_gestor, crear_expediente, catalogo, vincular):
     assert await ids("involucrado_id=501") == {a.id}
     assert await ids("involucrado_id=999") == set()
     assert await ids("") == {a.id, b.id}
+
+
+async def test_filtro_de_texto_no_usa_comodines(client, h_gestor, crear_expediente):
+    """Un ``_`` o ``%`` escrito por el usuario se busca literal."""
+    a = await crear_expediente(radicado="2026ER3_1", expediente="CA 301-26")
+    await crear_expediente(radicado="2026ER301", expediente="CA 302-26")
+    r = await client.get("/expedientes", params={"radicado": "3_1"}, headers=h_gestor)
+    assert {e["id"] for e in r.json()["data"]} == {a.id}
+    r = await client.get("/expedientes", params={"radicado": "%"}, headers=h_gestor)
+    assert r.json()["data"] == []
 
 
 async def test_listado_resuelve_involucrados(client, h_consultor, crear_expediente, vincular, stubs):

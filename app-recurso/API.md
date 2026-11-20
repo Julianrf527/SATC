@@ -76,9 +76,14 @@ Orden: más recientes primero (`fecha_creacion` desc).
     "involucrados": [{"involucrado_id": 3, "tipo_vinculo": "SOLICITANTE", "nombre": "Ana Pérez",
                       "tipo_documento": "CC", "numero_documento": 1020304050}]
   }],
-  "page": 1, "limit": 10, "totalCount": 1
+  "total": 1, "page": 1, "limit": 10, "total_pages": 1
 }
 ```
+
+Respuesta paginada estándar de app-recurso (`satc_shared.paginacion`): `data`,
+`total` (tras los filtros), `page`, `limit`, `total_pages` (mínimo 1). Los
+filtros de texto buscan «contiene» sin distinguir mayúsculas; `%` y `_` se
+buscan literales.
 
 Errores: `403`, `422` (params inválidos).
 
@@ -452,14 +457,15 @@ Query: `rol` = `encargado` | `revisor` (opcional); `solo_accion` (bool, default
 listado de informes de infraction.
 
 Orden: primero los que requieren mi acción; luego por `fecha_ultima_actualizacion` desc.
-`conteos` es sobre todo el conjunto filtrado (antes de `solo_accion` y de
-paginar); `total` / `total_pages` son de la lista paginada (después de `solo_accion`).
+Respuesta paginada estándar (`data`, `total`, `page`, `limit`, `total_pages`)
+más `conteos` y `filtros`. `conteos` es sobre todo el conjunto filtrado (antes
+de `solo_accion` y de paginar); `total` / `total_pages` son de la lista
+paginada (después de `solo_accion`).
 
 ```json
 {
   "ok": true,
-  "data": {
-    "documentos": [{
+  "data": [{
       "proceso_id": 7, "rol": "encargado", "roles": ["encargado"],
       "accion_pendiente": "Subir la versión corregida",
       "tipo_documento": "DECISION", "tipo_documento_etiqueta": "Decisión",
@@ -472,13 +478,12 @@ paginar); `total` / `total_pages` son de la lista paginada (después de `solo_ac
       "etapa_padre": "decision", "etapa_padre_etiqueta": "...", "sub_proceso": null,
       "nombre": "Decisión - Expediente CA 012-26",
       "fecha_creacion": "...", "fecha_ultima_actualizacion": "..."
-    }],
-    "conteos": {"total": 12, "requieren_accion": 3},
-    "filtros": {"tipos_documento": [{"codigo": "AUTO_ADMITE", "etiqueta": "Auto que admite"}],
-                "estados": [{"codigo": "pendiente_carga", "etiqueta": "Pendiente de carga", "tono": "neutral"}],
-                "roles": [{"codigo": "encargado", "etiqueta": "Encargado"}, {"codigo": "revisor", "etiqueta": "Revisor"}]}
-  },
-  "total": 12, "page": 1, "limit": 20, "total_pages": 1
+  }],
+  "total": 12, "page": 1, "limit": 20, "total_pages": 1,
+  "conteos": {"total": 12, "requieren_accion": 3},
+  "filtros": {"tipos_documento": [{"codigo": "AUTO_ADMITE", "etiqueta": "Auto que admite"}],
+              "estados": [{"codigo": "pendiente_carga", "etiqueta": "Pendiente de carga", "tono": "neutral"}],
+              "roles": [{"codigo": "encargado", "etiqueta": "Encargado"}, {"codigo": "revisor", "etiqueta": "Revisor"}]}
 }
 ```
 

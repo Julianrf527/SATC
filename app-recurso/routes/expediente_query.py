@@ -16,6 +16,7 @@ from db.models import Expediente, ExpedienteInvolucrado, Municipio, TipoFuente, 
 from services.etapas_lectura import leer_etapas
 from services.expediente import cargar_expediente, serializar_expediente
 from services.involved import get_involucrados_by_ids
+from satc_shared.paginacion import ESCAPE, patron_contiene, respuesta_paginada
 
 router = APIRouter()
 
@@ -36,12 +37,13 @@ async def listar_expedientes(
     await requiere_lectura(request)
 
     condiciones = []
-    if radicado and radicado.strip():
-        condiciones.append(Expediente.radicado.ilike(f"%{radicado.strip()}%"))
-    if expediente and expediente.strip():
-        condiciones.append(Expediente.expediente.ilike(f"%{expediente.strip()}%"))
-    if numero_vital and numero_vital.strip():
-        condiciones.append(Expediente.numero_vital.ilike(f"%{numero_vital.strip()}%"))
+    for columna, texto in (
+        (Expediente.radicado, radicado),
+        (Expediente.expediente, expediente),
+        (Expediente.numero_vital, numero_vital),
+    ):
+        if texto and texto.strip():
+            condiciones.append(columna.ilike(patron_contiene(texto), escape=ESCAPE))
     if vereda_id is not None:
         condiciones.append(Expediente.vereda_id == vereda_id)
     if municipio_id is not None:
@@ -128,7 +130,7 @@ async def listar_expedientes(
         }
         for r in rows
     ]
-    return {"ok": True, "data": data, "page": page, "limit": limit, "totalCount": total}
+    return respuesta_paginada(data, total=total, page=page, limit=limit)
 
 
 @router.get("/{expediente_id}")

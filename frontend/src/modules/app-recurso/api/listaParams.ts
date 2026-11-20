@@ -59,7 +59,9 @@ export function contarFiltrosActivos(f: FiltrosListaExpedientes): number {
   ].filter(Boolean).length;
 }
 
-/** Total de páginas (al menos 1). */
-export function totalPaginas(totalCount: number, limit: number): number {
-  return Math.max(1, Math.ceil(totalCount / Math.max(1, limit)));
+const CAMPOS_TEXTO = ["radicado", "expediente", "numero_vital"] as const;
+
+/** true si cambió algún filtro de texto: solo esos esperan a que se deje de escribir. */
+export function cambioDeTexto(anterior: FiltrosListaExpedientes, nuevo: FiltrosListaExpedientes): boolean {
+  return CAMPOS_TEXTO.some((c) => anterior[c] !== nuevo[c]);
 }
