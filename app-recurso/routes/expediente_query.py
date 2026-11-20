@@ -2,8 +2,8 @@
 
 Prefijo en main.py: ``/expedientes``.
 - ``GET /expedientes``: listado paginado con filtros.
-- ``GET /expedientes/{id}``: información base completa + ``etapas`` (hook del
-  agente C en ``services/etapas_lectura.py``) + ``acciones_disponibles``.
+- ``GET /expedientes/{id}``: información base completa + ``etapas``
+  (``services/etapas_lectura.py``) + ``acciones_disponibles``.
 """
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import and_, desc, func, select

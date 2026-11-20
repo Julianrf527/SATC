@@ -1,4 +1,4 @@
-"""Requerimientos (plan §4-Etapa 3 y sub-procesos de las etapas 5 y 6; fase 7).
+"""Requerimientos (plan §4-Etapa 3 y sub-procesos de las etapas 5 y 6).
 
 Ámbitos: ``etapa3`` (requerimiento del expediente, V6), ``memorias`` y
 ``obras`` (sub-procesos, V11: solo si el concepto dice que no cumple).

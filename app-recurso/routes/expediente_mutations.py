@@ -1,4 +1,4 @@
-"""Creación y edición de la información base del expediente (plan §3, fase 4).
+"""Creación y edición de la información base del expediente (plan §3).
 
 Prefijo en main.py: ``/expedientes``. Escritura: ``requiere_gestion`` (V1).
 
@@ -48,7 +48,6 @@ class ExpedienteDatos(BaseModel):
 
     radicado: str = Field(..., min_length=1, max_length=15)
     fecha_radicado: date
-    # TODO(negocio): el plan solo da el ejemplo "CA 001-26"; no se valida formato.
     expediente: str = Field(..., min_length=1, max_length=9)
     numero_vital: str = Field(..., min_length=1, max_length=20)
     nombre_predio: str = Field(..., min_length=1, max_length=50)
@@ -60,8 +59,7 @@ class ExpedienteDatos(BaseModel):
     vereda_id: int = Field(..., gt=0)
     tipo_fuente_id: int = Field(..., gt=0)
     nombre_fuente: str = Field(..., min_length=1, max_length=50)
-    # TODO(negocio): el plan lista fuentes y usos entre los datos de nacimiento
-    # pero no dice si puede nacer sin ninguno; se exige al menos uno.
+    # Al menos una fuente y un uso.
     fuente_ids: list[int] = Field(..., min_length=1)
     usos: list[UsoAgua] = Field(..., min_length=1)
 

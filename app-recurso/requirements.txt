@@ -1,54 +1,31 @@
 # ====================================
-# App Infracciones - Requirements
-# Python 3.11+
+# App Recurso (Concesiones de Aguas) - Requirements
+# Python 3.11+. Versiones fijas: builds reproducibles. Para actualizar, subir
+# la versión aquí, reconstruir y correr los tests.
+# python-jose lo trae satc_shared (shared/pyproject.toml).
 # ====================================
 
-# Framework Web
-fastapi>=0.100.0
-uvicorn[standard]>=0.23.0
-gunicorn>=21.2.0
-python-multipart>=0.0.6
+# Framework web
+fastapi==0.162.4
+uvicorn[standard]==0.54.0
+gunicorn==27.0.0
+python-multipart==0.0.33
 
-# Base de Datos
-sqlalchemy>=2.0.0
-asyncpg>=0.28.0
-psycopg2-binary>=2.9.7
-
-# Autenticación y Seguridad
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-bcrypt>=4.1.2
+# Base de datos
+sqlalchemy[asyncio]==2.1.8
+asyncpg==0.32.0
 
 # Validación
-pydantic>=2.0.0
-pydantic[email]>=2.0.0
-email-validator>=2.0.0
+pydantic==2.14.3
 
-# HTTP Client (comunicación entre microservicios)
-httpx>=0.24.0
+# HTTP (comunicación entre microservicios)
+httpx==0.28.1
 
-# Variables de Entorno
-python-dotenv>=1.0.0
+# Variables de entorno
+python-dotenv==1.2.4
 
-# Manejo de Archivos
-aiofiles>=23.0.0
+# Días hábiles de Colombia (alertas)
+holidays==0.108
 
-# Utilidades
-pytz>=2023.3
-# On Windows, the stdlib zoneinfo may not have the IANA tz database available.
-# Provide timezone data via `tzdata` instead of the non-existent `zoneinfo` PyPI package.
+# En Windows zoneinfo no trae la base IANA (en la imagen la da el paquete tzdata del sistema)
 tzdata>=2023.3; sys_platform == "win32"
-
-# Holiday calendars for business-day calculations
-holidays>=0.28.0
-
-# Background scheduler
-APScheduler>=3.10.1
-
-# Logging
-loguru>=0.7.0
-
-# ====================================
-# Instalación
-# ====================================
-# pip install -r requirements.txt

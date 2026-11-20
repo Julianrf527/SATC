@@ -1,74 +1,16 @@
 """Alertas de vencimiento de Concesiones de Aguas (pestaña Alertas).
 
-Se calculan al vuelo (sin tabla), igual que en infraction, con el mismo
-formato de alerta y semáforo para reutilizar ``satc_shared.alertas`` y la
-feature ``alertas`` del frontend. Los plazos son en días hábiles (Colombia:
-sin sábados, domingos ni festivos) salvo los del recurso de reposición, que
-son en días calendario.
+Se calculan al vuelo (sin tabla), con el mismo formato de alerta y semáforo que
+infraction (``satc_shared.alertas`` y la feature ``alertas`` del frontend).
+Plazos en días hábiles de Colombia, salvo el recurso de reposición (calendario).
+Cada alerta vive solo mientras su hito no se cumple, sobre el proceso de
+revisión ACTIVO de la etapa; las devoluciones no reinician el conteo.
 
-Reglas (cada alerta vive solo mientras su hito no se cumple y solo sobre el
-proceso de revisión ACTIVO de la etapa; las devoluciones no reinician el
-conteo):
+El inventario completo (alertas, plazos, desde cuándo cuentan, encargado y a
+dónde lleva el botón) está en ``documentacion/ALERTAS_RECURSO.md``.
 
-Auto que admite (proceso ``AUTO_ADMITE``)
-  - ``admite_primera_version``: 4 días desde que nace el proceso (encargado
-    asignado) hasta que existe la versión 1.
-  - ``admite_revision``: 3 días desde la versión 1 hasta "aprobado para firma".
-  - ``admite_version_final``: 3 días desde "aprobado para firma" hasta que se
-    carga el acto (``acto_admite.acto_admin_id``).
-  - ``admite_aviso_publicado``: informativa; cuenta los 10 días del aviso desde
-    que se registra la comunicación del auto y desaparece al cumplirlos.
-
-Concepto técnico de la etapa 2 (proceso ``CONCEPTO_ETAPA2``)
-  - ``concepto_primera_version``: 16 días desde la fecha de visita técnica
-    hasta que existe la versión 1.
-  - ``concepto_version_final``: 5 días desde la versión 1 hasta que se carga
-    la versión final (``concepto_tecnico.doc_concepto_tecnico_id``).
-
-Acto del requerimiento de la etapa 3 (proceso ``REQUERIMIENTO``; solo si el
-concepto de la etapa 2 no dice ``DECIDE``)
-  - ``requerimiento_primera_version``: 6 días desde la versión final del
-    concepto de la etapa 2 hasta la versión 1 (corre aunque nadie se haya
-    asignado el requerimiento).
-  - ``requerimiento_revision``: 4 días desde la versión 1 hasta "aprobado para firma".
-  - ``requerimiento_version_final``: 2 días desde "aprobado para firma" hasta
-    que se carga el acto.
-
-Concepto técnico adicional (proceso ``CONCEPTO_ADICIONAL``)
-  - ``concepto_adicional_tecnico``: 5 días desde que se registra la respuesta
-    del usuario al requerimiento hasta que se asigna el técnico.
-  - ``concepto_adicional_primera_version``: 5 días desde la asignación del
-    técnico hasta la versión 1.
-  - ``concepto_adicional_revision``: 2 días desde la versión 1 hasta "aprobado para firma".
-  - ``concepto_adicional_version_final``: 1 día desde "aprobado para firma"
-    hasta la versión final.
-
-Acto de decisión (proceso ``DECISION``)
-  - ``decision_primera_version``: 6 días desde la versión final del concepto
-    adicional (o, si el concepto de la etapa 2 dice ``DECIDE``, desde la del
-    concepto de la etapa 2) hasta la versión 1.
-  - ``decision_revision``: 4 días; ``decision_version_final``: 2 días.
-
-Recurso de reposición (días CALENDARIO, desde que se registra el recurso)
-  - Con práctica de pruebas: ``recurso_concepto_pruebas`` (30 días hasta la
-    versión final del concepto técnico de pruebas) y luego
-    ``recurso_acto_tras_pruebas`` (30 días desde esa versión final hasta el
-    acto que resuelve el recurso).
-  - Sin práctica de pruebas: ``recurso_acto`` (60 días hasta el acto que
-    resuelve el recurso).
-  Si cambia «¿requiere práctica de pruebas?», se aplica la regla nueva sin
-  reiniciar el conteo (siempre desde que se registró el recurso).
-
-Los requerimientos de memorias y obras no tienen alertas (pendientes de definir).
-
-La regla "visita técnica dentro de los 10 días hábiles siguientes al numerado
-del auto" NO es una alerta de esta pestaña: es un aviso que no bloquea al
-cargar el auto (``advertencia_visita``).
-
-Cada alerta trae ``encargado_id`` (de quién es la tarea; None si aún nadie la
-tomó), ``expediente_id`` y ``proceso_id`` (el proceso de revisión donde se hace
-la tarea, para abrirlo desde Mis actuaciones; None si aún no existe). Las alertas las ve todo el que abre la pestaña; el
-encargado solo decide "Mis alertas" y si el botón es Gestionar o Consultar.
+Cada alerta trae ``encargado_id`` (None si aún nadie tomó la tarea),
+``expediente_id`` y ``proceso_id`` (None si el proceso aún no existe).
 """
 from __future__ import annotations
 

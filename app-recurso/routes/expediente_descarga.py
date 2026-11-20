@@ -1,4 +1,4 @@
-"""Descarga del expediente completo en un único PDF (plan fase 11, pestaña Consulta).
+"""Descarga del expediente completo en un único PDF (pestaña Consulta).
 
 Prefijo en main.py: ``/expedientes``. Lectura (``requiere_lectura``).
 El orden de los documentos está en ``services/expediente_documentos.py``.

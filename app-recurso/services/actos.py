@@ -1,11 +1,11 @@
 """Actos administrativos, comunicación y notificación (plan §4-E, Etapa 1 paso 6,
 Etapa 4 "Citación y notificación", transversal tercero).
 
-API interna para las etapas (agente C) — ninguna función hace commit:
+API interna para las etapas — ninguna función hace commit:
 
 - ``crear_acto(db, *, etapa_tipo, clase_acto, numerado, fecha_numerado, documento_id, user_id)``:
-  lo llama C al "Cargar versión final", en la misma transacción que
-  ``revision_documentos.cargar_version_final``; C enlaza ``acto.id`` en la etapa.
+  se llama al "Cargar versión final", en la misma transacción que
+  ``revision_documentos.cargar_version_final``; la etapa enlaza ``acto.id``.
 - ``etapa_de_acto(db, acto_id)``: etapa dueña del acto (tabla, fila, expediente, encargado).
 - ``involucrados_notificables(db, expediente_id)``: solicitantes y terceros.
 - ``notificaciones_completas`` / ``acto_notificado``: para V13 (recurso solo si
@@ -156,9 +156,7 @@ async def validar_numerado_disponible(
     """Replica infraction: mismo ``numerado`` + misma ``fecha_numerado`` (desde
     2013) → 409. ``clase_acto``: la entidad numera los Autos y las Resoluciones
     por separado, así que solo choca con actos de la misma clase (los actos
-    antiguos sin clase no se comparan). TODO(negocio): si la numeración se
-    reinicia cada año, incluir el año en el índice ``(clase_acto, numerado)`` y
-    volverlo único (plan §7)."""
+    antiguos sin clase no se comparan)."""
     if fecha_numerado.year <= ANIO_CONTROL_DUPLICADOS:
         return
     stmt = select(modelo.id).where(modelo.numerado == numerado, modelo.fecha_numerado == fecha_numerado)
@@ -186,15 +184,13 @@ async def crear_acto(
     user_id: int,
 ) -> ActoAdministrativo:
     """Crea el ``acto_administrativo`` (número + fecha de numerado obligatorios,
-    plan §4-E.3) e incrementa ``numero_usos`` del PDF firmado. C lo llama al
-    cargar la versión final y enlaza ``acto.id`` en ``etapa.acto_admin_id``.
+    plan §4-E.3) e incrementa ``numero_usos`` del PDF firmado. Se llama al
+    cargar la versión final y la etapa enlaza ``acto.id`` en ``etapa.acto_admin_id``.
 
     ``etapa_tipo`` (tabla que expide el acto) fija el ``medio`` (comunica o
     notifica, ``MEDIO_POR_ETAPA``). Validaciones: clase AUTO/RES; numerado
     entero positivo de máx. 4 dígitos; fecha AAAA-MM-DD; ``documento_id`` > 0;
-    numerado+fecha no repetido en la misma clase (409). TODO(negocio):
-    numeración por año (plan §7, el índice ``(clase_acto, numerado)`` no es
-    único). Errores como ``HTTPException`` (400/409/502). No hace commit."""
+    numerado+fecha no repetido en la misma clase (409). Errores como ``HTTPException`` (400/409/502). No hace commit."""
     medio = medio_de_etapa(etapa_tipo)
     clase = validar_clase_acto(clase_acto)
     numero = validar_numerado(numerado)
@@ -315,9 +311,7 @@ def exigir_gestion_acto(etapa: EtapaActo, usuario: Usuario) -> None:
 
 async def involucrados_notificables(db: AsyncSession, expediente_id: int) -> list[ExpedienteInvolucrado]:
     """Solicitantes y terceros intervinientes del expediente (plan Etapa 4: "se
-    notifica a cada solicitante y a cada tercero interviniente").
-    TODO(negocio): el tercero se notifica de las actuaciones "siguientes" a su
-    vinculación; no se filtra por fecha porque el plan no lo exige."""
+    notifica a cada solicitante y a cada tercero interviniente")."""
     return list((await db.execute(
         select(ExpedienteInvolucrado)
         .where(ExpedienteInvolucrado.expediente_id == expediente_id)
@@ -328,9 +322,9 @@ async def involucrados_notificables(db: AsyncSession, expediente_id: int) -> lis
 async def notificaciones_completas(db: AsyncSession, acto_id: int) -> dict:
     """Estado de notificación del acto: ``{"total", "exitosas", "notificado"}``.
 
-    TODO(negocio): el plan no define "acto notificado". Regla provisional: hay
-    al menos una notificación y TODAS tienen ``notificacion_exitosa = true``
-    (no exige que cada solicitante/tercero tenga la suya)."""
+    Notificado: hay al menos una notificación y TODAS tienen
+    ``notificacion_exitosa = true`` (no exige que cada solicitante/tercero
+    tenga la suya)."""
     filas = (await db.execute(
         select(Notificacion.notificacion_exitosa).where(Notificacion.acto_admin_id == acto_id)
     )).scalars().all()
@@ -340,7 +334,7 @@ async def notificaciones_completas(db: AsyncSession, acto_id: int) -> dict:
 
 
 async def acto_notificado(db: AsyncSession, acto_id: int) -> bool:
-    """V13: ver ``notificaciones_completas`` (TODO(negocio))."""
+    """V13: ver ``notificaciones_completas``."""
     return (await notificaciones_completas(db, acto_id))["notificado"]
 
 

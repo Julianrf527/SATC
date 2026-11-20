@@ -1,4 +1,4 @@
-"""Etapa 4 · Decisión del proceso + recurso de reposición (plan §4-Etapa 4, fase 8).
+"""Etapa 4 · Decisión del proceso + recurso de reposición (plan §4-Etapa 4).
 
 - ``POST /etapas/{expediente_id}/decision/asignarme`` (V7)
 - ``POST /etapas/{expediente_id}/decision/version-final``: acto firmado +
@@ -15,7 +15,7 @@
 - ``POST /etapas/{expediente_id}/recurso/version-final``: acto que lo resuelve + ``resultado``
   (si requiere pruebas, después del concepto técnico de pruebas firmado)
 
-La citación y notificación de cada acto se gestiona en ``/actos/notificaciones`` (B).
+La citación y notificación de cada acto se gestiona en ``/actos/notificaciones``.
 """
 import logging
 from datetime import date
@@ -75,9 +75,7 @@ class DecisionFinalIn(ActoFinalIn):
 
 class EjecutoriaIn(BaseModel):
     version: int = Field(..., ge=1)
-    # TODO(negocio): plan §4-Etapa 4 — 10 días hábiles después de notificar si no hay
-    # recurso, o cuando queda en firme. No hay calendario de días hábiles/festivos en el
-    # sistema: el abogado la diligencia. Si se quiere automática, definir el calendario.
+    # La diligencia el abogado.
     fecha_ejecutoria: Optional[date] = None
 
 
