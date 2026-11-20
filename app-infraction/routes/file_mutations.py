@@ -50,6 +50,7 @@ from .models.file_models import (
 from utils.verify_token import verify_gateway_token
 from utils.log import insert_log
 from services.notification import create_notification
+from services.revision_actos import avisar_reasignacion
 from services.users import get_user_info, verify_permission
 from services.docs import get_file_info, increment_file_usage, decrement_file_usage
 
@@ -744,6 +745,8 @@ async def actualizar_encargado_de_expediente(
             logger.warning(
                 f"No se pudo crear notificación para usuario {encargado_id}: {notif_result['message']}"
             )
+        # Actos con proceso de revisión en curso: ahora los continúa el nuevo encargado.
+        await avisar_reasignacion(db, {expediente.id: expediente.radicado}, encargado_id)
 
     return JSONResponse(
         content={"ok": True, "message": "Encargado actualizado"},
@@ -832,6 +835,7 @@ async def actualizar_encargado_bulk(
                 tipo="exp_infraccion",  # <= 15 caracteres: columna notificacion.tipo de app-users
                 usuario_id=new_value
             )
+        await avisar_reasignacion(db, {u["id"]: u["radicado"] for u in updated}, new_value)
 
     return JSONResponse(
         content={"ok": True, "updated": updated, "msg": f"Se actualizaron {len(updated)} expedientes"},

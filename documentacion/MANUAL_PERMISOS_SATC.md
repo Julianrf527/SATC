@@ -14,7 +14,8 @@
 - El catálogo pasa de 21 a **32 permisos**: se agrega la categoría **Concesiones
   de Aguas** (`recurso_*`), la categoría Expedientes se renombra **Sancionatorio**
   (`sancionatorio_*`) y en Infracciones `subir_informes` se reemplaza por
-  `infraccion_informes_subir` / `infraccion_informes_revisar`; `infraccion_cargue`
+  `infraccion_informes_subir` / `infraccion_informes_revisar` (hoy
+  `infraccion_tecnico` / `infraccion_lider_tecnico`, ver 4.3); `infraccion_cargue`
   pasa a llamarse `infraccion_super_gestion`.
 - Cada permiso tiene una **descripción obligatoria** visible en la pantalla de roles.
 - Nuevas **dependencias obligatorias** entre permisos (sección 4), validadas en la
@@ -82,15 +83,18 @@ Detalles del armado:
 
 - Los permisos **sin ruta de menú** (marcados "—" en el catálogo) no generan
   entrada en el menú.
-- **Infracciones:** `infraccion_informes_subir` e `infraccion_informes_revisar`
-  llevan a la misma pantalla y se muestran como una sola entrada, **Mis informes**.
+- **Infracciones:** `infraccion_tecnico`, `infraccion_lider_tecnico` e
+  `infraccion_lider_proyecto` llevan a la misma pantalla y se muestran como una
+  sola entrada, **Mis actuaciones** (informes técnicos y actos administrativos
+  en los que el usuario actúa; antes "Mis informes"). Quien tiene
+  `infraccion_gestionar` también la ve: allí sigue los actos que proyecta.
 - **Concesiones de Aguas:** todos los permisos de revisor y el de técnico llevan
   a **Mis actuaciones** (actos y conceptos en los que el usuario actúa), que
   aparece una sola vez. Quien tiene `recurso_gestionar` también ve Mis
   actuaciones (allí suben sus documentos los abogados). La pestaña **Alertas**
   aparece con `recurso_gestionar` o `recurso_consultar`.
 - Orden de las entradas: Gestionar → Consultar → Alertas → Asignar → Asignar
-  informes → Mis informes / Mis actuaciones (según lo que tenga cada usuario).
+  informes → Mis actuaciones.
 
 ---
 
@@ -132,13 +136,31 @@ Solo aparecen como abogados asignables los usuarios con `sancionatorio_gestionar
 | `infraccion_alertas`          | `/infraction/alerts`         | Desbloquea la pestaña Alertas de infracciones. Sirve para ver los vencimientos de sus expedientes o de todos. |
 | `infraccion_asignar`          | `/infraction/assign_manage`  | Desbloquea la pantalla Asignar de infracciones. Sirve para asignar o cambiar el encargado responsable de un expediente. |
 | `infraccion_asignar_informes` | `/infraction/reports`        | Desbloquea la pantalla Informes de infracciones. Sirve para asignar cada informe técnico a un profesional y a un revisor. |
-| `infraccion_informes_subir`   | `/infraction/my-reports`     | Desbloquea Mis informes de infracciones. Sirve para subir los informes técnicos que le asignaron como profesional. |
-| `infraccion_informes_revisar` | `/infraction/my-reports`     | Desbloquea Mis informes de infracciones. Sirve para revisar (aprobar o devolver) los informes técnicos que le asignaron como revisor. |
-| `infraccion_super_gestion`    | —                            | Desbloquea el cargue manual de informes técnicos. Sirve para cargar informes históricos o manuales sin pasar por el flujo de revisión. |
+| `infraccion_tecnico`          | `/infraction/my-reports`     | Desbloquea Mis actuaciones de infracciones como técnico. Sirve para cargar los informes técnicos que le asignaron, su versión firmada y la matriz de recursos. |
+| `infraccion_lider_tecnico`    | `/infraction/my-reports`     | Desbloquea Mis actuaciones de infracciones como líder técnico. Sirve para revisar los informes técnicos: aprobar para firma o devolver. |
+| `infraccion_lider_proyecto`   | `/infraction/my-reports`     | Desbloquea Mis actuaciones de infracciones como líder de proyecto. Sirve para revisar los actos administrativos (medida preventiva, acoger concepto y cierre): aprobar para firma o devolver. |
+| `infraccion_super_gestion`    | —                            | Desbloquea el cargue directo de infracciones. Sirve para cargar informes técnicos y actos administrativos sin pasar por revisión, cambiar el documento de un acto y eliminar actos. |
 
 Solo aparecen como encargados asignables los usuarios con `infraccion_gestionar`.
-En la pantalla Informes solo se pueden elegir como profesional usuarios con
-`infraccion_informes_subir` y como revisor usuarios con `infraccion_informes_revisar`.
+En la pantalla Informes solo se pueden elegir como técnico usuarios con
+`infraccion_tecnico` y como líder técnico usuarios con `infraccion_lider_tecnico`
+(antes `infraccion_informes_subir` / `infraccion_informes_revisar`; app-users los
+renombra al arrancar y los roles los conservan). No hay aprobación directa: el
+líder técnico aprueba para firma o devuelve, y el técnico carga la versión final
+firmada con la matriz de recursos afectados (obligatoria en VISITA). Después, el
+técnico solo puede editar la matriz, y solo hasta que exista la etapa Acoger
+concepto.
+
+Los **actos administrativos** (medida preventiva, acoger concepto y cierre)
+también pasan por revisión: el encargado actual del expediente proyecta el
+acto en la etapa; cualquier usuario con `infraccion_lider_proyecto` lo aprueba
+para firma o lo devuelve (con comentario y, si quiere, un documento de
+observaciones); cada corrección es un archivo nuevo que vuelve a revisión, sin
+tope de devoluciones; aprobado para firma, el encargado carga en la etapa el PDF
+firmado con tipo, numerado y fecha, y así se crea el acto. Si se reasigna el
+expediente, el proceso continúa con el nuevo encargado (recibe un aviso). El
+encargado puede corregir tipo, numerado y fecha de un acto ya creado, pero no
+su PDF.
 
 ### 3.4 Concesiones de Aguas
 
@@ -198,8 +220,9 @@ solo sentido: tener el permiso requerido no obliga a tener el dependiente.
 | `infraccion_alertas`             | `infraccion_consultar`    |
 | `infraccion_asignar`             | `infraccion_consultar`    |
 | `infraccion_asignar_informes`    | `infraccion_consultar`    |
-| `infraccion_informes_subir`      | `infraccion_consultar`    |
-| `infraccion_informes_revisar`    | `infraccion_consultar`    |
+| `infraccion_tecnico`             | `infraccion_consultar`    |
+| `infraccion_lider_tecnico`       | `infraccion_consultar`    |
+| `infraccion_lider_proyecto`      | `infraccion_consultar`    |
 | `infraccion_super_gestion`       | `infraccion_gestionar`    |
 | `documento_crear`                | `documento_gestionar`     |
 | `documento_revisar`              | `documento_gestionar`     |
@@ -243,6 +266,7 @@ Algunos permisos **no pueden ir juntos** en el mismo rol (en los dos sentidos):
 | Permiso            | No puede ir con      | Por qué |
 | ------------------ | -------------------- | ------- |
 | `recurso_tecnico`  | `recurso_gestionar`  | El técnico no gestiona expedientes: carga sus conceptos desde Mis actuaciones. Como `recurso_super_gestion` exige gestionar, tampoco puede tener super gestión. |
+| `infraccion_tecnico` | `infraccion_gestionar` | Igual que en concesiones: el técnico carga sus informes desde Mis actuaciones y no gestiona expedientes. Como `infraccion_super_gestion` exige gestionar, tampoco puede tener super gestión. |
 
 - **Excepción:** un rol con `admin_roles_y_permisos` (administra roles) no tiene
   incompatibilidades. Solo se pueden otorgar permisos que el propio rol tiene,
@@ -358,6 +382,11 @@ que lo tenían.) Exige `infraccion_gestionar`. Permite:
 - Diligenciar la matriz de un informe cargado en modo manual.
 - Crear el informe de seguimiento sin esperar a que venza el término del
   concepto técnico.
+- **Cargue directo** de un acto administrativo (medida preventiva, acoger
+  concepto o cierre) desde la etapa, sin revisión del líder de proyecto. Si el
+  acto tenía un proceso de revisión abierto, se cierra.
+- Cambiar el documento (PDF) de un acto y eliminar actos (el encargado solo
+  corrige tipo, numerado y fecha).
 
 ### 7.2 Concesiones de Aguas — `recurso_super_gestion`
 
@@ -387,8 +416,12 @@ Consulta (sancionatorio_consultar)
 Coordinador (infraccion_asignar + infraccion_asignar_informes + infraccion_consultar)
     ├─ Asigna el expediente a → Abogado (infraccion_gestionar)
     └─ Asigna cada informe técnico a:
-          ├─ Profesional (infraccion_informes_subir + infraccion_consultar) → lo sube en Mis informes
-          └─ Revisor    (infraccion_informes_revisar + infraccion_consultar) → lo aprueba o lo devuelve
+          ├─ Técnico       (infraccion_tecnico + infraccion_consultar) → lo sube en Mis actuaciones y carga la versión final + matriz
+          └─ Líder técnico (infraccion_lider_tecnico + infraccion_consultar) → lo aprueba para firma o lo devuelve
+
+Abogado encargado (infraccion_gestionar) → proyecta cada acto en su etapa
+    └─ Líder de proyecto (infraccion_lider_proyecto + infraccion_consultar) → lo aprueba para firma o lo devuelve
+    └─ Aprobado para firma → el abogado carga en la etapa el PDF firmado y numerado → se crea el acto
 ```
 
 ### 8.3 Concesiones de Aguas
@@ -439,10 +472,13 @@ Con el permiso de alertas puede usar el filtro "Todos"; si no es responsable de
 un expediente, la alerta lo lleva a Consultar.
 
 ### Técnico de infracciones (sube informes)
-`infraccion_consultar`, `infraccion_informes_subir`
+`infraccion_consultar`, `infraccion_tecnico` (sin `infraccion_gestionar`: son incompatibles)
 
-### Revisor de informes técnicos de infracciones
-`infraccion_consultar`, `infraccion_informes_revisar`
+### Líder técnico de infracciones (revisa informes técnicos)
+`infraccion_consultar`, `infraccion_lider_tecnico`
+
+### Líder de proyecto de infracciones (revisa actos administrativos)
+`infraccion_consultar`, `infraccion_lider_proyecto`
 
 ### Técnico de Concesiones de Aguas
 `recurso_consultar`, `recurso_tecnico` (sin `recurso_gestionar`: son incompatibles)

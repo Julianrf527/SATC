@@ -14,6 +14,7 @@ export default function Seguimiento({ expedienteId, setToast, isEditable }: Prop
     <InformeTecnicoEtapa
       expedienteId={expedienteId}
       tipo="SEGUIMIENTO"
+      codigoEtapa="seguimiento"
       etapa={STAGE_NAME}
       titulo={`Datos del ${STAGE_NAME}`}
       setToast={setToast}

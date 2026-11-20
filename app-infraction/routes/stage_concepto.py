@@ -55,6 +55,10 @@ class SolicitudInformacionBody(BaseModel):
     radicado: str
     fecha_radicado: str
     archivo_solicitud_id: int
+    # Respuesta del usuario (opcional): si llega uno de los tres, van los tres.
+    radicado_respuesta: Optional[str] = None
+    fecha_radicado_respuesta: Optional[str] = None
+    archivo_respuesta_id: Optional[int] = None
 
 
 RADICADO_EE_REGEX = re.compile(r"^\d{4}EE\d{4,5}$")
@@ -66,6 +70,45 @@ def validar_radicado_ee(radicado: str) -> None:
             status_code=400,
             detail="El radicado debe tener el formato: 4 dígitos + EE + 4 o 5 dígitos (ej: 2024EE0001)",
         )
+
+
+RADICADO_ER_REGEX = re.compile(r"^\d{4}ER\d{4,5}$")
+
+
+def respuesta_solicitud(body: "SolicitudInformacionBody") -> tuple[Optional[str], Optional[str], Optional[int]]:
+    """Respuesta del usuario a la solicitud, normalizada: los tres datos o
+    ninguno (vacíos = None). Radicado 4 dígitos + ER + 4 o 5 dígitos y fecha
+    no futura. 400 si falta alguno de los tres o el formato no es válido."""
+    radicado = (body.radicado_respuesta or "").strip().upper() or None
+    fecha = (body.fecha_radicado_respuesta or "").strip() or None
+    archivo = body.archivo_respuesta_id or None
+    datos = (radicado, fecha, archivo)
+    if all(d is None for d in datos):
+        return None, None, None
+    if any(d is None for d in datos):
+        raise HTTPException(
+            status_code=400,
+            detail="Si registra la respuesta, indique el radicado, la fecha de radicado y el documento de respuesta",
+        )
+    if not RADICADO_ER_REGEX.match(radicado):
+        raise HTTPException(
+            status_code=400,
+            detail="El radicado de la respuesta debe tener el formato: 4 dígitos + ER + 4 o 5 dígitos (ej: 2024ER0001)",
+        )
+    validar_fecha_no_futura(fecha, "Fecha Radicado de la respuesta")
+    return radicado, fecha, archivo
+
+
+def solicitud_a_dict(s: SolicitudInformacion) -> dict:
+    return {
+        "id": s.id,
+        "radicado": s.radicado,
+        "fecha_radicado": s.fecha_radicado,
+        "archivo_solicitud_id": s.archivo_solicitud_id,
+        "radicado_respuesta": s.radicado_respuesta,
+        "fecha_radicado_respuesta": s.fecha_radicado_respuesta,
+        "archivo_respuesta_id": s.archivo_respuesta_id,
+    }
 
 
 def validar_fecha_no_futura(fecha_str: str, campo: str) -> None:
@@ -119,14 +162,7 @@ async def _build_concepto_response(db: AsyncSession, etapa: EtapaAcogerConcepto)
     solicitud_row = await db.scalar(
         select(SolicitudInformacion).where(SolicitudInformacion.etapa_acoger_concepto_id == etapa.id)
     )
-    solicitud_data = None
-    if solicitud_row:
-        solicitud_data = {
-            "id": solicitud_row.id,
-            "radicado": solicitud_row.radicado,
-            "fecha_radicado": solicitud_row.fecha_radicado,
-            "archivo_solicitud_id": solicitud_row.archivo_solicitud_id,
-        }
+    solicitud_data = solicitud_a_dict(solicitud_row) if solicitud_row else None
 
     return {
         "id": etapa.id,
@@ -507,18 +543,22 @@ async def crear_solicitud_informacion(
 
         validar_radicado_ee(body.radicado)
         validar_fecha_no_futura(body.fecha_radicado, "Fecha Radicado")
+        radicado_resp, fecha_resp, archivo_resp = respuesta_solicitud(body)
 
         nueva = SolicitudInformacion(
             etapa_acoger_concepto_id=etapa_concepto_id,
             radicado=body.radicado,
             fecha_radicado=body.fecha_radicado,
             archivo_solicitud_id=body.archivo_solicitud_id,
+            radicado_respuesta=radicado_resp,
+            fecha_radicado_respuesta=fecha_resp,
+            archivo_respuesta_id=archivo_resp,
         )
         db.add(nueva)
         await db.flush()
 
         from services.docs import increment_file_usage
-        await increment_file_usage([body.archivo_solicitud_id])
+        await increment_file_usage([f for f in (body.archivo_solicitud_id, archivo_resp) if f])
 
         audit_result = await insert_log(
             db=db,
@@ -528,7 +568,10 @@ async def crear_solicitud_informacion(
             detalle="Creación solicitud de información",
             expediente_id=etapa.expediente_id,
             expediente_radicado=exp_radicado,
-            datos_nuevos={"radicado": body.radicado, "fecha_radicado": body.fecha_radicado},
+            datos_nuevos={
+                "radicado": body.radicado, "fecha_radicado": body.fecha_radicado,
+                "radicado_respuesta": radicado_resp, "fecha_radicado_respuesta": fecha_resp,
+            },
         )
         if not audit_result["ok"]:
             await db.rollback()
@@ -539,12 +582,7 @@ async def crear_solicitud_informacion(
         return JSONResponse(
             content={
                 "ok": True,
-                "data": {
-                    "id": nueva.id,
-                    "radicado": nueva.radicado,
-                    "fecha_radicado": nueva.fecha_radicado,
-                    "archivo_solicitud_id": nueva.archivo_solicitud_id,
-                },
+                "data": solicitud_a_dict(nueva),
                 "message": "Solicitud de información creada correctamente",
             },
             status_code=201,
@@ -585,17 +623,27 @@ async def actualizar_solicitud_informacion(
 
     validar_radicado_ee(body.radicado)
     validar_fecha_no_futura(body.fecha_radicado, "Fecha Radicado")
+    radicado_resp, fecha_resp, archivo_resp = respuesta_solicitud(body)
 
-    datos_anteriores = {"radicado": solicitud.radicado, "fecha_radicado": solicitud.fecha_radicado, "archivo_solicitud_id": solicitud.archivo_solicitud_id}
+    datos_anteriores = solicitud_a_dict(solicitud)
 
+    from services.docs import increment_file_usage
     if body.archivo_solicitud_id != solicitud.archivo_solicitud_id:
-        from services.docs import increment_file_usage
         await decrement_file_usage([solicitud.archivo_solicitud_id])
         await increment_file_usage([body.archivo_solicitud_id])
+    # Respuesta: nueva, reemplazada o quitada (los tres datos vacíos).
+    if archivo_resp != solicitud.archivo_respuesta_id:
+        if solicitud.archivo_respuesta_id:
+            await decrement_file_usage([solicitud.archivo_respuesta_id])
+        if archivo_resp:
+            await increment_file_usage([archivo_resp])
 
     solicitud.radicado = body.radicado
     solicitud.fecha_radicado = body.fecha_radicado
     solicitud.archivo_solicitud_id = body.archivo_solicitud_id
+    solicitud.radicado_respuesta = radicado_resp
+    solicitud.fecha_radicado_respuesta = fecha_resp
+    solicitud.archivo_respuesta_id = archivo_resp
     await db.flush()
 
     audit_result = await insert_log(
@@ -607,7 +655,10 @@ async def actualizar_solicitud_informacion(
         expediente_id=etapa.expediente_id,
         expediente_radicado=exp_radicado,
         datos_anteriores=datos_anteriores,
-        datos_nuevos={"radicado": body.radicado, "fecha_radicado": body.fecha_radicado},
+        datos_nuevos={
+            "radicado": body.radicado, "fecha_radicado": body.fecha_radicado,
+            "radicado_respuesta": radicado_resp, "fecha_radicado_respuesta": fecha_resp,
+        },
     )
     if not audit_result["ok"]:
         await db.rollback()
@@ -618,12 +669,7 @@ async def actualizar_solicitud_informacion(
     return JSONResponse(
         content={
             "ok": True,
-            "data": {
-                "id": solicitud.id,
-                "radicado": solicitud.radicado,
-                "fecha_radicado": solicitud.fecha_radicado,
-                "archivo_solicitud_id": solicitud.archivo_solicitud_id,
-            },
+            "data": solicitud_a_dict(solicitud),
             "message": "Solicitud de información actualizada correctamente",
         },
         status_code=200,
@@ -654,13 +700,13 @@ async def eliminar_solicitud_informacion(
     if abogado_id != user_id:
         raise HTTPException(status_code=403, detail="Sin permisos sobre este expediente")
 
-    datos_anteriores = {"radicado": solicitud.radicado, "fecha_radicado": solicitud.fecha_radicado, "archivo_solicitud_id": solicitud.archivo_solicitud_id}
-    archivo_id = solicitud.archivo_solicitud_id
+    datos_anteriores = solicitud_a_dict(solicitud)
+    archivos = [f for f in (solicitud.archivo_solicitud_id, solicitud.archivo_respuesta_id) if f]
 
     await db.delete(solicitud)
     await db.flush()
 
-    await decrement_file_usage([archivo_id])
+    await decrement_file_usage(archivos)
 
     audit_result = await insert_log(
         db=db,

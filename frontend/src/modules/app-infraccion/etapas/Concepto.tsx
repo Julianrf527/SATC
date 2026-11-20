@@ -1,3 +1,4 @@
+import TarjetaEtapa from "./TarjetaEtapa";
 import { useState } from "react";
 import { useDelayedFlag } from "@shared/hooks/useDelayedFlag";
 import { formatDate } from "@shared/lib/format";
@@ -186,7 +187,7 @@ export default function Concepto({
   }
 
   return (
-    <div className="space-y-6">
+    <TarjetaEtapa etapa="concepto">
       {/* Solicitud de información — independiente del tipo de acogida, se puede agregar en cualquier momento */}
       <SolicitudInformacionCard
         etapaConceptoId={conceptoData.id}
@@ -250,6 +251,6 @@ export default function Concepto({
           </div>
         </div>
       )}
-    </div>
+    </TarjetaEtapa>
   );
 }

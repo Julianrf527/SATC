@@ -34,7 +34,7 @@ const ConsultaInfraccionLayout = lazy(() => import("@modules/app-infraccion/layo
 const EncargadoInfraccionLayout = lazy(() => import("@modules/app-infraccion/layout/EncargadoInfraccionLayout"));
 const InfraccionLogLayout = lazy(() => import("@modules/app-infraccion/layout/InfraccionLogLayout"));
 const AsignarInformes = lazy(() => import("@modules/app-infraccion/layout/AsignarInformes"));
-const MisInformes = lazy(() => import("@modules/app-infraccion/layout/MisInformes"));
+const MisActuacionesInfraccion = lazy(() => import("@modules/app-infraccion/layout/MisActuaciones"));
 const AlertasInfraccionLayout = lazy(() => import("@modules/app-infraccion/layout/AlertasInfraccionLayout"));
 // === app-recurso (Concesiones de Aguas Superficiales) ===
 const GestionRecursoLayout = lazy(() => import("@modules/app-recurso/layout/GestionRecursoLayout"));
@@ -99,7 +99,12 @@ const inferPermissionFromPath = (path: string): string | string[] => {
     "/infraction/alerts": "infraccion_alertas",
     "/infraction/assign_manage": "infraccion_asignar",
     "/infraction/reports": "infraccion_asignar_informes",
-    "/infraction/my-reports": ["infraccion_informes_subir", "infraccion_informes_revisar"],
+    "/infraction/my-reports": [
+      "infraccion_tecnico",
+      "infraccion_lider_tecnico",
+      "infraccion_lider_proyecto",
+      "infraccion_gestionar",
+    ],
 
     // === CONCESIONES DE AGUAS (app-recurso) ===
     "/recurso/manage": ["recurso_gestionar", "recurso_super_gestion"],
@@ -188,7 +193,7 @@ function App() {
     { path: "/infraction/consult", component: ConsultaInfraccionLayout },
     { path: "/infraction/assign_manage", component: EncargadoInfraccionLayout },
     { path: "/infraction/reports", component: AsignarInformes },
-    { path: "/infraction/my-reports", component: MisInformes },
+    { path: "/infraction/my-reports", component: MisActuacionesInfraccion },
     { path: "/infraction/alerts", component: AlertasInfraccionLayout },
 
     // === CONCESIONES DE AGUAS ===

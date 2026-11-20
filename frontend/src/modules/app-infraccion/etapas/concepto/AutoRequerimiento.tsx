@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ActoAdmin } from "@features/acto-administrativo";
+import ActoInfraccion from "../actos/ActoInfraccion";
 import type { ActoAdministrativo } from "@shared/types/sancionatorio";
 import { useDatosActoAdmin } from "../../api/expediente";
 import { useActualizarConceptoMutation } from "../../api/etapas";
@@ -131,7 +131,9 @@ export default function AutoRequerimiento({
       )}
 
       {/* Acto Administrativo + Notificaciones o Comunicación */}
-      <ActoAdmin
+      <ActoInfraccion
+        etapaTipo="etapa_concepto"
+        refId={etapaConceptoId}
         expedienteId={expedienteId}
         actoAdmin={actoAdmin ?? {}}
         etapaId={0}
@@ -144,6 +146,7 @@ export default function AutoRequerimiento({
         endpoints={INFRACCION_ACTO_ENDPOINTS}
         stageBinding={{ type: "etapa_concepto", id: etapaConceptoId }}
         embedded
+        anidada
       />
 
       {/* Aviso: por qué no se puede definir días de término todavía */}

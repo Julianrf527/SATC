@@ -121,6 +121,8 @@ async def descargar_expediente_completo(
             )
             if solicitud_info:
                 agregar(solicitud_info.archivo_solicitud_id)
+                if solicitud_info.archivo_respuesta_id:
+                    agregar(solicitud_info.archivo_respuesta_id)
             if concepto.acto_administrativo_id:
                 acto_c = await db.scalar(
                     select(ActoAdministrativo).where(ActoAdministrativo.id == concepto.acto_administrativo_id)

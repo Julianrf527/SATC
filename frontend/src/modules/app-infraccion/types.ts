@@ -95,6 +95,10 @@ export type SolicitudInformacion = {
   radicado: string;
   fecha_radicado: string;
   archivo_solicitud_id: number;
+  /** Respuesta del usuario (opcional: los tres o ninguno). */
+  radicado_respuesta: string | null;
+  fecha_radicado_respuesta: string | null;
+  archivo_respuesta_id: number | null;
 };
 
 export type ConceptoEtapaData = {
@@ -201,7 +205,8 @@ export type MiInforme = ResumenProcesoInforme & {
   fecha_aceptacion_informe: string | null;
   documento_informe_id: number | null;
   aceptado: boolean;
-  puede_diligenciar_matriz: boolean;
+  /** Técnico asignado, VISITA aceptada y sin Acoger concepto: edita solo la matriz. */
+  puede_editar_matriz: boolean;
   tiene_matriz: boolean;
 };
 
@@ -221,4 +226,51 @@ export type FilaRecursoAfectado = {
 export type ProfesionalDisponible = {
   id: number;
   nombre: string;
+};
+
+// ── Actos administrativos: proceso de revisión y Mis actuaciones ────────────
+
+/** Etapa dueña del acto (`documento_proceso.etapa_tipo` en app-infraction). */
+export type EtapaActoTipo = "medida_preventiva" | "etapa_concepto" | "etapa_cierre";
+
+export type EstadoProcesoLista = NonNullable<ResumenProcesoInforme["estado_proceso"]>;
+
+export type RolActuacion = { codigo: "encargado" | "revisor"; etiqueta: string };
+
+/** Fila de GET /mis-actuaciones: un informe técnico o un acto administrativo. */
+export type Actuacion = {
+  clave: string;
+  categoria: "informe" | "acto";
+  tipo_documento: string;
+  tipo_etiqueta: string;
+  expediente_id: number;
+  expediente_radicado: string | null;
+  roles: RolActuacion[];
+  proceso_id: number | null;
+  estado_proceso: EstadoProcesoLista | null;
+  proceso_activo: boolean;
+  numero_devoluciones: number;
+  version_actual: number;
+  requiere_mi_accion: boolean;
+  accion_pendiente: string | null;
+  fecha_actualizacion: string | null;
+  /** Solo informes: el ítem de /informes/mios (matriz, documento aceptado...). */
+  informe: MiInforme | null;
+  /** Solo actos. */
+  acto: {
+    etapa_tipo: EtapaActoTipo;
+    etapa_ref_id: number;
+    /** Proceso vigente de la etapa (false: histórico). */
+    vigente: boolean;
+    acto_id: number | null;
+    soy_encargado_actual: boolean;
+  } | null;
+};
+
+export type OpcionFiltro = { codigo: string; etiqueta: string };
+
+export type MisActuaciones = {
+  actuaciones: Actuacion[];
+  conteos: { total: number; requieren_accion: number };
+  filtros: { tipos_documento: OpcionFiltro[]; estados: EstadoProcesoLista[]; roles: OpcionFiltro[] };
 };

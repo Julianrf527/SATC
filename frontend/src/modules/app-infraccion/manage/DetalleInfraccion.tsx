@@ -114,6 +114,8 @@ type Props = {
   setQuejosoList?: (quejosos: Quejoso[]) => void;
   isEditable?: boolean;
   onArchiveSuccess?: () => void;
+  /** Pestaña con la que abrir el expediente al seleccionarlo ("Ir a la etapa"). */
+  etapaInicial?: string | null;
 };
 
 export default function DetalleInfraccion({
@@ -126,17 +128,20 @@ export default function DetalleInfraccion({
   setToast,
   isEditable = true,
   onArchiveSuccess,
+  etapaInicial = null,
 }: Props) {
   const expedienteActual = expedienteSeleccionado;
   const [activeTab, setActiveTab] = useState<string>("info");
   const [isTabsCollapsed, setIsTabsCollapsed] = useState(false);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
 
-  // En modo consulta, al cambiar de expediente se vuelve a "Información".
+  // En modo consulta, al cambiar de expediente se vuelve a "Información";
+  // si llega desde "Ir a la etapa", se abre esa pestaña.
   const [prevSeleccionado, setPrevSeleccionado] = useState(expedienteSeleccionado);
   if (prevSeleccionado !== expedienteSeleccionado) {
     setPrevSeleccionado(expedienteSeleccionado);
-    if (!isEditable) setActiveTab("info");
+    if (etapaInicial && TABS.some((t) => t.id === etapaInicial)) setActiveTab(etapaInicial);
+    else if (!isEditable) setActiveTab("info");
   }
 
   const query = useExpedienteCompletoQuery(expedienteActual?.id);

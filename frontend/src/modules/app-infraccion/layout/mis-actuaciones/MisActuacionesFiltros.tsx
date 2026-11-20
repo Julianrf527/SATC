@@ -1,20 +1,34 @@
 import { Filter, RefreshCw, X } from "lucide-react";
 import CustomSelect from "@shared/ui/form/CustomSelect";
-import { FILTROS_MIS_INFORMES, type FiltrosMisInformes } from "./filtros";
+import type { OpcionFiltro } from "../../types";
+import { FILTROS_MIS_ACTUACIONES, type FiltrosMisActuaciones } from "./filtros";
 
 type Props = {
-  filtros: FiltrosMisInformes;
-  onChange: (f: FiltrosMisInformes) => void;
-  /** Estados presentes en la lista (vienen del backend, no se hardcodean). */
+  filtros: FiltrosMisActuaciones;
+  onChange: (f: FiltrosMisActuaciones) => void;
+  /** Tipos y roles del usuario (vienen del backend). */
+  tipos: OpcionFiltro[];
+  roles: OpcionFiltro[];
+  /** Estados presentes en la lista. */
   opcionesEstado: { value: string; label: string }[];
   onActualizar: () => void;
   actualizando: boolean;
 };
 
-export default function MisInformesFiltros({ filtros, onChange, opcionesEstado, onActualizar, actualizando }: Props) {
+const TODOS = { value: "all", label: "Todos" };
+
+export default function MisActuacionesFiltros({
+  filtros,
+  onChange,
+  tipos,
+  roles,
+  opcionesEstado,
+  onActualizar,
+  actualizando,
+}: Props) {
   const activos =
     filtros.radicado !== "" || filtros.tipo !== "all" || filtros.rol !== "all" || filtros.estado !== "all" || filtros.soloMiTurno;
-  const set = (parcial: Partial<FiltrosMisInformes>) => onChange({ ...filtros, ...parcial });
+  const set = (parcial: Partial<FiltrosMisActuaciones>) => onChange({ ...filtros, ...parcial });
 
   return (
     <div className="card bg-base-100 shadow border border-base-300">
@@ -32,7 +46,7 @@ export default function MisInformesFiltros({ filtros, onChange, opcionesEstado, 
             </button>
             <button
               type="button"
-              onClick={() => onChange(FILTROS_MIS_INFORMES)}
+              onClick={() => onChange(FILTROS_MIS_ACTUACIONES)}
               disabled={!activos}
               className={`btn btn-xs gap-1 ${activos ? "btn-error btn-outline" : "btn-ghost opacity-40"}`}
             >
@@ -54,17 +68,13 @@ export default function MisInformesFiltros({ filtros, onChange, opcionesEstado, 
             />
           </label>
           <div className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-base-content/60">Tipo informe</span>
+            <span className="text-xs font-medium text-base-content/60">Documento</span>
             <CustomSelect
               className="select-sm"
               value={filtros.tipo}
               onChange={(tipo) => set({ tipo })}
               hidePlaceholderOption
-              options={[
-                { value: "all", label: "Todos" },
-                { value: "VISITA", label: "VISITA" },
-                { value: "SEGUIMIENTO", label: "SEGUIMIENTO" },
-              ]}
+              options={[TODOS, ...tipos.map((t) => ({ value: t.codigo, label: t.etiqueta }))]}
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -74,11 +84,7 @@ export default function MisInformesFiltros({ filtros, onChange, opcionesEstado, 
               value={filtros.rol}
               onChange={(rol) => set({ rol })}
               hidePlaceholderOption
-              options={[
-                { value: "all", label: "Todos" },
-                { value: "profesional", label: "Profesional" },
-                { value: "revisor", label: "Revisor" },
-              ]}
+              options={[TODOS, ...roles.map((r) => ({ value: r.codigo, label: r.etiqueta }))]}
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -88,7 +94,7 @@ export default function MisInformesFiltros({ filtros, onChange, opcionesEstado, 
               value={filtros.estado}
               onChange={(estado) => set({ estado })}
               hidePlaceholderOption
-              options={[{ value: "all", label: "Todos" }, ...opcionesEstado]}
+              options={[TODOS, ...opcionesEstado]}
             />
           </div>
           <label className="flex items-center gap-2 self-end pb-1 cursor-pointer">

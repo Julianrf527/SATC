@@ -187,6 +187,10 @@ export type SolicitudInformacionPayload = {
   radicado: string;
   fecha_radicado: string;
   archivo_solicitud_id: number;
+  /** Respuesta del usuario: los tres o ninguno (vacíos/null = sin respuesta). */
+  radicado_respuesta: string | null;
+  fecha_radicado_respuesta: string | null;
+  archivo_respuesta_id: number | null;
 };
 
 export function useGuardarSolicitudInformacionMutation(expedienteId: number, etapaConceptoId: number) {

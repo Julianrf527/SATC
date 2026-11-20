@@ -28,6 +28,8 @@ type Props = {
   isEditable?: boolean;
   comunicacionDeleteEndpoint?: (comunicacionId: number) => string;
   embedded?: boolean;
+  /** Mostrar "Eliminar acto" (default true). */
+  allowDelete?: boolean;
 };
 
 export default function ActoAdminCard({
@@ -49,6 +51,7 @@ export default function ActoAdminCard({
   isEditable = true,
   comunicacionDeleteEndpoint,
   embedded = false,
+  allowDelete = true,
 }: Props) {
   const getTipoBadgeStyles = (tipo: string) => {
     const styles = {
@@ -107,6 +110,7 @@ export default function ActoAdminCard({
                 </svg>
               </button>
 
+              {allowDelete && (
               <button
                 onClick={onDelete}
                 className="btn btn-ghost btn-sm btn-square text-error hover:bg-error/10"
@@ -126,6 +130,7 @@ export default function ActoAdminCard({
                   />
                 </svg>
               </button>
+              )}
             </div>
           )}
         </div>

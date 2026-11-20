@@ -5,7 +5,6 @@ import type {
   FilaRecursoAfectado,
   ImpactoCambioModo,
   InformeTecnico,
-  MiInforme,
   ModoInforme,
   ProfesionalDisponible,
   TipoInforme,
@@ -21,7 +20,8 @@ export const informeKeys = {
   all: [...infraccionKeys.all, "informes"] as const,
   listas: () => [...informeKeys.all, "lista"] as const,
   lista: (filtros: FiltrosInformes, page: number) => [...informeKeys.listas(), filtros, page] as const,
-  mios: () => [...informeKeys.all, "mios"] as const,
+  /** Mis actuaciones (informes + actos): se refresca con cualquier cambio de informes o actos. */
+  misActuaciones: () => [...informeKeys.all, "mis-actuaciones"] as const,
   disponibles: () => [...informeKeys.all, "disponibles"] as const,
   proceso: (procesoId: number) => [...informeKeys.all, "proceso", procesoId] as const,
   recursos: (informeId: number) => [...informeKeys.all, "recursos", informeId] as const,
@@ -125,15 +125,6 @@ export function useAsignarInformeMutation() {
   });
 }
 
-// ── Mis informes (/informes/mios) ───────────────────────────────────────────
-
-export function useMisInformesQuery() {
-  return useQuery({
-    queryKey: informeKeys.mios(),
-    queryFn: async () => (await apiRequest<{ data?: MiInforme[] }>(INFRACTION_ENDPOINTS.INFRACTION_MIS_INFORMES)).data ?? [],
-  });
-}
-
 // ── Etapa del expediente (Visita / Seguimiento) ─────────────────────────────
 
 /** 404 = la etapa aún no existe (el cuerpo trae `creable`/`creable_msg`). */
@@ -218,6 +209,8 @@ export type CargueManualDatos = {
   fecha_programacion_visita?: string;
   profesional_id?: number;
   revisor_id?: number;
+  /** Obligatoria en informes de VISITA. */
+  recursos_afectados?: FilaRecursoAfectado[];
 };
 
 export function useCargueManualMutation(informeId: number) {
@@ -253,5 +246,37 @@ export function useGuardarMatrizMutation(informeId: number) {
         ...jsonBody({ filas }),
       }),
     onSuccess: invalidar,
+  });
+}
+
+// ── Versión final del informe (aprobado para firma) ─────────────────────────
+
+export type VersionFinalInforme = {
+  archivo: File;
+  /** Obligatoria en informes de VISITA. */
+  recursosAfectados?: FilaRecursoAfectado[];
+  comentario?: string;
+};
+
+/**
+ * El técnico carga la versión firmada (PDF) con la matriz de recursos: el
+ * informe queda aceptado. Reemplaza subir la firmada por /versiones (409).
+ */
+export function useVersionFinalInformeMutation(procesoId: number) {
+  const queryClient = useQueryClient();
+  const invalidar = useInvalidarInformes();
+  return useMutation({
+    mutationFn: ({ archivo, recursosAfectados, comentario }: VersionFinalInforme) => {
+      const form = new FormData();
+      form.append("archivo", archivo);
+      if (recursosAfectados) form.append("recursos_afectados", JSON.stringify(recursosAfectados));
+      if (comentario) form.append("comentario", comentario);
+      return apiRequest<{ message?: string; informe_aceptado: boolean; tiene_matriz: boolean }>(
+        INFRACTION_ENDPOINTS.INFRACTION_REVISION_VERSION_FINAL(procesoId),
+        { method: "POST", body: form },
+      );
+    },
+    onSuccess: () =>
+      Promise.all([invalidar(), queryClient.invalidateQueries({ queryKey: informeKeys.proceso(procesoId) })]),
   });
 }

@@ -840,7 +840,10 @@ CREATE TABLE public.solicitud_informacion (
     etapa_acoger_concepto_id integer NOT NULL,
     radicado character varying(11) NOT NULL,
     fecha_radicado character varying(10) NOT NULL,
-    archivo_solicitud_id integer NOT NULL
+    archivo_solicitud_id integer NOT NULL,
+    radicado_respuesta character varying(11),
+    fecha_radicado_respuesta character varying(10),
+    archivo_respuesta_id integer
 );
 
 
@@ -1410,7 +1413,7 @@ COPY public.recurso_afectado (id, nombre) FROM stdin;
 -- Data for Name: solicitud_informacion; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.solicitud_informacion (id, etapa_acoger_concepto_id, radicado, fecha_radicado, archivo_solicitud_id) FROM stdin;
+COPY public.solicitud_informacion (id, etapa_acoger_concepto_id, radicado, fecha_radicado, archivo_solicitud_id, radicado_respuesta, fecha_radicado_respuesta, archivo_respuesta_id) FROM stdin;
 \.
 
 

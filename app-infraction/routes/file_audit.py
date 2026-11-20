@@ -210,6 +210,7 @@ async def obtener_logs_auditoria(
             "ACTUALIZAR_MEDIDA_PREVENTIVA":         ("UPDATE", "Medida Preventiva"),
             "CREAR_INFORME_TECNICO":                ("INSERT", "Informe Técnico"),
             "CREAR_INFORME_POLICIAL":               ("INSERT", "Informe Policial"),
+            "EDITAR_MATRIZ_RECURSOS":               ("UPDATE", "Matriz de recursos afectados"),
             "CREAR_ETAPA_CONCEPTO":                 ("INSERT", "Acoger Concepto"),
             "ACTUALIZAR_ETAPA_CONCEPTO":            ("UPDATE", "Acoger Concepto"),
             "CREAR_OFICIO_REMITE":                  ("INSERT", "Oficio Remite"),

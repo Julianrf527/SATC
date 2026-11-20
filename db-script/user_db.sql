@@ -369,9 +369,9 @@ COPY public.permiso (id, nombre, menu_path, descripcion) FROM stdin;
 18	infraccion_alertas	/infraction/alerts	Desbloquea la pestaña Alertas de infracciones. Sirve para ver los vencimientos de sus expedientes o de todos.
 19	infraccion_asignar	/infraction/assign_manage	Desbloquea la pantalla Asignar de infracciones. Sirve para asignar o cambiar el encargado responsable de un expediente.
 20	infraccion_asignar_informes	/infraction/reports	Desbloquea la pantalla Informes de infracciones. Sirve para asignar cada informe técnico a un profesional y a un revisor.
-21	infraccion_informes_revisar	/infraction/my-reports	Desbloquea Mis informes de infracciones. Sirve para revisar (aprobar o devolver) los informes técnicos que le asignaron como revisor.
-22	infraccion_super_gestion		Desbloquea el cargue manual de informes técnicos. Sirve para cargar informes históricos o manuales sin pasar por el flujo de revisión.
-23	infraccion_informes_subir	/infraction/my-reports	Desbloquea Mis informes de infracciones. Sirve para subir los informes técnicos que le asignaron como profesional.
+21	infraccion_lider_tecnico	/infraction/my-reports	Desbloquea Mis actuaciones de infracciones como líder técnico. Sirve para revisar los informes técnicos: aprobar para firma o devolver.
+22	infraccion_super_gestion		Desbloquea el cargue directo de infracciones. Sirve para cargar informes técnicos y actos administrativos sin pasar por revisión, cambiar el documento de un acto y eliminar actos.
+23	infraccion_tecnico	/infraction/my-reports	Desbloquea Mis actuaciones de infracciones como técnico. Sirve para cargar los informes técnicos que le asignaron, su versión firmada y la matriz de recursos.
 24	recurso_gestionar	/recurso/manage	Desbloquea la pantalla Gestionar de concesiones. Sirve para crear y editar expedientes, asignarse procesos y proyectar los documentos de cada etapa.
 25	recurso_consultar	/recurso/consult	Desbloquea la pantalla Consulta de concesiones. Sirve para ver cualquier expediente en solo lectura y descargarlo completo.
 26	recurso_super_gestion		Desbloquea el cargue histórico de concesiones. Sirve para cargar directamente cualquier etapa de expedientes viejos sin revisión ni asignación.
@@ -381,6 +381,7 @@ COPY public.permiso (id, nombre, menu_path, descripcion) FROM stdin;
 30	recurso_lider_tecnico	/recurso/my-reports	Desbloquea Mis actuaciones de concesiones como líder técnico. Sirve para revisar los conceptos técnicos.
 31	recurso_sig	/recurso/my-reports	Desbloquea Mis actuaciones de concesiones como SIG. Sirve para revisar el concepto técnico de la etapa 2 junto con el líder técnico.
 32	recurso_tecnico	/recurso/my-reports	Desbloquea Mis actuaciones de concesiones como técnico. Sirve para que el abogado lo elija como técnico y cargar su concepto técnico.
+33	infraccion_lider_proyecto	/infraction/my-reports	Desbloquea Mis actuaciones de infracciones como líder de proyecto. Sirve para revisar los actos administrativos (medida preventiva, acoger concepto y cierre): aprobar para firma o devolver.
 \.
 
 
@@ -389,6 +390,8 @@ COPY public.permiso (id, nombre, menu_path, descripcion) FROM stdin;
 --
 
 COPY public.permiso_excluye (permiso_id, excluye_id) FROM stdin;
+16	23
+23	16
 24	32
 32	24
 \.
@@ -416,6 +419,7 @@ COPY public.permiso_requiere (permiso_id, requiere_id) FROM stdin;
 30	25
 31	25
 32	25
+33	17
 \.
 
 
@@ -465,6 +469,7 @@ COPY public.rol_permiso (rol_id, permiso_id) FROM stdin;
 1	30
 1	31
 1	32
+1	33
 \.
 
 
@@ -510,7 +515,7 @@ SELECT pg_catalog.setval('public.notificacion_id_seq', 1, false);
 -- Name: permiso_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.permiso_id_seq', 32, true);
+SELECT pg_catalog.setval('public.permiso_id_seq', 33, true);
 
 
 --

@@ -517,7 +517,8 @@ permiso del rol que se le asigna y responde **400** si no lo tiene.
 |---|---|---|
 | Sancionatorio | Abogado responsable (asignación individual y masiva) | `sancionatorio_gestionar` |
 | Infracciones | Encargado del expediente | `infraccion_gestionar` |
-| Infracciones | Profesional y revisor de un informe técnico | `infraccion_informes_subir` / `infraccion_informes_revisar` |
+| Infracciones | Técnico y líder técnico de un informe técnico | `infraccion_tecnico` / `infraccion_lider_tecnico` |
+| Infracciones | Revisor de un acto administrativo (no se asigna: se valida el permiso en cada revisión; sube versiones solo el encargado actual) | `infraccion_lider_proyecto` |
 | Concesiones | Técnico de un concepto | `recurso_tecnico` |
 | Concesiones (super gestión) | Abogado encargado / técnico | `recurso_gestionar` / `recurso_tecnico` |
 

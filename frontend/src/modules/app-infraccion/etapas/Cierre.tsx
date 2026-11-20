@@ -126,12 +126,11 @@ export default function Cierre({
         isEditable={isEditable}
         setToast={setToast}
         onDataUpdated={handleDataUpdated}
-      />
-
+      >
       {/* Archivar — solo si todos notificados exitosamente */}
       {todasNotificadas && isEditable && (
-        <div className="card bg-warning/5 shadow-lg">
-          <div className="card-body">
+        <div className="border border-warning/30 rounded-xl bg-warning/5">
+          <div className="p-4">
             <div className="flex flex-col md:flex-row items-center justify-between gap-4">
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-warning/20 rounded-full flex items-center justify-center flex-shrink-0">
@@ -156,6 +155,7 @@ export default function Cierre({
           </div>
         </div>
       )}
+      </CierreActo>
 
       {/* Modal confirmación archivo */}
       <Modal

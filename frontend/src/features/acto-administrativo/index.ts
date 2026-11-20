@@ -4,6 +4,8 @@ export { default as ActoAdmin } from "./ActoAdmin";
 export { DEFAULT_ENDPOINTS } from "./actoAdminConfig";
 export type {
   ActoAdminEndpoints,
+  ActoAdminFormData,
+  ActoAdminSaveResult,
   ActoAdminStageBinding,
   TipoActo,
   SetToast,
