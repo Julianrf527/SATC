@@ -238,13 +238,17 @@ async def desvincular_involucrado(
     version: int,
     usuario: Usuario,
     request: Request | None = None,
-) -> None:
+    confirmar_eliminar_notificaciones: bool = False,
+) -> list[int]:
     """Borra el vínculo (bloqueo optimista con ``version``).
 
-    TODO(negocio): app-infraction borra las notificaciones de la persona al
-    desvincularla; aquí NO se borran documentos legales: si la persona ya tiene
-    notificaciones registradas o un acto que la reconoce, se responde 409.
-    Confirmar con el área qué debe pasar en esos casos.
+    - Con un acto que la reconoce → 409 (no se puede desvincular).
+    - Con notificaciones en los actos del expediente → 428 con el aviso de que
+      se eliminarán; con ``confirmar_eliminar_notificaciones`` se borran junto
+      con el vínculo (como app-infraction).
+
+    Devuelve los archivos de las notificaciones borradas: la ruta los libera en
+    app-docs DESPUÉS del commit (``etapas.liberar_archivos``).
     """
     if vinculo.acto_admin_id is not None:
         raise HTTPException(
@@ -254,18 +258,21 @@ async def desvincular_involucrado(
     from services.expediente_documentos import actos_del_expediente
 
     actos = await actos_del_expediente(db, expediente)
-    if actos:
-        notificado = await db.scalar(
-            select(Notificacion.id).where(
-                Notificacion.acto_admin_id.in_(actos),
-                Notificacion.involucrado_id == vinculo.involucrado_id,
-            ).limit(1)
+    notificaciones = list((await db.execute(
+        select(Notificacion).where(
+            Notificacion.acto_admin_id.in_(actos),
+            Notificacion.involucrado_id == vinculo.involucrado_id,
         )
-        if notificado is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="No se puede desvincular: tiene notificaciones registradas en este expediente",
-            )
+    )).scalars().all()) if actos else []
+    if notificaciones and not confirmar_eliminar_notificaciones:
+        n = len(notificaciones)
+        raise HTTPException(
+            status_code=428,
+            detail=(
+                f"La persona tiene {n} notificación{'es' if n != 1 else ''} registrada{'s' if n != 1 else ''} "
+                "en este expediente. Si la desvinculas se eliminarán también. Esta acción no se puede deshacer."
+            ),
+        )
 
     mapa = await involved_svc.get_involucrados_by_ids(db, [vinculo.involucrado_id])
     persona = mapa[0] if mapa else {"id": vinculo.involucrado_id}
@@ -277,6 +284,11 @@ async def desvincular_involucrado(
     )
     if resultado.rowcount == 0:
         raise HTTPException(status_code=409, detail=MSG_MODIFICADO)
+
+    archivos: list[int] = []
+    for n in notificaciones:
+        archivos += [f for f in (n.documento_citacion_id, n.documento_notificacion_id) if f]
+        await db.delete(n)
 
     audit = await insert_log(
         db=db,
@@ -293,8 +305,12 @@ async def desvincular_involucrado(
             "tipo_vinculo": vinculo.tipo_vinculo.value,
             "involucrado": _resumen_persona(persona),
             "representante_id": vinculo.representante_id,
+            "notificaciones_eliminadas": [
+                {"id": n.id, "acto_admin_id": n.acto_admin_id, "numerado": n.numerado} for n in notificaciones
+            ],
         },
         **datos_cliente(request),
     )
     if not audit["ok"]:
         raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
+    return archivos

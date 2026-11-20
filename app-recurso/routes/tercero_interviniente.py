@@ -30,6 +30,7 @@ from services.etapas import (
     auditar,
     cargar_acto_final,
     crear_proceso_etapa,
+    liberar_archivos,
     ok,
 )
 from services.etapas_lectura import leer_etapas
@@ -117,7 +118,8 @@ async def editar_representante(
 
 @router.delete("/{vinculo_id}")
 async def desvincular_tercero(
-    request: Request, vinculo_id: int, version: int = Query(..., ge=1), db: AsyncSession = Depends(get_db_managed),
+    request: Request, vinculo_id: int, version: int = Query(..., ge=1),
+    confirmar_eliminar_notificaciones: bool = Query(False), db: AsyncSession = Depends(get_db_managed),
 ):
     usuario = await requiere_gestion(request)
     vinculo, exp = await _tercero(db, vinculo_id, bloquear=True)
@@ -125,9 +127,12 @@ async def desvincular_tercero(
         raise HTTPException(
             status_code=409, detail="No se puede desvincular: el acto que lo reconoce está en proyección",
         )
-    await desvincular_involucrado(db, vinculo=vinculo, expediente=exp, version=version, usuario=usuario,
-                                  request=request)
+    archivos = await desvincular_involucrado(
+        db, vinculo=vinculo, expediente=exp, version=version, usuario=usuario, request=request,
+        confirmar_eliminar_notificaciones=confirmar_eliminar_notificaciones,
+    )
     await db.commit()
+    await liberar_archivos(archivos)
     return ok("Tercero interviniente desvinculado", {"id": vinculo_id})
 
 

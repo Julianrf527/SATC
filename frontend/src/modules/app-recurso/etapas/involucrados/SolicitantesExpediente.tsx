@@ -2,7 +2,7 @@ import { useState } from "react";
 import { UserMinus, Users } from "lucide-react";
 import { Modal } from "@shared/ui";
 import { useDesvincularMutation } from "../../api/involucrados";
-import { mensajeError } from "../../api/errors";
+import { mensajeError, requiereConfirmacion } from "../../api/errors";
 import type { ExpedienteDetalle, SetToast, VinculoInvolucrado } from "../../types";
 import { nombrePersona } from "./personaForm";
 import RepresentanteModal from "./RepresentanteModal";
@@ -32,18 +32,32 @@ export default function SolicitantesExpediente({ expediente, setToast, isEditabl
   const puedeVincular = isEditable && expediente.acciones_disponibles.includes("vincular_solicitante");
   const accion = (v: VinculoInvolucrado, codigo: string) => isEditable && (v.acciones_disponibles ?? []).includes(codigo);
 
+  // Aviso del backend (428) cuando la persona tiene notificaciones: se eliminan si confirma.
+  const [avisoNotificaciones, setAvisoNotificaciones] = useState<string | null>(null);
+  const cerrarDesvincular = () => {
+    setDesvincularDe(null);
+    setAvisoNotificaciones(null);
+  };
+
   const confirmarDesvincular = () => {
     if (!desvincularDe) return;
-    desvincular.mutate(desvincularDe, {
-      onSuccess: () => {
-        setToast({ id: Date.now(), message: "Solicitante desvinculado", type: "success" });
-        setDesvincularDe(null);
+    desvincular.mutate(
+      { id: desvincularDe.id, version: desvincularDe.version, confirmar: avisoNotificaciones !== null },
+      {
+        onSuccess: () => {
+          setToast({ id: Date.now(), message: "Solicitante desvinculado", type: "success" });
+          cerrarDesvincular();
+        },
+        onError: (err) => {
+          if (requiereConfirmacion(err)) {
+            setAvisoNotificaciones(mensajeError(err, "La persona tiene notificaciones en este expediente"));
+            return;
+          }
+          setToast({ id: Date.now(), message: mensajeError(err, "Error al desvincular"), type: "error" });
+          cerrarDesvincular();
+        },
       },
-      onError: (err) => {
-        setToast({ id: Date.now(), message: mensajeError(err, "Error al desvincular"), type: "error" });
-        setDesvincularDe(null);
-      },
-    });
+    );
   };
 
   return (
@@ -112,19 +126,19 @@ export default function SolicitantesExpediente({ expediente, setToast, isEditabl
 
       <Modal
         isOpen={desvincularDe !== null}
-        onClose={() => setDesvincularDe(null)}
+        onClose={cerrarDesvincular}
         size="sm"
         icon={<UserMinus size={20} />}
         title="Desvincular solicitante"
         closeOnEsc={!desvincular.isPending}
         footer={
           <>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDesvincularDe(null)} disabled={desvincular.isPending}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={cerrarDesvincular} disabled={desvincular.isPending}>
               Cancelar
             </button>
             <button type="button" className="btn btn-error btn-sm text-white" onClick={confirmarDesvincular} disabled={desvincular.isPending}>
               {desvincular.isPending && <span className="loading loading-spinner loading-xs" />}
-              Desvincular
+              {avisoNotificaciones ? "Desvincular y eliminar notificaciones" : "Desvincular"}
             </button>
           </>
         }

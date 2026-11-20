@@ -240,10 +240,16 @@ Errores: `400` (NIT sin representante; vínculo de tercero interviniente),
 Desvincula un solicitante. Respuesta: `{"ok": true, "message": "Solicitante
 desvinculado", "data": {"id": 15}}`.
 
+Si la persona tiene notificaciones en los actos del expediente responde `428`
+con el aviso en `detail` («tiene N notificaciones… se eliminarán»); el front lo
+muestra y, si el usuario confirma, repite la petición con
+`&confirmar_eliminar_notificaciones=true`: se borran el vínculo y sus
+notificaciones, se liberan sus archivos en app-docs y la auditoría guarda qué
+notificaciones se eliminaron.
+
 Errores: `400` (vínculo de tercero interviniente), `403`, `404`, `409`
-(versión vieja; o la persona ya tiene notificaciones registradas en el
-expediente o un acto que la reconoce — `TODO(negocio)`: confirmar qué hacer en
-esos casos; hoy se bloquea y no se borra nada), `422` (falta `version`).
+(versión vieja, o la persona tiene un acto que la reconoce), `422` (falta
+`version`), `428` (tiene notificaciones y no se confirmó).
 
 ### A.5 Descarga del expediente completo (lectura)
 
@@ -1012,7 +1018,7 @@ Respuesta: `{"ok": true, "message", "data": {id, version, acto_id?}}`.
 | GET | `/terceros/expediente/{exp}` | lectura | lista con la forma de `etapas.terceros` |
 | POST | `/terceros` | gestión | `{expediente_id, involucrado_id, representante_id?}` → `201` + vínculo (V14; 409 si ya está vinculado) |
 | PATCH | `/terceros/{vinculo_id}/representante` | gestión | `{representante_id, version}` |
-| DELETE | `/terceros/{vinculo_id}?version=N` | gestión | 409 si tiene acto, notificaciones o el acto en proyección |
+| DELETE | `/terceros/{vinculo_id}?version=N[&confirmar_eliminar_notificaciones=true]` | gestión | 409 si tiene acto o el acto en proyección; 428 si tiene notificaciones sin confirmar (igual que solicitantes) |
 | POST | `/terceros/{vinculo_id}/asignarme` | gestión | crea el proceso `RECONOCE_TERCERO` (encargado = quien se asigna) |
 | POST | `/terceros/{vinculo_id}/version-final` | encargado | `ActoFinal` → acto en `expediente_involucrado.acto_admin_id` |
 

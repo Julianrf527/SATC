@@ -15,6 +15,11 @@ export function estadoError(err: unknown): number | null {
   return err instanceof ApiError ? err.status : null;
 }
 
+/** 428: la acción necesita que el usuario confirme el aviso del backend (`detail`). */
+export function requiereConfirmacion(err: unknown): boolean {
+  return estadoError(err) === 428;
+}
+
 /** Texto para el usuario: el `detail` del backend o el genérico dado. */
 export function mensajeError(err: unknown, fallback: string): string {
   return detalleError(err) ?? fallback;
