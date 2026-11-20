@@ -539,6 +539,8 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDIS_DB_SESSIONS: 1
+      # Versión global de permisos (satc_shared.permisos_version)
+      REDIS_DB_PERMISOS: 2
 
       # JWT
       SECRET_KEY: ${SECRET_KEY}
@@ -872,6 +874,12 @@ services:
       GATEWAY_URL: http://api-gateway:8000
       USER_SERVICE_URL: http://app-users:8001
       DOCS_SERVICE_URL: http://app-docs:8003
+
+      # Versión global de permisos: invalida la caché al cambiar roles (satc_shared.permisos_version)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_DB_PERMISOS: 2
 
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}
