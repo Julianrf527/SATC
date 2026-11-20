@@ -148,6 +148,18 @@ def delete_file_from_minio(object_name: str) -> dict:
             "message": f"Error inesperado: {str(e)}"
         }
 
+def descargar_a_archivo(object_name: str, ruta: str) -> bool:
+    """Descarga un objeto de MinIO directo a disco (sin cargarlo en memoria)."""
+    try:
+        if object_name.startswith(f"{MINIO_BUCKET}/"):
+            object_name = object_name.replace(f"{MINIO_BUCKET}/", "")
+        minio_client.fget_object(MINIO_BUCKET, object_name, ruta)
+        return True
+    except Exception as e:
+        logger.error(f"Error descargando {object_name} de MinIO: {e}")
+        return False
+
+
 def get_file_from_minio(object_name: str) -> dict:
     """
     Obtiene un archivo de MinIO. Devuelve {'ok', 'data', 'message'}.

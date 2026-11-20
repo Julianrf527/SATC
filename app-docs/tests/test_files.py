@@ -180,3 +180,64 @@ async def test_decrement_no_baja_de_cero(client, make_file_hash, db_session):
 async def test_increment_sin_ids_400(client):
     r = await client.put("/files/increment-usage", headers=service_headers(), json={"file_ids": []})
     assert r.status_code == 400
+
+
+# --- download-unified -------------------------------------------------------
+
+def _pdf_de(paginas: int) -> bytes:
+    import io
+
+    from pypdf import PdfWriter
+
+    w = PdfWriter()
+    for _ in range(paginas):
+        w.add_blank_page(width=100, height=100)
+    buf = io.BytesIO()
+    w.write(buf)
+    return buf.getvalue()
+
+
+@pytest.fixture
+def stub_minio_a_archivo(monkeypatch):
+    """MinIO simulado: url -> bytes (None = no existe)."""
+    contenidos: dict[str, bytes | None] = {}
+
+    def fake(url, ruta):
+        data = contenidos.get(url)
+        if data is None:
+            return False
+        with open(ruta, "wb") as f:
+            f.write(data)
+        return True
+
+    monkeypatch.setattr(f"{MODULE}.descargar_a_archivo", fake)
+    return contenidos
+
+
+async def test_download_unified_une_en_orden_y_omite_faltantes(client, make_file_hash, stub_minio_a_archivo):
+    import io
+
+    from pypdf import PdfReader
+
+    # file_hash explícito: el fixture genera el mismo hash si se crean varios en un test.
+    a, b, c = [await make_file_hash(file_hash=f"{letra * 64}") for letra in "abc"]
+    stub_minio_a_archivo[a.file_url] = _pdf_de(2)
+    stub_minio_a_archivo[b.file_url] = None  # no está en MinIO: se omite
+    stub_minio_a_archivo[c.file_url] = _pdf_de(1)
+    r = await client.post("/files/download-unified", headers=service_headers(), json={"file_ids": [c.id, b.id, a.id]})
+    assert r.status_code == 200
+    assert r.headers["content-type"] == "application/pdf"
+    assert len(PdfReader(io.BytesIO(r.content)).pages) == 3
+
+
+async def test_download_unified_sin_documentos_validos_500(client, make_file_hash, stub_minio_a_archivo):
+    a = await make_file_hash()
+    stub_minio_a_archivo[a.file_url] = None
+    r = await client.post("/files/download-unified", headers=service_headers(), json={"file_ids": [a.id]})
+    assert r.status_code == 500
+
+
+async def test_download_unified_solo_servicios(client, perms, make_file_hash, stub_minio_a_archivo):
+    a = await make_file_hash()
+    r = await client.post("/files/download-unified", headers=gateway_headers(7), json={"file_ids": [a.id]})
+    assert r.status_code in (401, 403)

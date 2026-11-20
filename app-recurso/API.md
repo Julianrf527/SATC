@@ -273,6 +273,12 @@ decreta, concepto técnico y anexos; acto que lo resuelve) → memorias de cálc
 (informes, conceptos, requerimiento, acto). Solo documentos finales (no las
 versiones en revisión). Un archivo repetido aparece una vez.
 
+El PDF lo arma app-docs y se reenvía por bloques (no se carga en memoria).
+Un documento que no esté en el gestor documental se omite y sigue el
+siguiente. Cada descarga queda en la auditoría (`DESCARGAR_EXPEDIENTE`).
+Errores: `403`, `404` (expediente inexistente o sin documentos), `502`
+(«No se pudo generar el PDF del expediente»).
+
 Errores: `403`, `404` (expediente inexistente o sin documentos), `502`
 (app-docs no generó el PDF).
 

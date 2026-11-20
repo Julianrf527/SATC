@@ -9,10 +9,11 @@ import asyncio
 import logging
 import os
 import io
+import tempfile
 
 from db.deps import get_db_managed
 from db.models.file_hash import FileHash
-from utils.minio_client import upload_file_with_deduplication, get_file_from_minio
+from utils.minio_client import upload_file_with_deduplication, get_file_from_minio, descargar_a_archivo
 from utils.file_validator import validate_file_complete
 from utils.antivirus import escanear_archivo
 from core.permission import PERMISOS_ARCHIVOS
@@ -268,6 +269,45 @@ async def decrement_file_usage(
 
     return JSONResponse(content={"ok": True, "message": f"Uso decrementado para {decremented_count} archivo(s)"})
 
+# PDF unificado: cuántas uniones a la vez por worker, desde qué tamaño el
+# resultado pasa de memoria a disco y tamaño de los bloques que se envían.
+_UNIONES_SIMULTANEAS = int(os.getenv("UNIFIED_PDF_CONCURRENCIA", "2"))
+_UNIONES = asyncio.Semaphore(_UNIONES_SIMULTANEAS)
+_SALIDA_EN_MEMORIA_MAX = 20 * 1024 * 1024
+_TAMANO_BLOQUE = 256 * 1024
+
+
+def _unir_pdfs(archivos: list[tuple[int, str]]) -> tuple[tempfile.SpooledTemporaryFile, int]:
+    """Une los PDF en orden (corre en un hilo). Cada archivo se baja a disco y
+    pypdf lo lee desde ahí, sin tenerlos todos en memoria; el resultado queda en
+    un archivo temporal que pasa a disco desde ``_SALIDA_EN_MEMORIA_MAX``.
+
+    Un archivo dañado o ausente en MinIO se omite (no aborta el PDF completo):
+    si falta es porque no se anexó, y sigue el siguiente del flujo."""
+    from pypdf import PdfReader, PdfWriter
+
+    escritor = PdfWriter()
+    procesados = 0
+    salida = tempfile.SpooledTemporaryFile(max_size=_SALIDA_EN_MEMORIA_MAX)
+    with tempfile.TemporaryDirectory(prefix="unificado-") as carpeta:
+        for indice, (file_id, url) in enumerate(archivos):
+            ruta = os.path.join(carpeta, f"{indice}.pdf")
+            try:
+                if not descargar_a_archivo(url, ruta):
+                    logger.warning(f"[DOWNLOAD-UNIFIED] No se pudo descargar archivo ID {file_id}")
+                    continue
+                for pagina in PdfReader(ruta).pages:
+                    escritor.add_page(pagina)
+                procesados += 1
+            except Exception as e:
+                logger.warning(f"[DOWNLOAD-UNIFIED] Error procesando archivo ID {file_id}: {e}")
+        if procesados:
+            escritor.write(salida)
+            salida.seek(0)
+        escritor.close()
+    return salida, procesados
+
+
 @router.post("/download-unified")
 async def download_unified_pdf(
     request: Request,
@@ -296,36 +336,25 @@ async def download_unified_pdf(
     if not files_ordered:
         raise HTTPException(status_code=404, detail="No se encontraron archivos válidos")
 
-    from pypdf import PdfWriter, PdfReader
-
-    pdf_writer = PdfWriter()
-    documentos_procesados = 0
-
-    for file_record in files_ordered:
-        # Un archivo dañado o ausente en MinIO no debe abortar el PDF completo.
-        try:
-            resultado = await asyncio.to_thread(get_file_from_minio, file_record.file_url)
-            if not resultado["ok"]:
-                logger.warning(f"[DOWNLOAD-UNIFIED] No se pudo descargar archivo ID {file_record.id}")
-                continue
-
-            pdf_reader = PdfReader(io.BytesIO(resultado["data"]))
-            for page in pdf_reader.pages:
-                pdf_writer.add_page(page)
-            documentos_procesados += 1
-        except Exception as e:
-            logger.warning(f"[DOWNLOAD-UNIFIED] Error procesando archivo ID {file_record.id}: {e}")
-            continue
-
-    if documentos_procesados == 0:
+    # Como mucho _UNIONES_SIMULTANEAS uniones a la vez por worker; la unión
+    # (MinIO + pypdf) corre en un hilo para no bloquear el event loop.
+    async with _UNIONES:
+        salida, procesados = await asyncio.to_thread(
+            _unir_pdfs, [(f.id, f.file_url) for f in files_ordered]
+        )
+    if procesados == 0:
+        salida.close()
         raise HTTPException(status_code=500, detail="No se pudo procesar ningún documento")
 
-    output_buffer = io.BytesIO()
-    pdf_writer.write(output_buffer)
-    output_buffer.seek(0)
+    def _contenido():
+        try:
+            while bloque := salida.read(_TAMANO_BLOQUE):
+                yield bloque
+        finally:
+            salida.close()
 
     return StreamingResponse(
-        output_buffer,
+        _contenido(),
         media_type="application/pdf",
         headers={"Content-Disposition": 'attachment; filename="documentos_unificados.pdf"'}
     )

@@ -62,19 +62,3 @@ async def get_file_info(file_id: int) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error getting file info for file {file_id}: {e}")
         return _error(e)
-
-
-async def download_unified_pdf(file_ids: List[int], cookies: Dict[str, str]) -> Dict[str, Any]:
-    """
-    Combina varios archivos en un único PDF vía app-docs (orden = file_ids).
-    Devuelve {'ok': True, 'content': bytes, 'message'} o {'ok': False, 'message'}.
-    """
-    if not file_ids:
-        return {"ok": False, "message": "No file_ids provided"}
-    try:
-        content = await files_client.download_unified(file_ids, cookies=cookies)
-    except Exception as e:
-        logger.error(f"Error downloading unified PDF for {len(file_ids)} files: {e}")
-        return _error(e)
-    logger.info(f"PDF unificado descargado exitosamente ({len(file_ids)} archivos)")
-    return {"ok": True, "content": content, "message": "PDF unificado generado exitosamente"}

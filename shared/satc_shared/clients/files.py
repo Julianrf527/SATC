@@ -98,6 +98,22 @@ class FilesClient(ServiceClient):
         )
         return UsageResult.model_validate(self.json_body(resp, self.target))
 
+    @asynccontextmanager
+    async def download_unified_stream(
+        self, file_ids: list[int], *, timeout: float = 300.0,
+    ) -> AsyncIterator[httpx.Response]:
+        """POST /files/download-unified en streaming (sin cargar el PDF en memoria)::
+
+            async with files.download_unified_stream([3, 9]) as resp:
+                async for chunk in resp.aiter_bytes():
+                    ...
+        """
+        async with self.stream(
+            "POST", "/files/download-unified",
+            json=FileIdsRequest(file_ids=file_ids).model_dump(), timeout=timeout,
+        ) as resp:
+            yield resp
+
     async def download_unified(
         self,
         file_ids: list[int],
