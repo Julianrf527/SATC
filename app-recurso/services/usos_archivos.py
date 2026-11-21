@@ -33,31 +33,35 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
-# Lotes de file_ids sumados en la petición en curso y aún no confirmados.
-_sumados: ContextVar[Optional[list[list[int]]]] = ContextVar("recurso_usos_sumados", default=None)
+# Lotes sumados en la petición en curso y aún no confirmados: ``file_ids``
+# (formato anterior) o usos ``{file_id, entidad, entidad_id}``.
+_sumados: ContextVar[Optional[list[list[Any]]]] = ContextVar("recurso_usos_sumados", default=None)
 
 
-def anotar_suma(file_ids: Iterable[Optional[int]]) -> None:
+def anotar_suma(archivos: Iterable[Any]) -> None:
     """Anota un lote sumado con éxito en app-docs (no-op fuera de una petición)."""
     lotes = _sumados.get()
-    ids = [int(f) for f in file_ids if f]
-    if lotes is not None and ids:
-        lotes.append(ids)
+    lote = [dict(a) if isinstance(a, dict) else int(a) for a in archivos if a]
+    if lotes is not None and lote:
+        lotes.append(lote)
 
 
-def pendientes() -> list[list[int]]:
+def pendientes() -> list[list[Any]]:
     """Lotes sumados y aún no confirmados de la petición en curso (copia)."""
     return [list(l) for l in (_sumados.get() or [])]
 
 
-async def compensar(lotes: list[list[int]], contexto: str = "") -> None:
+async def compensar(lotes: list[list[Any]], contexto: str = "") -> None:
     """Resta los usos de ``lotes`` (uno por lote, igual que se sumaron).
     Best-effort: registra en log y NUNCA lanza (no debe ocultar el error original)."""
     import services.docs as docs_svc
 
     for ids in lotes:
         try:
-            resultado = await docs_svc.decrement_file_usage(ids)
+            if ids and isinstance(ids[0], dict):
+                resultado = await docs_svc.decrement_file_usage(usos=ids)
+            else:
+                resultado = await docs_svc.decrement_file_usage(ids)
             if resultado.get("ok"):
                 logger.warning(f"Uso de archivos compensado {ids} por operación fallida {contexto}".rstrip())
             else:
@@ -67,12 +71,12 @@ async def compensar(lotes: list[list[int]], contexto: str = "") -> None:
 
 
 @asynccontextmanager
-async def registro_peticion(db: AsyncSession, contexto: str = "") -> AsyncIterator[list[list[int]]]:
+async def registro_peticion(db: AsyncSession, contexto: str = "") -> AsyncIterator[list[list[Any]]]:
     """Registro de usos sumados de una petición ligado a su sesión ``db``.
 
     El ``commit`` de la sesión lo vacía; si el bloque termina con una
     excepción (``Exception``) se compensa lo pendiente y se relanza."""
-    lotes: list[list[int]] = []
+    lotes: list[list[Any]] = []
     token = _sumados.set(lotes)
 
     def _confirmado(_session: Any) -> None:

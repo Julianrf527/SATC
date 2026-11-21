@@ -30,6 +30,7 @@ from core.acceso import requiere_gestion, requiere_lectura, requiere_permiso, ti
 from core.permission import Permission
 from db.deps import get_db_managed
 from services.concurrencia import MSG_MODIFICADO, bloquear_expediente
+from services.archivos_entidades import usos_liberados
 from services.etapas import (
     CAMPOS_CONCEPTO,
     ETIQUETAS_CONCEPTO,
@@ -319,10 +320,10 @@ async def editar_concepto(
     subir_version(concepto)
     await db.flush()
     if anterior_pdf is not None:
-        await registrar_archivos([body.file_id])
+        await registrar_archivos(concepto, [body.file_id], usuario.user_id)
     await auditar(db, usuario, exp, "EDITAR_CONCEPTO", f"{ETIQUETAS_CONCEPTO[tipo]} editado",
                   {"concepto_id": concepto.id, "antes": antes, "despues": despues}, request)
     data = {**datos_fila(concepto, "fecha_aceptacion", "accion", "doc_concepto_tecnico_id"), "tipo": tipo}
     await db.commit()
-    await liberar_archivos([anterior_pdf])
+    await liberar_archivos(usos_liberados(concepto, [anterior_pdf]))
     return ok("Concepto técnico actualizado", data)

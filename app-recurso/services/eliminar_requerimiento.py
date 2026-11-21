@@ -10,9 +10,9 @@ proceso y se borra entera (ver ``validaciones.aviso_eliminar_requerimiento``):
 - los documentos anexos de ambos;
 - sus procesos de revisión (versiones, revisiones, auditoría: cascada en BD).
 
-Los archivos dejan de usarse: se devuelven los ``file_id`` a descontar en
-app-docs DESPUÉS del commit (``liberar_archivos``). Cada referencia se
-descuenta una vez (cada una sumó un uso al registrarse). No hace commit.
+Los archivos dejan de usarse: se devuelve la ``Liberacion`` para app-docs
+DESPUÉS del commit (``liberar_archivos``): el uso de cada fila borrada y los
+``file_ids`` de versiones/adjuntos de revisión. No hace commit.
 """
 from __future__ import annotations
 
@@ -21,20 +21,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import ActoAdministrativo, ConceptoTecnico, DocumentoAnexo, Requerimiento
 from db.models.documento_proceso import DocumentoProceso, DocumentoProcesoRevision, DocumentoProcesoVersion
+from services.archivos_entidades import Liberacion
 from services.expediente_documentos import _Colector
 
 
-async def eliminar_requerimiento_etapa3(db: AsyncSession, req: Requerimiento) -> tuple[dict, list[int]]:
+async def eliminar_requerimiento_etapa3(db: AsyncSession, req: Requerimiento) -> tuple[dict, Liberacion]:
     """Borra el requerimiento ``req`` y todo lo que cuelga de él.
 
-    Devuelve ``(resumen para auditoría, file_ids a liberar)``."""
+    Devuelve ``(resumen para auditoría, Liberacion)``."""
     concepto_id = req.concepto_tecnico_id
     acto_id = req.acto_admin_id
 
     # Documentos finales (acto, comunicación, notificaciones, respuesta, concepto adicional, anexos).
     colector = _Colector(db)
     await colector.requerimiento(req.id, "Requerimiento")
-    archivos = [d["file_id"] for d in colector.documentos]
+    archivos = Liberacion(usos=list(colector.usos))
 
     # Procesos de revisión del requerimiento y del concepto adicional.
     filtro_etapas = [and_(DocumentoProceso.etapa_tipo == "requerimiento", DocumentoProceso.etapa_ref_id == req.id)]
@@ -43,10 +44,10 @@ async def eliminar_requerimiento_etapa3(db: AsyncSession, req: Requerimiento) ->
                                   DocumentoProceso.etapa_ref_id == concepto_id))
     procesos = list((await db.execute(select(DocumentoProceso.id).where(or_(*filtro_etapas)))).scalars().all())
     if procesos:
-        archivos += [f for f in (await db.execute(
+        archivos.file_ids += [f for f in (await db.execute(
             select(DocumentoProcesoVersion.file_id).where(DocumentoProcesoVersion.proceso_id.in_(procesos))
         )).scalars().all() if f]
-        archivos += [f for f in (await db.execute(
+        archivos.file_ids += [f for f in (await db.execute(
             select(DocumentoProcesoRevision.adjunto_file_id).where(DocumentoProcesoRevision.proceso_id.in_(procesos))
         )).scalars().all() if f]
         await db.execute(delete(DocumentoProceso).where(DocumentoProceso.id.in_(procesos)))

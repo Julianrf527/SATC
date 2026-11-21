@@ -58,6 +58,7 @@ from services.actos import (
     validar_numerado,
     validar_numerado_disponible,
 )
+from services.archivos_entidades import usos
 from services.concurrencia import MSG_ASIGNADO, asignar_encargado, integridad_a_409
 from services.expediente_involucrados import datos_cliente
 from services.revision_documentos import (
@@ -439,14 +440,16 @@ async def validar_pdf(file_id: int, campo: str) -> None:
         raise HTTPException(status_code=400, detail=f"{campo}: debe ser un PDF")
 
 
-async def registrar_archivos(nuevos: Iterable[Optional[int]]) -> None:
-    """``numero_usos`` +1 (antes del commit; 502 si app-docs falla)."""
-    await _incrementar([f for f in nuevos if f])
+async def registrar_archivos(fila, nuevos: Iterable[Optional[int]], usuario_id: Optional[int]) -> None:
+    """Asocia ``nuevos`` a ``fila`` en app-docs a nombre de ``usuario_id``
+    (antes del commit, con la fila ya en BD; 502 si app-docs falla)."""
+    await _incrementar(usos(fila, nuevos), usuario_id)
 
 
-async def liberar_archivos(anteriores: Iterable[Optional[int]]) -> None:
-    """``numero_usos`` −1 (después del commit, best-effort)."""
-    await _decrementar([f for f in anteriores if f])
+async def liberar_archivos(liberar) -> None:
+    """Suelta en app-docs una ``Liberacion`` o lista de usos (después del
+    commit, best-effort). Para un reemplazo: ``usos_liberados(fila, [anterior])``."""
+    await _decrementar(liberar)
 
 
 async def auditar(
@@ -662,7 +665,7 @@ async def cargar_concepto_final(
     # como crear_acto: si super gestión lo reemplaza luego, la versión sigue
     # contando y el cleanup de app-docs no lo borra. Si la operación falla
     # después de este +1, get_db_managed lo compensa (services/usos_archivos.py).
-    await _incrementar([file_id])
+    await _incrementar(usos(concepto, [file_id]), usuario.user_id)
 
 
 def datos_fila(fila, *extra: str) -> dict:

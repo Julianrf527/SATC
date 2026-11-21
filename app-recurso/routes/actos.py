@@ -26,6 +26,7 @@ from db.models import ActoAdministrativo, Comunicacion, Notificacion, TipoNotifi
 from services.concurrencia import MSG_MODIFICADO, bloquear_expediente, integridad_a_409
 import services.involved as involved_svc
 from services.etapas import validar_pdf
+from services.archivos_entidades import usos, usos_de_fila, usos_liberados
 from services.actos import (
     _decrementar,
     _incrementar,
@@ -135,7 +136,7 @@ async def actualizar_acto(
     if nuevo_doc and nuevo_doc != acto.documento_acto_administrativo_id:
         await validar_pdf(nuevo_doc, "Acto administrativo")
         anterior = acto.documento_acto_administrativo_id
-        await _incrementar([nuevo_doc])
+        await _incrementar(usos(acto, [nuevo_doc]), usuario.user_id)
         acto.documento_acto_administrativo_id = nuevo_doc
     else:
         anterior = None
@@ -146,7 +147,7 @@ async def actualizar_acto(
     data = await serializar_acto(db, acto, etapa)
     await db.commit()
     if anterior:
-        await _decrementar([anterior])
+        await _decrementar(usos_liberados(acto, [anterior]))
     logger.info(f"Acto {acto.id} corregido por {usuario.user_id}")
     return _ok(data)
 
@@ -170,17 +171,18 @@ async def eliminar_acto(
             detail="Solo super gestión puede eliminar un acto administrativo; para corregirlo usa editar",
         )
     data = await serializar_acto(db, acto, etapa)
-    docs = [acto.documento_acto_administrativo_id]
-    if data["comunicacion"]:
-        docs.append(data["comunicacion"]["documento_comunicacion_id"])
-    for n in data["notificacion"]["involucrados"]:
-        docs += [n["documento_citacion_id"], n["documento_notificacion_id"]]
+    # Usos del acto, su comunicación y sus notificaciones (se borran en cascada).
+    hijos = [
+        *(await db.execute(select(Comunicacion).where(Comunicacion.acto_administrativo_id == acto.id))).scalars(),
+        *(await db.execute(select(Notificacion).where(Notificacion.acto_admin_id == acto.id))).scalars(),
+    ]
+    liberar = [u for fila in (acto, *hijos) for u in usos_de_fila(fila)]
     etapa.etapa.acto_admin_id = None
     await db.flush()
     await db.delete(acto)
     await db.flush()
     await db.commit()
-    await _decrementar(list({d for d in docs if d}))
+    await _decrementar(liberar)
     return _ok(data)
 
 
@@ -199,7 +201,7 @@ async def crear_comunicacion(
 ):
     """Una comunicación por acto (plan Etapa 1 paso 6): 409 si ya existe.
     Solo para los actos que se comunican (``MEDIO_POR_ETAPA``); 400 si no."""
-    _, acto, _ = await _contexto_escritura(db, request, acto_admin_id, expediente_id)
+    usuario, acto, _ = await _contexto_escritura(db, request, acto_admin_id, expediente_id)
     if not se_comunica(acto.medio):
         raise HTTPException(status_code=400, detail=MSG_SIN_COMUNICACION)
     numero = validar_numerado(numerado)
@@ -215,7 +217,7 @@ async def crear_comunicacion(
     async with integridad_a_409(db, "La comunicación ya existe para este acto administrativo"):
         db.add(com)
         await db.flush()
-    await _incrementar([documento_comunicacion_id])
+    await _incrementar(usos(com, [documento_comunicacion_id]), usuario.user_id)
     data = serializar_comunicacion(com)
     await db.commit()
     return _ok(data, 201)
@@ -225,13 +227,13 @@ async def _comunicacion_escritura(db, request, comunicacion_id: int, expediente_
     acto_id = await db.scalar(select(Comunicacion.acto_administrativo_id).where(Comunicacion.id == comunicacion_id))
     if acto_id is None:
         raise HTTPException(status_code=404, detail="Comunicación no encontrada")
-    await _contexto_escritura(db, request, acto_id, expediente_id)
+    usuario, _, _ = await _contexto_escritura(db, request, acto_id, expediente_id)
     com = await db.scalar(
         select(Comunicacion).where(Comunicacion.id == comunicacion_id).execution_options(populate_existing=True)
     )
     if com is None:
         raise HTTPException(status_code=404, detail="Comunicación no encontrada")
-    return com
+    return usuario, com
 
 
 @router.put("/comunicaciones/{comunicacion_id}", status_code=200)
@@ -245,7 +247,7 @@ async def actualizar_comunicacion(
     documento_comunicacion_id: int = Form(...),
     db: AsyncSession = Depends(get_db_managed),
 ):
-    com = await _comunicacion_escritura(db, request, comunicacion_id, expediente_id)
+    usuario, com = await _comunicacion_escritura(db, request, comunicacion_id, expediente_id)
     numero = validar_numerado(numerado)
     f_numerado = validar_fecha(fecha_numerado, "fecha de numerado")
     f_envio = validar_fecha(fecha_envio, "fecha de envío")
@@ -253,7 +255,7 @@ async def actualizar_comunicacion(
     if documento_comunicacion_id != com.documento_comunicacion_id:
         await validar_pdf(documento_comunicacion_id, "Documento de la comunicación")
         anterior = com.documento_comunicacion_id
-        await _incrementar([documento_comunicacion_id])
+        await _incrementar(usos(com, [documento_comunicacion_id]), usuario.user_id)
     com.numerado = numero
     com.fecha_numerado = f_numerado
     com.fecha_envio = f_envio
@@ -262,7 +264,7 @@ async def actualizar_comunicacion(
     data = serializar_comunicacion(com)
     await db.commit()
     if anterior:
-        await _decrementar([anterior])
+        await _decrementar(usos_liberados(com, [anterior]))
     return _ok(data)
 
 
@@ -277,12 +279,13 @@ async def eliminar_comunicacion(
     expediente_id = data.get("expediente_id")
     if not expediente_id:
         raise HTTPException(status_code=422, detail="expediente_id es requerido")
-    com = await _comunicacion_escritura(db, request, comunicacion_id, int(expediente_id))
+    _, com = await _comunicacion_escritura(db, request, comunicacion_id, int(expediente_id))
     salida = serializar_comunicacion(com)
+    liberar = usos_de_fila(com)
     await db.delete(com)
     await db.flush()
     await db.commit()
-    await _decrementar([salida["documento_comunicacion_id"]])
+    await _decrementar(liberar)
     return _ok(salida)
 
 
@@ -326,7 +329,7 @@ async def crear_notificacion(
     """Una fila por persona notificada. La citación siempre es obligatoria
     (numerado, fechas de envío y constancia, documento); la entrega (exitosa,
     tipo, fecha, documento) puede llenarse después con PUT."""
-    _, acto, etapa = await _contexto_escritura(db, request, acto_admin_id, expediente_id)
+    usuario, acto, etapa = await _contexto_escritura(db, request, acto_admin_id, expediente_id)
     if not se_notifica(acto.medio):
         raise HTTPException(status_code=400, detail=MSG_SIN_NOTIFICACION)
     numero = validar_numerado(numerado)
@@ -368,7 +371,8 @@ async def crear_notificacion(
     )
     db.add(n)
     await db.flush()
-    await _incrementar([documento_citacion_id, *( [documento_notificacion_id] if notificacion_exitosa else [])])
+    await _incrementar(usos(n, [documento_citacion_id, documento_notificacion_id if notificacion_exitosa else None]),
+                       usuario.user_id)
     data = serializar_notificacion(n)
     await db.commit()
     return _ok(data, 201)
@@ -385,13 +389,13 @@ async def _notificacion_escritura(db, request, notificacion_id: int, expediente_
     acto_id = await db.scalar(select(Notificacion.acto_admin_id).where(Notificacion.id == notificacion_id))
     if acto_id is None:
         raise HTTPException(status_code=404, detail="Notificación no encontrada")
-    await _contexto_escritura(db, request, acto_id, expediente_id)
+    usuario, _, _ = await _contexto_escritura(db, request, acto_id, expediente_id)
     n = await db.scalar(
         select(Notificacion).where(Notificacion.id == notificacion_id).execution_options(populate_existing=True)
     )
     if n is None:
         raise HTTPException(status_code=404, detail="Notificación no encontrada")
-    return n
+    return usuario, n
 
 
 @router.put("/notificaciones/{notificacion_id}", status_code=200)
@@ -413,7 +417,7 @@ async def actualizar_notificacion(
 ):
     """Edita citación y/o registra la entrega. ``version`` (opcional: el
     formulario heredado no la envía) activa el bloqueo optimista → 409."""
-    n = await _notificacion_escritura(db, request, notificacion_id, expediente_id)
+    usuario, n = await _notificacion_escritura(db, request, notificacion_id, expediente_id)
     if version is not None and version != n.version:
         raise HTTPException(status_code=409, detail=MSG_MODIFICADO)
     numero = validar_numerado(numerado)
@@ -451,10 +455,10 @@ async def actualizar_notificacion(
     n.documento_notificacion_id = doc_notif_nuevo
     n.version = (n.version or 1) + 1
     await db.flush()
-    await _incrementar([d for d in incrementar if d])
+    await _incrementar(usos(n, incrementar), usuario.user_id)
     data = serializar_notificacion(n)
     await db.commit()
-    await _decrementar([d for d in decrementar if d])
+    await _decrementar(usos_liberados(n, decrementar))
     return _ok(data)
 
 
@@ -469,10 +473,11 @@ async def eliminar_notificacion(
     expediente_id = data.get("expediente_id")
     if not expediente_id:
         raise HTTPException(status_code=422, detail="expediente_id es requerido")
-    n = await _notificacion_escritura(db, request, notificacion_id, int(expediente_id))
+    _, n = await _notificacion_escritura(db, request, notificacion_id, int(expediente_id))
     salida = serializar_notificacion(n)
+    liberar = usos_de_fila(n)
     await db.delete(n)
     await db.flush()
     await db.commit()
-    await _decrementar([salida["documento_citacion_id"], salida["documento_notificacion_id"]])
+    await _decrementar(liberar)
     return _ok(salida)

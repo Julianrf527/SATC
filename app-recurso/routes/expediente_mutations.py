@@ -24,6 +24,7 @@ from core.acceso import requiere_gestion
 from db.deps import get_db_managed
 from db.models import Expediente, ExpedienteFuente, ExpedienteUso, UsoAgua
 from services.concurrencia import actualizar_versionado, integridad_a_409
+from services.archivos_entidades import usos
 from services.docs import decrement_file_usage, increment_file_usage
 from services.expediente import (
     CAMPOS_BASE,
@@ -123,7 +124,7 @@ async def crear_expediente(
 
     # Uso del archivo antes del commit (como infraction): si no se puede
     # registrar, no se crea el expediente.
-    inc = await increment_file_usage([body.doc_comprobante_pago_id])
+    inc = await increment_file_usage(usos=usos(expediente, [body.doc_comprobante_pago_id]), usuario_id=usuario.user_id)
     if not inc.get("ok"):
         await db.rollback()
         raise HTTPException(status_code=502, detail="No se pudo registrar el uso del comprobante de pago")
@@ -185,7 +186,7 @@ async def editar_expediente(
     )
 
     if cambia_comprobante:
-        inc = await increment_file_usage([body.doc_comprobante_pago_id])
+        inc = await increment_file_usage(usos=usos(nuevo, [body.doc_comprobante_pago_id]), usuario_id=usuario.user_id)
         if not inc.get("ok"):
             await db.rollback()
             raise HTTPException(status_code=502, detail="No se pudo registrar el uso del comprobante de pago")
@@ -198,7 +199,7 @@ async def editar_expediente(
     # resto de la app): si la transacción fallara, el anterior sigue en uso.
     if cambia_comprobante and comprobante_anterior:
         try:
-            dec = await decrement_file_usage([comprobante_anterior])
+            dec = await decrement_file_usage(usos=usos(nuevo, [comprobante_anterior]))
             if not dec.get("ok"):
                 logger.warning(
                     f"No se pudo decrementar el uso del archivo {comprobante_anterior}: {dec.get('message')}"

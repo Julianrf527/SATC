@@ -22,6 +22,7 @@ from core.acceso import requiere_gestion
 from db.deps import get_db_managed
 from db.models import Requerimiento
 from services.concurrencia import MSG_ASIGNADO, actualizar_versionado, bloquear_expediente
+from services.archivos_entidades import usos
 from services.etapas import (
     AMBITOS_REQUERIMIENTO,
     ETIQUETAS_REQUERIMIENTO,
@@ -138,10 +139,10 @@ async def respuesta_requerimiento(
     valores = body.model_dump(exclude={"version"})
     nueva = await actualizar_versionado(db, Requerimiento, e.req3.id, body.version, valores)
     if body.doc_oficio_entrada_id != anterior:
-        await registrar_archivos([body.doc_oficio_entrada_id])
+        await registrar_archivos(e.req3, [body.doc_oficio_entrada_id], usuario.user_id)
     await auditar(db, usuario, exp, "RESPUESTA_REQUERIMIENTO", "Respuesta del usuario al requerimiento",
                   valores, request)
     await db.commit()
     if anterior and anterior != body.doc_oficio_entrada_id:
-        await liberar_archivos([anterior])
+        await liberar_archivos(usos(e.req3, [anterior]))
     return ok("Respuesta del usuario registrada", {"id": e.req3.id, "version": nueva, **valores})

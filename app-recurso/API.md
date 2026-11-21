@@ -321,6 +321,30 @@ están en `services/archivos_entidades.py` (`COLUMNAS_ARCHIVO`); una columna de
 archivo nueva se agrega ahí. Las subidas (`subir_a_docs`) envían el
 `usuario_id` de quien sube.
 
+Todas las escrituras de recurso asocian y sueltan archivos con ese formato:
+
+- Asociar (antes del commit, 502 si app-docs falla):
+  `etapas.registrar_archivos(fila, file_ids, usuario_id)` o
+  `actos._incrementar(usos(fila, file_ids), usuario_id)`. app-docs suma un uso
+  solo por asociación nueva (repetir no cuenta dos veces).
+- Reemplazar (después del commit): `liberar_archivos(usos_liberados(fila, [anterior]))`.
+  Solo suelta el archivo si la fila ya no lo usa en otra columna (citación y
+  notificación, documentos del auto que admite).
+- Borrar una fila: `usos_de_fila(fila)` antes del `delete`. Los borrados en
+  cascada (`eliminar_requerimiento_etapa3`, `eliminar_practica_pruebas`)
+  devuelven una `Liberacion`.
+- Compensación si la petición falla tras asociar (`services/usos_archivos.py`):
+  solo se deshace si todas las asociaciones del lote eran nuevas. Si alguna
+  ya existía, el archivo queda con un uso de más, que es lo seguro.
+
+Excepción: las versiones y adjuntos del proceso de revisión siguen con el
+formato anterior (`file_ids`): los maneja el servicio de revisión, compartido
+con infracción. No entran en la carga inicial.
+
+Si la carga inicial no se corre, soltar un archivo anterior al despliegue no
+le resta el uso (app-docs no encuentra la asociación). Nunca se borra un
+archivo en uso, pero el contador queda alto.
+
 Carga inicial de los archivos que ya existen (una vez tras desplegar,
 idempotente, lotes de 1000 con `/files/registrar-usos`, no cambia
 `numero_usos`):
