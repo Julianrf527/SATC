@@ -39,7 +39,7 @@ from db.models.revisiones import Revision
 from db.models.v_documentos_detalle import VDocumentoDetalle
 from db.models.versiones_documento import VersionDocumento
 from services.notification import notify_assignment, notify_new_version
-from services.revision_documentos import FLUJO, http_error, prevalidar_subida, servicio
+from services.revision_documentos import FLUJO, SERVICIO_DOCS, http_error, prevalidar_subida, servicio
 from services.users import get_user_names, verify_permission
 from utils.antivirus import escanear_archivo
 from utils.file_validator import validate_file_complete
@@ -107,14 +107,15 @@ async def _procesar_archivo_seguro(archivo: UploadFile):
     return file_hash, sanitized_filename, mime_type, archivo_size, file_data
 
 
-async def subir_archivo(db: AsyncSession, archivo: UploadFile) -> tuple[ArchivoRef, str]:
+async def subir_archivo(db: AsyncSession, archivo: UploadFile, user_id: int) -> tuple[ArchivoRef, str]:
     """Pipeline de seguridad + subida deduplicada. Devuelve (ArchivoRef, sha256).
 
     No registra el uso: lo hace el servicio de revisión (UsoArchivosLocal) en la
     misma transacción que la versión/revisión que referencia el archivo."""
     file_hash, sanitized_filename, mime_type, archivo_size, file_data = await _procesar_archivo_seguro(archivo)
     resultado = await upload_file_with_deduplication(
-        db=db, file_data=file_data, original_filename=sanitized_filename, content_type=mime_type
+        db=db, file_data=file_data, original_filename=sanitized_filename, content_type=mime_type,
+        subida=(user_id, SERVICIO_DOCS),
     )
     if not resultado["ok"]:
         raise HTTPException(
@@ -329,7 +330,7 @@ async def crear_documento(
             raise HTTPException(status_code=400, detail=f"El usuario {revisor_id} no tiene permiso de revisor")
 
     _validar_extension(archivo.filename)
-    ref, file_hash = await subir_archivo(db, archivo)
+    ref, file_hash = await subir_archivo(db, archivo, user_id)
 
     try:
         documento = await servicio(db).crear_proceso(
@@ -393,7 +394,7 @@ async def subir_nueva_version(
     except ReviewError as e:
         raise http_error(e)
 
-    ref, file_hash = await subir_archivo(db, archivo)
+    ref, file_hash = await subir_archivo(db, archivo, user_id)
 
     try:
         resultado = await svc.subir_version(db, documento_id, user_id=user_id, archivo=ref, comentario=comentario)

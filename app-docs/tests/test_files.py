@@ -3,6 +3,7 @@ Tests de routes/files.py: subida con deduplicación, acceso interno por token,
 y contadores de uso (increment/decrement).
 """
 import io
+import os
 import pytest
 from minio.error import S3Error
 
@@ -368,3 +369,23 @@ async def test_download_unified_solo_servicios(client, perms, make_file_hash, st
     a = await make_file_hash()
     r = await client.post("/files/download-unified", headers=gateway_headers(7), json={"file_ids": [a.id]})
     assert r.status_code in (401, 403)
+
+
+# --- punta a punta: FilesClient -> app-docs -> respuesta_archivo -----------------
+
+async def test_respuesta_archivo_contra_app_docs_real(client, make_file_hash, stub_minio):
+    import httpx
+    import main as main_module
+    from satc_shared.archivos import respuesta_archivo
+    from satc_shared.clients import FilesClient
+
+    fh = await make_file_hash(file_size=len(CONTENIDO))
+    files = FilesClient(
+        "http://test", service_name="sanctioning-service", secret_key=os.environ["SANCTIONING_SERVICE_SECRET"],
+        transport=httpx.ASGITransport(app=main_module.app),
+    )
+    r = await respuesta_archivo(files, fh.id, {"range": "bytes=0-7"}, nombre="Acta nº 3.pdf")
+    cuerpo = b"".join([b async for b in r.body_iterator])
+    assert r.status_code == 206 and cuerpo == CONTENIDO[:8]
+    assert r.headers["content-range"] == f"bytes 0-7/{len(CONTENIDO)}"
+    assert r.headers["content-disposition"].startswith('inline; filename="Acta no 3.pdf"; filename*=UTF-8')

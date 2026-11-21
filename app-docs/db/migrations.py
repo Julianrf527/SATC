@@ -17,7 +17,8 @@ Cambios (flujo genérico sobre satc_shared.review_process, origen fuera de app-d
      es una decisión de negocio, no de la migración.
   5. ``file_hash.ultima_subida`` (periodo de gracia de la limpieza), rellenada
      con ``created_at`` en las filas existentes.
-  6. Recrea la vista sin ``origen`` y con los nombres del contrato
+  6. Dueños (``file_uso``) de los archivos del módulo Documentos.
+  7. Recrea la vista sin ``origen`` y con los nombres del contrato
      (``creador_id``; sin el duplicado ``documento_id``). Como el paso 1 la
      borra antes, ``CREATE OR REPLACE`` puede renombrar/quitar columnas.
 
@@ -94,6 +95,22 @@ _BACKFILL = (
 )
 
 
+# Dueños de los archivos del propio módulo Documentos (servicio "docs"). Las
+# tablas file_uso/file_subida las crea create_all; los demás módulos registran
+# los suyos con POST /files/registrar-usos.
+_BACKFILL_USOS_DOCS = """
+INSERT INTO file_uso (file_id, servicio, entidad, entidad_id, creado_en)
+SELECT DISTINCT u.file_id, 'docs', 'documento', u.documento_id::text, now()
+FROM (
+    SELECT file_id, documento_id FROM versiones_documento WHERE file_id IS NOT NULL
+    UNION
+    SELECT adjunto_file_id, documento_id FROM revisiones WHERE adjunto_file_id IS NOT NULL
+) u
+JOIN file_hash fh ON fh.id = u.file_id
+ON CONFLICT ON CONSTRAINT uq_file_uso DO NOTHING
+"""
+
+
 async def _columna_existe(conn: AsyncConnection, tabla: str, columna: str) -> bool:
     return bool(await conn.scalar(text(
         "SELECT 1 FROM information_schema.columns "
@@ -113,6 +130,7 @@ async def aplicar_migraciones(conn: AsyncConnection) -> dict:
     resumen["versiones_backfill"] = (await conn.execute(text(_BACKFILL[0]))).rowcount or 0
     resumen["revisiones_backfill"] = (await conn.execute(text(_BACKFILL[1]))).rowcount or 0
     await conn.execute(text(_BACKFILL[2]))
+    resumen["usos_docs_backfill"] = (await conn.execute(text(_BACKFILL_USOS_DOCS))).rowcount or 0
 
     if await _columna_existe(conn, "documentos", "origen"):
         pendientes = await conn.scalar(text("SELECT COUNT(*) FROM documentos WHERE origen IS NOT NULL"))

@@ -312,16 +312,27 @@ async def find_file_by_hash(db: AsyncSession, file_hash: str) -> Optional[dict]:
     }
 
 
+def _registrar_subida(db, file_id: int, subida, ahora: datetime) -> None:
+    if subida is None:
+        return
+    from db.models.file_uso import FileSubida
+
+    usuario_id, servicio = subida
+    db.add(FileSubida(file_id=file_id, usuario_id=usuario_id, servicio_origen=servicio, fecha=ahora))
+
+
 async def upload_file_with_deduplication(
     db: AsyncSession,
     file_data: bytes,
     original_filename: str,
     content_type: str = "application/octet-stream",
-    object_name: str = None
+    object_name: str = None,
+    subida: Optional[tuple[Optional[int], str]] = None,
 ) -> dict:
     """
     Sube un archivo a MinIO con deduplicación por hash SHA256 y lo registra en
-    ``file_hash``. Si el hash ya existe reutiliza el objeto; en ambos casos
+    ``file_hash``. ``subida=(usuario_id, servicio)`` deja constancia en
+    ``file_subida`` (mismo commit). Si el hash ya existe reutiliza el objeto; en ambos casos
     marca ``ultima_subida`` (periodo de gracia de la limpieza).
 
     Hace commit propio a propósito: el objeto ya está en MinIO, así que su fila
@@ -347,6 +358,7 @@ async def upload_file_with_deduplication(
             .returning(FileHash.id, FileHash.file_url, FileHash.numero_usos)
         )).first()
         if existente is not None:
+            _registrar_subida(db, existente.id, subida, ahora)
             await db.commit()
             logger.info(f"Archivo duplicado reutilizado. Hash: {file_hash}, URL: {existente.file_url}")
             return {
@@ -382,6 +394,7 @@ async def upload_file_with_deduplication(
             .on_conflict_do_update(index_elements=[FileHash.file_hash], set_={"ultima_subida": ahora})
             .returning(FileHash.id, FileHash.file_url, FileHash.numero_usos)
         )).one()
+        _registrar_subida(db, fila.id, subida, ahora)
         await db.commit()
 
         logger.info(f"Archivo nuevo subido y registrado. Hash: {file_hash}, URL: {fila.file_url}")

@@ -1,11 +1,11 @@
 from utils.verify_token import verify_gateway_token, verify_service_token
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from minio.error import S3Error
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import List
-from pydantic import BaseModel
+from typing import List, Optional
+from pydantic import BaseModel, Field
 import asyncio
 import logging
 import os
@@ -27,6 +27,14 @@ from utils.file_validator import validate_file_complete
 from utils.antivirus import escanear_archivo
 from core.permission import PERMISOS_ARCHIVOS
 from services.users import verify_permission
+from services.uso_archivos import (
+    MODO_VALIDACION,
+    UsoArchivo,
+    aplicar_usos,
+    nombre_servicio,
+    quitar_usos,
+    validar_asociacion,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -35,9 +43,25 @@ class FilesBatchRequest(BaseModel):
     file_ids: List[int]
 
 class FileStateUpdateRequest(BaseModel):
-    file_ids: List[int]
+    """Formato actual: ``file_ids`` (solo mueve numero_usos). Formato nuevo:
+    ``usos`` con la entidad dueña (+ ``usuario_id`` de quien asocia)."""
+    file_ids: Optional[List[int]] = None
+    usos: Optional[List[UsoArchivo]] = Field(default=None, max_length=500)
+    usuario_id: Optional[int] = None
 
-async def verify_internal_access(request: Request) -> None:
+
+class RegistrarUsosRequest(BaseModel):
+    usos: List[UsoArchivo] = Field(min_length=1, max_length=1000)
+
+
+class Acceso(BaseModel):
+    """Quién llama: ``servicio`` (nombre corto, 'gateway' si es un usuario) y
+    el usuario cuando lo hay."""
+    servicio: str
+    usuario_id: Optional[int] = None
+
+
+async def verify_internal_access(request: Request) -> Acceso:
     """
     Service-token (otro microservicio, sin usuario) o gateway-token más AL
     MENOS UN permiso de módulo con archivos (PERMISOS_ARCHIVOS).
@@ -51,39 +75,45 @@ async def verify_internal_access(request: Request) -> None:
     gateway_token = request.headers.get("x-gateway-token")
 
     if service_token:
-        verify_service_token(request)
+        return Acceso(servicio=nombre_servicio(verify_service_token(request)))
     elif gateway_token:
         user_id = verify_gateway_token(request)["user_id"]
         for permiso in PERMISOS_ARCHIVOS:
             if await verify_permission(user_id, permiso):
-                return
+                return Acceso(servicio="gateway", usuario_id=user_id)
         raise HTTPException(status_code=403, detail="No tiene permisos para acceder a archivos")
     else:
         raise HTTPException(status_code=401, detail="No se proporcionó token de autenticación")
 
-def verify_service_only_access(request: Request) -> None:
+def verify_service_only_access(request: Request) -> str:
     """
     Para endpoints exclusivamente service-to-service (nunca llamados desde el
     frontend vía gateway): exige X-Service-Token estricto, sin fallback a
     X-Gateway-Token. El gateway inyecta X-Gateway-Token en toda petición que
     reenvía, incluidas las que no exigen sesión de usuario — aceptarlo acá
     permitiría a cualquiera con acceso a la red interna suplantar un servicio.
+
+    Devuelve el nombre corto del servicio que llama ('infraction', 'recurso'...).
     """
-    verify_service_token(request)
+    return nombre_servicio(verify_service_token(request))
 
 @router.post("/upload")
 async def upload_file(
     request: Request,
     archivo: UploadFile = File(...),
+    usuario_id: Optional[int] = Form(None),
     db: AsyncSession = Depends(get_db_managed)
 ):
     """
     Sube un archivo con deduplicación por hash. Devuelve su ID y numero_usos
     actual (0 si es nuevo): quien lo asocie a un recurso debe incrementarlo.
 
-    Lo llaman el frontend (vía gateway) y app-infraction (service-token).
+    Lo llaman el frontend (vía gateway) y los servicios (service-token). Cada
+    subida queda en ``file_subida``: por gateway con el usuario de la sesión;
+    un servicio que sube a nombre de un usuario lo manda en ``usuario_id``.
     """
-    await verify_internal_access(request)
+    acceso = await verify_internal_access(request)
+    subida_usuario = acceso.usuario_id if acceso.servicio == "gateway" else usuario_id
 
     file_data = await archivo.read()
 
@@ -108,7 +138,8 @@ async def upload_file(
         db=db,
         file_data=file_data,
         original_filename=sanitized_filename,
-        content_type=mime_type
+        content_type=mime_type,
+        subida=(subida_usuario, acceso.servicio),
     )
     if not resultado_upload.get("ok"):
         raise HTTPException(
@@ -258,10 +289,40 @@ async def increment_file_usage(
     db: AsyncSession = Depends(get_db_managed)
 ):
     """
-    Incrementa numero_usos al asociar archivos a un recurso. Mientras el
-    contador sea > 0, el cleanup no los borra.
+    Registra que un recurso usa los archivos; mientras tengan uso el cleanup
+    no los borra.
+
+    - ``file_ids`` (formato actual): suma 1 a numero_usos de cada uno.
+    - ``usos`` (formato nuevo): upsert en file_uso con el servicio del token;
+      numero_usos sube solo por cada asociación nueva (repetir es idempotente).
+      Con ``usuario_id`` se valida que no asocie archivos ajenos (no subidos
+      por él ni ya de esa entidad): según ARCHIVOS_VALIDAR_ASOCIACION se
+      rechaza el lote con 403 (on) o solo se registra en el log (log).
     """
-    verify_service_only_access(request)
+    servicio = verify_service_only_access(request)
+
+    if file_request.usos:
+        rechazados = []
+        if MODO_VALIDACION in ("log", "on"):
+            rechazados = await validar_asociacion(db, servicio, file_request.usos, file_request.usuario_id)
+        if rechazados:
+            logger.warning(
+                f"Asociación de archivos ajenos ({'rechazada' if MODO_VALIDACION == 'on' else 'solo registro'}): "
+                f"servicio={servicio} usuario={file_request.usuario_id} file_ids={rechazados}"
+            )
+            if MODO_VALIDACION == "on":
+                return JSONResponse(status_code=403, content={
+                    "ok": False,
+                    "message": "Hay archivos que el usuario no subió ni pertenecen a esta entidad",
+                    "rechazados": rechazados,
+                })
+        resultado = await aplicar_usos(db, servicio, file_request.usos, file_request.usuario_id)
+        await db.commit()
+        return JSONResponse(content={
+            "ok": True,
+            "message": f"Uso registrado para {resultado['registrados']} asociación(es) nueva(s)",
+            **resultado,
+        })
 
     if not file_request.file_ids:
         return JSONResponse(status_code=400, content={"ok": False, "message": "No file_ids provided."})
@@ -284,10 +345,21 @@ async def decrement_file_usage(
     db: AsyncSession = Depends(get_db_managed)
 ):
     """
-    Decrementa numero_usos al desvincular archivos de un recurso (nunca por
-    debajo de 0). Al llegar a 0 quedan elegibles para el cleanup.
+    Libera el uso al desvincular archivos de un recurso (numero_usos nunca baja
+    de 0; en 0 quedan elegibles para el cleanup tras el periodo de gracia).
+
+    - ``file_ids`` (formato actual): resta 1 a cada uno.
+    - ``usos`` (formato nuevo): borra esas filas de file_uso del servicio y
+      resta 1 por cada fila borrada.
     """
-    verify_service_only_access(request)
+    servicio = verify_service_only_access(request)
+
+    if file_request.usos:
+        quitados = await quitar_usos(db, servicio, file_request.usos)
+        await db.commit()
+        return JSONResponse(content={
+            "ok": True, "message": f"Uso liberado para {quitados} asociación(es)", "quitados": quitados,
+        })
 
     if not file_request.file_ids:
         return JSONResponse(status_code=400, content={"ok": False, "message": "No file_ids provided."})
@@ -305,6 +377,22 @@ async def decrement_file_usage(
     await db.commit()
 
     return JSONResponse(content={"ok": True, "message": f"Uso decrementado para {decremented_count} archivo(s)"})
+
+@router.post("/registrar-usos")
+async def registrar_usos(
+    request: Request,
+    body: RegistrarUsosRequest,
+    db: AsyncSession = Depends(get_db_managed)
+):
+    """
+    Carga inicial de dueños (backfill): registra en file_uso las asociaciones
+    que el servicio ya tiene, SIN tocar numero_usos (esos archivos ya fueron
+    contados con el formato anterior). Idempotente; máx. 1000 por llamada.
+    """
+    servicio = verify_service_only_access(request)
+    resultado = await aplicar_usos(db, servicio, body.usos, None, mover_contador=False)
+    await db.commit()
+    return JSONResponse(content={"ok": True, **resultado})
 
 # PDF unificado: cuántas uniones a la vez por worker, desde qué tamaño el
 # resultado pasa de memoria a disco y tamaño de los bloques que se envían.
