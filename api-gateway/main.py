@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from starlette.background import BackgroundTask
 from dotenv import load_dotenv
 import logging
+import re
 import httpx
 import os
 
@@ -143,10 +144,69 @@ class RateLimitMiddleware:
         return await self.app(scope, receive, send)
 
 
-app.add_middleware(GZipMiddleware, minimum_size=2000, compresslevel=6)
+# Rutas de descarga de archivos. Se transmiten sin cargarlas en memoria, con
+# timeout largo y sin GZip (ver `GZipSalvoDescargas`):
+#   - `<modulo>/archivos/<id>`: endpoint de cada módulo que valida el acceso
+#     con sus tablas y transmite los bytes que le entrega app-docs.
+#   - `download-all`, `file/download/`: descargas masivas ya existentes.
+#   - `files/download/`: descarga directa de app-docs, mientras dura la
+#     transición hacia `<modulo>/archivos/<id>`.
+PATRONES_DESCARGA = ("download-all", "file/download/", "files/download/")
+PATRON_ARCHIVO_MODULO = re.compile(r"(?:^|/)archivos/\d+$")
+
+# Por encima de este tamaño (según el Content-Length del backend) cualquier
+# respuesta se transmite en streaming en vez de leerse entera en memoria.
+UMBRAL_STREAMING = 1_000_000
+
+TIMEOUT_NORMAL = httpx.Timeout(20.0, connect=5.0)
+TIMEOUT_DESCARGA = httpx.Timeout(300.0, connect=5.0)
+
+
+def es_descarga(path: str) -> bool:
+    """¿`path` (relativo al servicio) es una descarga de archivo?"""
+    return any(p in path for p in PATRONES_DESCARGA) or bool(
+        PATRON_ARCHIVO_MODULO.search(path)
+    )
+
+
+def debe_transmitirse(descarga: bool, content_type: str, content_length: str | None) -> bool:
+    """¿La respuesta del backend se reenvía en streaming en vez de leerse entera?"""
+    if descarga or "text/event-stream" in content_type:
+        return True
+    return bool(
+        content_length and content_length.isdigit() and int(content_length) > UMBRAL_STREAMING
+    )
+
+
+class GZipSalvoDescargas:
+    """GZip para todo menos las descargas de archivos y las peticiones con Range.
+
+    El GZip de Starlette comprime también los `StreamingResponse`: añade
+    `Content-Encoding: gzip` y quita `Content-Length`. Sin `Content-Length`, o
+    con una codificación distinta de identity, pdf.js desactiva la carga por
+    rangos, y un 206 comprimido rompe la semántica de `Content-Range` (el rango
+    se refiere a los bytes sin comprimir). Además los PDF e imágenes ya vienen
+    comprimidos, así que comprimirlos de nuevo solo gasta CPU.
+    """
+
+    def __init__(self, app, **kwargs):
+        self.app = app
+        self.gzip = GZipMiddleware(app, **kwargs)
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            partes = scope["path"].lstrip("/").split("/", 1)
+            path_servicio = partes[1] if len(partes) > 1 else ""
+            pide_rango = any(k.lower() == b"range" for k, _ in scope.get("headers", []))
+            if pide_rango or es_descarga(path_servicio):
+                return await self.app(scope, receive, send)
+        return await self.gzip(scope, receive, send)
+
+
+app.add_middleware(GZipSalvoDescargas, minimum_size=2000, compresslevel=6)
 
 # `add_middleware` antepone, así que el último agregado es el más externo: la
-# pila queda CORS → RateLimit → GZip → app. CORS debe ir por fuera para que el
+# pila queda CORS → RateLimit → GZip (salvo descargas) → app. CORS debe ir por fuera para que el
 # 429 lleve cabeceras CORS (si no el navegador ve un error opaco) y para que el
 # preflight OPTIONS se responda sin gastar cuota.
 app.add_middleware(RateLimitMiddleware)
@@ -325,7 +385,7 @@ async def proxy(
         cookies_dict["access_token"] = access_token
 
     is_sse = "notification/stream" in path
-    is_large_download = "download-all" in path or "file/download/" in path
+    descarga = es_descarga(path)
 
     if is_sse:
         # Sin follow_redirects, por el mismo motivo que `http_client`: no
@@ -377,18 +437,23 @@ async def proxy(
             background=BackgroundTask(close_sse_resources),
         )
 
+    # Siempre con stream=True: así una descarga (o cualquier respuesta grande)
+    # pasa al cliente a medida que llega en vez de quedar entera en memoria. Las
+    # respuestas pequeñas se leen completas más abajo, como antes. Se usa el
+    # cliente compartido (pool de conexiones): pdf.js pide un mismo PDF en
+    # muchos rangos y abrir un cliente por petición costaría un handshake cada
+    # vez. Solo hay que cerrar la respuesta, lo que devuelve la conexión al pool.
+    req = http_client.build_request(
+        request.method,
+        target_url,
+        headers=headers,
+        params=request.query_params,
+        content=body,
+        cookies=cookies_dict,
+        timeout=TIMEOUT_DESCARGA if descarga else TIMEOUT_NORMAL,
+    )
     try:
-        timeout_config = httpx.Timeout(300.0, connect=5.0) if is_large_download else httpx.Timeout(20.0, connect=5.0)
-
-        backend_resp = await http_client.request(
-            request.method,
-            target_url,
-            headers=headers,
-            params=request.query_params,
-            content=body,
-            cookies=cookies_dict,
-            timeout=timeout_config,
-        )
+        backend_resp = await http_client.send(req, stream=True)
         record_success(service)
     except httpx.TimeoutException:
         record_failure(service)
@@ -402,26 +467,46 @@ async def proxy(
         key: value for key, value in backend_resp.headers.items()
         if key.lower() not in EXCLUDED_RESPONSE_HEADERS and value
     }
+    # httpx decodifica el cuerpo si el backend lo comprimió y la cabecera
+    # Content-Encoding ya se descartó: su Content-Length (el comprimido) no
+    # correspondería a los bytes que se reenvían.
+    if "content-encoding" in backend_resp.headers:
+        response_headers = {
+            k: v for k, v in response_headers.items() if k.lower() != "content-length"
+        }
     sanear_redireccion(service, backend_resp.status_code, response_headers)
 
     content_type = backend_resp.headers.get("content-type", "")
     content_length = backend_resp.headers.get("content-length")
-    respuesta_es_sse = "text/event-stream" in content_type
-    is_large_file = bool(content_length and content_length.isdigit() and int(content_length) > 1_000_000)
 
-    if respuesta_es_sse or is_large_file:
+    if debe_transmitirse(descarga, content_type, content_length):
+        # Status tal cual (200, 206, 416...) y cabeceras del backend, incluidas
+        # Content-Range, Accept-Ranges, Content-Length y Content-Disposition.
         return StreamingResponse(
             backend_resp.aiter_bytes(),
             status_code=backend_resp.status_code,
             headers=response_headers,
-            media_type=content_type
+            media_type=content_type or None,
+            background=BackgroundTask(backend_resp.aclose),
         )
 
+    try:
+        contenido = await backend_resp.aread()
+    except httpx.TimeoutException:
+        record_failure(service)
+        raise HTTPException(status_code=504, detail="Gateway timeout")
+    except httpx.RequestError as e:
+        record_failure(service)
+        logger.warning(f"Fallo de red hacia {service} leyendo la respuesta: {e}")
+        raise HTTPException(status_code=503, detail="Service unavailable")
+    finally:
+        await backend_resp.aclose()
+
     return Response(
-        content=backend_resp.content,
+        content=contenido,
         status_code=backend_resp.status_code,
         headers=response_headers,
-        media_type=backend_resp.headers.get("content-type")
+        media_type=content_type or None,
     )
 
 
