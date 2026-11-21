@@ -232,4 +232,35 @@ async def test_sync_reporta_rol_con_incompatibles_y_no_lo_modifica(db_session, m
     r = await _sync()
     reporte = {x["rol_id"]: x for x in r["roles_incumplen"]}
     assert reporte[mezcla.id]["incompatibles"] == [{"permiso": "recurso_gestionar", "con": "recurso_tecnico"}]
-    assert await _permisos_de_rol(mezcla.id) == {"recurso_tecnico", "recurso_gestionar", "recurso_consultar"}
+    # Sus permisos no se tocan (solo recibe recurso_alertas al crearse, por tener gestionar/consultar).
+    assert await _permisos_de_rol(mezcla.id) == {
+        "recurso_tecnico", "recurso_gestionar", "recurso_consultar", "recurso_alertas",
+    }
+
+
+@pytest.mark.asyncio
+async def test_sync_otorga_recurso_alertas_a_quien_ya_veia_la_pestana(db_session, make_permiso, make_rol):
+    """recurso_alertas nace para los roles con recurso_gestionar o
+    recurso_consultar (antes la pestaña se abría con esos) y solo esa vez."""
+    gestionar = await make_permiso("recurso_gestionar", "/recurso/manage")
+    consultar = await make_permiso("recurso_consultar", "/recurso/consult")
+    tecnico = await make_permiso("recurso_tecnico", "/recurso/my-reports")
+    rol_g = await make_rol("abogado", [gestionar])
+    rol_c = await make_rol("lector", [consultar])
+    rol_t = await make_rol("tecnico", [tecnico, consultar])
+    rol_x = await make_rol("solo_tecnico", [tecnico])
+    await db_session.commit()
+
+    r = await _sync()
+    assert sorted(r["otorgados_al_crear"]["recurso_alertas"]) == sorted([rol_g.id, rol_c.id, rol_t.id])
+    assert "recurso_alertas" in await _permisos_de_rol(rol_g.id)
+    assert "recurso_alertas" not in await _permisos_de_rol(rol_x.id)
+
+    # Si después se lo quitan a un rol, la siguiente corrida no lo vuelve a dar.
+    async with engine.begin() as conn:
+        await conn.execute(text(
+            "DELETE FROM rol_permiso WHERE rol_id = :r AND permiso_id = "
+            "(SELECT id FROM permiso WHERE nombre = 'recurso_alertas')"
+        ), {"r": rol_c.id})
+    assert (await _sync())["otorgados_al_crear"] == {}
+    assert "recurso_alertas" not in await _permisos_de_rol(rol_c.id)

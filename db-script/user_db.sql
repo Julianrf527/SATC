@@ -381,6 +381,7 @@ COPY public.permiso (id, nombre, menu_path, descripcion) FROM stdin;
 30	recurso_lider_tecnico	/recurso/my-reports	Desbloquea Mis actuaciones de concesiones como líder técnico. Sirve para revisar los conceptos técnicos.
 31	recurso_sig	/recurso/my-reports	Desbloquea Mis actuaciones de concesiones como SIG. Sirve para revisar el concepto técnico de la etapa 2 junto con el líder técnico.
 32	recurso_tecnico	/recurso/my-reports	Desbloquea Mis actuaciones de concesiones como técnico. Sirve para que el abogado lo elija como técnico y cargar su concepto técnico.
+33	recurso_alertas	/recurso/alerts	Desbloquea la pestaña Alertas de concesiones. Sirve para ver los vencimientos que le corresponden (Mis alertas) o los de todos los expedientes.
 \.
 
 
@@ -465,6 +466,7 @@ COPY public.rol_permiso (rol_id, permiso_id) FROM stdin;
 1	30
 1	31
 1	32
+1	33
 \.
 
 
@@ -510,7 +512,7 @@ SELECT pg_catalog.setval('public.notificacion_id_seq', 1, false);
 -- Name: permiso_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.permiso_id_seq', 32, true);
+SELECT pg_catalog.setval('public.permiso_id_seq', 33, true);
 
 
 --

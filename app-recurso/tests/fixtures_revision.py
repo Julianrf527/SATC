@@ -16,8 +16,8 @@ JURIDICO, JURIDICO2, PROYECTO, ASESORA, LIDER_TECNICO, SIG = 40, 41, 42, 43, 44,
 LECTOR, SUPER_G, EXTRANO = 50, 51, 99
 
 PERMISOS_REVISION: dict[int, tuple[str, ...]] = {
-    ABOGADO: (Permission.MANAGE,),
-    ABOGADO2: (Permission.MANAGE,),
+    ABOGADO: (Permission.MANAGE, Permission.ALERTAS),
+    ABOGADO2: (Permission.MANAGE, Permission.ALERTAS),
     TECNICO: (Permission.TECNICO,),
     JURIDICO: (Permission.LIDER_JURIDICO,),
     JURIDICO2: (Permission.LIDER_JURIDICO,),
@@ -25,7 +25,7 @@ PERMISOS_REVISION: dict[int, tuple[str, ...]] = {
     ASESORA: (Permission.ASESORA_SUBDIRECCION,),
     LIDER_TECNICO: (Permission.LIDER_TECNICO,),
     SIG: (Permission.SIG,),
-    LECTOR: (Permission.CONSULT,),
+    LECTOR: (Permission.CONSULT, Permission.ALERTAS),
     SUPER_G: (Permission.MANAGE, Permission.SUPER_MANAGE),
 }
 

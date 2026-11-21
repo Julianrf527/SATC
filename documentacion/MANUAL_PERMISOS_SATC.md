@@ -88,7 +88,7 @@ Detalles del armado:
   a **Mis actuaciones** (actos y conceptos en los que el usuario actúa), que
   aparece una sola vez. Quien tiene `recurso_gestionar` también ve Mis
   actuaciones (allí suben sus documentos los abogados). La pestaña **Alertas**
-  aparece con `recurso_gestionar` o `recurso_consultar`.
+  aparece con `recurso_alertas`.
 - Orden de las entradas: Gestionar → Consultar → Alertas → Asignar → Asignar
   informes → Mis informes / Mis actuaciones (según lo que tenga cada usuario).
 
@@ -146,6 +146,7 @@ En la pantalla Informes solo se pueden elegir como profesional usuarios con
 | ------------------------------- | ---------------------- | ----------- |
 | `recurso_gestionar`             | `/recurso/manage`      | Desbloquea la pantalla Gestionar de concesiones. Sirve para crear y editar expedientes, asignarse procesos y proyectar los documentos de cada etapa. |
 | `recurso_consultar`             | `/recurso/consult`     | Desbloquea la pantalla Consulta de concesiones. Sirve para ver cualquier expediente en solo lectura y descargarlo completo. |
+| `recurso_alertas`               | `/recurso/alerts`      | Desbloquea la pestaña Alertas de concesiones. Sirve para ver los vencimientos que le corresponden (Mis alertas) o los de todos los expedientes. Al crearse se otorgó a los roles que tenían `recurso_gestionar` o `recurso_consultar`. |
 | `recurso_super_gestion`         | —                      | Desbloquea el cargue histórico de concesiones. Sirve para cargar directamente cualquier etapa de expedientes viejos sin revisión ni asignación. |
 | `recurso_lider_juridico`        | `/recurso/my-reports`  | Desbloquea Mis actuaciones de concesiones como líder jurídico. Sirve para revisar los actos administrativos en el primer paso de su cadena. |
 | `recurso_lider_proyecto`        | `/recurso/my-reports`  | Desbloquea Mis actuaciones de concesiones como líder del proyecto. Sirve para revisar tras el líder jurídico o técnico/SIG y aprobar para firma. |

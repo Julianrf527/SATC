@@ -1055,3 +1055,22 @@ Las filas de `GET /mis-documentos` y el detalle `GET /revision-documentos/{id}` 
   `requerimiento_etapa3` | `requerimiento_memorias` | `requerimiento_obras`, `decision`,
   `recurso`, `auto_pruebas`, `concepto_pruebas`, `concepto_memorias`, `concepto_subsanacion`, `concepto_obras`,
   `concepto_obras_segundo`, `aprobacion`, `reconoce_tercero`.
+
+---
+
+## D — Alertas — `/recurso/alertas`
+
+Reglas y plazos en `services/alertas.py`; inventario en `documentacion/ALERTAS_RECURSO.md`.
+
+| Método | Ruta | Permiso | Qué hace |
+|---|---|---|---|
+| GET | `/alertas/todas?alcance=mios\|todos&page&limit&radicado&estado&tipo` | `recurso_alertas` | Pestaña Alertas, paginada (contrato de `satc_shared.alertas`: `alertas`, `total`, `page`, `limit`, `total_pages`, `tipos_disponibles`, `estadisticas_semaforo`). |
+| GET | `/alertas/aviso-visita?fecha_numerado&fecha_visita` | gestión | Fecha límite de la visita técnica y aviso (no bloquea). |
+| GET | `/alertas/{expediente_id}` | lectura | Alertas de un expediente. |
+
+Cada alerta trae, además de `tipo`, `etapa`, `semaforo`, `expediente_id` y `proceso_id`:
+
+- `encargado_id`: persona a cargo de la tarea.
+- `roles_responsables`: `[{permiso, etiqueta}]`. Con elementos solo mientras el documento está **en revisión**: los roles del paso actual que aún no revisan. Vacío en los demás estados.
+- `estado_documento`: estado del proceso de revisión (informativo; `null` si aún no hay proceso).
+- `es_responsable`: si `roles_responsables` tiene elementos, el usuario tiene alguno de esos permisos; si no, es el `encargado_id`. `alcance=mios` filtra por este campo.
