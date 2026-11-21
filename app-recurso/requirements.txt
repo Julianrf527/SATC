@@ -24,6 +24,9 @@ httpx==0.28.1
 # Variables de entorno
 python-dotenv==1.2.4
 
+# Versión global de permisos en Redis (satc_shared.permisos_version)
+redis==8.1.0
+
 # Días hábiles de Colombia (alertas)
 holidays==0.108
 

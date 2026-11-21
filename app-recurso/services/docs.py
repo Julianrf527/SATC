@@ -17,9 +17,10 @@ files_client = FilesClient.from_env("recurso-service")
 
 
 def _error(e: Exception) -> Dict[str, Any]:
+    """Mensaje para el usuario sin detalles internos (el detalle va al log)."""
     if isinstance(e, ServiceClientError) and e.status_code is not None:
-        return {"ok": False, "message": f"Error from app-docs: {e.status_code}"}
-    return {"ok": False, "message": str(e)}
+        return {"ok": False, "message": f"El gestor documental respondió {e.status_code}"}
+    return {"ok": False, "message": "El gestor documental no está disponible"}
 
 
 async def increment_file_usage(file_ids: List[int]) -> Dict[str, Any]:
