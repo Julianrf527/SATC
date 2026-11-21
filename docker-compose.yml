@@ -698,6 +698,11 @@ services:
       # Asociar archivos ajenos: off | log (solo avisa) | on (rechaza con 403)
       ARCHIVOS_VALIDAR_ASOCIACION: ${ARCHIVOS_VALIDAR_ASOCIACION:-log}
       ARCHIVOS_VENTANA_SUBIDA_HORAS: ${ARCHIVOS_VENTANA_SUBIDA_HORAS:-24}
+      # Fase 4 (activar según scripts/reporte_archivos.py):
+      #   false = los usuarios ya no leen /files/{id} ni /files/download/{id}; descargan por su módulo
+      ARCHIVOS_ACCESO_DIRECTO_USUARIOS: ${ARCHIVOS_ACCESO_DIRECTO_USUARIOS:-true}
+      #   contador = sin uso si numero_usos=0 y sin dueños | duenos = solo sin dueños en file_uso
+      LIMPIEZA_CRITERIO: ${LIMPIEZA_CRITERIO:-contador}
 
       # ClamAV Antivirus
       CLAMAV_ENABLED: ${CLAMAV_ENABLED:-true}

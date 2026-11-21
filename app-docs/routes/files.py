@@ -39,6 +39,23 @@ from services.uso_archivos import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# Fase 4 del acceso a archivos. Con "false", GET /files/{id} y
+# /files/download/{id} solo aceptan service-token: el usuario descarga por el
+# endpoint de su módulo (/<modulo>/archivos/{id}), que valida que pueda ver la
+# entidad dueña. Apagar solo cuando todos los módulos y el front lo usen.
+ACCESO_DIRECTO_USUARIOS = os.getenv("ARCHIVOS_ACCESO_DIRECTO_USUARIOS", "true").strip().lower() != "false"
+
+
+def exigir_acceso_directo(acceso: "Acceso", file_id: int) -> None:
+    """Lectura de archivos por gateway: solo mientras siga habilitada. Cada
+    lectura directa queda en el log ("Acceso directo de usuario") para medir
+    cuándo se puede cerrar sin romper pantallas."""
+    if acceso.servicio != "gateway":
+        return
+    if not ACCESO_DIRECTO_USUARIOS:
+        raise HTTPException(status_code=403, detail="Descarga el archivo desde el módulo al que pertenece")
+    logger.info(f"Acceso directo de usuario: usuario={acceso.usuario_id} file_id={file_id}")
+
 class FilesBatchRequest(BaseModel):
     file_ids: List[int]
 
@@ -168,7 +185,7 @@ async def get_file_by_id(
     """
     Retorna la información de un documento por su ID unico.
     """
-    await verify_internal_access(request)
+    exigir_acceso_directo(await verify_internal_access(request), file_id)
 
     stmt = select(FileHash).where(FileHash.id == file_id)
     result = await db.execute(stmt)
@@ -231,7 +248,7 @@ async def download_file_by_id(
     rangos (``Range``/``If-Range`` -> 206, 416 si no cabe). Solo PDF e imágenes
     se sirven ``inline``; el resto como adjunto ``application/octet-stream``.
     """
-    await verify_internal_access(request)
+    exigir_acceso_directo(await verify_internal_access(request), file_id)
 
     file_record = (await db.execute(
         select(FileHash).where(FileHash.id == file_id)
