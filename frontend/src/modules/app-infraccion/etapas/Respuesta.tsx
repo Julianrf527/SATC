@@ -1,3 +1,4 @@
+import TarjetaEtapa from "./TarjetaEtapa";
 import { useCallback, useState } from "react";
 import { useDelayedFlag } from "@shared/hooks/useDelayedFlag";
 import { openDocumentById } from "@shared/lib/documentViewer";
@@ -73,7 +74,7 @@ export default function Respuesta({
   }
 
   return (
-    <div className="space-y-6">
+    <TarjetaEtapa etapa="respuesta">
       {(respuestaData || isCreatingStage) && (
         <RespuestaData
           expedienteId={expedienteId}
@@ -95,6 +96,6 @@ export default function Respuesta({
           setToast={setToast}
         />
       )}
-    </div>
+    </TarjetaEtapa>
   );
 }

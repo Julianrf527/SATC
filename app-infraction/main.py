@@ -4,7 +4,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 import os
 
-from routes import involved, town, reports, revision_informes
+from routes import involved, town, reports, revision_informes, revision_actos, mis_actuaciones
 from routes import file_query, file_mutations, file_audit, file_alerts, file_download
 from routes import stage_respuesta, stage_informe, stage_concepto, stage_cierre
 from routes import acto_admin, acto_notificacion, acto_comunicacion
@@ -62,6 +62,8 @@ app.include_router(stage_concepto.router, prefix="/etapas", tags=["Etapas - Conc
 app.include_router(stage_cierre.router, prefix="/etapas", tags=["Etapas - Cierre"])
 app.include_router(reports.router, prefix="/informes", tags=["Informes técnicos"])
 app.include_router(revision_informes.router, prefix="/revision-informes", tags=["Informes técnicos - Revisión"])
+app.include_router(revision_actos.router, prefix="/revision-actos", tags=["Actos administrativos - Revisión"])
+app.include_router(mis_actuaciones.router, prefix="/mis-actuaciones", tags=["Mis actuaciones"])
 
 
 @app.get("/health")

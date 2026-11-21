@@ -13,7 +13,9 @@ import NotificacionModal from "./NotificationModal";
 import {
   DEFAULT_ENDPOINTS,
   type ActoAdminEndpoints,
+  type ActoAdminFormData,
   type ActoAdminOrEmpty,
+  type ActoAdminSaveResult,
   type ActoAdminStageBinding,
   type SetToast,
   type TipoActo,
@@ -37,6 +39,26 @@ type Props = {
   endpoints?: ActoAdminEndpoints;
   stageBinding?: ActoAdminStageBinding;
   embedded?: boolean;
+  /** Crear el acto desde el estado vacío (default true). */
+  allowCreate?: boolean;
+  /** Eliminar el acto (default true). */
+  allowDelete?: boolean;
+  /** Reemplazar el PDF al editar (default true). */
+  allowDocumentChange?: boolean;
+  /**
+   * Contenido propio cuando la etapa aún no tiene acto (reemplaza el estado
+   * vacío). Recibe `abrirCrear` para abrir el modal de creación (solo
+   * funciona si `allowCreate` y `isEditable`).
+   */
+  renderEmpty?: (abrirCrear: () => void) => React.ReactNode;
+  /**
+   * Modal propio para crear el acto (en lugar de `ActoAdminModal`). Recibe el
+   * guardado de la feature: actualiza el estado local y `onActoAdminUpdate`.
+   */
+  renderModalCrear?: (props: {
+    onSave: (data: ActoAdminFormData) => Promise<ActoAdminSaveResult>;
+    onClose: () => void;
+  }) => React.ReactNode;
 };
 
 export default function ActoAdmin({
@@ -55,6 +77,11 @@ export default function ActoAdmin({
   endpoints,
   stageBinding,
   embedded = false,
+  allowCreate = true,
+  allowDelete = true,
+  allowDocumentChange = true,
+  renderEmpty,
+  renderModalCrear,
 }: Props) {
   const apiEndpoints = endpoints ?? DEFAULT_ENDPOINTS;
 
@@ -93,17 +120,31 @@ export default function ActoAdmin({
   };
 
   if (!hasActoAdmin) {
+    const cerrarCrear = () => acto.setShowActoModal(false);
+    const modalCrear = isEditable && allowCreate && (renderModalCrear ? (
+      acto.showActoModal && renderModalCrear({ onSave: acto.handleSaveActoAdmin, onClose: cerrarCrear })
+    ) : (
+      <ActoAdminModal
+        isOpen={acto.showActoModal}
+        onClose={() => acto.setShowActoModal(false)}
+        onSave={acto.handleSaveActoAdmin}
+        editActoAdmin={null}
+      />
+    ));
+    if (renderEmpty) {
+      return (
+        <>
+          {renderEmpty(() => acto.setShowActoModal(true))}
+          {modalCrear}
+        </>
+      );
+    }
     return (
       <ActoAdminEmptyState
-        isEditable={isEditable}
+        isEditable={isEditable && allowCreate}
         onCreate={() => acto.setShowActoModal(true)}
       >
-        <ActoAdminModal
-          isOpen={acto.showActoModal}
-          onClose={() => acto.setShowActoModal(false)}
-          onSave={acto.handleSaveActoAdmin}
-          editActoAdmin={null}
-        />
+        {modalCrear}
       </ActoAdminEmptyState>
     );
   }
@@ -141,6 +182,7 @@ export default function ActoAdmin({
         isEditable={isEditable}
         comunicacionDeleteEndpoint={apiEndpoints.comunicacion?.delete}
         embedded={embedded}
+        allowDelete={allowDelete}
       />
 
       {isEditable && (
@@ -152,6 +194,7 @@ export default function ActoAdmin({
             editActoAdmin={
               hasActoAdmin ? (localActoAdmin as ActoAdministrativo) : null
             }
+            allowDocumentChange={allowDocumentChange}
           />
 
           {isComunicacion && apiEndpoints.comunicacion && (

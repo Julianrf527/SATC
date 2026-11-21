@@ -29,13 +29,16 @@ const ordenInfracciones = [
   "alertas",
   "asignar",
   "asignar informes",
-  "mis informes",
+  "mis actuaciones",
   "involucrados",
 ];
 
-// informes_subir e informes_revisar apuntan al mismo path (/infraction/my-reports)
-// — si el usuario tiene ambos, deben colapsar en una sola entrada "Mis Informes".
-const NOMBRES_MIS_INFORMES = ["informes subir", "informes revisar"];
+// infraccion_tecnico, infraccion_lider_tecnico e infraccion_lider_proyecto apuntan al
+// mismo path (/infraction/my-reports): colapsan en una sola entrada "Mis actuaciones"
+// (informes técnicos + actos administrativos). infraccion_gestionar también la ve:
+// el encargado sigue ahí los actos que proyecta.
+const NOMBRES_MIS_ACTUACIONES = ["tecnico", "lider tecnico", "lider proyecto"];
+const MIS_ACTUACIONES_INFRACCION = "/infraction/my-reports";
 
 // Concesiones de Aguas: los permisos de revisor y técnico apuntan todos a
 // /recurso/my-reports (una sola entrada "Mis actuaciones"); recurso_gestionar
@@ -98,13 +101,20 @@ export default function Slider({ permission = [] }: Props) {
 
       if (cat.prefix === "infraccion_") {
         const renombrado = subMenuPermitido.map((item) =>
-          NOMBRES_MIS_INFORMES.includes(item.name.toLowerCase())
-            ? { ...item, name: "Mis Informes" }
+          NOMBRES_MIS_ACTUACIONES.includes(item.name.toLowerCase())
+            ? { ...item, name: "Mis actuaciones" }
             : item,
         );
+        if (permission.some((p) => p.name === "infraccion_gestionar")) {
+          renombrado.push({
+            name: "Mis actuaciones",
+            url: MIS_ACTUACIONES_INFRACCION,
+            originalName: "infraccion_mis_actuaciones",
+          });
+        }
         const seen = new Set<string>();
         const sinDuplicados = renombrado.filter((item) => {
-          if (item.name !== "Mis Informes") return true;
+          if (item.name !== "Mis actuaciones") return true;
           if (seen.has(item.url)) return false;
           seen.add(item.url);
           return true;

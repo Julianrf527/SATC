@@ -23,6 +23,7 @@ const Respuesta = lazy(() => import("../etapas/Respuesta"));
 const Visita = lazy(() => import("../etapas/Visita"));
 const Concepto = lazy(() => import("../etapas/Concepto"));
 const Seguimiento = lazy(() => import("../etapas/Seguimiento"));
+const ConceptoSeguimiento = lazy(() => import("../etapas/ConceptoSeguimiento"));
 const Cierre = lazy(() => import("../etapas/Cierre"));
 
 type SetToast = (toast: {
@@ -57,6 +58,12 @@ const TABS: Tab[] = [
   { id: "visita", label: ETIQUETA_ETAPA.visita, icon: "bx-error-alt", component: Visita },
   { id: "concepto", label: ETIQUETA_ETAPA.concepto, icon: "bx-book-bookmark", component: Concepto },
   { id: "seguimiento", label: ETIQUETA_ETAPA.seguimiento, icon: "bx-error-alt", component: Seguimiento },
+  {
+    id: "concepto_seguimiento",
+    label: ETIQUETA_ETAPA.concepto_seguimiento,
+    icon: "bx-book-bookmark",
+    component: ConceptoSeguimiento,
+  },
   { id: "cierre", label: ETIQUETA_ETAPA.cierre, icon: "bx-check-circle", component: Cierre },
 ];
 
@@ -68,7 +75,8 @@ const TAB_TO_ETAPA: Record<string, number | null> = {
   visita: 2,
   concepto: 3,
   seguimiento: 4,
-  cierre: 5,
+  concepto_seguimiento: 5,
+  cierre: 6,
 };
 
 /**
@@ -114,6 +122,8 @@ type Props = {
   setQuejosoList?: (quejosos: Quejoso[]) => void;
   isEditable?: boolean;
   onArchiveSuccess?: () => void;
+  /** Pestaña con la que abrir el expediente al seleccionarlo ("Ir a la etapa"). */
+  etapaInicial?: string | null;
 };
 
 export default function DetalleInfraccion({
@@ -126,17 +136,20 @@ export default function DetalleInfraccion({
   setToast,
   isEditable = true,
   onArchiveSuccess,
+  etapaInicial = null,
 }: Props) {
   const expedienteActual = expedienteSeleccionado;
   const [activeTab, setActiveTab] = useState<string>("info");
   const [isTabsCollapsed, setIsTabsCollapsed] = useState(false);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
 
-  // En modo consulta, al cambiar de expediente se vuelve a "Información".
+  // En modo consulta, al cambiar de expediente se vuelve a "Información";
+  // si llega desde "Ir a la etapa", se abre esa pestaña.
   const [prevSeleccionado, setPrevSeleccionado] = useState(expedienteSeleccionado);
   if (prevSeleccionado !== expedienteSeleccionado) {
     setPrevSeleccionado(expedienteSeleccionado);
-    if (!isEditable) setActiveTab("info");
+    if (etapaInicial && TABS.some((t) => t.id === etapaInicial)) setActiveTab(etapaInicial);
+    else if (!isEditable) setActiveTab("info");
   }
 
   const query = useExpedienteCompletoQuery(expedienteActual?.id);

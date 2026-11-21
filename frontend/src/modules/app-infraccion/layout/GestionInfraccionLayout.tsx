@@ -16,6 +16,7 @@ import {
   useInvalidarListaExpedientes,
 } from "../api/listaExpedientes";
 import type { Expediente } from "../types";
+import { useEtapaDesdeNavegacion } from "./useEtapaDesdeNavegacion";
 
 type Props = { setToast: SetToast };
 
@@ -31,6 +32,7 @@ export default function GestionInfraccionLayout({ setToast }: Props) {
   useErrorToast(lista.error, setToast, "Error al cargar los expedientes");
   const invalidarLista = useInvalidarListaExpedientes();
 
+  const etapaInicial = useEtapaDesdeNavegacion(expedienteSeleccionado?.radicado);
   const { noDisponible, cerrarAviso } = useExpedienteDesdeNavegacion(
     lista.isFetching ? undefined : lista.data,
     setExpedienteSeleccionado,
@@ -69,6 +71,7 @@ export default function GestionInfraccionLayout({ setToast }: Props) {
         detalle={
           <DetalleInfraccion
             expedienteSeleccionado={expedienteSeleccionado}
+            etapaInicial={etapaInicial}
             municipioList={catalogos.municipios}
             recursoAfectadoList={catalogos.recursos}
             tipoAfectacionList={catalogos.tiposAfectacion}

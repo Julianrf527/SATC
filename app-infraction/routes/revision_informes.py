@@ -2,8 +2,8 @@
 
 Reemplaza el flujo que vivía en app-docs (documentos con origen
 'informe_tecnico' + sincronización). Todo ocurre en infracciones_db y en una
-sola transacción: la revisión/subida que aprueba el proceso también acepta el
-informe técnico. Los archivos se suben a app-docs (/files/upload, que valida y
+sola transacción: la carga de la versión final (que aprueba el proceso) también
+acepta el informe técnico y guarda la matriz de recursos afectados. Los archivos se suben a app-docs (/files/upload, que valida y
 pasa ClamAV) con FilesClient y aquí solo se guarda la referencia.
 """
 from __future__ import annotations
@@ -21,7 +21,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from satc_shared.clients import NotFoundError, ServiceClientError
 from satc_shared.review_process import (
-    APROBADO,
     ArchivoRef,
     PermisoDenegado,
     ProcesoDetalle,
@@ -32,22 +31,28 @@ from satc_shared.review_process import (
 from core.permission import Permission
 from db.deps import get_db_managed
 from db.models.expediente import Expediente
-from db.models.informe_proceso import (
-    InformeProceso,
-    InformeProcesoRevision,
-    InformeProcesoRevisor,
-    InformeProcesoVersion,
+from db.models.documento_proceso import (
+    ETAPA_INFORME,
+    DocumentoProceso,
+    DocumentoProcesoRevision,
+    DocumentoProcesoRevisor,
+    DocumentoProcesoVersion,
 )
 from db.models.informe_tecnico import InformeTecnico
 from utils.verify_token import verify_gateway_token
 import services.docs as docs_svc
 import services.users as users_svc
+from services.matriz_recursos import aplica_matriz, guardar_matriz, parsear_matriz, validar_matriz
 from services.revision_informes import (
+    APROBADO_FIRMA,
+    EXTENSION_PDF,
     FLUJO,
+    MOTIVO_VERSION_FINAL,
     Avisos,
     aplicar_aprobacion,
     avisos_revision,
     avisos_version,
+    cargar_version_final,
     contexto_informe,
     proceso_vigente,
     servicio,
@@ -87,14 +92,14 @@ async def _detalle(db: AsyncSession, proceso_id: int, user_id: int) -> dict:
     except (ProcesoNoEncontrado, PermisoDenegado):
         # 403 en ambos casos: no revelar qué ids existen.
         raise HTTPException(status_code=403, detail="No tienes acceso a este proceso")
-    proceso: InformeProceso = ctx.proceso
+    proceso: DocumentoProceso = ctx.proceso
 
     ids = {proceso.creador_id}
     if proceso.asignador_id:
         ids.add(proceso.asignador_id)
     ids.update(await ctx.revisores_ids())
     ids.update(r for (r,) in (await db.execute(
-        select(InformeProcesoRevision.revisor_id).where(InformeProcesoRevision.proceso_id == proceso.id).distinct()
+        select(DocumentoProcesoRevision.revisor_id).where(DocumentoProcesoRevision.proceso_id == proceso.id).distinct()
     )).all())
     usuarios = await users_svc.get_user_info(sorted(ids))
     nombres = {uid: (info or {}).get("nombre") for uid, info in usuarios.items() if (info or {}).get("nombre")}
@@ -186,14 +191,16 @@ async def _verificar_acceso(db: AsyncSession, proceso_id: int, user_id: int) -> 
 async def _bloquear_informe(db: AsyncSession, proceso_id: int) -> None:
     """Bloquea el informe ANTES que el proceso: mismo orden que /informes
     (asignar, reasignar, cambiar-modo), para no cruzar bloqueos."""
-    informe_id = await db.scalar(select(InformeProceso.informe_id).where(InformeProceso.id == proceso_id))
+    informe_id = await db.scalar(select(DocumentoProceso.etapa_ref_id).where(
+        DocumentoProceso.id == proceso_id, DocumentoProceso.etapa_tipo == ETAPA_INFORME,
+    ))
     if informe_id is not None:
         await db.execute(select(InformeTecnico.id).where(InformeTecnico.id == informe_id).with_for_update())
 
 
 async def _revisores(db: AsyncSession, proceso_id: int) -> list[int]:
     return [r for (r,) in (await db.execute(
-        select(InformeProcesoRevisor.revisor_id).where(InformeProcesoRevisor.proceso_id == proceso_id)
+        select(DocumentoProcesoRevisor.revisor_id).where(DocumentoProcesoRevisor.proceso_id == proceso_id)
     )).all()]
 
 
@@ -232,8 +239,9 @@ async def revisar_proceso(
     adjunto: Optional[UploadFile] = File(None),
     db: AsyncSession = Depends(get_db_managed),
 ):
-    """Acción del revisor asignado: ``aprobado`` | ``aprobado_firma`` | ``devuelto``
-    (solo ``devuelto`` admite adjunto pdf/doc/docx)."""
+    """Acción del líder técnico asignado: ``aprobado_firma`` | ``devuelto``
+    (solo ``devuelto`` admite adjunto pdf/doc/docx). No existe aprobar directo:
+    el informe se acepta cuando el técnico carga la versión final."""
     user_id = int(verify_gateway_token(request)["user_id"])
     svc = servicio()
     tiene_adjunto = adjunto is not None and bool(adjunto.filename)
@@ -259,13 +267,9 @@ async def revisar_proceso(
             ref = await _subir_a_docs(adjunto)
 
         res = await svc.revisar(db, proceso_id, user_id=user_id, accion=accion, comentario=comentario, adjunto=ref)
-        proceso: InformeProceso = res.proceso
+        proceso: DocumentoProceso = res.proceso
         _, radicado = await contexto_informe(db, proceso.informe_id)
         avisos = Avisos(proceso.informe_id)
-        informe_aceptado = False
-        if res.estado_nuevo == APROBADO:
-            await aplicar_aprobacion(db, proceso, avisos, radicado)
-            informe_aceptado = True
         avisos_revision(avisos, proceso, accion, res.estado_nuevo, radicado, ref is not None, await _revisores(db, proceso.id))
         await db.commit()
     except ReviewError as e:
@@ -282,7 +286,6 @@ async def revisar_proceso(
         "informe_id": proceso.informe_id,
         "estado": FLUJO.estado_info(res.estado_nuevo).model_dump(),
         "numero_devoluciones": proceso.numero_devoluciones,
-        "informe_aceptado": informe_aceptado,
         "message": res.descripcion,
     })
 
@@ -297,9 +300,9 @@ async def subir_version(
     comentario: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db_managed),
 ):
-    """El profesional asignado sube la primera versión (``pendiente_carga``),
-    una corrección (``rechazado``) o la versión firmada en PDF
-    (``aprobado_firma``), que se auto-aprueba y acepta el informe."""
+    """El técnico asignado sube la primera versión (``pendiente_carga``) o una
+    corrección (``rechazado``). En ``aprobado_firma`` la versión firmada va por
+    ``POST /{proceso_id}/version-final`` (409 aquí)."""
     user_id = int(verify_gateway_token(request)["user_id"])
     svc = servicio()
 
@@ -307,7 +310,9 @@ async def subir_version(
         await _bloquear_informe(db, proceso_id)
         ctx = await svc.contexto(db, proceso_id, para_actualizar=True)
         if not await FLUJO.puede_subir_version(ctx, user_id):
-            raise PermisoDenegado("No eres el profesional asignado a este informe")
+            raise PermisoDenegado("No eres el técnico asignado a este informe")
+        if ctx.proceso.estado == APROBADO_FIRMA:
+            raise HTTPException(status_code=409, detail=MOTIVO_VERSION_FINAL)
         if not FLUJO.subida_permitida_en(ctx.proceso):
             raise HTTPException(status_code=400, detail="En el estado actual no se puede subir una nueva versión")
         extensiones = FLUJO.extensiones_subida(ctx.proceso)
@@ -316,13 +321,9 @@ async def subir_version(
         ref = await _subir_a_docs(archivo)
 
         res = await svc.subir_version(db, proceso_id, user_id=user_id, archivo=ref, comentario=comentario)
-        proceso: InformeProceso = res.proceso
+        proceso: DocumentoProceso = res.proceso
         _, radicado = await contexto_informe(db, proceso.informe_id)
         avisos = Avisos(proceso.informe_id)
-        informe_aceptado = False
-        if res.estado_nuevo == APROBADO:
-            await aplicar_aprobacion(db, proceso, avisos, radicado)
-            informe_aceptado = True
         avisos_version(avisos, proceso, res.version.numero_version, res.estado_nuevo, radicado, await _revisores(db, proceso.id))
         await db.commit()
     except ReviewError as e:
@@ -340,9 +341,73 @@ async def subir_version(
         "version": res.version.numero_version,
         "version_id": res.version.id,
         "estado": FLUJO.estado_info(res.estado_nuevo).model_dump(),
-        "auto_aprobado": res.estado_nuevo == APROBADO,
-        "informe_aceptado": informe_aceptado,
-        "message": "Versión firmada cargada: informe aprobado" if informe_aceptado else "Versión subida exitosamente",
+        "message": "Versión subida exitosamente",
+    })
+
+
+# ══════════════════════════════════════════════════════ versión final
+
+@router.post("/{proceso_id}/version-final", status_code=200)
+async def cargar_version_final_informe(
+    request: Request,
+    proceso_id: int,
+    archivo: UploadFile = File(...),
+    recursos_afectados: Optional[str] = Form(None),
+    comentario: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db_managed),
+):
+    """El técnico carga la versión firmada (PDF) del informe ``aprobado_firma``.
+    En los de VISITA, ``recursos_afectados`` (JSON: la matriz completa) es
+    obligatorio. Se auto-aprueba, se acepta el informe y se guarda la matriz,
+    todo en una transacción."""
+    user_id = int(verify_gateway_token(request)["user_id"])
+    svc = servicio()
+
+    try:
+        await _bloquear_informe(db, proceso_id)
+        ctx = await svc.contexto(db, proceso_id, para_actualizar=True)
+        if not await FLUJO.puede_subir_version(ctx, user_id):
+            raise PermisoDenegado("Solo el técnico asignado puede cargar la versión final")
+        if ctx.proceso.estado != APROBADO_FIRMA:
+            raise HTTPException(status_code=409, detail="El informe aún no está aprobado para firma. Recarga")
+        informe = await db.scalar(select(InformeTecnico).where(InformeTecnico.id == ctx.proceso.informe_id))
+        # Todo lo validable va antes de subir el archivo (no dejar huérfanos en app-docs).
+        filas = None
+        if aplica_matriz(informe):
+            filas = validar_matriz(parsear_matriz(recursos_afectados))
+        if not (archivo.filename or "").lower().endswith(EXTENSION_PDF):
+            raise HTTPException(status_code=400, detail="La versión final firmada debe ser un PDF")
+        ref = await _subir_a_docs(archivo)
+
+        res = await cargar_version_final(
+            db, proceso_id, user_id=user_id, archivo=ref, comentario=comentario or "Versión final firmada",
+        )
+        proceso: DocumentoProceso = res.proceso
+        _, radicado = await contexto_informe(db, proceso.informe_id)
+        avisos = Avisos(proceso.informe_id)
+        await aplicar_aprobacion(db, proceso, avisos, radicado)
+        if filas is not None:
+            await guardar_matriz(db, proceso.informe_id, filas)
+        avisos_version(avisos, proceso, res.version.numero_version, res.estado_nuevo, radicado, await _revisores(db, proceso.id))
+        await db.commit()
+    except ReviewError as e:
+        await db.rollback()
+        raise _http(e)
+    except HTTPException:
+        await db.rollback()
+        raise
+
+    await avisos.enviar()
+    return JSONResponse(content={
+        "ok": True,
+        "proceso_id": proceso.id,
+        "informe_id": proceso.informe_id,
+        "version": res.version.numero_version,
+        "version_id": res.version.id,
+        "estado": FLUJO.estado_info(res.estado_nuevo).model_dump(),
+        "informe_aceptado": True,
+        "tiene_matriz": filas is not None,
+        "message": "Versión firmada cargada: informe aceptado",
     })
 
 
@@ -354,8 +419,8 @@ async def descargar_version(
 ):
     user_id = int(verify_gateway_token(request)["user_id"])
     await _verificar_acceso(db, proceso_id, user_id)
-    version = await db.scalar(select(InformeProcesoVersion).where(
-        InformeProcesoVersion.id == version_id, InformeProcesoVersion.proceso_id == proceso_id
+    version = await db.scalar(select(DocumentoProcesoVersion).where(
+        DocumentoProcesoVersion.id == version_id, DocumentoProcesoVersion.proceso_id == proceso_id
     ))
     if version is None:
         raise HTTPException(status_code=404, detail="Versión no encontrada")
@@ -368,8 +433,8 @@ async def descargar_adjunto(
 ):
     user_id = int(verify_gateway_token(request)["user_id"])
     await _verificar_acceso(db, proceso_id, user_id)
-    revision = await db.scalar(select(InformeProcesoRevision).where(
-        InformeProcesoRevision.id == revision_id, InformeProcesoRevision.proceso_id == proceso_id
+    revision = await db.scalar(select(DocumentoProcesoRevision).where(
+        DocumentoProcesoRevision.id == revision_id, DocumentoProcesoRevision.proceso_id == proceso_id
     ))
     if revision is None or not revision.adjunto_url:
         raise HTTPException(status_code=404, detail="Adjunto no encontrado")

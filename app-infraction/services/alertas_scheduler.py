@@ -11,7 +11,7 @@ import logging
 #DB MODELS Y PERMISOS
 from db.models.expediente import Expediente
 from services.users import get_users_by_permission, users_client
-from services.alertas import calcular_alertas_expedientes
+from services.alertas import calcular_alertas_expedientes, hoy_bogota
 from core.permission import Permission
 
 load_dotenv()
@@ -39,7 +39,7 @@ async def obtener_alertas_usuario(user_id: int, db: AsyncSession) -> dict:
             return None
 
         alertas_totales = {}
-        fecha_hoy = date.today()
+        fecha_hoy = hoy_bogota()
 
         por_expediente = await calcular_alertas_expedientes([e[0] for e in expedientes], db, fecha_hoy)
         for expediente_id, radicado in expedientes:

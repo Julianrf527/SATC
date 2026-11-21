@@ -35,6 +35,17 @@ from services.actos import (
     get_acto_context as _get_acto_context,
 )
 from utils.log import insert_log
+from core.permission import Permission
+from db.models.documento_proceso import ETAPA_CIERRE, ETAPA_CONCEPTO, ETAPA_MEDIDA
+from services.revision_actos import archivar_vigente
+import services.users as users_svc
+
+# get_etapa_context / get_acto_context devuelven "medida" | "concepto" | "cierre".
+ETAPA_PROCESO = {"medida": ETAPA_MEDIDA, "concepto": ETAPA_CONCEPTO, "cierre": ETAPA_CIERRE}
+
+
+async def _es_super(user_id) -> bool:
+    return await users_svc.verify_permission(int(user_id), Permission.MANUAL_UPLOAD)
 
 
 @router.post("/administrativos")
@@ -51,8 +62,16 @@ async def crear_acto_admin(
     documento_acto_administrativo_id: int = Form(...),
     db: AsyncSession = Depends(get_db_managed),
 ):
+    """Cargue directo del acto, SIN proceso de revisión: solo super gestión
+    (``infraccion_super_gestion``). Cierra el proceso de revisión vigente de la
+    etapa si lo hay. El flujo normal del encargado es /revision-actos."""
     token_data = verify_gateway_token(request)
     user_id = token_data["user_id"]
+    if not await _es_super(user_id):
+        raise HTTPException(
+            status_code=403,
+            detail="El acto se carga por el proceso de revisión; el cargue directo es solo para super gestión",
+        )
     fecha_numerado_date = datetime.strptime(fecha_numerado, "%Y-%m-%d").date()
 
     if not numerado or len(str(numerado)) > 4:
@@ -82,8 +101,6 @@ async def crear_acto_admin(
         etapa_expediente_id, radicado, encargado_id = exp_row
         if etapa_expediente_id != expediente_id:
             raise HTTPException(status_code=400, detail="El expediente no corresponde a la medida preventiva")
-        if encargado_id != user_id:
-            raise HTTPException(status_code=403, detail="No tiene permisos para modificar esta infracción")
         if medida.acto_administrativo_id:
             raise HTTPException(status_code=400, detail="El acto administrativo ya existe para esta medida")
         etapa_tipo = "medida"
@@ -98,9 +115,6 @@ async def crear_acto_admin(
 
         if etapa_expediente_id != expediente_id:
             raise HTTPException(status_code=400, detail="El expediente no corresponde a la etapa seleccionada")
-
-        if encargado_id != user_id:
-            raise HTTPException(status_code=403, detail="No tiene permisos para modificar esta infracción")
 
         if etapa.acto_administrativo_id:
             raise HTTPException(status_code=400, detail="El acto administrativo ya existe para esta etapa")
@@ -133,6 +147,11 @@ async def crear_acto_admin(
     etapa.acto_administrativo_id = nuevo_acto.id
     await db.flush()
 
+    proceso_cerrado = await archivar_vigente(
+        db, ETAPA_PROCESO[etapa_tipo], etapa.id, usuario_id=int(user_id),
+        descripcion="Cerrado: super gestión cargó el acto directamente (sin revisión)",
+    )
+
     await increment_file_usage([documento_acto_administrativo_id])
 
     datos_nuevos = {
@@ -141,6 +160,8 @@ async def crear_acto_admin(
         "fecha_numerado": fecha_numerado,
         "fecha_creacion": str(nuevo_acto.fecha_creacion),
         "etapa_tipo": etapa_tipo,
+        "cargue_directo": True,
+        "proceso_revision_cerrado": proceso_cerrado.id if proceso_cerrado else None,
     }
 
     audit_result = await insert_log(
@@ -148,7 +169,7 @@ async def crear_acto_admin(
         tipo_evento="CREAR_ACTO_ADMIN",
         resultado="EXITOSO",
         usuario_id=user_id,
-        detalle=f"Creación de acto administrativo {tipo_acto} {numerado}",
+        detalle=f"Creación de acto administrativo {tipo_acto} {numerado} (cargue directo de super gestión)",
         expediente_id=etapa_expediente_id,
         expediente_radicado=radicado,
         datos_nuevos=datos_nuevos,
@@ -205,8 +226,16 @@ async def actualizar_acto_admin(
     if expediente_id and expediente_id != etapa_expediente_id:
         raise HTTPException(status_code=400, detail="El expediente no corresponde al acto administrativo")
 
-    if encargado_id != user_id:
+    # El encargado corrige tipo/numerado/fecha; el documento (PDF) solo lo cambia super gestión.
+    es_super = await _es_super(user_id)
+    if encargado_id != user_id and not es_super:
         raise HTTPException(status_code=403, detail="No tiene permisos para modificar esta infracción")
+    cambia_documento = bool(
+        documento_acto_administrativo_id
+        and documento_acto_administrativo_id != acto_admin.documento_acto_administrativo_id
+    )
+    if cambia_documento and not es_super:
+        raise HTTPException(status_code=403, detail="Solo super gestión puede cambiar el documento del acto")
 
     datos_anteriores = {
         "tipo_acto": acto_admin.tipo_acto,
@@ -230,10 +259,7 @@ async def actualizar_acto_admin(
                 detail=f"El numerado {numerado} con fecha {fecha_numerado} ya está en uso",
             )
 
-    if (
-        documento_acto_administrativo_id
-        and documento_acto_administrativo_id != acto_admin.documento_acto_administrativo_id
-    ):
+    if cambia_documento:
         await decrement_file_usage([acto_admin.documento_acto_administrativo_id])
         await increment_file_usage([documento_acto_administrativo_id])
         acto_admin.documento_acto_administrativo_id = documento_acto_administrativo_id
@@ -294,12 +320,12 @@ async def eliminar_acto_admin(
     token_data = verify_gateway_token(request)
     user_id = token_data["user_id"]
 
+    if not await _es_super(user_id):
+        raise HTTPException(status_code=403, detail="Solo super gestión puede eliminar actos administrativos")
+
     etapa_tipo, acto_admin, etapa, etapa_expediente_id, radicado, encargado_id = await _get_acto_context(
         db, acto_id
     )
-
-    if encargado_id != user_id:
-        raise HTTPException(status_code=403, detail="No tiene permisos para modificar esta infracción")
 
     datos_acto = {
         "tipo_acto": acto_admin.tipo_acto,
@@ -326,6 +352,11 @@ async def eliminar_acto_admin(
     etapa.acto_administrativo_id = None
     await db.delete(acto_admin)
     await db.flush()
+    # El proceso (aprobado) queda en el histórico; el encargado puede proyectar uno nuevo.
+    await archivar_vigente(
+        db, ETAPA_PROCESO[etapa_tipo], etapa.id, usuario_id=int(user_id),
+        descripcion="Cerrado: super gestión eliminó el acto",
+    )
 
     audit_result = await insert_log(
         db=db,

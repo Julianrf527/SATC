@@ -39,6 +39,18 @@ export function parseDate(value: DateInput): Date | null {
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
+/**
+ * Día LOCAL "aaaa-mm-dd" de una fecha, para compararla con el valor de un
+ * input de fecha. Los timestamps del backend llegan en UTC
+ * ("2026-11-20T03:00:00+00:00" es el 19 en Colombia): compararlos como texto
+ * da el día equivocado y deja fuera el propio día "hasta".
+ */
+export function fechaLocalYMD(value: DateInput): string | null {
+  const d = parseDate(value);
+  if (!d) return null;
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
 export type FormatDateOptions = {
   /** "short" = dd/mm/aaaa (por defecto) · "long" = "5 de enero de 2026" */
   style?: "short" | "long";
