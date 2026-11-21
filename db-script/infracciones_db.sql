@@ -148,7 +148,8 @@ CREATE TABLE public.etapa_acoger_concepto (
     dias_termino integer,
     fecha_termino_calculada date,
     acto_administrativo_id integer,
-    fecha_creacion timestamp with time zone NOT NULL
+    fecha_creacion timestamp with time zone NOT NULL,
+    instancia character varying(15) DEFAULT 'VISITA'::character varying NOT NULL
 );
 
 
@@ -563,7 +564,8 @@ CREATE TABLE public.informe_tecnico (
     fecha_aceptacion_informe date,
     documento_informe_id integer,
     tipo_informe character varying(20),
-    fecha_creacion timestamp with time zone NOT NULL
+    fecha_creacion timestamp with time zone NOT NULL,
+    fecha_asignacion date
 );
 
 
@@ -1206,7 +1208,7 @@ COPY public.comunicacion (id, numerado, fecha_numerado, fecha_envio, acto_admini
 -- Data for Name: etapa_acoger_concepto; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.etapa_acoger_concepto (id, tipo_acogida_concepto, expediente_id, dias_termino, fecha_termino_calculada, acto_administrativo_id, fecha_creacion) FROM stdin;
+COPY public.etapa_acoger_concepto (id, tipo_acogida_concepto, expediente_id, dias_termino, fecha_termino_calculada, acto_administrativo_id, fecha_creacion, instancia) FROM stdin;
 \.
 
 
@@ -2440,6 +2442,13 @@ CREATE INDEX ix_acto_admin_fecha_creacion ON public.acto_administrativo USING bt
 --
 
 CREATE INDEX ix_etapa_acoger_concepto_expediente ON public.etapa_acoger_concepto USING btree (expediente_id);
+
+
+--
+-- Name: uq_etapa_acoger_concepto_instancia; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_etapa_acoger_concepto_instancia ON public.etapa_acoger_concepto USING btree (expediente_id, instancia);
 
 
 --

@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from "react";
 import type { ModeloGenerico } from "@shared/types/common";
 import type { FiltrosAvanzadosSlotContext } from "@features/expedientes";
 import type { TipoAfectacion } from "../types";
@@ -16,9 +17,26 @@ export default function FiltroTiposAfectacion({
   tipoAfectacionList,
 }: Props) {
   const seleccionados = filtros.tipo_afectacion_ids ?? [];
-  const recursos = filtros.recurso_ids?.length
-    ? recursoAfectadoList.filter((r) => filtros.recurso_ids!.includes(r.id))
-    : recursoAfectadoList;
+  const recursoIds = filtros.recurso_ids;
+  const recursos = useMemo(
+    () => (recursoIds?.length ? recursoAfectadoList.filter((r) => recursoIds.includes(r.id)) : recursoAfectadoList),
+    [recursoIds, recursoAfectadoList],
+  );
+
+  // Al acotar los recursos, los tipos de los recursos que ya no se muestran se
+  // quitan de la selección: ocultos no se pueden desmarcar y se enviarían igual.
+  const visibles = useMemo(() => {
+    const ids = new Set(recursos.map((r) => r.id));
+    return new Set(tipoAfectacionList.filter((t) => ids.has(t.recurso_id)).map((t) => t.id));
+  }, [recursos, tipoAfectacionList]);
+  const hayOcultos = seleccionados.some((id) => !visibles.has(id));
+  useEffect(() => {
+    if (!hayOcultos) return;
+    setFiltros((p) => ({
+      ...p,
+      tipo_afectacion_ids: (p.tipo_afectacion_ids ?? []).filter((id) => visibles.has(id)),
+    }));
+  }, [hayOcultos, visibles, setFiltros]);
 
   const toggle = (id: number) =>
     setFiltros((p) => {

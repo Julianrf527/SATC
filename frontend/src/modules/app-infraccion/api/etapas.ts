@@ -7,6 +7,7 @@ import type {
   MedidaPreventiva,
   RespuestaEtapa,
   TipoAcogidaConcepto,
+  InstanciaConcepto,
   TipoMedida,
 } from "../types";
 import { infraccionKeys } from "./queryKeys";
@@ -116,24 +117,37 @@ export function useGuardarMedidaMutation(expedienteId: number) {
 
 // ── Concepto ──────────────────────────────────────────────────────────────
 
-export function useConceptoEtapaQuery(expedienteId: number) {
+// Las dos instancias (visita y seguimiento) cambian solo en el GET/POST por
+// expediente; PUT, oficio y solicitud van por id de la etapa.
+const RUTAS_CONCEPTO = {
+  VISITA: {
+    key: infraccionKeys.concepto,
+    get: INFRACTION_ENDPOINTS.INFRACTION_GET_CONCEPTO,
+    crear: INFRACTION_ENDPOINTS.INFRACTION_CREATE_CONCEPTO,
+  },
+  SEGUIMIENTO: {
+    key: infraccionKeys.conceptoSeguimiento,
+    get: INFRACTION_ENDPOINTS.INFRACTION_GET_CONCEPTO_SEGUIMIENTO,
+    crear: INFRACTION_ENDPOINTS.INFRACTION_CREATE_CONCEPTO_SEGUIMIENTO,
+  },
+} as const;
+
+export function useConceptoEtapaQuery(expedienteId: number, instancia: InstanciaConcepto = "VISITA") {
+  const rutas = RUTAS_CONCEPTO[instancia];
   return useQuery({
-    queryKey: infraccionKeys.concepto(expedienteId),
+    queryKey: rutas.key(expedienteId),
     queryFn: () =>
-      consultarEtapa<ConceptoEtapaData>(
-        INFRACTION_ENDPOINTS.INFRACTION_GET_CONCEPTO(expedienteId),
-        (res) => res.data as ConceptoEtapaData,
-      ),
+      consultarEtapa<ConceptoEtapaData>(rutas.get(expedienteId), (res) => res.data as ConceptoEtapaData),
     enabled: !!expedienteId,
     ...ETAPA_QUERY_OPTIONS,
   });
 }
 
-export function useCrearConceptoMutation(expedienteId: number) {
+export function useCrearConceptoMutation(expedienteId: number, instancia: InstanciaConcepto = "VISITA") {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (tipo: TipoAcogidaConcepto) =>
-      apiRequest(INFRACTION_ENDPOINTS.INFRACTION_CREATE_CONCEPTO(expedienteId), {
+      apiRequest(RUTAS_CONCEPTO[instancia].crear(expedienteId), {
         method: "POST",
         ...jsonBody({ tipo_acogida_concepto: tipo }),
       }),
@@ -144,6 +158,7 @@ export function useCrearConceptoMutation(expedienteId: number) {
 export type ActualizarConceptoRespuesta = {
   message?: string;
   cierre_eliminado?: boolean;
+  concepto_seguimiento_eliminado?: boolean;
 };
 
 /**

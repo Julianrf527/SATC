@@ -73,6 +73,10 @@ export const INFRACTION_ENDPOINTS = {
     `/infraction/etapas/concepto/${expediente_id}`,
   INFRACTION_CREATE_CONCEPTO: (expediente_id: number) =>
     `/infraction/etapas/concepto/${expediente_id}`,
+  INFRACTION_GET_CONCEPTO_SEGUIMIENTO: (expediente_id: number) =>
+    `/infraction/etapas/concepto-seguimiento/${expediente_id}`,
+  INFRACTION_CREATE_CONCEPTO_SEGUIMIENTO: (expediente_id: number) =>
+    `/infraction/etapas/concepto-seguimiento/${expediente_id}`,
   INFRACTION_PUT_CONCEPTO: (etapa_concepto_id: number) =>
     `/infraction/etapas/concepto/${etapa_concepto_id}`,
   INFRACTION_CREATE_OFICIO_REMITE: (etapa_concepto_id: number) =>

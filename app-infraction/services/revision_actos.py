@@ -55,6 +55,10 @@ from satc_shared.review_process.models import ahora
 from core.permission import Permission
 from db.models.acto_administrativo import ActoAdministrativo
 from db.models.documento_proceso import (
+    ACTO_CIERRE,
+    ACTO_CONCEPTO,
+    ACTO_CONCEPTO_SEGUIMIENTO,
+    ACTO_MEDIDA,
     ETAPA_CIERRE,
     ETAPA_CONCEPTO,
     ETAPA_MEDIDA,
@@ -86,6 +90,13 @@ ETIQUETAS_ETAPA = {
     ETAPA_MEDIDA: "Acto de la medida preventiva",
     ETAPA_CONCEPTO: "Acto de acoger concepto",
     ETAPA_CIERRE: "Acto de cierre",
+}
+# Por tipo de documento (distingue el acto del acoger concepto · seguimiento).
+ETIQUETA_TIPO_DOCUMENTO = {
+    ACTO_MEDIDA: ETIQUETAS_ETAPA[ETAPA_MEDIDA],
+    ACTO_CONCEPTO: ETIQUETAS_ETAPA[ETAPA_CONCEPTO],
+    ACTO_CONCEPTO_SEGUIMIENTO: "Acto de acoger concepto · seguimiento",
+    ACTO_CIERRE: ETIQUETAS_ETAPA[ETAPA_CIERRE],
 }
 
 MOTIVO_VERSION_FINAL = (
@@ -120,8 +131,16 @@ class EtapaActo:
         return self.fila.acto_administrativo_id
 
     @property
+    def es_concepto_seguimiento(self) -> bool:
+        return self.etapa_tipo == ETAPA_CONCEPTO and getattr(self.fila, "es_seguimiento", False)
+
+    @property
+    def tipo_documento(self) -> str:
+        return ACTO_CONCEPTO_SEGUIMIENTO if self.es_concepto_seguimiento else TIPO_ACTO_POR_ETAPA[self.etapa_tipo]
+
+    @property
     def etiqueta(self) -> str:
-        return ETIQUETAS_ETAPA[self.etapa_tipo]
+        return ETIQUETA_TIPO_DOCUMENTO[self.tipo_documento]
 
 
 async def cargar_etapa(
@@ -295,7 +314,7 @@ async def _crear_proceso(db: AsyncSession, etapa: EtapaActo, user_id: int) -> Do
         version_actual=0,
         numero_devoluciones=0,
         expediente_id=etapa.expediente_id,
-        tipo_documento=TIPO_ACTO_POR_ETAPA[etapa.etapa_tipo],
+        tipo_documento=etapa.tipo_documento,
         etapa_tipo=etapa.etapa_tipo,
         etapa_ref_id=etapa.ref_id,
         activo=True,
@@ -442,13 +461,16 @@ class Avisos:
                 logger.warning(f"Notificación del proceso {self.proceso_id} a {usuario_id} falló: {resultado}")
 
 
-def encabezado(radicado: Optional[str], etapa_tipo: str) -> str:
-    return f"Expediente {radicado or '?'}\n{ETIQUETAS_ETAPA.get(etapa_tipo, 'Acto administrativo')}: "
+def encabezado(radicado: Optional[str], proceso: DocumentoProceso) -> str:
+    etiqueta = ETIQUETA_TIPO_DOCUMENTO.get(proceso.tipo_documento) or ETIQUETAS_ETAPA.get(
+        proceso.etapa_tipo, "Acto administrativo"
+    )
+    return f"Expediente {radicado or '?'}\n{etiqueta}: "
 
 
 async def avisos_tras_revision(avisos: Avisos, proceso: DocumentoProceso, estado_nuevo: str,
                                radicado: Optional[str], con_adjunto: bool, encargado: Optional[int]) -> None:
-    enc = encabezado(radicado, proceso.etapa_tipo)
+    enc = encabezado(radicado, proceso)
     if estado_nuevo == APROBADO_FIRMA:
         avisos.agregar(encargado, f"{enc}aprobado para firma, carga la versión firmada desde la etapa")
     elif estado_nuevo == RECHAZADO:
@@ -458,7 +480,7 @@ async def avisos_tras_revision(avisos: Avisos, proceso: DocumentoProceso, estado
 
 async def avisos_tras_version(avisos: Avisos, proceso: DocumentoProceso, numero: int, estado_nuevo: str,
                               radicado: Optional[str], user_id: int) -> None:
-    enc = encabezado(radicado, proceso.etapa_tipo)
+    enc = encabezado(radicado, proceso)
     if estado_nuevo == EN_REVISION:
         await avisos.agregar_lideres(f"{enc}{'para revisión' if numero == 1 else f'nueva versión (v{numero})'}",
                                      excluir=user_id)
@@ -502,6 +524,6 @@ async def avisar_reasignacion(db: AsyncSession, radicados: dict[int, Optional[st
         for p in procesos:
             avisos = Avisos(p.id)
             estado = FLUJO.estado_info(p.estado).etiqueta.lower()
-            avisos.agregar(nuevo_encargado, f"{encabezado(radicados.get(expediente_id), p.etapa_tipo)}"
+            avisos.agregar(nuevo_encargado, f"{encabezado(radicados.get(expediente_id), p)}"
                                             f"te corresponde continuar el proceso ({estado})")
             await avisos.enviar()

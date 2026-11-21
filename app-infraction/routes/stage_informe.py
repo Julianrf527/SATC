@@ -10,7 +10,8 @@ import pytz
 from db.deps import get_db_managed
 from db.models.expediente import Expediente
 from db.models.etapa_respuesta import EtapaRespuesta
-from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
+from db.models.etapa_acoger_concepto import INSTANCIA_VISITA
+from services.conceptos import concepto_de
 from db.models.informe_tecnico import InformeTecnico
 from db.models.informe_recurso_afectado import InformeRecursoAfectado, RECURSOS_MATRIZ
 from db.models.medida_preventiva import MedidaPreventiva
@@ -90,9 +91,7 @@ async def obtener_informe_tecnico(
                     else:
                         creable = True
         elif tipo_informe == "SEGUIMIENTO":
-            concepto = await db.scalar(
-                select(EtapaAcogerConcepto).where(EtapaAcogerConcepto.expediente_id == expediente_id)
-            )
+            concepto = await concepto_de(db, expediente_id, INSTANCIA_VISITA)
             if not concepto:
                 creable_msg = "La etapa de Concepto Técnico aún no ha sido creada"
             elif concepto.tipo_acogida_concepto == "OFICIO":

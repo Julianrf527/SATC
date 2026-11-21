@@ -12,6 +12,8 @@ type Props = {
   actoAdmin: ActoAdministrativo | null;
   diasTermino: number | null;
   fechaTerminoCalculada: string | null;
+  /** Título del recuadro del acto (el del seguimiento se distingue). */
+  tituloActo?: string;
   isEditable: boolean;
   setToast: (t: { id: number; message: string; type: "success" | "error" }) => void;
   /** Cambios hechos dentro de ActoAdmin: el padre re-consulta la etapa. */
@@ -26,6 +28,7 @@ export default function AutoRequerimiento({
   actoAdmin,
   diasTermino,
   fechaTerminoCalculada,
+  tituloActo,
   isEditable,
   setToast,
   onActoAdminUpdate,
@@ -35,19 +38,13 @@ export default function AutoRequerimiento({
   const guardarDias = useActualizarConceptoMutation(expedienteId, etapaConceptoId);
   const isSavingDias = guardarDias.isPending;
 
-  // tipoActo: si ya existe comunicacion en el actoAdmin, arranca en comunicacion
-  const [tipoActo, setTipoActo] = useState<"notificacion" | "comunicacion">(
-    actoAdmin?.comunicacion ? "comunicacion" : "notificacion",
-  );
+  // El acto de acoger concepto siempre se notifica (ya no se cambia a
+  // comunicación). Una comunicación registrada antes se sigue mostrando.
+  const tipoActo: "notificacion" | "comunicacion" = actoAdmin?.comunicacion ? "comunicacion" : "notificacion";
 
   useEffect(() => {
     setSelectedDias(diasTermino ?? 0);
   }, [diasTermino]);
-
-  // Sync tipoActo si el actoAdmin cambia (p.ej. después de guardar comunicacion)
-  useEffect(() => {
-    if (actoAdmin?.comunicacion) setTipoActo("comunicacion");
-  }, [actoAdmin?.comunicacion]);
 
   const notifs = actoAdmin?.notificacion?.involucrados ?? [];
 
@@ -66,17 +63,6 @@ export default function AutoRequerimiento({
     (inv) =>
       !notifs.some((n) => n.involucrado_id === inv.id && n.notificacion_exitosa === true),
   );
-
-  // Regla 15 días: alguna notif tiene fecha_constancia + no notificada + >= 15 días
-  const puedeChangiarAComunicacion =
-    tipoActo === "notificacion" &&
-    notifs.some((n) => {
-      if (!n.fecha_constancia_citacion || n.notificacion_exitosa === true) return false;
-      const diff =
-        (Date.now() - new Date(n.fecha_constancia_citacion).getTime()) /
-        (1000 * 60 * 60 * 24);
-      return diff >= 15;
-    });
 
   // Condición para mostrar días de término
   const puedeSeleccionarDias =
@@ -106,34 +92,11 @@ export default function AutoRequerimiento({
 
   return (
     <div className="space-y-4">
-      {/* Alerta: 15 días cumplidos → opción cambiar a comunicación */}
-      {puedeChangiarAComunicacion && isEditable && (
-        <div className="alert bg-warning/10 border border-warning/30">
-          <svg className="w-5 h-5 text-warning shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-base-content">
-              Han pasado más de 15 días desde la fecha de constancia y la persona no ha sido notificada.
-            </p>
-            <p className="text-xs text-base-content/60 mt-0.5">
-              Puede continuar el proceso por comunicación.
-            </p>
-          </div>
-          <button
-            className="btn btn-warning btn-sm text-white"
-            onClick={() => setTipoActo("comunicacion")}
-          >
-            Cambiar a Comunicación
-          </button>
-        </div>
-      )}
-
       {/* Acto Administrativo + Notificaciones o Comunicación */}
       <ActoInfraccion
         etapaTipo="etapa_concepto"
         refId={etapaConceptoId}
+        titulo={tituloActo}
         expedienteId={expedienteId}
         actoAdmin={actoAdmin ?? {}}
         etapaId={0}

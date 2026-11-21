@@ -6,7 +6,8 @@ Un proceso documenta UNA fila de etapa: ``(etapa_tipo, etapa_ref_id)``
 
 - ``informe_tecnico``     → ``informe_tecnico.id`` (VISITA o SEGUIMIENTO)
 - ``medida_preventiva``   → ``medida_preventiva.id`` (su acto)
-- ``etapa_concepto``      → ``etapa_acoger_concepto.id`` (su acto)
+- ``etapa_concepto``      → ``etapa_acoger_concepto.id`` (su acto; las dos
+  instancias, visita y seguimiento: ``tipo_documento`` las distingue)
 - ``etapa_cierre``        → ``etapa_cierre.id`` (su acto)
 
 Referencia polimórfica: sin FK real a la etapa (quien borra la etapa borra sus
@@ -46,6 +47,7 @@ INFORME_VISITA = "INFORME_VISITA"
 INFORME_SEGUIMIENTO = "INFORME_SEGUIMIENTO"
 ACTO_MEDIDA = "ACTO_MEDIDA"
 ACTO_CONCEPTO = "ACTO_CONCEPTO"
+ACTO_CONCEPTO_SEGUIMIENTO = "ACTO_CONCEPTO_SEGUIMIENTO"
 ACTO_CIERRE = "ACTO_CIERRE"
 
 TIPO_ACTO_POR_ETAPA = {ETAPA_MEDIDA: ACTO_MEDIDA, ETAPA_CONCEPTO: ACTO_CONCEPTO, ETAPA_CIERRE: ACTO_CIERRE}

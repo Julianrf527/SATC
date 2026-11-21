@@ -56,6 +56,13 @@ export const ETIQUETA_ETAPA_ACTO: Record<EtapaActoTipo, string> = {
   etapa_cierre: "Acto de cierre",
 };
 
+/** Etiqueta del documento de un proceso: el `tipo_documento` distingue el acto
+ * del acoger concepto · seguimiento (comparte `etapa_tipo` con el de la visita). */
+export function etiquetaDocumentoActo(d: { tipo_documento: string; etapa_tipo: EtapaActoTipo }): string {
+  if (d.tipo_documento === "ACTO_CONCEPTO_SEGUIMIENTO") return "Acto de acoger concepto · seguimiento";
+  return ETIQUETA_ETAPA_ACTO[d.etapa_tipo] ?? "Acto";
+}
+
 export const actoKeys = {
   all: [...infraccionKeys.all, "actos-revision"] as const,
   etapa: (etapaTipo: EtapaActoTipo, refId: number) => [...actoKeys.all, "etapa", etapaTipo, refId] as const,

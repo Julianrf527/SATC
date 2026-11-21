@@ -352,7 +352,7 @@ class TestEstadoExpedienteCascade:
     def test_concepto_auto_requerimiento_no_notificado(self):
         concepto = SimpleNamespace(id=1, tipo_acogida_concepto="AUTO_REQUERIMIENTO", acto_administrativo_id=9)
         kwargs = self._base_kwargs(concepto=concepto, notificados_actos=set())
-        assert _evaluar_uno(**kwargs) == "NOTIFICAR Y/O COMUNICAR ACTO ADM. ARCHIVADO"
+        assert _evaluar_uno(**kwargs) == "NOTIFICAR ACTO ADM. ARCHIVADO"
 
     def test_solicitud_informacion_sin_involucrados(self):
         concepto = SimpleNamespace(id=1, tipo_acogida_concepto="OFICIO", acto_administrativo_id=None)
@@ -525,3 +525,86 @@ class TestEdicionMatriz:
 
         await self._acoger_concepto(db_session, informe.expediente_id)
         assert (await _fila())["puede_editar_matriz"] is False
+
+
+class TestListadoFiltroFechas:
+    """GET /informes (Asignar informes): el rango de fechas toma días completos."""
+
+    async def test_fecha_hasta_incluye_todo_el_dia(self, client, make_expediente, make_informe):
+        from datetime import datetime
+
+        exp = await make_expediente()
+        # Sin zona: Postgres las toma en la zona de la sesión, igual que los límites.
+        ultimo_instante = await make_informe(exp.id, fecha_creacion=datetime(2026, 11, 20, 23, 59, 59, 500000))
+        dia_siguiente = await make_informe(exp.id, fecha_creacion=datetime(2026, 11, 21, 0, 0, 1))
+        dia_anterior = await make_informe(exp.id, fecha_creacion=datetime(2026, 11, 19, 23, 59, 59))
+
+        resp = await client.get(
+            "/informes?fecha_desde=2026-11-20&fecha_hasta=2026-11-20", headers=gateway_headers(1)
+        )
+
+        assert resp.status_code == 200, resp.text
+        ids = {i["id"] for i in resp.json()["data"]}
+        assert ultimo_instante.id in ids
+        assert dia_siguiente.id not in ids
+        assert dia_anterior.id not in ids
+
+
+class TestFechaAsignacionYAdvertencia:
+    """Asignar guarda fecha_asignacion la primera vez (reasignar no la cambia)
+    y avisa, sin bloquear, si la visita queda a más de 30 días hábiles."""
+
+    async def test_asignar_guarda_fecha_y_avisa_fuera_de_plazo(
+        self, client, make_expediente, make_informe, db_session, monkeypatch
+    ):
+        from datetime import timedelta
+
+        hoy = date(2026, 6, 10)
+        monkeypatch.setattr(reports_mod, "hoy_bogota", lambda: hoy)
+        exp = await make_expediente(abogado_responsable_id=7)
+        informe = await make_informe(exp.id)
+
+        lejos = date(2026, 9, 30)
+        resp = await client.post(
+            f"/informes/{informe.id}/asignar",
+            json={"profesional_id": 10, "revisor_id": 20, "fecha_programacion_visita": lejos.isoformat()},
+            headers=gateway_headers(1),
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["advertencia"].startswith("Fecha fuera del plazo")
+        await db_session.refresh(informe)
+        assert informe.fecha_asignacion == hoy
+
+        # Reasignar más tarde, con fecha dentro del plazo: no avisa ni mueve la fecha.
+        monkeypatch.setattr(reports_mod, "hoy_bogota", lambda: hoy + timedelta(days=7))
+        resp = await client.put(
+            f"/informes/{informe.id}/asignar",
+            json={"profesional_id": 11, "revisor_id": 20, "fecha_programacion_visita": "2026-06-25"},
+            headers=gateway_headers(1),
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["advertencia"] is None
+        await db_session.refresh(informe)
+        assert informe.fecha_asignacion == hoy
+
+    async def test_sin_fecha_de_programacion_no_marca_asignacion(self, client, make_expediente, make_informe, db_session):
+        exp = await make_expediente(abogado_responsable_id=7)
+        informe = await make_informe(exp.id)
+        resp = await client.post(
+            f"/informes/{informe.id}/asignar",
+            json={"profesional_id": 10, "revisor_id": 20},
+            headers=gateway_headers(1),
+        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["advertencia"] is None
+        await db_session.refresh(informe)
+        assert informe.fecha_asignacion is None
+
+    async def test_listado_trae_el_limite_de_programacion(self, client, monkeypatch):
+        from services.alertas import limite_programacion
+
+        hoy = date(2026, 6, 10)
+        monkeypatch.setattr(reports_mod, "hoy_bogota", lambda: hoy)
+        resp = await client.get("/informes", headers=gateway_headers(1))
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["fecha_limite_programacion"] == limite_programacion(hoy).isoformat()

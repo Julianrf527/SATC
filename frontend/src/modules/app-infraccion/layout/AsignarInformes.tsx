@@ -22,7 +22,7 @@ export default function AsignarInformes({ setToast }: Props) {
   const precargar = usePrecargarProceso(informeAdapter);
   const navigate = useNavigate();
   const state = useInformesTecnicos();
-  const { loading, totalCount, page, totalPages, profesionales, revisores } = state;
+  const { loading, totalCount, page, totalPages, profesionales, revisores, fechaLimiteProgramacion } = state;
   const asignar = useAsignarInformeMutation();
 
   const [asignando, setAsignando] = useState<AsignarState>(null);
@@ -35,8 +35,9 @@ export default function AsignarInformes({ setToast }: Props) {
   const handleAsignarSubmit = async (profesionalId: number, revisorId: number, fechaProgramacion: string) => {
     if (!asignando) return;
     const { informe, reasignar } = asignando;
+    let advertencia: string | null | undefined;
     try {
-      await asignar.mutateAsync({
+      ({ advertencia } = await asignar.mutateAsync({
         informeId: informe.id,
         reasignar,
         datos: {
@@ -44,7 +45,7 @@ export default function AsignarInformes({ setToast }: Props) {
           revisor_id: revisorId,
           ...(fechaProgramacion ? { fecha_programacion_visita: fechaProgramacion } : {}),
         },
-      });
+      }));
     } catch (e) {
       if (e instanceof ApiError && e.status === 409 && !reasignar) {
         setAsignando({ informe, reasignar: true });
@@ -56,7 +57,9 @@ export default function AsignarInformes({ setToast }: Props) {
     }
     setToast({
       id: Date.now(),
-      message: reasignar ? "Profesional reasignado exitosamente" : "Profesional asignado exitosamente",
+      message: `${reasignar ? "Profesional reasignado exitosamente" : "Profesional asignado exitosamente"}${
+        advertencia ? `. ${advertencia}` : ""
+      }`,
       type: "success",
     });
   };
@@ -134,6 +137,7 @@ export default function AsignarInformes({ setToast }: Props) {
         profesionalActualId={asignando?.informe.profesional_asignado_id}
         revisorActualId={asignando?.informe.revisor_asignado_id}
         fechaProgramacionActual={asignando?.informe.fecha_programacion_visita}
+        fechaLimiteProgramacion={fechaLimiteProgramacion}
         isReassign={asignando?.reasignar ?? false}
       />
 

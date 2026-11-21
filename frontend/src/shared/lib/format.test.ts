@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatDateTime, formatFileSize, parseDate } from "./format";
+import { fechaLocalYMD, formatDate, formatDateTime, formatFileSize, parseDate } from "./format";
 
 describe("parseDate", () => {
   it("interpreta fechas sin hora en hora local (sin corrimiento UTC)", () => {
@@ -59,5 +59,18 @@ describe("formatFileSize", () => {
     expect(formatFileSize(2 * 1024 ** 3)).toBe("2.0 GB");
     expect(formatFileSize(null)).toBe("—");
     expect(formatFileSize(-1)).toBe("—");
+  });
+});
+
+describe("fechaLocalYMD", () => {
+  it("usa el día local, no el del texto UTC", () => {
+    // 19-nov 22:00 local: en UTC puede caer el 20; el día local manda.
+    const local = new Date(2026, 10, 19, 22, 0);
+    expect(fechaLocalYMD(local.toISOString())).toBe("2026-11-19");
+    expect(fechaLocalYMD("2026-01-05")).toBe("2026-01-05");
+  });
+  it("devuelve null para vacíos", () => {
+    expect(fechaLocalYMD(null)).toBeNull();
+    expect(fechaLocalYMD("")).toBeNull();
   });
 });

@@ -5,7 +5,7 @@ import { formatDate } from "@shared/lib/format";
 import { useConceptoEtapaQuery, useCrearConceptoMutation } from "../api/etapas";
 import { detalleError, esErrorDeConexion } from "../api/errors";
 import { useInvalidarExpediente } from "../api/invalidar";
-import type { TipoAcogidaConcepto } from "../types";
+import type { InstanciaConcepto, TipoAcogidaConcepto } from "../types";
 import ConceptoDataCard from "./concepto/ConceptoData";
 import AutoRequerimiento from "./concepto/AutoRequerimiento";
 import OficioRemiteCard from "./concepto/OficioRemiteCard";
@@ -27,9 +27,26 @@ type Props = {
   expedienteId: number;
   setToast: (toast: { id: number; message: string; type: "success" | "error" }) => void;
   isEditable?: boolean;
+  /** Acoger concepto de la visita (etapa 3, por defecto) o del seguimiento (etapa 5). */
+  instancia?: InstanciaConcepto;
 };
 
-const STAGE_NAME = "Concepto";
+/** Lo que cambia entre las dos instancias; todo lo demás funciona igual. */
+const POR_INSTANCIA = {
+  VISITA: {
+    codigo: "concepto",
+    nombre: "Concepto",
+    tituloActo: undefined,
+    descripcion: "Para continuar, debe crear esta etapa indicando cómo se acoge el concepto técnico.",
+  },
+  SEGUIMIENTO: {
+    codigo: "concepto_seguimiento",
+    nombre: "Concepto · Seguimiento",
+    tituloActo: "Acto de acoger concepto · seguimiento",
+    descripcion:
+      "Para continuar, debe crear esta etapa indicando cómo se acoge el concepto técnico de la visita de seguimiento.",
+  },
+} as const;
 
 const TIPO_OPTIONS: { value: TipoAcogidaConcepto; label: string }[] = [
   { value: "AUTO_REQUERIMIENTO", label: "Auto de Requerimiento" },
@@ -41,9 +58,12 @@ export default function Concepto({
   expedienteId,
   setToast,
   isEditable = true,
+  instancia = "VISITA",
 }: Props) {
-  const query = useConceptoEtapaQuery(expedienteId);
-  const crearConcepto = useCrearConceptoMutation(expedienteId);
+  const cfg = POR_INSTANCIA[instancia];
+  const STAGE_NAME = cfg.nombre;
+  const query = useConceptoEtapaQuery(expedienteId, instancia);
+  const crearConcepto = useCrearConceptoMutation(expedienteId, instancia);
   const showLoading = useDelayedFlag(query.isPending && !!expedienteId, 300);
   const [isCreatingStage, setIsCreatingStage] = useState(false);
   const [selectedTipoCrear, setSelectedTipoCrear] = useState<TipoAcogidaConcepto | "">("");
@@ -66,7 +86,7 @@ export default function Concepto({
     }
     crearConcepto.mutate(selectedTipoCrear, {
       onSuccess: () => {
-        setToast({ id: Date.now(), message: "Etapa concepto creada correctamente", type: "success" });
+        setToast({ id: Date.now(), message: `Etapa ${STAGE_NAME.toLowerCase()} creada correctamente`, type: "success" });
         setIsCreatingStage(false);
         setSelectedTipoCrear("");
       },
@@ -84,7 +104,7 @@ export default function Concepto({
   // queda hacerlo tras cambios hechos dentro de ActoAdmin.
   const handleDataUpdated = useInvalidarExpediente(expedienteId);
 
-  if (showLoading) return <EtapaCargando etapa="concepto" />;
+  if (showLoading) return <EtapaCargando etapa={STAGE_NAME.toLowerCase()} />;
   if (!expedienteId) return <EtapaSinExpediente isEditable={isEditable} />;
   if (query.isPending) return <EtapaHueco />;
 
@@ -106,7 +126,7 @@ export default function Concepto({
         etapa={STAGE_NAME}
         icono={ICONOS_ETAPA.portapapeles}
         etapaClassName="text-tono-info"
-        descripcion="Para continuar, debe crear esta etapa indicando cómo se acoge el concepto técnico."
+        descripcion={cfg.descripcion}
       >
         <button
           className="btn btn-success text-white btn-lg gap-2 shadow-md hover:shadow-lg transition-all"
@@ -187,7 +207,7 @@ export default function Concepto({
   }
 
   return (
-    <TarjetaEtapa etapa="concepto">
+    <TarjetaEtapa etapa={cfg.codigo}>
       {/* Solicitud de información — independiente del tipo de acogida, se puede agregar en cualquier momento */}
       <SolicitudInformacionCard
         etapaConceptoId={conceptoData.id}
@@ -202,6 +222,7 @@ export default function Concepto({
         etapaConceptoId={conceptoData.id}
         expedienteId={expedienteId}
         tipoActual={conceptoData.tipo_acogida_concepto}
+        instancia={instancia}
         isEditable={isEditable}
         setToast={setToast}
       />
@@ -214,6 +235,7 @@ export default function Concepto({
           actoAdmin={conceptoData.acto_admin}
           diasTermino={conceptoData.dias_termino}
           fechaTerminoCalculada={conceptoData.fecha_termino_calculada}
+          tituloActo={cfg.tituloActo}
           isEditable={isEditable}
           setToast={setToast}
           onActoAdminUpdate={handleDataUpdated}

@@ -13,7 +13,7 @@ import re
 
 from db.deps import get_db_managed
 from db.models.expediente import Expediente
-from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
+from db.models.etapa_acoger_concepto import INSTANCIA_SEGUIMIENTO, INSTANCIA_VISITA, EtapaAcogerConcepto
 from db.models.informe_tecnico import InformeTecnico
 from db.models.acto_administrativo import ActoAdministrativo
 from db.models.oficio_remite import OficioRemite
@@ -32,7 +32,14 @@ from services.docs import decrement_file_usage
 from services.etapas import build_acto_for_frontend as _build_acto_for_frontend
 from services.etapas import get_expediente_con_permiso, exigir_lectura_expediente
 from utils.log import insert_log
-from services.cascada_etapas import Cascada, aplicar_restas, eliminar_cierre, eliminar_datos_concepto
+from services.cascada_etapas import (
+    Cascada,
+    aplicar_restas,
+    eliminar_cierre,
+    eliminar_concepto_seguimiento,
+    eliminar_datos_concepto,
+)
+from services.conceptos import INFORME_HABILITANTE, NOMBRE_ETAPA, concepto_de
 
 
 class ConceptoCreateBody(BaseModel):
@@ -167,6 +174,7 @@ async def _build_concepto_response(db: AsyncSession, etapa: EtapaAcogerConcepto)
     return {
         "id": etapa.id,
         "expediente_id": etapa.expediente_id,
+        "instancia": etapa.instancia,
         "tipo_acogida_concepto": etapa.tipo_acogida_concepto,
         "dias_termino": etapa.dias_termino,
         "fecha_termino_calculada": etapa.fecha_termino_calculada.isoformat() if etapa.fecha_termino_calculada else None,
@@ -178,39 +186,41 @@ async def _build_concepto_response(db: AsyncSession, etapa: EtapaAcogerConcepto)
     }
 
 
-# ── ETAPA CONCEPTO ────────────────────────────────────────────────────────────
+# ── ETAPA CONCEPTO (visita) y CONCEPTO SEGUIMIENTO ───────────────────────────
+#
+# Las dos instancias funcionan igual (misma tabla, columna ``instancia``):
+# GET/POST por expediente cambian de ruta; PUT, oficio remite y solicitud de
+# información van por id de la etapa y sirven para ambas.
 
-@router.get("/concepto/{expediente_id}", status_code=200)
-async def obtener_concepto(
-    request: Request,
-    expediente_id: int = PathParam(...),
-    db: AsyncSession = Depends(get_db_managed),
-):
+def _msg_no_aceptado(instancia: str) -> str:
+    return f'El informe técnico de "{INFORME_HABILITANTE[instancia]}" aún no ha sido aceptado'
+
+
+async def _informe_habilitante_aceptado(db: AsyncSession, expediente_id: int, instancia: str) -> bool:
+    """La instancia se crea cuando existe el informe final (aceptado) de su visita."""
+    return await db.scalar(
+        select(InformeTecnico.id).where(
+            InformeTecnico.expediente_id == expediente_id,
+            InformeTecnico.tipo_informe == INFORME_HABILITANTE[instancia],
+            InformeTecnico.fecha_aceptacion_informe.isnot(None),
+        ).limit(1)
+    ) is not None
+
+
+async def _obtener(request: Request, db: AsyncSession, expediente_id: int, instancia: str) -> JSONResponse:
     user_id = verify_gateway_token(request)["user_id"]
     await exigir_lectura_expediente(db, expediente_id, user_id)
 
-    etapa = await db.scalar(
-        select(EtapaAcogerConcepto).where(EtapaAcogerConcepto.expediente_id == expediente_id)
-    )
-
+    etapa = await concepto_de(db, expediente_id, instancia)
     if not etapa:
-        # Check if creable
-        informe_visita = await db.scalar(
-            select(InformeTecnico).where(
-                InformeTecnico.expediente_id == expediente_id,
-                InformeTecnico.tipo_informe == "VISITA",
-                InformeTecnico.fecha_aceptacion_informe.isnot(None),
-            )
-        )
-        creable = informe_visita is not None
-        creable_msg = None if creable else 'El informe técnico de "VISITA" aún no ha sido aceptado'
+        creable = await _informe_habilitante_aceptado(db, expediente_id, instancia)
         return JSONResponse(
             status_code=404,
             content={
                 "ok": False,
-                "detail": "Etapa concepto no encontrada",
+                "detail": f"{NOMBRE_ETAPA[instancia]} no encontrada",
                 "creable": creable,
-                "creable_msg": creable_msg,
+                "creable_msg": None if creable else _msg_no_aceptado(instancia),
             },
         )
 
@@ -218,50 +228,40 @@ async def obtener_concepto(
     return JSONResponse(content={"ok": True, "data": data}, status_code=200)
 
 
-@router.post("/concepto/{expediente_id}", status_code=201)
-async def crear_concepto(
-    request: Request,
-    expediente_id: int = PathParam(...),
-    body: ConceptoCreateBody = ...,
-    db: AsyncSession = Depends(get_db_managed),
-):
-    token_data = verify_gateway_token(request)
-    user_id = token_data["user_id"]
+async def _crear(
+    request: Request, db: AsyncSession, expediente_id: int, body: ConceptoCreateBody, instancia: str
+) -> JSONResponse:
+    user_id = verify_gateway_token(request)["user_id"]
 
     if body.tipo_acogida_concepto not in VALID_TIPOS_CONCEPTO:
         raise HTTPException(status_code=400, detail="tipo_acogida_concepto inválido")
 
     _eid, exp_radicado, _abg = await get_expediente_con_permiso(db, expediente_id, user_id)
 
-    if await db.scalar(select(EtapaAcogerConcepto.id).where(EtapaAcogerConcepto.expediente_id == expediente_id)):
-        raise HTTPException(status_code=409, detail="La etapa concepto ya existe para este expediente")
-
-    informe_visita = await db.scalar(
-        select(InformeTecnico).where(
-            InformeTecnico.expediente_id == expediente_id,
-            InformeTecnico.tipo_informe == "VISITA",
-            InformeTecnico.fecha_aceptacion_informe.isnot(None),
-        )
-    )
-    if not informe_visita:
-        raise HTTPException(status_code=400, detail='El informe técnico de "VISITA" aún no ha sido aceptado')
+    nombre = NOMBRE_ETAPA[instancia]
+    if await concepto_de(db, expediente_id, instancia):
+        raise HTTPException(status_code=409, detail=f"La {nombre.lower()} ya existe para este expediente")
+    if not await _informe_habilitante_aceptado(db, expediente_id, instancia):
+        raise HTTPException(status_code=400, detail=_msg_no_aceptado(instancia))
 
     nueva = EtapaAcogerConcepto(
         expediente_id=expediente_id,
+        instancia=instancia,
         tipo_acogida_concepto=body.tipo_acogida_concepto,
     )
     db.add(nueva)
     await db.flush()
 
+    sufijo = "_SEG" if instancia == INSTANCIA_SEGUIMIENTO else ""  # tipo_evento: máx. 30
     audit_result = await insert_log(
         db=db,
-        tipo_evento="CREAR_ETAPA_CONCEPTO",
+        tipo_evento=f"CREAR_ETAPA_CONCEPTO{sufijo}",
         resultado="EXITOSO",
         usuario_id=user_id,
-        detalle="Creación Etapa concepto",
+        detalle=f"Creación {nombre}",
         expediente_id=expediente_id,
         expediente_radicado=exp_radicado,
-        datos_nuevos={"tipo_acogida_concepto": body.tipo_acogida_concepto},
+        datos_nuevos={"tipo_acogida_concepto": body.tipo_acogida_concepto, "instancia": instancia},
     )
     if not audit_result["ok"]:
         await db.rollback()
@@ -271,7 +271,47 @@ async def crear_concepto(
     await db.refresh(nueva)
 
     data = await _build_concepto_response(db, nueva)
-    return JSONResponse(content={"ok": True, "data": data, "message": "Etapa concepto creada correctamente"}, status_code=201)
+    return JSONResponse(content={"ok": True, "data": data, "message": f"{nombre} creada correctamente"}, status_code=201)
+
+
+@router.get("/concepto/{expediente_id}", status_code=200)
+async def obtener_concepto(
+    request: Request,
+    expediente_id: int = PathParam(...),
+    db: AsyncSession = Depends(get_db_managed),
+):
+    return await _obtener(request, db, expediente_id, INSTANCIA_VISITA)
+
+
+@router.post("/concepto/{expediente_id}", status_code=201)
+async def crear_concepto(
+    request: Request,
+    expediente_id: int = PathParam(...),
+    body: ConceptoCreateBody = ...,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    return await _crear(request, db, expediente_id, body, INSTANCIA_VISITA)
+
+
+@router.get("/concepto-seguimiento/{expediente_id}", status_code=200)
+async def obtener_concepto_seguimiento(
+    request: Request,
+    expediente_id: int = PathParam(...),
+    db: AsyncSession = Depends(get_db_managed),
+):
+    """Acoger concepto de la visita de seguimiento (etapa 5)."""
+    return await _obtener(request, db, expediente_id, INSTANCIA_SEGUIMIENTO)
+
+
+@router.post("/concepto-seguimiento/{expediente_id}", status_code=201)
+async def crear_concepto_seguimiento(
+    request: Request,
+    expediente_id: int = PathParam(...),
+    body: ConceptoCreateBody = ...,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    """Se habilita cuando el informe técnico de SEGUIMIENTO está aceptado."""
+    return await _crear(request, db, expediente_id, body, INSTANCIA_SEGUIMIENTO)
 
 
 @router.put("/concepto/{etapa_concepto_id}", status_code=200)
@@ -290,6 +330,7 @@ async def actualizar_concepto(
     etapa = await db.scalar(select(EtapaAcogerConcepto).where(EtapaAcogerConcepto.id == etapa_concepto_id))
     if not etapa:
         raise HTTPException(status_code=404, detail="Etapa concepto no encontrada")
+    nombre = NOMBRE_ETAPA[etapa.instancia]
 
     exp_row = (await db.execute(
         select(Expediente.radicado, Expediente.abogado_responsable_id)
@@ -309,14 +350,18 @@ async def actualizar_concepto(
     }
 
     cierre_eliminado = False
+    concepto_seguimiento_eliminado = False
     cascada = Cascada()
 
     # Si cambia el tipo: eliminar la data asociada al tipo anterior (acto,
     # notificaciones, comunicaciones y oficio; la solicitud de información es
-    # independiente del tipo y se conserva) y la etapa de Cierre.
+    # independiente del tipo y se conserva) y la etapa de Cierre. En el
+    # concepto de la visita también el acoger concepto · seguimiento.
     if tipo_anterior != tipo_nuevo:
         await eliminar_datos_concepto(db, etapa, cascada, incluir_solicitud=False)
         cierre_eliminado = await eliminar_cierre(db, etapa.expediente_id, cascada)
+        if etapa.instancia == INSTANCIA_VISITA:
+            concepto_seguimiento_eliminado = await eliminar_concepto_seguimiento(db, etapa.expediente_id, cascada)
 
         etapa.dias_termino = None
         etapa.fecha_termino_calculada = None
@@ -335,10 +380,10 @@ async def actualizar_concepto(
 
     audit_result = await insert_log(
         db=db,
-        tipo_evento="ACTUALIZAR_ETAPA_CONCEPTO",
+        tipo_evento="ACTUALIZAR_ETAPA_CONCEPTO" + ("_SEG" if etapa.es_seguimiento else ""),
         resultado="EXITOSO",
         usuario_id=user_id,
-        detalle="Actualización Etapa concepto",
+        detalle=f"Actualización {nombre}",
         expediente_id=etapa.expediente_id,
         expediente_radicado=exp_radicado,
         datos_anteriores=datos_anteriores,
@@ -354,10 +399,19 @@ async def actualizar_concepto(
     await db.refresh(etapa)
 
     data = await _build_concepto_response(db, etapa)
-    msg = "Etapa concepto actualizada correctamente"
-    if cierre_eliminado:
-        msg = "Tipo de acogida actualizado. La etapa de Cierre fue eliminada por el cambio de tipo."
-    return JSONResponse(content={"ok": True, "data": data, "message": msg, "cierre_eliminado": cierre_eliminado}, status_code=200)
+    msg = f"{nombre} actualizada correctamente"
+    eliminadas = [n for n, si in (("Acoger concepto · seguimiento", concepto_seguimiento_eliminado),
+                                  ("Cierre", cierre_eliminado)) if si]
+    if eliminadas:
+        msg = f"Tipo de acogida actualizado. Por el cambio de tipo se eliminó: {', '.join(eliminadas)}."
+    return JSONResponse(
+        content={
+            "ok": True, "data": data, "message": msg,
+            "cierre_eliminado": cierre_eliminado,
+            "concepto_seguimiento_eliminado": concepto_seguimiento_eliminado,
+        },
+        status_code=200,
+    )
 
 
 # ── OFICIO REMITE ─────────────────────────────────────────────────────────────

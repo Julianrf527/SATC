@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, or_, func
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pydantic import BaseModel
 from typing import Optional
 import logging
@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 from utils.verify_token import verify_gateway_token
 from services.users import get_users_by_permission, verify_permission
 from services.docs import increment_file_usage, decrement_file_usage, get_file_info
+from services.alertas import advertencia_programacion, hoy_bogota, limite_programacion
 from services.cascada_etapas import (
     ErrorRestaUsos,
     aplicar_restas,
@@ -114,14 +115,28 @@ async def _validar_asignacion(informe: Optional[InformeTecnico], body: AsignarPr
         raise HTTPException(status_code=400, detail=MSG_SIN_PERMISO_LIDER)
 
 
-def _aplicar_datos_asignacion(informe: InformeTecnico, body: AsignarProfesionalRequest) -> None:
+def _marcar_asignacion(informe: InformeTecnico) -> None:
+    """Primera vez con técnico Y fecha de programación: guarda el día (inicio
+    de la alerta de primera versión). Reasignar no la cambia."""
+    if (informe.fecha_asignacion is None and informe.profesional_asignado_id
+            and informe.fecha_programacion_visita):
+        informe.fecha_asignacion = hoy_bogota()
+
+
+def _aplicar_datos_asignacion(informe: InformeTecnico, body: AsignarProfesionalRequest) -> Optional[str]:
+    """Aplica la asignación. Devuelve la advertencia de la fecha de
+    programación (fuera de los 30 días hábiles; no bloquea) o None."""
     informe.profesional_asignado_id = body.profesional_id
     informe.revisor_asignado_id = body.revisor_id
+    fecha_nueva = None
     if body.fecha_programacion_visita:
         try:
-            informe.fecha_programacion_visita = date.fromisoformat(body.fecha_programacion_visita)
+            fecha_nueva = date.fromisoformat(body.fecha_programacion_visita)
+            informe.fecha_programacion_visita = fecha_nueva
         except ValueError:
             pass
+    _marcar_asignacion(informe)
+    return advertencia_programacion(fecha_nueva, hoy_bogota())
 
 
 async def _commit_asignacion(db: AsyncSession) -> None:
@@ -191,6 +206,9 @@ async def obtener_informes_tecnicos(
     # pertenecen a esta tabla, se gestionan desde la etapa del expediente.
     stmt = select(InformeTecnico).where(InformeTecnico.modo == "FLUJO")
 
+    # Días completos, ambos incluidos ("hasta" = antes del día siguiente; con
+    # "<= T23:59:59" se perdía el último segundo con fracción). Fechas sin hora:
+    # Postgres las toma en la zona de la sesión (America/Bogota).
     if fecha_desde:
         try:
             stmt = stmt.where(InformeTecnico.fecha_creacion >= datetime.fromisoformat(fecha_desde))
@@ -198,7 +216,9 @@ async def obtener_informes_tecnicos(
             pass
     if fecha_hasta:
         try:
-            stmt = stmt.where(InformeTecnico.fecha_creacion <= datetime.fromisoformat(fecha_hasta + "T23:59:59"))
+            stmt = stmt.where(
+                InformeTecnico.fecha_creacion < datetime.fromisoformat(fecha_hasta) + timedelta(days=1)
+            )
         except ValueError:
             pass
     if aceptado is True:
@@ -244,6 +264,7 @@ async def obtener_informes_tecnicos(
             "revisor_nombre": revisor_info["nombre"] if revisor_info else None,
             "modo": inf.modo,
             "fecha_programacion_visita": _format_date(inf.fecha_programacion_visita),
+            "fecha_asignacion": _format_date(inf.fecha_asignacion),
             "fecha_recibido_informe": _format_date(inf.fecha_recibido_informe),
             "fecha_aceptacion_informe": _format_date(inf.fecha_aceptacion_informe),
             "documento_informe_id": inf.documento_informe_id,
@@ -260,6 +281,9 @@ async def obtener_informes_tecnicos(
         "page": page,
         "limit": limit,
         "total_pages": max(1, -(-total // limit)),  # ceil division
+        # Fecha de programación más lejana sin advertencia si se asigna hoy
+        # (30 días hábiles); el modal de asignar avisa con ella.
+        "fecha_limite_programacion": limite_programacion(hoy_bogota()).isoformat(),
         "profesionales_disponibles": [
             {"id": uid, "nombre": info["nombre"]}
             for uid, info in users.items()
@@ -311,7 +335,7 @@ async def asignar_profesional(
     except ReviewError as e:
         await db.rollback()
         raise HTTPException(status_code=e.status_code, detail=e.detail)
-    _aplicar_datos_asignacion(informe, body)
+    advertencia = _aplicar_datos_asignacion(informe, body)
     await _commit_asignacion(db)
     await avisos.enviar()
 
@@ -321,6 +345,7 @@ async def asignar_profesional(
         "informe_id": informe_id,
         "proceso_id": proceso.id,
         "message": "Profesional asignado y proceso de revisión creado exitosamente",
+        "advertencia": advertencia,
     })
 
 
@@ -362,7 +387,7 @@ async def reasignar_profesional(
     except ReviewError as e:
         await db.rollback()
         raise HTTPException(status_code=e.status_code, detail=e.detail)
-    _aplicar_datos_asignacion(informe, body)
+    advertencia = _aplicar_datos_asignacion(informe, body)
     await _commit_asignacion(db)
     await avisos.enviar()
 
@@ -372,6 +397,7 @@ async def reasignar_profesional(
         "informe_id": informe_id,
         "proceso_id": proceso.id,
         "message": "Profesional reasignado y nuevo proceso de revisión creado",
+        "advertencia": advertencia,
     })
 
 
@@ -476,6 +502,7 @@ async def cambiar_modo_informe(
     informe.fecha_recibido_informe = None
     informe.fecha_aceptacion_informe = None
     informe.fecha_programacion_visita = None
+    informe.fecha_asignacion = None
     informe.modo = body.modo
     await db.execute(delete(InformeRecursoAfectado).where(InformeRecursoAfectado.informe_id == informe_id))
     await db.flush()
@@ -607,6 +634,7 @@ async def cargue_manual_informe(
     informe.fecha_programacion_visita = fecha_programacion
     informe.profesional_asignado_id = body.profesional_id
     informe.revisor_asignado_id = body.revisor_id
+    _marcar_asignacion(informe)
     if filas is not None:
         await guardar_matriz(db, informe_id, filas)
 
@@ -693,6 +721,7 @@ async def filas_mis_informes(db: AsyncSession, user_id: int, *, puede_subir: boo
             "soy_profesional": inf.profesional_asignado_id == user_id,
             "soy_revisor": inf.revisor_asignado_id == user_id,
             "fecha_programacion_visita": _format_date(inf.fecha_programacion_visita),
+            "fecha_asignacion": _format_date(inf.fecha_asignacion),
             "fecha_recibido_informe": _format_date(inf.fecha_recibido_informe),
             "fecha_aceptacion_informe": _format_date(inf.fecha_aceptacion_informe),
             "documento_informe_id": inf.documento_informe_id,

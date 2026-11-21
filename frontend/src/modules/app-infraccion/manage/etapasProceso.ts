@@ -9,6 +9,7 @@ export const ETAPAS_PROCESO = [
   { codigo: "visita", etiqueta: "Visita Técnica", icono: "bx-error-alt" },
   { codigo: "concepto", etiqueta: "Acoger Concepto", icono: "bx-book-bookmark" },
   { codigo: "seguimiento", etiqueta: "Visita Seguimiento", icono: "bx-error-alt" },
+  { codigo: "concepto_seguimiento", etiqueta: "Acoger Concepto · Seguimiento", icono: "bx-book-bookmark" },
   { codigo: "cierre", etiqueta: "Cierre Expediente", icono: "bx-check-circle" },
 ] as const;
 

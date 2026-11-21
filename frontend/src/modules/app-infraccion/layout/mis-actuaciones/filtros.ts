@@ -57,6 +57,8 @@ const ETAPA_DEL_ACTO: Record<EtapaActoTipo, CodigoEtapa> = {
 };
 
 export function pestanaDeActuacion(a: Actuacion): CodigoEtapa {
+  // El acto del acoger concepto · seguimiento comparte etapa_tipo con el de la visita.
+  if (a.tipo_documento === "ACTO_CONCEPTO_SEGUIMIENTO") return "concepto_seguimiento";
   if (a.acto) return ETAPA_DEL_ACTO[a.acto.etapa_tipo];
   return (a.informe?.tipo_informe ?? "").toUpperCase() === "SEGUIMIENTO" ? "seguimiento" : "visita";
 }

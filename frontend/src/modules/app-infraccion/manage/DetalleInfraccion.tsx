@@ -23,6 +23,7 @@ const Respuesta = lazy(() => import("../etapas/Respuesta"));
 const Visita = lazy(() => import("../etapas/Visita"));
 const Concepto = lazy(() => import("../etapas/Concepto"));
 const Seguimiento = lazy(() => import("../etapas/Seguimiento"));
+const ConceptoSeguimiento = lazy(() => import("../etapas/ConceptoSeguimiento"));
 const Cierre = lazy(() => import("../etapas/Cierre"));
 
 type SetToast = (toast: {
@@ -57,6 +58,12 @@ const TABS: Tab[] = [
   { id: "visita", label: ETIQUETA_ETAPA.visita, icon: "bx-error-alt", component: Visita },
   { id: "concepto", label: ETIQUETA_ETAPA.concepto, icon: "bx-book-bookmark", component: Concepto },
   { id: "seguimiento", label: ETIQUETA_ETAPA.seguimiento, icon: "bx-error-alt", component: Seguimiento },
+  {
+    id: "concepto_seguimiento",
+    label: ETIQUETA_ETAPA.concepto_seguimiento,
+    icon: "bx-book-bookmark",
+    component: ConceptoSeguimiento,
+  },
   { id: "cierre", label: ETIQUETA_ETAPA.cierre, icon: "bx-check-circle", component: Cierre },
 ];
 
@@ -68,7 +75,8 @@ const TAB_TO_ETAPA: Record<string, number | null> = {
   visita: 2,
   concepto: 3,
   seguimiento: 4,
-  cierre: 5,
+  concepto_seguimiento: 5,
+  cierre: 6,
 };
 
 /**

@@ -12,7 +12,7 @@ Errores: `{"detail": "mensaje"}` con el código HTTP indicado.
   involucrados, alertas, descarga y auditoría.
 - **B — Etapas**: respuesta (+ medida preventiva), informe técnico de visita,
   acoger concepto (+ oficio remite / solicitud de información), informe de
-  seguimiento y cierre.
+  seguimiento, acoger concepto · seguimiento y cierre.
 - **C — Actos administrativos**: acto, notificación y comunicación (comunes a
   medida preventiva, concepto y cierre), proceso de revisión del acto
   (`/revision-actos`) y Mis actuaciones (`/mis-actuaciones`).
@@ -25,7 +25,8 @@ tablas** (`documento_proceso`, `_version`, `_revision`, `_auditoria`,
 fila de etapa es cada proceso (`informe_tecnico`, `medida_preventiva`,
 `etapa_concepto`, `etapa_cierre`) y `tipo_documento` qué documento es
 (`INFORME_VISITA`, `INFORME_SEGUIMIENTO`, `ACTO_MEDIDA`, `ACTO_CONCEPTO`,
-`ACTO_CIERRE`). A lo sumo un proceso **vigente** (`activo`) por etapa.
+`ACTO_CONCEPTO_SEGUIMIENTO`, `ACTO_CIERRE`). A lo sumo un proceso **vigente**
+(`activo`) por etapa.
 
 ## Reglas comunes
 
@@ -115,14 +116,17 @@ Respuesta `201`: `{"ok": true, "data": {id, nombre, telefono, correo, anonimo}}`
 
 ### A.3 Listados de expedientes
 
-Los tres listados de abajo devuelven ítems con **la misma forma**:
+Los tres listados de abajo devuelven ítems con **la misma forma** y en el
+mismo orden: más recientes primero (`fecha_creacion` descendente, luego `id`).
+`fecha_creacion` es un timestamp en **UTC**: para filtrar por día (filtros
+rápidos de la lista) se compara el día local.
 
 ```json
 {
   "id": 12,
   "radicado": "2026ER00045",
   "fecha_radicado": "2026-02-10",
-  "fecha_creacion": "2026-02-11T09:30:00-05:00",
+  "fecha_creacion": "2026-02-11T14:30:00+00:00",
   "archivado": false,
   "municipio": {"id": 3, "nombre": "Tunja"},
   "involucrados": [{"id": 20, "tipo_documento": "CC", "numero_documento": 1020304050, "nombre": "Pedro Gómez", "...": "..."}],
@@ -133,16 +137,22 @@ Los tres listados de abajo devuelven ítems con **la misma forma**:
 
 - `involucrados`: datos de app-involved. Si app-involved no responde, llega `[]`.
 - `etapa_actual`: la etapa **más avanzada** que existe (no la más reciente):
-  `respuesta` < `visita` < `concepto` < `seguimiento` < `cierre`, o `null`.
+  `respuesta` < `visita` < `concepto` < `seguimiento` < `concepto_seguimiento`
+  < `cierre`, o `null`.
 - `estado`: indicador de gestión (primera regla que se cumpla, o `null`):
 
   | Estado | Cuándo |
   |---|---|
   | `ARCHIVADO` | `archivado = true` |
   | `NOTIFICAR Y/O COMUNICAR ACTO ADM DE SEGUIMIENTO` | Hay cierre con acto y nadie ha sido notificado con éxito |
+  | `NOTIFICAR ACTO ADM. CONCEPTO SEGUIMIENTO` | Concepto · seguimiento `AUTO_REQUERIMIENTO` con acto sin notificación exitosa |
+  | `POR ALLEGAR INFORMACIÓN` | Concepto · seguimiento con solicitud de información y sin involucrados |
+  | `ACOGER CONCEPTO SEGUIMIENTO` | Concepto · seguimiento `AUTO_REQUERIMIENTO` aún sin acto |
+  | `PARA CIERRE` | Concepto · seguimiento listo (acto notificado, u `OFICIO` / `RESOLUCION_ARCHIVO`) y sin etapa de cierre |
+  | `ACOGER CONCEPTO SEGUIMIENTO` | Informe de seguimiento aceptado y sin concepto · seguimiento |
   | `PARA PROGRAMAR SEGUIMIENTO` / `SEGUIMIENTO PROGRAMADO` | Existe informe de seguimiento, sin / con fecha de visita |
   | `VISITA DE SGTO A CUMPLIMIENTO` | Concepto `AUTO_REQUERIMIENTO` con acto notificado |
-  | `NOTIFICAR Y/O COMUNICAR ACTO ADM. ARCHIVADO` | Concepto `AUTO_REQUERIMIENTO` con acto sin notificar |
+  | `NOTIFICAR ACTO ADM. ARCHIVADO` | Concepto `AUTO_REQUERIMIENTO` con acto sin notificar (antes `NOTIFICAR Y/O COMUNICAR ACTO ADM. ARCHIVADO`: el acto de acoger concepto ya no se comunica) |
   | `POR ALLEGAR INFORMACIÓN` | Concepto con solicitud de información y sin involucrados |
   | `PARA PROGRAMAR VISITA` | Informe de visita sin fecha de programación |
   | `ACOGER CONCEPTO` | Informe de visita aceptado y sin concepto |
@@ -237,8 +247,8 @@ asignar).
 - `ultima_etapa`: igual a `etapa_actual` (se conserva por compatibilidad).
 - `radicado_inicial`: `null` si no se ha cargado.
 - `etapas_existentes`: ids numéricos de las etapas creadas (los del
-  `tabToEtapaMap` del front): `1` respuesta, `2` visita, `3` concepto,
-  `4` seguimiento, `5` cierre.
+  `TAB_TO_ETAPA` del front): `1` respuesta, `2` visita, `3` concepto,
+  `4` seguimiento, `5` concepto · seguimiento, `6` cierre (antes `5`).
 
 Errores: `403`, `404` (solo si tiene `infraccion_consultar` y no existe).
 
@@ -327,7 +337,7 @@ app-involved (`/involved/...`) y luego se vincula aquí.
 |---|---|---|---|
 | GET | `/involucrados/expediente/{expediente_id}` | lectura | `{"ok": true, "data": {"expediente_id", "involucrados": [persona de app-involved]}}` (`[]` si app-involved no responde) |
 | POST | `/involucrados/vinculos` | encargado | Body `{expediente_id, involucrado_id}`. Ya vinculado → `400`; expediente ajeno o persona inexistente → `404` |
-| DELETE | `/involucrados/vinculos/{involucrado_id}?expediente_id=N` | encargado | Desvincula y **borra sus notificaciones** en los actos del expediente (medida, concepto, cierre). Sin vínculo → `404` |
+| DELETE | `/involucrados/vinculos/{involucrado_id}?expediente_id=N` | encargado | Desvincula y **borra sus notificaciones** en los actos del expediente (medida, los dos conceptos, cierre). Sin vínculo → `404` |
 | GET | `/involucrados/{involved_id}/expedientes` | `infraccion_consultar` o `involucrado_gestionar` | `{"ok": true, "data": {"expedientes": [{id, radicado, fecha_radicado, fecha_creacion}], "total"}}`. Sin expedientes → `404` |
 
 Respuestas de escritura: `{"ok": true, "data": {"message": "..."}}` (el POST
@@ -353,15 +363,45 @@ Cada alerta:
 }
 ```
 
-Reglas (días hábiles con festivos de Colombia):
+Reglas: todos los plazos en **días hábiles** con festivos de Colombia (el día
+de inicio no cuenta); "hoy" es el día en Bogotá. Una alerta existe mientras
+corre su plazo y desaparece al cumplirse su fin. Los expedientes
+**archivados** no tienen alertas.
 
-| `tipo` (clave) | Cuándo | Plazo |
-|---|---|---|
-| `respuesta_plazo` | No existe la etapa respuesta | 15 días hábiles desde la creación del expediente |
-| `concepto_constancia` (`concepto_constancia_{notif_id}`) | Concepto `AUTO_REQUERIMIENTO` con acto; por cada notificación con constancia de citación y `notificacion_exitosa = false` | 15 días hábiles desde la constancia (si no se notifica, pasar a comunicación) |
-| `concepto_termino` | Concepto con `dias_termino` calculado | Vence en `fecha_termino_calculada` |
+| `tipo` (clave) | Plazo | Inicia | Termina |
+|---|---|---|---|
+| `respuesta_plazo` | 15 | Creación del expediente | Se registra la etapa respuesta |
+| `visita_asignar` | 30 | Registro de la respuesta | El informe de VISITA tiene técnico **y** fecha de programación |
+| `visita_primera_version` | 30 | `informe_tecnico.fecha_asignacion` (D.2) | Primera versión en el proceso de revisión del informe |
+| `visita_aprobacion` | 20 | Primera versión | Versión firmada cargada (el informe queda aceptado) |
+| `concepto_solicitud` | 10 | Fecha de radicado de la solicitud de información | Se registra su respuesta |
+| `concepto_acto_proyectar` | 17 | Versión firmada del informe de VISITA (en cargue manual, su fecha de aceptación); con solicitud de información, la fecha de radicado de su respuesta (mientras no haya respuesta no corre) | Primera versión del auto de requerimiento |
+| `concepto_acto_aprobacion` | 25 | Primera versión del auto | El acto existe (versión firmada o cargue directo) |
+| `concepto_constancia` (`concepto_constancia_{notif_id}`) | 15 | Constancia de citación de una notificación con `notificacion_exitosa = false` (concepto `AUTO_REQUERIMIENTO` con acto) | Notificar (el acto de acoger concepto ya no pasa a comunicación) |
+| `concepto_termino` | `dias_termino` | Notificación del acto | Vence `fecha_termino_calculada` |
+| `seguimiento_asignar` | 30 | Vencimiento del término del auto de requerimiento | El informe de SEGUIMIENTO tiene técnico y fecha |
+| `seguimiento_primera_version` / `seguimiento_aprobacion` | 30 / 20 | Como en la visita | Como en la visita |
+| `concepto_seguimiento_solicitud` / `_acto_proyectar` / `_acto_aprobacion` / `_constancia` / `_termino` | Igual | Como en el concepto de la visita, con el informe de SEGUIMIENTO como antecesor | Igual |
+| `medida_acto_proyectar` / `medida_acto_aprobacion` | 17 / 25 | Registro de la respuesta, si requiere medida preventiva / primera versión | Primera versión / el acto de la medida existe |
+| `cierre_acto_proyectar` / `cierre_acto_aprobacion` | 17 / 25 | Cuando el cierre queda habilitado (abajo) / primera versión | Primera versión / el acto de cierre existe |
 
-Semáforo: `verde` < 50 % < `amarillo` < 80 % ≤ `rojo`; pasada la fecha límite, `vencido`.
+- Los actos de acoger concepto solo tienen alertas con `AUTO_REQUERIMIENTO`.
+  Si aún no se eligió el tipo de acogida, sale `concepto_acto_proyectar`
+  como recordatorio ("Elegir el tipo de acogida y proyectar el acto").
+- Inicio del acto de cierre, según el concepto que habilita el cierre (el de
+  la visita, o el de seguimiento si el de la visita fue `AUTO_REQUERIMIENTO`):
+  `RESOLUCION_ARCHIVO` → el mismo inicio que tendría el acto del concepto;
+  `OFICIO` → fecha de remisión del oficio (con su documento); concepto ·
+  seguimiento `AUTO_REQUERIMIENTO` → día de la primera notificación marcada
+  exitosa de su acto.
+- "Primera versión" = la versión más antigua del documento en cualquiera de
+  sus procesos de revisión (también los cerrados por reasignación).
+- `etapa`: "Respuesta", "Visita técnica", "Concepto", "Seguimiento",
+  "Concepto seguimiento" o "Cierre".
+
+Semáforo, en días hábiles: `verde` < 50 % < `amarillo` < 80 % ≤ `rojo`; pasada
+la fecha límite, `vencido`. `dias_totales`, `dias_transcurridos` y
+`dias_restantes` son días hábiles.
 
 #### `GET /infraction/expedientes/alertas/todas`
 
@@ -476,7 +516,8 @@ Orden del proceso y condición para crear cada etapa:
 | 2 | Informe técnico **VISITA** | Existe respuesta y, si requiere medida preventiva: la medida tiene acto y el acto tiene comunicación con documento |
 | 3 | Acoger concepto | Informe de VISITA aceptado |
 | 4 | Informe técnico **SEGUIMIENTO** | Concepto `AUTO_REQUERIMIENTO` con término calculado y vencido (`infraccion_super_gestion` no espera el término). Con `OFICIO` o `RESOLUCION_ARCHIVO` no aplica |
-| 5 | Cierre | Concepto `AUTO_REQUERIMIENTO` + SEGUIMIENTO aceptado; o `RESOLUCION_ARCHIVO`; o `OFICIO` con oficio remite y su documento |
+| 5 | Acoger concepto · seguimiento | Informe de SEGUIMIENTO aceptado |
+| 6 | Cierre | Concepto `RESOLUCION_ARCHIVO`; o `OFICIO` con oficio remite y su documento; o concepto `AUTO_REQUERIMIENTO` + concepto · seguimiento que cumpla: `AUTO_REQUERIMIENTO` con acto y al menos una notificación **exitosa**, `RESOLUCION_ARCHIVO`, u `OFICIO` con oficio remite y su documento |
 
 **Patrón de los GET de etapa**: lectura del expediente. Si la etapa no existe
 responden `404` con el cuerpo:
@@ -578,21 +619,29 @@ Crea el informe vacío (sin validar `creable`: el front solo muestra el botón
 cuando el GET lo permite). Respuesta `200` con `data` del informe. Después,
 el líder lo asigna (D.2) o el super gestor lo carga a mano (D.3).
 
-### B.4 Acoger concepto (etapa 3)
+### B.4 Acoger concepto (etapa 3) y acoger concepto · seguimiento (etapa 5)
+
+Dos etapas que funcionan igual, sobre la misma tabla (`etapa_acoger_concepto`,
+columna `instancia` = `VISITA` | `SEGUIMIENTO`; a lo sumo una de cada una por
+expediente). Solo cambian el GET/POST por expediente y lo que habilita crearla;
+PUT, oficio remite, solicitud de información y el acto van por id de la etapa
+y sirven para las dos.
 
 `tipo_acogida_concepto` = `AUTO_REQUERIMIENTO` | `OFICIO` | `RESOLUCION_ARCHIVO`.
 
 | Método | Ruta | Body / notas |
 |---|---|---|
-| GET | `/etapas/concepto/{expediente_id}` | |
+| GET | `/etapas/concepto/{expediente_id}` | Concepto de la visita |
 | POST | `/etapas/concepto/{expediente_id}` | `{tipo_acogida_concepto}`. Sin VISITA aceptada → `400`; ya existe → `409`. `201` |
-| PUT | `/etapas/concepto/{etapa_concepto_id}` | `{tipo_acogida_concepto, dias_termino?}` |
+| GET | `/etapas/concepto-seguimiento/{expediente_id}` | Concepto · seguimiento |
+| POST | `/etapas/concepto-seguimiento/{expediente_id}` | `{tipo_acogida_concepto}`. Sin SEGUIMIENTO aceptado → `400`; ya existe → `409`. `201` |
+| PUT | `/etapas/concepto/{etapa_concepto_id}` | `{tipo_acogida_concepto, dias_termino?}` (cualquiera de las dos) |
 
 ```json
 {
   "ok": true,
   "data": {
-    "id": 6, "expediente_id": 12, "tipo_acogida_concepto": "AUTO_REQUERIMIENTO",
+    "id": 6, "expediente_id": 12, "instancia": "VISITA", "tipo_acogida_concepto": "AUTO_REQUERIMIENTO",
     "dias_termino": 30, "fecha_termino_calculada": "2026-04-20",
     "acto_administrativo_id": 41, "fecha_creacion": "2026-03-05T10:00:00-05:00",
     "acto_admin": {"...": "ActoFrontend"},
@@ -609,12 +658,15 @@ PUT:
 - `dias_termino` ∈ {10, 15, 30, 60, 120} y solo con `AUTO_REQUERIMIENTO`
   (si no → `400`). `fecha_termino_calculada` = hoy + `dias_termino` días hábiles.
 - **Cambiar el tipo borra** el acto (con notificaciones y comunicación), el
-  oficio remite y la etapa de **Cierre**; reinicia el término. La solicitud de
-  información se conserva. Respuesta con `cierre_eliminado: true` y mensaje
-  que lo indica.
+  oficio remite y la etapa de **Cierre**; en el concepto de la visita también
+  el **acoger concepto · seguimiento** completo. Reinicia el término. La
+  solicitud de información se conserva. Respuesta con `cierre_eliminado` y
+  `concepto_seguimiento_eliminado` (booleanos) y un mensaje que lo indica.
+- Auditoría: `CREAR_ETAPA_CONCEPTO` / `ACTUALIZAR_ETAPA_CONCEPTO`; en la
+  instancia de seguimiento, `CREAR_ETAPA_CONCEPTO_SEG` / `ACTUALIZAR_ETAPA_CONCEPTO_SEG`.
 
 El acto del concepto se crea con `POST /actos/administrativos` +
-`etapa_concepto_id` (C.1).
+`etapa_concepto_id` (C.1). **Siempre se notifica**: no admite comunicación (C.3).
 
 #### Oficio remite (solo concepto `OFICIO`)
 
@@ -650,12 +702,12 @@ Validaciones de oficio y solicitud: `radicado` con formato
 `AAAAEE####` o `AAAAEE#####` (p. ej. `2024EE0001`); fechas `YYYY-MM-DD` no
 futuras (si no → `400`).
 
-### B.5 Cierre (etapa 5)
+### B.5 Cierre (etapa 6)
 
 | Método | Ruta | Notas |
 |---|---|---|
 | GET | `/etapas/cierre/{expediente_id}` | |
-| POST | `/etapas/cierre/{expediente_id}` | Sin body. Condición no cumplida → `400` con el motivo; ya existe → `409`. `201` |
+| POST | `/etapas/cierre/{expediente_id}` | Sin body. Condición no cumplida (tabla de B) → `400` con el motivo; ya existe → `409`. `201` |
 
 ```json
 {"ok": true, "data": {"id": 4, "expediente_id": 12, "acto_administrativo_id": null,
@@ -807,7 +859,7 @@ notificación. Respuesta `{"ok": true, "data": {...datos borrados}}`.
 
 | Método | Ruta | Campos |
 |---|---|---|
-| POST | `/actos/comunicaciones` | Form: `expediente_id`, `acto_admin_id`, `numerado`, `fecha_numerado`, `fecha_envio`, `documento_comunicacion_id`. Ya existe → `409`. `201` |
+| POST | `/actos/comunicaciones` | Form: `expediente_id`, `acto_admin_id`, `numerado`, `fecha_numerado`, `fecha_envio`, `documento_comunicacion_id`. Acto de acoger concepto (visita o seguimiento) → `400` (se notifica, no se comunica); ya existe → `409`. `201` |
 | PUT | `/actos/comunicaciones/{comunicacion_id}` | Form: los mismos sin `acto_admin_id` |
 | DELETE | `/actos/comunicaciones/{comunicacion_id}` | Body JSON `{"expediente_id": N}` |
 
@@ -958,6 +1010,11 @@ Después del commit, `tipo = "acto_infraccion"`, `id_vinculada` = id del proceso
 Borrar la etapa (cambio de modo del informe o de tipo de concepto) borra
 también los procesos de su acto y resta los usos de sus archivos.
 
+El acto del acoger concepto · seguimiento usa `etapa_tipo = etapa_concepto`
+(su `etapa_ref_id` es la fila de esa instancia) con `tipo_documento =
+ACTO_CONCEPTO_SEGUIMIENTO`; nombre, avisos y Mis actuaciones lo muestran como
+"Acto de acoger concepto · seguimiento".
+
 ### C.5 Mis actuaciones — `GET /infraction/mis-actuaciones`
 
 Pantalla "Mis actuaciones" (antes Mis informes). Requiere
@@ -1020,7 +1077,8 @@ En campos y rutas se conservan los nombres `profesional` / `revisor`
 #### `GET /infraction/informes` (`infraccion_asignar_informes`)
 
 Solo informes en modo `FLUJO`. Query params: `fecha_desde`, `fecha_hasta`
-(ISO, sobre la creación), `aceptado` (bool), `profesional_id`,
+(`aaaa-mm-dd`, sobre la creación; días completos en hora de Colombia, ambos
+incluidos: `fecha_hasta` cubre hasta el final de ese día), `aceptado` (bool), `profesional_id`,
 `expediente_radicado` (contiene), `tipo_informe`, `page` (≥ 1),
 `limit` (1–100, default 20). Orden: más recientes primero.
 
@@ -1032,17 +1090,22 @@ Solo informes en modo `FLUJO`. Query params: `fecha_desde`, `fecha_hasta`
     "profesional_asignado_id": 15, "profesional_nombre": "Carlos Ruiz",
     "revisor_asignado_id": 16, "revisor_nombre": "Marta Gil",
     "modo": "FLUJO", "tipo_informe": "VISITA",
-    "fecha_programacion_visita": "2026-03-01", "fecha_recibido_informe": null,
-    "fecha_aceptacion_informe": null, "documento_informe_id": null,
+    "fecha_programacion_visita": "2026-03-01", "fecha_asignacion": "2026-02-20",
+    "fecha_recibido_informe": null, "fecha_aceptacion_informe": null, "documento_informe_id": null,
     "fecha_creacion": "...", "aceptado": false,
     "proceso_id": 30, "estado_proceso": {"codigo": "pendiente_carga", "etiqueta": "Pendiente de carga", "tono": "neutral"},
     "proceso_activo": true, "numero_devoluciones": 0, "version_actual": 0, "requiere_mi_accion": false
   }],
   "total": 1, "page": 1, "limit": 20, "total_pages": 1,
+  "fecha_limite_programacion": "2026-04-14",
   "profesionales_disponibles": [{"id": 15, "nombre": "Carlos Ruiz"}],
   "revisores_disponibles": [{"id": 16, "nombre": "Marta Gil"}]
 }
 ```
+
+`fecha_limite_programacion`: fecha de programación más lejana sin advertencia
+si se asigna hoy (30 días hábiles desde hoy, en Bogotá). El modal de asignar
+la usa para avisar mientras se escribe (ver D.2).
 
 #### `GET /infraction/informes/mios` (`infraccion_tecnico` o `infraccion_lider_tecnico`)
 
@@ -1078,9 +1141,17 @@ el revisor no tiene `infraccion_lider_tecnico`. Informe inexistente → `404`.
 | POST | `/informes/{informe_id}/asignar` | Crea el proceso (`pendiente_carga`). Si ya hay uno vigente sin terminar → `409` (usar PUT). Si el vigente quedó `finalizado`, se archiva y se crea uno nuevo |
 | PUT | `/informes/{informe_id}/asignar` | Reasigna: finaliza el vigente y crea uno nuevo en la misma transacción. Avisa al profesional anterior |
 
-Respuesta: `{"ok": true, "informe_id": 8, "proceso_id": 30, "message": "..."}`.
+Respuesta: `{"ok": true, "informe_id": 8, "proceso_id": 30, "message": "...", "advertencia": null}`.
 Se notifica in-app al profesional y al revisor (`tipo = "informe_tecnico"`,
 `id_vinculada` = id del informe).
+
+- **`advertencia`** (texto o `null`): la `fecha_programacion_visita` enviada
+  supera los 30 días hábiles desde hoy ("Fecha fuera del plazo: ..."). **No
+  bloquea**: la asignación se guarda igual.
+- **`fecha_asignacion`**: la primera vez que el informe queda con técnico **y**
+  fecha de programación se guarda el día (Bogotá). Reasignar no la cambia; el
+  cambio de modo (D.3) la borra junto con la asignación, y el cargue manual
+  la llena si estaba vacía. Es el inicio de la alerta de primera versión (A.9).
 
 ### D.3 Modo y cargue manual (`infraccion_super_gestion`)
 
@@ -1088,8 +1159,9 @@ Se notifica in-app al profesional y al revisor (`tipo = "informe_tecnico"`,
 
 Vista previa de lo que borraría cambiar de modo (para el diálogo de
 confirmación). Además del propio informe, se borran las etapas
-**posteriores**: desde VISITA → concepto, seguimiento y cierre; desde
-SEGUIMIENTO → cierre.
+**posteriores**: desde VISITA → concepto, seguimiento, concepto · seguimiento
+(`concepto_seguimiento`) y cierre; desde SEGUIMIENTO → concepto · seguimiento
+y cierre.
 
 ```json
 {"ok": true, "informe_id": 8, "etapas": [

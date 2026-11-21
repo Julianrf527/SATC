@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { fechaLocalYMD } from "@shared/lib/format";
 import type { ExpedienteBase, FiltroRapido, OpcionFiltro } from "./types";
 
 const TODOS = "all";
@@ -34,6 +35,11 @@ export function useFiltrosRapidos<T extends ExpedienteBase>(lista: T[], filtros:
             const v = f.valor(e);
             if (v) valores.add(v);
           });
+          // La opción elegida sigue visible aunque ya no esté en la lista
+          // (p. ej. tras una búsqueda avanzada): si no, el select queda en
+          // blanco y la lista vacía sin explicación.
+          const sel = selecciones[f.id];
+          if (sel && sel !== TODOS) valores.add(sel);
           const arr = Array.from(valores);
           if (f.ordenar) arr.sort();
           opciones = arr.map((v) => ({ value: v, label: v }));
@@ -48,23 +54,29 @@ export function useFiltrosRapidos<T extends ExpedienteBase>(lista: T[], filtros:
   );
 
   const filtrados = useMemo(() => {
-    const radicadoLower = radicado.toLowerCase();
-    const nombreLower = nombre.toLowerCase();
-    const buscaDocumento = !isNaN(Number(nombre));
+    const radicadoLower = radicado.trim().toLowerCase();
+    const nombreLower = nombre.trim().toLowerCase();
+    const buscaDocumento = /^\d+$/.test(nombreLower);
 
     return lista.filter((e) => {
-      if (radicado && !e.radicado.toLowerCase().includes(radicadoLower)) return false;
+      if (radicadoLower && !(e.radicado ?? "").toLowerCase().includes(radicadoLower)) return false;
 
-      if (nombre) {
+      if (nombreLower) {
         const involucrados = e.involucrados ?? [];
         const coincide = buscaDocumento
-          ? involucrados.some((i) => i.numero_documento.toString().includes(nombreLower))
-          : involucrados.some((i) => i.nombre.toLowerCase().includes(nombreLower));
+          ? involucrados.some((i) => String(i.numero_documento ?? "").includes(nombreLower))
+          : involucrados.some((i) => (i.nombre ?? "").toLowerCase().includes(nombreLower));
         if (!coincide) return false;
       }
 
-      if (desde && !(e.fecha_creacion >= desde)) return false;
-      if (hasta && !(e.fecha_creacion <= hasta)) return false;
+      // Día local de creación (el backend manda el timestamp en UTC); ambos
+      // extremos incluidos.
+      if (desde || hasta) {
+        const dia = fechaLocalYMD(e.fecha_creacion);
+        if (!dia) return false;
+        if (desde && dia < desde) return false;
+        if (hasta && dia > hasta) return false;
+      }
 
       return filtros.every((f) => {
         const sel = selecciones[f.id] ?? TODOS;

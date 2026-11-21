@@ -16,6 +16,9 @@ class InformeTecnico(Base):
     fecha_programacion_visita = Column(Date)
     fecha_recibido_informe = Column(Date)
     fecha_aceptacion_informe = Column(Date)
+    # Día en que quedó por primera vez con técnico Y fecha de programación
+    # (inicio de la alerta de primera versión; reasignar no la cambia).
+    fecha_asignacion = Column(Date)
     documento_informe_id = Column(Integer)
     tipo_informe = Column(String(20))
     fecha_creacion = Column(TIMESTAMP(timezone=True), nullable=False, default=lambda: datetime.now(ZoneInfo("America/Bogota")))

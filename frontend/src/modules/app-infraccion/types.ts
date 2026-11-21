@@ -81,6 +81,8 @@ export type RespuestaEtapa = {
 };
 
 export type TipoAcogidaConcepto = "AUTO_REQUERIMIENTO" | "OFICIO" | "RESOLUCION_ARCHIVO";
+/** Acoger concepto de la visita técnica (etapa 3) o de la visita de seguimiento (etapa 5). */
+export type InstanciaConcepto = "VISITA" | "SEGUIMIENTO";
 
 export type OficioRemite = {
   id: number;
@@ -104,6 +106,7 @@ export type SolicitudInformacion = {
 export type ConceptoEtapaData = {
   id: number;
   expediente_id: number;
+  instancia: InstanciaConcepto;
   tipo_acogida_concepto: TipoAcogidaConcepto;
   dias_termino: number | null;
   fecha_termino_calculada: string | null;
@@ -168,6 +171,8 @@ export type InformeTecnico = ResumenProcesoInforme & {
   revisor_asignado_id: number | null;
   revisor_nombre: string | null;
   fecha_programacion_visita: string | null;
+  /** Día en que quedó por primera vez con técnico y fecha de programación. */
+  fecha_asignacion?: string | null;
   fecha_recibido_informe: string | null;
   fecha_aceptacion_informe: string | null;
   documento_informe_id: number | null;

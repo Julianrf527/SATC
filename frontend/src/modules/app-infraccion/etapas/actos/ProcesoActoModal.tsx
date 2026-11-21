@@ -1,6 +1,6 @@
 import { ArrowRight, FileSignature, FileText } from "lucide-react";
 import { ProcesoDetalleModal } from "@features/proceso-revision";
-import { actoAdapter, ETIQUETA_ETAPA_ACTO, useInvalidarActos, type ProcesoActoDetalle } from "../../api/actos";
+import { actoAdapter, etiquetaDocumentoActo, useInvalidarActos, type ProcesoActoDetalle } from "../../api/actos";
 import PasosRevision from "./PasosRevision";
 
 type Props = {
@@ -41,7 +41,7 @@ export default function ProcesoActoModal({ procesoId, onClose, soloLectura = fal
       extraHeader={(d) => (
         <span className="badge badge-ghost gap-1" title="Expediente">
           <FileText size={12} />
-          {d.expediente_radicado ?? `#${d.expediente_id}`} · {ETIQUETA_ETAPA_ACTO[d.etapa_tipo] ?? "Acto"}
+          {d.expediente_radicado ?? `#${d.expediente_id}`} · {etiquetaDocumentoActo(d)}
           {!d.activo && " · inactivo"}
         </span>
       )}
@@ -60,7 +60,7 @@ export default function ProcesoActoModal({ procesoId, onClose, soloLectura = fal
         <div className="space-y-3">
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-base-content/70">
             <span>
-              Documento: <span className="font-medium text-base-content">{ETIQUETA_ETAPA_ACTO[d.etapa_tipo] ?? "Acto"}</span>
+              Documento: <span className="font-medium text-base-content">{etiquetaDocumentoActo(d)}</span>
             </span>
             {d.encargado_nombre && (
               <span>

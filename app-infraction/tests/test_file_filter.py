@@ -241,3 +241,15 @@ class TestErrores:
 
         assert resp.status_code == 500
         assert resp.json() == {"detail": "Error interno del servidor"}
+
+
+class TestOrden:
+    async def test_mas_recientes_primero(self, client, sin_consultar, make_expediente):
+        from datetime import datetime, timezone
+
+        viejo = await make_expediente(abogado_responsable_id=5, fecha_creacion=datetime(2026, 1, 1, tzinfo=timezone.utc))
+        nuevo = await make_expediente(abogado_responsable_id=5, fecha_creacion=datetime(2026, 6, 1, tzinfo=timezone.utc))
+
+        data = await _filtrar(client, 5)
+
+        assert [e["id"] for e in data] == [nuevo.id, viejo.id]

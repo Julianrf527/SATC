@@ -213,6 +213,8 @@ async def obtener_logs_auditoria(
             "EDITAR_MATRIZ_RECURSOS":               ("UPDATE", "Matriz de recursos afectados"),
             "CREAR_ETAPA_CONCEPTO":                 ("INSERT", "Acoger Concepto"),
             "ACTUALIZAR_ETAPA_CONCEPTO":            ("UPDATE", "Acoger Concepto"),
+            "CREAR_ETAPA_CONCEPTO_SEG":             ("INSERT", "Acoger Concepto Seguimiento"),
+            "ACTUALIZAR_ETAPA_CONCEPTO_SEG":        ("UPDATE", "Acoger Concepto Seguimiento"),
             "CREAR_OFICIO_REMITE":                  ("INSERT", "Oficio Remite"),
             "ACTUALIZAR_OFICIO_REMITE":             ("UPDATE", "Oficio Remite"),
             "CREAR_ETAPA_CIERRE":                   ("INSERT", "Etapa Cierre"),

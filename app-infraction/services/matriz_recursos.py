@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.permission import Permission
-from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
+from db.models.etapa_acoger_concepto import INSTANCIA_VISITA, EtapaAcogerConcepto
 from db.models.informe_recurso_afectado import RECURSOS_MATRIZ, InformeRecursoAfectado
 from db.models.informe_tecnico import InformeTecnico
 import services.users as users_svc
@@ -134,7 +134,10 @@ async def expedientes_con_concepto(db: AsyncSession, expediente_ids: list[int]) 
         return set()
     return set((await db.execute(
         select(EtapaAcogerConcepto.expediente_id)
-        .where(EtapaAcogerConcepto.expediente_id.in_(expediente_ids))
+        .where(
+            EtapaAcogerConcepto.expediente_id.in_(expediente_ids),
+            EtapaAcogerConcepto.instancia == INSTANCIA_VISITA,
+        )
         .distinct()
     )).scalars().all())
 

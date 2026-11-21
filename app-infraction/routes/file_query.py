@@ -18,7 +18,7 @@ from db.models.tipo_afectacion import TipoAfectacion
 from db.models.quejoso_expediente import QuejosoExpediente
 from db.models.expediente import Expediente
 from db.models.etapa_respuesta import EtapaRespuesta
-from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
+from db.models.etapa_acoger_concepto import INSTANCIA_SEGUIMIENTO, INSTANCIA_VISITA, EtapaAcogerConcepto
 from db.models.etapa_cierre import EtapaCierre
 from db.models.informe_tecnico import InformeTecnico
 from db.models.vereda import Vereda
@@ -206,6 +206,9 @@ async def _listar_expedientes(db: AsyncSession, condiciones=()) -> list[dict]:
     )
     if condiciones:
         stmt = stmt.where(and_(*condiciones))
+    # Orden estable: más recientes primero (la lista y la búsqueda avanzada
+    # se ven en el mismo orden).
+    stmt = stmt.order_by(desc(Expediente.fecha_creacion), desc(Expediente.id))
 
     rows = (await db.execute(stmt)).mappings().all()
     if not rows:
@@ -479,12 +482,19 @@ async def obtener_expediente_completo_por_expediente_id(
     stage_checks = [
         (EtapaRespuesta, None, 1),
         (InformeTecnico, "VISITA", 2),
-        (EtapaAcogerConcepto, None, 3),
+        (EtapaAcogerConcepto, INSTANCIA_VISITA, 3),
         (InformeTecnico, "SEGUIMIENTO", 4),
-        (EtapaCierre, None, 5),
+        (EtapaAcogerConcepto, INSTANCIA_SEGUIMIENTO, 5),
+        (EtapaCierre, None, 6),
     ]
     for ModelClass, tipo_informe, legacy_id in stage_checks:
-        if tipo_informe:
+        if ModelClass is EtapaAcogerConcepto:
+            exists = await db.scalar(
+                select(ModelClass.id).where(
+                    and_(ModelClass.expediente_id == expediente_id, ModelClass.instancia == tipo_informe)
+                )
+            )
+        elif tipo_informe:
             exists = await db.scalar(
                 select(ModelClass.id).where(
                     and_(ModelClass.expediente_id == expediente_id, ModelClass.tipo_informe == tipo_informe)

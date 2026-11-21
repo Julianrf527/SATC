@@ -34,6 +34,7 @@ from db.deps import get_db_managed
 from db.models.documento_proceso import (
     ACTO_CIERRE,
     ACTO_CONCEPTO,
+    ACTO_CONCEPTO_SEGUIMIENTO,
     ACTO_MEDIDA,
     ETAPA_CIERRE,
     ETAPA_CONCEPTO,
@@ -63,6 +64,7 @@ TIPOS = {
     INFORME_SEGUIMIENTO: "Informe técnico de seguimiento",
     ACTO_MEDIDA: "Acto de medida preventiva",
     ACTO_CONCEPTO: "Acto de acoger concepto",
+    ACTO_CONCEPTO_SEGUIMIENTO: "Acto de acoger concepto · seguimiento",
     ACTO_CIERRE: "Acto de cierre",
 }
 ETIQUETA_ROL = {

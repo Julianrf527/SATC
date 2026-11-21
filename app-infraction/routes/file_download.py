@@ -111,11 +111,8 @@ async def descargar_expediente_completo(
         if informe_visita:
             agregar(informe_visita.documento_informe_id)
 
-        # 3. Etapa Concepto
-        concepto = await db.scalar(
-            select(EtapaAcogerConcepto).where(EtapaAcogerConcepto.expediente_id == expediente_id)
-        )
-        if concepto:
+        # 3 y 5. Acoger concepto (visita) y acoger concepto · seguimiento
+        async def agregar_concepto(concepto):
             solicitud_info = await db.scalar(
                 select(SolicitudInformacion).where(SolicitudInformacion.etapa_acoger_concepto_id == concepto.id)
             )
@@ -146,6 +143,13 @@ async def descargar_expediente_completo(
             if oficio:
                 agregar(oficio.archivo_remite_id)
 
+        conceptos = (await db.execute(
+            select(EtapaAcogerConcepto).where(EtapaAcogerConcepto.expediente_id == expediente_id)
+            .order_by(EtapaAcogerConcepto.id)
+        )).scalars().all()
+        for concepto in conceptos:
+            await agregar_concepto(concepto)
+
         # 4. Informe Técnico SEGUIMIENTO
         informe_seg = await db.scalar(
             select(InformeTecnico).where(
@@ -156,7 +160,7 @@ async def descargar_expediente_completo(
         if informe_seg:
             agregar(informe_seg.documento_informe_id)
 
-        # 5. Etapa Cierre
+        # 6. Etapa Cierre
         cierre = await db.scalar(
             select(EtapaCierre).where(EtapaCierre.expediente_id == expediente_id)
         )

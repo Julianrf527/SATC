@@ -89,7 +89,7 @@ export default function ActoInfraccion({
       // Cargue directo con la estética de recurso (no el modal genérico).
       renderModalCrear={({ onSave, onClose }) => (
         <SuperCargueActoModal
-          titulo={ETIQUETA_ETAPA_ACTO[etapaTipo]}
+          titulo={titulo}
           conProceso={!!proceso && proceso.estado.codigo !== "aprobado" && proceso.estado.codigo !== "finalizado"}
           onSave={onSave}
           onClose={onClose}
@@ -98,7 +98,7 @@ export default function ActoInfraccion({
     />
   );
 
-  const documento = ETIQUETA_ETAPA_ACTO[etapaTipo];
+  const documento = titulo;
   const puedeSubir = isEditable && !!data?.puede_proyectar;
 
   const tarjeta = (abrirCargueDirecto: (() => void) | null, cuerpo: ReactNode) => {

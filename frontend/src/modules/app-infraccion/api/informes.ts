@@ -74,6 +74,8 @@ export type ListaInformes = {
   total_pages: number;
   profesionales_disponibles: ProfesionalDisponible[];
   revisores_disponibles: ProfesionalDisponible[];
+  /** Fecha de programación más lejana sin advertencia si se asigna hoy (30 días hábiles). */
+  fecha_limite_programacion: string | null;
 };
 
 export function useInformesQuery(filtros: FiltrosInformes, page: number) {
@@ -97,6 +99,7 @@ export function useInformesQuery(filtros: FiltrosInformes, page: number) {
         total_pages: res.total_pages ?? 1,
         profesionales_disponibles: res.profesionales_disponibles ?? [],
         revisores_disponibles: res.revisores_disponibles ?? [],
+        fecha_limite_programacion: res.fecha_limite_programacion ?? null,
       };
     },
   });
@@ -117,10 +120,13 @@ export function useAsignarInformeMutation() {
   const invalidar = useInvalidarInformes();
   return useMutation({
     mutationFn: ({ informeId, reasignar, datos }: { informeId: number; reasignar: boolean; datos: AsignacionInforme }) =>
-      apiRequest<{ proceso_id: number; message?: string }>(INFRACTION_ENDPOINTS.INFRACTION_REPORTS_ASIGNAR(informeId), {
-        method: reasignar ? "PUT" : "POST",
-        ...jsonBody(datos),
-      }),
+      apiRequest<{ proceso_id: number; message?: string; advertencia?: string | null }>(
+        INFRACTION_ENDPOINTS.INFRACTION_REPORTS_ASIGNAR(informeId),
+        {
+          method: reasignar ? "PUT" : "POST",
+          ...jsonBody(datos),
+        },
+      ),
     onSuccess: invalidar,
   });
 }
