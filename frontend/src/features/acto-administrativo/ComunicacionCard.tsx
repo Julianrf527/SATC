@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { API_CONFIG, apiCall } from "@shared/lib/api";
 import { formatDate } from "@shared/lib/format";
-import {
-  openDocumentById,
-  isValidDocumentId,
-} from "@shared/lib/documentViewer";
+import { isValidDocumentId } from "@shared/lib/documentViewer";
+import { useDocumentos } from "@shared/lib/documentos";
 import ConfirmDeleteModal from "./ConfirmDeleteModal";
 import InfoField from "./InfoField";
 import { INFO_ICONS } from "./infoIcons";
@@ -40,12 +38,13 @@ export default function ComunicacionCard({
     return numerado.toString().padStart(4, "0");
   };
 
+  const documentos = useDocumentos();
   const openDocument = () => {
     if (
       comunicacion?.documento_comunicacion_id &&
       isValidDocumentId(comunicacion.documento_comunicacion_id)
     ) {
-      openDocumentById(comunicacion.documento_comunicacion_id);
+      documentos.abrir(comunicacion.documento_comunicacion_id);
     }
   };
 

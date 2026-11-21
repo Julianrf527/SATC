@@ -350,7 +350,7 @@ async def revisar_proceso(
                     detail=f"Formato no permitido. Permitidos: {', '.join(acc.adjunto_extensiones)}",
                 )
             await db.rollback()  # cierra la transacción de lectura durante la subida
-            ref = await subir_a_docs(adjunto)
+            ref = await subir_a_docs(adjunto, user_id)
 
         await _bloquear(db, proceso_id)
         res = await svc.revisar(db, proceso_id, user_id=user_id, accion=accion, comentario=comentario, adjunto=ref)
@@ -423,7 +423,7 @@ async def subir_version(
         ctx = await svc.contexto(db, proceso_id)
         await _validar_subida(ctx, user_id, archivo)
         await db.rollback()  # cierra la transacción de lectura durante la subida
-        ref = await subir_a_docs(archivo)
+        ref = await subir_a_docs(archivo, user_id)
 
         await _bloquear(db, proceso_id)
         ctx = await svc.contexto(db, proceso_id, para_actualizar=True)

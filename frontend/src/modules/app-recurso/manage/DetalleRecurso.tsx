@@ -5,6 +5,7 @@ import "boxicons/css/boxicons.min.css";
 import { descargarExpedienteCompleto, useExpedienteDetalleQuery } from "../api/expedientes";
 import type { EtapaProps } from "../etapas/tipos";
 import type { CatalogosRecurso, SetToast } from "../types";
+import DocumentosExpediente from "../etapas/comun/DocumentosExpediente";
 import DetalleHeader from "./detalle/DetalleHeader";
 import EtapasNav from "./detalle/EtapasNav";
 import { ETAPAS_RECURSO, pestanaConDatos, type EtapaTabId } from "./etapasProceso";
@@ -107,13 +108,15 @@ export default function DetalleRecurso({ expedienteId, catalogos, setToast, isEd
     return (
       <ErrorBoundary key={activeTab}>
         <Suspense fallback={<Cargando texto="Cargando contenido..." />}>
-          <Componente
-            expediente={expediente}
-            etapas={expediente.etapas}
-            catalogos={catalogos}
-            setToast={setToast}
-            isEditable={isEditable}
-          />
+          <DocumentosExpediente expedienteId={expediente.id}>
+            <Componente
+              expediente={expediente}
+              etapas={expediente.etapas}
+              catalogos={catalogos}
+              setToast={setToast}
+              isEditable={isEditable}
+            />
+          </DocumentosExpediente>
         </Suspense>
       </ErrorBoundary>
     );

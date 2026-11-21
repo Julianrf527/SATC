@@ -1,4 +1,5 @@
-"""Descarga del expediente completo en un único PDF (pestaña Consulta).
+"""Descarga del expediente completo en un único PDF (pestaña Consulta) y de
+cada uno de sus documentos.
 
 Prefijo en main.py: ``/expedientes``. Lectura (``requiere_lectura``).
 El orden de los documentos está en ``services/expediente_documentos.py``.
@@ -14,7 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.acceso import requiere_lectura
 from db.deps import get_db_managed
 from db.models import Expediente
-from satc_shared.clients import ServiceClientError
+from satc_shared.archivos import respuesta_archivo
+from satc_shared.clients import NotFoundError, ServiceClientError
 import services.docs as docs_svc
 from services.expediente_documentos import documentos_del_expediente
 from services.expediente_involucrados import datos_cliente
@@ -41,6 +43,46 @@ async def listar_documentos_expediente(
     await requiere_lectura(request)
     expediente = await _expediente(db, expediente_id)
     return {"ok": True, "data": await documentos_del_expediente(db, expediente)}
+
+
+@router.get("/{expediente_id}/archivos/{file_id}")
+async def ver_archivo_expediente(
+    request: Request,
+    expediente_id: int,
+    file_id: int,
+    db: AsyncSession = Depends(get_db_managed),
+):
+    """Un documento del expediente (botones "Ver documento"). Solo sirve los
+    archivos que pertenecen al expediente (los mismos de la descarga
+    completa); app-docs ya no se consulta directo desde el navegador. Reenvía
+    ``Range`` (visor de PDF) y deja en la auditoría la primera petición."""
+    usuario = await requiere_lectura(request)
+    expediente = await _expediente(db, expediente_id)
+    documento = next((d for d in await documentos_del_expediente(db, expediente) if d["file_id"] == file_id), None)
+    if documento is None:
+        raise HTTPException(status_code=404, detail="El documento no pertenece a este expediente")
+
+    try:
+        respuesta = await respuesta_archivo(docs_svc.files_client, file_id, request.headers,
+                                            nombre=f"{documento['descripcion']}.pdf")
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado en el gestor documental")
+    except ServiceClientError as e:
+        logger.error("Documento %s del expediente %s: %s", file_id, expediente_id, e)
+        raise HTTPException(status_code=502, detail="No se pudo obtener el documento")
+
+    if "range" not in request.headers:  # el visor pide luego por rangos: se audita una vez
+        try:
+            await insert_log(
+                db=db, tipo_evento="VER_DOCUMENTO", resultado="EXITOSO", usuario_id=usuario.user_id,
+                expediente_id=expediente.id, expediente_radicado=expediente.radicado,
+                detalle=f"{documento['descripcion']} (archivo {file_id})", **datos_cliente(request),
+            )
+            await db.commit()
+        except BaseException:
+            await respuesta.background()  # cierra la conexión con app-docs
+            raise
+    return respuesta
 
 
 @router.get("/{expediente_id}/descargar")

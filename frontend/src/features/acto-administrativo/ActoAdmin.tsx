@@ -1,4 +1,4 @@
-import { openDocumentById } from "@shared/lib/documentViewer";
+import { useDocumentos } from "@shared/lib/documentos";
 import type {
   ActoAdministrativo,
   TipoNotificacion,
@@ -115,8 +115,9 @@ export default function ActoAdmin({
     onActoAdminUpdate,
   });
 
+  const documentos = useDocumentos();
   const handleViewDocument = (fileId: number) => {
-    openDocumentById(fileId);
+    documentos.abrir(fileId);
   };
 
   if (!hasActoAdmin) {

@@ -15,7 +15,7 @@ import {
   Waves,
 } from "lucide-react";
 import { formatDate } from "@shared/lib/format";
-import { openDocumentById } from "@shared/lib/documentViewer";
+import { useDocumentos } from "@shared/lib/documentos";
 import type { ExpedienteDetalle } from "../../types";
 import { textoFuente } from "./formatoInformacion";
 
@@ -46,6 +46,7 @@ const Texto = ({ children, title }: { children: ReactNode; title?: string }) => 
  * Cada dato ocupa una sola línea para que las filas queden parejas.
  */
 export default function InformacionBaseView({ expediente: e }: { expediente: ExpedienteDetalle }) {
+  const documentos = useDocumentos();
   const fuente = textoFuente(
     e.fuentes.map((f) => f.nombre),
     e.nombre_fuente,
@@ -80,7 +81,7 @@ export default function InformacionBaseView({ expediente: e }: { expediente: Exp
           <button
             type="button"
             className="btn btn-ghost btn-xs -ml-2 gap-1 text-success"
-            onClick={() => openDocumentById(e.doc_comprobante_pago_id)}
+            onClick={() => documentos.abrir(e.doc_comprobante_pago_id)}
             title="Ver comprobante de pago"
           >
             <Eye size={14} />
