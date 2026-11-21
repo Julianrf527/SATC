@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.etapa_cierre import EtapaCierre
-from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
+from db.models.etapa_acoger_concepto import INSTANCIA_SEGUIMIENTO, INSTANCIA_VISITA, EtapaAcogerConcepto
 from db.models.informe_tecnico import InformeTecnico
 from db.models.solicitud_informacion import SolicitudInformacion
 from db.models.expediente_involucrado import ExpedienteInvolucrado
@@ -26,6 +26,8 @@ def _evaluar_uno(
     notificados_actos: set,
     solicitud_concepto_ids: set,
     tiene_involucrados: bool,
+    concepto_seguimiento=None,
+    tiene_cierre: bool = False,
 ) -> Optional[str]:
     if archivado:
         return "ARCHIVADO"
@@ -33,7 +35,22 @@ def _evaluar_uno(
     if cierre_acto_id is not None and cierre_acto_id not in notificados_actos:
         return "NOTIFICAR Y/O COMUNICAR ACTO ADM DE SEGUIMIENTO"
 
+    # Acoger concepto · seguimiento (etapa 5).
+    cs = concepto_seguimiento
+    if cs is not None:
+        es_auto = cs.tipo_acogida_concepto == "AUTO_REQUERIMIENTO"
+        if es_auto and cs.acto_administrativo_id and cs.acto_administrativo_id not in notificados_actos:
+            return "NOTIFICAR ACTO ADM. CONCEPTO SEGUIMIENTO"
+        if cs.id in solicitud_concepto_ids and not tiene_involucrados:
+            return "POR ALLEGAR INFORMACIÓN"
+        if es_auto and not cs.acto_administrativo_id:
+            return "ACOGER CONCEPTO SEGUIMIENTO"
+        if not tiene_cierre:
+            return "PARA CIERRE"
+
     if seguimiento is not None:
+        if seguimiento.fecha_aceptacion_informe is not None and cs is None:
+            return "ACOGER CONCEPTO SEGUIMIENTO"
         if seguimiento.fecha_programacion_visita is None:
             return "PARA PROGRAMAR SEGUIMIENTO"
         return "SEGUIMIENTO PROGRAMADO"
@@ -41,7 +58,8 @@ def _evaluar_uno(
     if concepto is not None and concepto.tipo_acogida_concepto == "AUTO_REQUERIMIENTO" and concepto.acto_administrativo_id:
         if concepto.acto_administrativo_id in notificados_actos:
             return "VISITA DE SGTO A CUMPLIMIENTO"
-        return "NOTIFICAR Y/O COMUNICAR ACTO ADM. ARCHIVADO"
+        # El acto de acoger concepto solo se notifica (sin comunicación).
+        return "NOTIFICAR ACTO ADM. ARCHIVADO"
 
     if concepto is not None and concepto.id in solicitud_concepto_ids and not tiene_involucrados:
         return "POR ALLEGAR INFORMACIÓN"
@@ -81,11 +99,13 @@ async def calcular_estados(
         select(
             EtapaAcogerConcepto.id,
             EtapaAcogerConcepto.expediente_id,
+            EtapaAcogerConcepto.instancia,
             EtapaAcogerConcepto.tipo_acogida_concepto,
             EtapaAcogerConcepto.acto_administrativo_id,
         ).where(EtapaAcogerConcepto.expediente_id.in_(ids))
     )).all()
-    concepto_map = {r.expediente_id: r for r in concepto_rows}
+    concepto_map = {r.expediente_id: r for r in concepto_rows if r.instancia == INSTANCIA_VISITA}
+    concepto_seg_map = {r.expediente_id: r for r in concepto_rows if r.instancia == INSTANCIA_SEGUIMIENTO}
 
     informe_rows = (await db.execute(
         select(
@@ -150,6 +170,8 @@ async def calcular_estados(
             notificados_actos=notificados_actos,
             solicitud_concepto_ids=solicitud_concepto_ids,
             tiene_involucrados=exp_id in involucrados_con,
+            concepto_seguimiento=concepto_seg_map.get(exp_id),
+            tiene_cierre=exp_id in cierre_map,
         )
     return resultado
 

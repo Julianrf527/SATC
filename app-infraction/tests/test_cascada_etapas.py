@@ -15,12 +15,18 @@ from db.models.auditoria import Auditoria
 from db.models.comunicacion import Comunicacion
 from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
 from db.models.etapa_cierre import EtapaCierre
-from db.models.informe_proceso import (
-    InformeProceso,
-    InformeProcesoAuditoria,
-    InformeProcesoRevision,
-    InformeProcesoRevisor,
-    InformeProcesoVersion,
+from db.models.documento_proceso import (
+    ACTO_CIERRE,
+    ACTO_CONCEPTO,
+    ETAPA_CIERRE,
+    ETAPA_CONCEPTO,
+    ETAPA_INFORME,
+    INFORME_SEGUIMIENTO,
+    DocumentoProceso,
+    DocumentoProcesoAuditoria,
+    DocumentoProcesoRevision,
+    DocumentoProcesoRevisor,
+    DocumentoProcesoVersion,
 )
 from db.models.informe_recurso_afectado import InformeRecursoAfectado
 from db.models.informe_tecnico import InformeTecnico
@@ -34,14 +40,14 @@ ABOGADO = 7
 # Archivos (ids ficticios de app-docs)
 DOC_VISITA = 501
 DOC_ACTO_CONCEPTO, DOC_CITACION, DOC_NOTIFICACION, DOC_COMUNICACION = 601, 602, 603, 604
-DOC_OFICIO, DOC_SOLICITUD = 605, 606
+DOC_OFICIO, DOC_SOLICITUD, DOC_RESPUESTA_SOLICITUD = 605, 606, 607
 DOC_SEGUIMIENTO_V1, DOC_SEGUIMIENTO_V2, DOC_ADJUNTO = 701, 702, 703  # el informe aceptado usa la v1
 DOC_ACTO_CIERRE, DOC_CITACION_CIERRE, DOC_COMUNICACION_CIERRE = 801, 802, 803
 
 TODAS = [
     ActoAdministrativo, Notificacion, Comunicacion, EtapaAcogerConcepto, OficioRemite, SolicitudInformacion,
-    EtapaCierre, InformeTecnico, InformeProceso, InformeProcesoVersion, InformeProcesoRevision,
-    InformeProcesoAuditoria, InformeProcesoRevisor, InformeRecursoAfectado,
+    EtapaCierre, InformeTecnico, DocumentoProceso, DocumentoProcesoVersion, DocumentoProcesoRevision,
+    DocumentoProcesoAuditoria, DocumentoProcesoRevisor, InformeRecursoAfectado,
 ]
 
 
@@ -123,7 +129,9 @@ async def _escenario(db, make_expediente, *, con_concepto=True, con_seguimiento=
         db.add(OficioRemite(etapa_acoger_concepto_id=concepto.id, radicado="2024EE0001",
                             fecha_radicado="2024-01-03", fecha_remitido="2024-01-04", archivo_remite_id=DOC_OFICIO))
         db.add(SolicitudInformacion(etapa_acoger_concepto_id=concepto.id, radicado="2024EE0002",
-                                    fecha_radicado="2024-01-05", archivo_solicitud_id=DOC_SOLICITUD))
+                                    fecha_radicado="2024-01-05", archivo_solicitud_id=DOC_SOLICITUD,
+                                    radicado_respuesta="2024ER0003", fecha_radicado_respuesta="2024-01-06",
+                                    archivo_respuesta_id=DOC_RESPUESTA_SOLICITUD))
         out["concepto"] = concepto
 
     if con_seguimiento:
@@ -134,21 +142,22 @@ async def _escenario(db, make_expediente, *, con_concepto=True, con_seguimiento=
         )
         db.add(seg)
         await db.flush()
-        proceso = InformeProceso(informe_id=seg.id, nombre="Seguimiento", estado="aprobado", creador_id=10,
-                                 version_actual=2, activo=True, asignador_id=1)
+        proceso = DocumentoProceso(expediente_id=exp.id, tipo_documento=INFORME_SEGUIMIENTO,
+                                   etapa_tipo=ETAPA_INFORME, etapa_ref_id=seg.id, nombre="Seguimiento",
+                                   estado="aprobado", creador_id=10, version_actual=2, activo=True, asignador_id=1)
         db.add(proceso)
         await db.flush()
         # v2 (Word) devuelta con adjunto; la v1 (PDF) quedó aprobada: no importa el orden aquí.
         db.add_all([
-            InformeProcesoVersion(proceso_id=proceso.id, numero_version=1, file_id=DOC_SEGUIMIENTO_V2,
+            DocumentoProcesoVersion(proceso_id=proceso.id, numero_version=1, file_id=DOC_SEGUIMIENTO_V2,
                                   archivo_url="/f/702", archivo_nombre="borrador.docx", usuario_subida_id=10),
-            InformeProcesoVersion(proceso_id=proceso.id, numero_version=2, file_id=DOC_SEGUIMIENTO_V1,
+            DocumentoProcesoVersion(proceso_id=proceso.id, numero_version=2, file_id=DOC_SEGUIMIENTO_V1,
                                   archivo_url="/f/701", archivo_nombre="final.pdf", usuario_subida_id=10),
-            InformeProcesoRevision(proceso_id=proceso.id, version_revisada=1, revisor_id=20, accion="rechazado",
+            DocumentoProcesoRevision(proceso_id=proceso.id, version_revisada=1, revisor_id=20, accion="rechazado",
                                    adjunto_file_id=DOC_ADJUNTO),
-            InformeProcesoRevision(proceso_id=proceso.id, version_revisada=2, revisor_id=20, accion="aprobado"),
-            InformeProcesoAuditoria(proceso_id=proceso.id, accion="crear", usuario_id=1),
-            InformeProcesoRevisor(proceso_id=proceso.id, revisor_id=20),
+            DocumentoProcesoRevision(proceso_id=proceso.id, version_revisada=2, revisor_id=20, accion="aprobado"),
+            DocumentoProcesoAuditoria(proceso_id=proceso.id, accion="crear", usuario_id=1),
+            DocumentoProcesoRevisor(proceso_id=proceso.id, revisor_id=20),
         ])
         out["seguimiento"] = seg
 
@@ -195,7 +204,7 @@ class TestCambioEnVisita:
         assert registro.decrementos == [
             sorted([
                 DOC_VISITA, DOC_ACTO_CONCEPTO, DOC_CITACION, DOC_NOTIFICACION, DOC_COMUNICACION, DOC_OFICIO,
-                DOC_SOLICITUD, DOC_SEGUIMIENTO_V1, DOC_SEGUIMIENTO_V2, DOC_ADJUNTO, DOC_ACTO_CIERRE,
+                DOC_SOLICITUD, DOC_RESPUESTA_SOLICITUD, DOC_SEGUIMIENTO_V1, DOC_SEGUIMIENTO_V2, DOC_ADJUNTO, DOC_ACTO_CIERRE,
                 DOC_CITACION_CIERRE, DOC_COMUNICACION_CIERRE,
             ]),
             [DOC_SEGUIMIENTO_V1],
@@ -232,6 +241,38 @@ class TestCambioEnVisita:
         assert await _contar(db_session, ActoAdministrativo) == 0
 
 
+class TestProcesosDeActos:
+    async def test_borra_procesos_de_revision_de_los_actos(self, client, db_session, make_expediente, registro):
+        """Los procesos de revisión del acto de concepto y de cierre (tabla única)
+        se borran con su etapa y restan el uso de versiones y adjuntos."""
+        esc = await _escenario(db_session, make_expediente, con_seguimiento=False)
+        archivos = {ETAPA_CONCEPTO: (901, 902), ETAPA_CIERRE: (911, 912)}
+        for etapa_tipo, tipo_doc, ref in ((ETAPA_CONCEPTO, ACTO_CONCEPTO, esc["concepto"].id),
+                                          (ETAPA_CIERRE, ACTO_CIERRE, esc["cierre"].id)):
+            version, adjunto = archivos[etapa_tipo]
+            p = DocumentoProceso(expediente_id=esc["exp"].id, tipo_documento=tipo_doc, etapa_tipo=etapa_tipo,
+                                 etapa_ref_id=ref, nombre="Acto", estado="aprobado", creador_id=ABOGADO,
+                                 version_actual=1, activo=True)
+            db_session.add(p)
+            await db_session.flush()
+            db_session.add_all([
+                DocumentoProcesoVersion(proceso_id=p.id, numero_version=1, file_id=version,
+                                        archivo_url=f"/f/{version}", archivo_nombre="acto.pdf", usuario_subida_id=ABOGADO),
+                DocumentoProcesoRevision(proceso_id=p.id, version_revisada=1, revisor_id=30, accion="devuelto",
+                                         adjunto_file_id=adjunto),
+                DocumentoProcesoAuditoria(proceso_id=p.id, accion="crear", usuario_id=ABOGADO),
+            ])
+        await db_session.commit()
+
+        resp = await _cambiar(client, esc["visita"].id, "FLUJO")
+        assert resp.status_code == 200, resp.text
+
+        for modelo in (DocumentoProceso, DocumentoProcesoVersion, DocumentoProcesoRevision, DocumentoProcesoAuditoria):
+            assert await _contar(db_session, modelo) == 0
+        restados = [f for ronda in registro.decrementos for f in ronda]
+        assert {901, 902, 911, 912} <= set(restados)
+
+
 class TestCambioEnSeguimiento:
     async def test_solo_borra_cierre(self, client, db_session, make_expediente, registro):
         esc = await _escenario(db_session, make_expediente)
@@ -252,9 +293,10 @@ class TestCambioEnSeguimiento:
         # El seguimiento sigue existiendo (solo cambió de modo); su proceso queda archivado.
         informe = await db_session.get(InformeTecnico, seg.id, populate_existing=True)
         assert informe.modo == "MANUAL" and informe.documento_informe_id is None
-        proceso = await db_session.scalar(select(InformeProceso).where(InformeProceso.informe_id == seg.id))
+        proceso = await db_session.scalar(select(DocumentoProceso).where(
+            DocumentoProceso.etapa_tipo == ETAPA_INFORME, DocumentoProceso.etapa_ref_id == seg.id))
         assert proceso is not None and proceso.activo is False
-        assert await _contar(db_session, InformeProcesoVersion) == 2
+        assert await _contar(db_session, DocumentoProcesoVersion) == 2
 
         # Cierre (acto, citación, comunicación) + uso propio del informe de seguimiento.
         assert registro.decrementos == [

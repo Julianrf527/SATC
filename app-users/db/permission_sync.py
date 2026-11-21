@@ -21,6 +21,10 @@ lo hace sola y se puede correr N veces con el mismo resultado:
    verlos ni asignarlos: la pantalla de roles solo lista y deja otorgar
    permisos que el propio rol tiene. Es la única escritura sobre roles y solo
    ocurre la vez en que el permiso nace; no aplica a permisos ya existentes.
+4b. El rol "admin" (ROL_ADMIN) SIEMPRE tiene todos los permisos: en cada
+   arranque recibe los que le falten (p. ej. si se le quitó uno a mano o un
+   permiso nació cuando admin no los tenía todos y el paso 4 no lo alcanzó).
+   Solo agrega, nunca quita.
 5. permiso_requiere = DEPENDENCIAS y permiso_excluye = INCOMPATIBLES (en los dos
    sentidos): agrega las que falten y quita las que sobren.
 6. Descripciones por defecto anteriores (DESCRIPCIONES_ANTERIORES): si la
@@ -52,6 +56,9 @@ logger = logging.getLogger(__name__)
 
 # Distinto del lock de init_db (815123002).
 PERMISSION_SYNC_LOCK = 815123003
+
+# Rol que siempre se carga con todos los permisos (lo crea db/seeds.py).
+ROL_ADMIN = "admin"
 
 _DDL_ESQUEMA = (
     "ALTER TABLE permiso ADD COLUMN IF NOT EXISTS descripcion VARCHAR(200)",
@@ -111,6 +118,21 @@ async def _roles_superadmin(conn: AsyncConnection) -> list[int]:
         ),
         {"total": total},
     )).scalars().all())
+
+
+async def _completar_admin(conn: AsyncConnection, resumen: dict) -> None:
+    """Otorga al rol admin todos los permisos que le falten. Idempotente."""
+    otorgados = (await conn.execute(
+        text(
+            "INSERT INTO rol_permiso (rol_id, permiso_id) "
+            "SELECT r.id, p.id FROM rol r CROSS JOIN permiso p WHERE r.nombre = :rol "
+            "ON CONFLICT DO NOTHING RETURNING permiso_id"
+        ),
+        {"rol": ROL_ADMIN},
+    )).scalars().all()
+    resumen["otorgados_a_admin"] = len(otorgados)
+    if otorgados:
+        logger.info("[permisos] Rol '%s': %d permiso(s) que le faltaban otorgado(s)", ROL_ADMIN, len(otorgados))
 
 
 async def _upsert_permisos(conn: AsyncConnection, resumen: dict) -> list[int]:
@@ -256,6 +278,7 @@ async def sincronizar_permisos(conn: AsyncConnection) -> dict:
         "actualizados": [],
         "otorgados_a_roles": [],
         "otorgados_al_crear": {},
+        "otorgados_a_admin": 0,
         "dependencias_agregadas": 0,
         "dependencias_quitadas": 0,
         "incompatibles_agregadas": 0,
@@ -292,6 +315,7 @@ async def sincronizar_permisos(conn: AsyncConnection) -> dict:
             )
 
     await _otorgar_al_crear(conn, resumen)
+    await _completar_admin(conn, resumen)
     await _sincronizar_dependencias(conn, resumen)
     await _sincronizar_incompatibles(conn, resumen)
     await _descripcion_obligatoria(conn, resumen)

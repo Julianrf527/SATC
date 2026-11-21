@@ -1,4 +1,6 @@
-import { ActoAdmin } from "@features/acto-administrativo";
+import type { ReactNode } from "react";
+import ActoInfraccion from "../actos/ActoInfraccion";
+import { TITULO_ETAPA } from "../../manage/etapasProceso";
 import type { ActoAdministrativo } from "@shared/types/sancionatorio";
 import { useDatosActoAdmin } from "../../api/expediente";
 import { INFRACCION_ACTO_ENDPOINTS_SOLO_NOTIFICACION } from "../actoAdminEndpoints";
@@ -10,6 +12,8 @@ type Props = {
   isEditable: boolean;
   setToast: (t: { id: number; message: string; type: "success" | "error" }) => void;
   onDataUpdated: () => void;
+  /** Resto de la etapa (archivar), dentro del recuadro de la etapa. */
+  children?: ReactNode;
 };
 
 export default function CierreActo({
@@ -19,11 +23,15 @@ export default function CierreActo({
   isEditable,
   setToast,
   onDataUpdated,
+  children,
 }: Props) {
   const { involucrados, tiposNotificacion } = useDatosActoAdmin(expedienteId);
 
   return (
-    <ActoAdmin
+    <ActoInfraccion
+      etapaTipo="etapa_cierre"
+      titulo={TITULO_ETAPA.cierre}
+      refId={etapaCierreId}
       expedienteId={expedienteId}
       actoAdmin={actoAdmin ?? {}}
       etapaId={0}
@@ -36,6 +44,8 @@ export default function CierreActo({
       endpoints={INFRACCION_ACTO_ENDPOINTS_SOLO_NOTIFICACION}
       stageBinding={{ type: "etapa_cierre", id: etapaCierreId }}
       embedded
-    />
+    >
+      {children}
+    </ActoInfraccion>
   );
 }

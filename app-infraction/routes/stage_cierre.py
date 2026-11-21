@@ -9,7 +9,10 @@ import pytz
 from db.deps import get_db_managed
 from db.models.expediente import Expediente
 from db.models.etapa_respuesta import EtapaRespuesta
-from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
+from db.models.etapa_acoger_concepto import INSTANCIA_SEGUIMIENTO, INSTANCIA_VISITA, EtapaAcogerConcepto
+from db.models.notificacion import Notificacion
+from services.conceptos import concepto_de
+from typing import Optional
 from db.models.etapa_cierre import EtapaCierre
 from db.models.informe_tecnico import InformeTecnico
 from db.models.medida_preventiva import MedidaPreventiva
@@ -54,6 +57,51 @@ async def _build_cierre_response(db: AsyncSession, etapa: EtapaCierre) -> dict:
     }
 
 
+async def _motivo_concepto_terminal(db: AsyncSession, concepto: EtapaAcogerConcepto) -> Optional[str]:
+    """Concepto que no lleva a otra visita: OFICIO (con su documento) o
+    RESOLUCION_ARCHIVO. None si permite el cierre."""
+    if concepto.tipo_acogida_concepto == "OFICIO":
+        oficio_r = await db.scalar(
+            select(OficioRemite).where(OficioRemite.etapa_acoger_concepto_id == concepto.id)
+        )
+        if not oficio_r or not oficio_r.archivo_remite_id:
+            return "El oficio de remisión aún no ha sido registrado con su documento"
+    return None
+
+
+async def motivo_no_creable_cierre(db: AsyncSession, expediente_id: int) -> Optional[str]:
+    """Por qué aún no se puede crear el cierre (None = se puede).
+
+    - Concepto de la visita OFICIO / RESOLUCION_ARCHIVO: como siempre (oficio
+      con documento / de inmediato).
+    - Concepto de la visita AUTO_REQUERIMIENTO: hace falta el acoger concepto ·
+      seguimiento; si es AUTO_REQUERIMIENTO, su acto con al menos una
+      notificación EXITOSA; si es OFICIO / RESOLUCION_ARCHIVO, igual que arriba.
+    """
+    concepto = await concepto_de(db, expediente_id, INSTANCIA_VISITA)
+    if not concepto:
+        return "La etapa de Concepto Técnico aún no ha sido creada"
+    if concepto.tipo_acogida_concepto != "AUTO_REQUERIMIENTO":
+        return await _motivo_concepto_terminal(db, concepto)
+
+    seguimiento = await concepto_de(db, expediente_id, INSTANCIA_SEGUIMIENTO)
+    if not seguimiento:
+        return "La etapa Acoger concepto · seguimiento aún no ha sido creada"
+    if seguimiento.tipo_acogida_concepto != "AUTO_REQUERIMIENTO":
+        return await _motivo_concepto_terminal(db, seguimiento)
+    if not seguimiento.acto_administrativo_id:
+        return "El acto administrativo de Acoger concepto · seguimiento aún no ha sido creado"
+    notificado = await db.scalar(
+        select(Notificacion.id).where(
+            Notificacion.acto_administrativo_id == seguimiento.acto_administrativo_id,
+            Notificacion.notificacion_exitosa.is_(True),
+        ).limit(1)
+    )
+    if notificado is None:
+        return "El acto de Acoger concepto · seguimiento aún no tiene una notificación exitosa"
+    return None
+
+
 # ── ETAPA CIERRE ──────────────────────────────────────────────────────────────
 
 @router.get("/cierre/{expediente_id}", status_code=200)
@@ -70,36 +118,8 @@ async def obtener_cierre(
     )
 
     if not etapa:
-        concepto = await db.scalar(
-            select(EtapaAcogerConcepto).where(EtapaAcogerConcepto.expediente_id == expediente_id)
-        )
-        creable = False
-        creable_msg = None
-
-        if not concepto:
-            creable_msg = "La etapa de Concepto Técnico aún no ha sido creada"
-        elif concepto.tipo_acogida_concepto == "AUTO_REQUERIMIENTO":
-            informe_seg = await db.scalar(
-                select(InformeTecnico).where(
-                    InformeTecnico.expediente_id == expediente_id,
-                    InformeTecnico.tipo_informe == "SEGUIMIENTO",
-                    InformeTecnico.fecha_aceptacion_informe.isnot(None),
-                )
-            )
-            if not informe_seg:
-                creable_msg = 'El informe técnico de "SEGUIMIENTO" aún no ha sido aceptado'
-            else:
-                creable = True
-        elif concepto.tipo_acogida_concepto == "RESOLUCION_ARCHIVO":
-            creable = True
-        elif concepto.tipo_acogida_concepto == "OFICIO":
-            oficio_r = await db.scalar(
-                select(OficioRemite).where(OficioRemite.etapa_acoger_concepto_id == concepto.id)
-            )
-            if oficio_r and oficio_r.archivo_remite_id:
-                creable = True
-            else:
-                creable_msg = "El oficio de remisión aún no ha sido registrado con su documento"
+        creable_msg = await motivo_no_creable_cierre(db, expediente_id)
+        creable = creable_msg is None
 
         return JSONResponse(
             status_code=404,
@@ -129,34 +149,9 @@ async def crear_cierre(
     if await db.scalar(select(EtapaCierre.id).where(EtapaCierre.expediente_id == expediente_id)):
         raise HTTPException(status_code=409, detail="La etapa de cierre ya existe para este expediente")
 
-    concepto = await db.scalar(
-        select(EtapaAcogerConcepto).where(EtapaAcogerConcepto.expediente_id == expediente_id)
-    )
-    if not concepto:
-        raise HTTPException(status_code=400, detail="La etapa de Concepto Técnico aún no ha sido creada")
-
-    if concepto.tipo_acogida_concepto == "AUTO_REQUERIMIENTO":
-        informe_seg = await db.scalar(
-            select(InformeTecnico).where(
-                InformeTecnico.expediente_id == expediente_id,
-                InformeTecnico.tipo_informe == "SEGUIMIENTO",
-                InformeTecnico.fecha_aceptacion_informe.isnot(None),
-            )
-        )
-        if not informe_seg:
-            raise HTTPException(
-                status_code=400,
-                detail='El informe técnico de "SEGUIMIENTO" aún no ha sido aceptado',
-            )
-    elif concepto.tipo_acogida_concepto == "OFICIO":
-        oficio_r = await db.scalar(
-            select(OficioRemite).where(OficioRemite.etapa_acoger_concepto_id == concepto.id)
-        )
-        if not oficio_r or not oficio_r.archivo_remite_id:
-            raise HTTPException(
-                status_code=400,
-                detail="El oficio de remisión aún no ha sido registrado con su documento",
-            )
+    motivo = await motivo_no_creable_cierre(db, expediente_id)
+    if motivo:
+        raise HTTPException(status_code=400, detail=motivo)
 
     nueva = EtapaCierre(expediente_id=expediente_id)
     db.add(nueva)

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { UserCheck, Calendar } from "lucide-react";
+import { UserCheck, Calendar, TriangleAlert } from "lucide-react";
 import type { ProfesionalDisponible } from "../types";
 import { getErrorMessage } from "@shared/lib/api";
+import { formatDate } from "@shared/lib/format";
 import { Modal } from "@shared/ui";
 import CustomSelect from "@shared/ui/form/CustomSelect";
 import CustomDateInput from "@shared/ui/form/CustomDateInput";
@@ -22,6 +23,8 @@ type Props = {
   revisorActualId?: number | null;
   /** Fecha de programación actual */
   fechaProgramacionActual?: string | null;
+  /** Límite (aaaa-mm-dd) de 30 días hábiles desde hoy: más allá se avisa, sin bloquear. */
+  fechaLimiteProgramacion?: string | null;
   isReassign?: boolean;
 };
 
@@ -34,6 +37,7 @@ export default function AsignarProfesionalModal({
   profesionalActualId,
   revisorActualId,
   fechaProgramacionActual,
+  fechaLimiteProgramacion,
   isReassign = false,
 }: Props) {
   const [profesionalId, setProfesionalId] = useState<number | "">("");
@@ -51,6 +55,9 @@ export default function AsignarProfesionalModal({
       setSubmitting(false);
     }
   }, [isOpen, profesionalActualId, revisorActualId, fechaProgramacionActual]);
+
+  const fueraDePlazo =
+    !!fechaProgramacion && !!fechaLimiteProgramacion && fechaProgramacion > fechaLimiteProgramacion;
 
   const handleSubmit = async () => {
     if (!profesionalId) {
@@ -154,6 +161,15 @@ export default function AsignarProfesionalModal({
             </span>
           </span>
           <CustomDateInput value={fechaProgramacion} onChange={setFechaProgramacion} disabled={submitting} />
+          {fueraDePlazo && (
+            <div role="status" className="alert alert-warning py-2 mt-2">
+              <TriangleAlert size={16} />
+              <span className="text-xs">
+                Fecha fuera del plazo: supera los 30 días hábiles desde hoy (límite{" "}
+                {formatDate(fechaLimiteProgramacion)}). Puedes guardar igual.
+              </span>
+            </div>
+          )}
         </div>
 
         {error && (

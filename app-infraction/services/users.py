@@ -14,7 +14,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-from utils.cache import permission_cache, users_cache
+from utils.cache import permission_cache, users_by_permission_cache, users_cache
 
 users_client = UsersClient.from_env("infraction-service")
 
@@ -28,7 +28,7 @@ async def get_users_by_permission(permission_name: str) -> dict:
         return {}
 
     cache_key = f"users_by_permission:{permission_name}"
-    cached = await users_cache.get(cache_key)
+    cached = await users_by_permission_cache.get(cache_key)
     if cached is not None:
         return cached
 
@@ -47,7 +47,9 @@ async def get_users_by_permission(permission_name: str) -> dict:
         }
         for u in usuarios
     }
-    await users_cache.set(cache_key, result)
+    # No cachear vacíos: un permiso recién asignado no debe quedar invisible.
+    if result:
+        await users_by_permission_cache.set(cache_key, result)
     return result
 
 

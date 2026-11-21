@@ -133,19 +133,24 @@ PERMISOS: list[dict] = [
         "descripcion": "Desbloquea la pantalla Informes de infracciones. Sirve para asignar cada informe técnico a un profesional y a un revisor.",
     },
     {
-        "nombre": "infraccion_informes_revisar",
+        "nombre": "infraccion_lider_tecnico",
         "menu_path": "/infraction/my-reports",
-        "descripcion": "Desbloquea Mis informes de infracciones. Sirve para revisar (aprobar o devolver) los informes técnicos que le asignaron como revisor.",
+        "descripcion": "Desbloquea Mis actuaciones de infracciones como líder técnico. Sirve para revisar los informes técnicos: aprobar para firma o devolver.",
+    },
+    {
+        "nombre": "infraccion_lider_proyecto",
+        "menu_path": "/infraction/my-reports",
+        "descripcion": "Desbloquea Mis actuaciones de infracciones como líder de proyecto. Sirve para revisar los actos administrativos (medida preventiva, acoger concepto y cierre): aprobar para firma o devolver.",
     },
     {
         "nombre": "infraccion_super_gestion",
         "menu_path": "",
-        "descripcion": "Desbloquea el cargue manual de informes técnicos. Sirve para cargar informes históricos o manuales sin pasar por el flujo de revisión.",
+        "descripcion": "Desbloquea el cargue directo de infracciones. Sirve para cargar informes técnicos y actos administrativos sin pasar por revisión, cambiar el documento de un acto y eliminar actos.",
     },
     {
-        "nombre": "infraccion_informes_subir",
+        "nombre": "infraccion_tecnico",
         "menu_path": "/infraction/my-reports",
-        "descripcion": "Desbloquea Mis informes de infracciones. Sirve para subir los informes técnicos que le asignaron como profesional.",
+        "descripcion": "Desbloquea Mis actuaciones de infracciones como técnico. Sirve para cargar los informes técnicos que le asignaron, su versión firmada y la matriz de recursos.",
     },
     # ---------- Concesiones de Aguas Superficiales (app-recurso, plan §2 y §5) ----------
     {
@@ -207,8 +212,9 @@ DEPENDENCIAS: dict[str, tuple[str, ...]] = {
     "infraccion_alertas": ("infraccion_consultar",),
     "infraccion_asignar": ("infraccion_consultar",),
     "infraccion_asignar_informes": ("infraccion_consultar",),
-    "infraccion_informes_subir": ("infraccion_consultar",),
-    "infraccion_informes_revisar": ("infraccion_consultar",),
+    "infraccion_tecnico": ("infraccion_consultar",),
+    "infraccion_lider_tecnico": ("infraccion_consultar",),
+    "infraccion_lider_proyecto": ("infraccion_consultar",),
     "infraccion_super_gestion": ("infraccion_gestionar",),
     "documento_crear": ("documento_gestionar",),
     "documento_revisar": ("documento_gestionar",),
@@ -222,11 +228,13 @@ DEPENDENCIAS: dict[str, tuple[str, ...]] = {
     "recurso_sig": ("recurso_consultar",),
 }
 
-# Pares que no pueden ir en el mismo rol (decisión de negocio). El técnico de
-# concesiones no gestiona: carga sus conceptos desde Mis actuaciones (y, como
-# recurso_super_gestion exige gestionar, tampoco puede tener super gestión).
+# Pares que no pueden ir en el mismo rol (decisión de negocio). El técnico
+# (concesiones e infracciones) no gestiona: carga sus conceptos/informes desde
+# Mis actuaciones / Mis informes (y, como la super gestión exige gestionar,
+# tampoco puede tenerla).
 INCOMPATIBLES: tuple[tuple[str, str], ...] = (
     ("recurso_tecnico", "recurso_gestionar"),
+    ("infraccion_tecnico", "infraccion_gestionar"),
 )
 
 # Los roles con este permiso (administran roles) no tienen incompatibilidades.
@@ -252,6 +260,20 @@ DESCRIPCIONES_ANTERIORES: dict[str, tuple[str, ...]] = {
     "recurso_tecnico": (
         "Desbloquea Mis informes de concesiones como técnico. Sirve para que el abogado lo elija como técnico y cargar su concepto técnico.",
     ),
+    # Descripciones de cuando se llamaban infraccion_informes_subir / _revisar,
+    # y de antes de que "Mis informes" pasara a "Mis actuaciones".
+    "infraccion_tecnico": (
+        "Desbloquea Mis informes de infracciones. Sirve para subir los informes técnicos que le asignaron como profesional.",
+        "Desbloquea Mis informes de infracciones como técnico. Sirve para cargar los informes técnicos que le asignaron, su versión firmada y la matriz de recursos.",
+    ),
+    "infraccion_lider_tecnico": (
+        "Desbloquea Mis informes de infracciones. Sirve para revisar (aprobar o devolver) los informes técnicos que le asignaron como revisor.",
+        "Desbloquea Mis informes de infracciones como líder técnico. Sirve para revisar los informes técnicos: aprobar para firma o devolver.",
+    ),
+    # Antes de que super gestión cargara también los actos administrativos.
+    "infraccion_super_gestion": (
+        "Desbloquea el cargue manual de informes técnicos. Sirve para cargar informes históricos o manuales sin pasar por el flujo de revisión.",
+    ),
 }
 
 # Permiso nuevo -> permisos de los roles que lo reciben al crearse (una sola
@@ -266,6 +288,8 @@ OTORGAR_AL_CREAR: dict[str, tuple[str, ...]] = {
 # (nombre viejo, nombre nuevo), en orden de aplicación.
 RENOMBRES: tuple[tuple[str, str], ...] = (
     ("infraccion_cargue", "infraccion_super_gestion"),
+    ("infraccion_informes_subir", "infraccion_tecnico"),
+    ("infraccion_informes_revisar", "infraccion_lider_tecnico"),
 )
 
 

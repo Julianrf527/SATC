@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, or_, func
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pydantic import BaseModel
 from typing import Optional
 import logging
@@ -13,12 +13,22 @@ from satc_shared.review_process import FINALIZADO, ReviewError
 from db.deps import get_db_managed
 from db.models.informe_tecnico import InformeTecnico
 from db.models.informe_recurso_afectado import InformeRecursoAfectado, RECURSOS_MATRIZ
+from services.matriz_recursos import (
+    FilaRecurso,
+    aplica_matriz,
+    exigir_edicion_matriz,
+    expedientes_con_concepto,
+    guardar_matriz,
+    matriz_para_auditoria,
+    tecnico_puede_editar,
+    validar_matriz,
+)
 from db.models.expediente import Expediente
 
 from core.permission import Permission
 ASSIGN_REPORTS = Permission.ASSIGN_REPORTS
-UPLOAD_REPORTS = Permission.UPLOAD_REPORTS
-REVIEW_REPORTS = Permission.REVIEW_REPORTS
+TECNICO = Permission.TECNICO
+LIDER_TECNICO = Permission.LIDER_TECNICO
 MANUAL_UPLOAD = Permission.MANUAL_UPLOAD
 
 router = APIRouter()
@@ -29,6 +39,7 @@ logger = logging.getLogger(__name__)
 from utils.verify_token import verify_gateway_token
 from services.users import get_users_by_permission, verify_permission
 from services.docs import increment_file_usage, decrement_file_usage, get_file_info
+from services.alertas import advertencia_programacion, hoy_bogota, limite_programacion
 from services.cascada_etapas import (
     ErrorRestaUsos,
     aplicar_restas,
@@ -67,9 +78,14 @@ class CargueManualRequest(BaseModel):
     fecha_programacion_visita: Optional[str] = None  # ISO date string
     profesional_id: Optional[int] = None
     revisor_id: Optional[int] = None
+    # Obligatoria en informes de VISITA (la matriz completa).
+    recursos_afectados: Optional[list[FilaRecurso]] = None
 
 
 # ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+MSG_SIN_PERMISO_TECNICO = "El usuario seleccionado no tiene el permiso de técnico (infraccion_tecnico)"
+MSG_SIN_PERMISO_LIDER = "El usuario seleccionado no tiene el permiso de líder técnico (infraccion_lider_tecnico)"
 
 def _format_date(d) -> Optional[str]:
     if d is None:
@@ -93,20 +109,34 @@ async def _validar_asignacion(informe: Optional[InformeTecnico], body: AsignarPr
         raise HTTPException(status_code=400, detail="El informe ya fue aceptado, no se puede reasignar")
     if body.revisor_id == body.profesional_id:
         raise HTTPException(status_code=400, detail="El profesional y el revisor deben ser personas distintas")
-    if not await verify_permission(body.profesional_id, UPLOAD_REPORTS):
-        raise HTTPException(status_code=400, detail="El usuario no tiene permiso de infraccion_informes_subir")
-    if not await verify_permission(body.revisor_id, REVIEW_REPORTS):
-        raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de infraccion_informes_revisar")
+    if not await verify_permission(body.profesional_id, TECNICO):
+        raise HTTPException(status_code=400, detail=MSG_SIN_PERMISO_TECNICO)
+    if not await verify_permission(body.revisor_id, LIDER_TECNICO):
+        raise HTTPException(status_code=400, detail=MSG_SIN_PERMISO_LIDER)
 
 
-def _aplicar_datos_asignacion(informe: InformeTecnico, body: AsignarProfesionalRequest) -> None:
+def _marcar_asignacion(informe: InformeTecnico) -> None:
+    """Primera vez con técnico Y fecha de programación: guarda el día (inicio
+    de la alerta de primera versión). Reasignar no la cambia."""
+    if (informe.fecha_asignacion is None and informe.profesional_asignado_id
+            and informe.fecha_programacion_visita):
+        informe.fecha_asignacion = hoy_bogota()
+
+
+def _aplicar_datos_asignacion(informe: InformeTecnico, body: AsignarProfesionalRequest) -> Optional[str]:
+    """Aplica la asignación. Devuelve la advertencia de la fecha de
+    programación (fuera de los 30 días hábiles; no bloquea) o None."""
     informe.profesional_asignado_id = body.profesional_id
     informe.revisor_asignado_id = body.revisor_id
+    fecha_nueva = None
     if body.fecha_programacion_visita:
         try:
-            informe.fecha_programacion_visita = date.fromisoformat(body.fecha_programacion_visita)
+            fecha_nueva = date.fromisoformat(body.fecha_programacion_visita)
+            informe.fecha_programacion_visita = fecha_nueva
         except ValueError:
             pass
+    _marcar_asignacion(informe)
+    return advertencia_programacion(fecha_nueva, hoy_bogota())
 
 
 async def _commit_asignacion(db: AsyncSession) -> None:
@@ -134,8 +164,8 @@ async def obtener_profesionales_revisores_disponibles(
     if not permisos:
         raise HTTPException(status_code=403, detail="No tienes permiso para cargar informes manualmente")
 
-    profesionales = await get_users_by_permission(UPLOAD_REPORTS)
-    revisores = await get_users_by_permission(REVIEW_REPORTS)
+    profesionales = await get_users_by_permission(TECNICO)
+    revisores = await get_users_by_permission(LIDER_TECNICO)
 
     return JSONResponse(content={
         "ok": True,
@@ -168,14 +198,17 @@ async def obtener_informes_tecnicos(
     if not permisos:
         raise HTTPException(status_code=403, detail="No tienes permiso para gestionar informes técnicos")
 
-    # Cargar usuarios con UPLOAD_REPORTS/REVIEW_REPORTS para enriquecer respuesta
-    users = await get_users_by_permission(UPLOAD_REPORTS)
-    revisores = await get_users_by_permission(REVIEW_REPORTS)
+    # Técnicos y líderes técnicos para enriquecer la respuesta
+    users = await get_users_by_permission(TECNICO)
+    revisores = await get_users_by_permission(LIDER_TECNICO)
 
     # Los informes en modo MANUAL no pasan por asignación/revisión — no
     # pertenecen a esta tabla, se gestionan desde la etapa del expediente.
     stmt = select(InformeTecnico).where(InformeTecnico.modo == "FLUJO")
 
+    # Días completos, ambos incluidos ("hasta" = antes del día siguiente; con
+    # "<= T23:59:59" se perdía el último segundo con fracción). Fechas sin hora:
+    # Postgres las toma en la zona de la sesión (America/Bogota).
     if fecha_desde:
         try:
             stmt = stmt.where(InformeTecnico.fecha_creacion >= datetime.fromisoformat(fecha_desde))
@@ -183,7 +216,9 @@ async def obtener_informes_tecnicos(
             pass
     if fecha_hasta:
         try:
-            stmt = stmt.where(InformeTecnico.fecha_creacion <= datetime.fromisoformat(fecha_hasta + "T23:59:59"))
+            stmt = stmt.where(
+                InformeTecnico.fecha_creacion < datetime.fromisoformat(fecha_hasta) + timedelta(days=1)
+            )
         except ValueError:
             pass
     if aceptado is True:
@@ -229,6 +264,7 @@ async def obtener_informes_tecnicos(
             "revisor_nombre": revisor_info["nombre"] if revisor_info else None,
             "modo": inf.modo,
             "fecha_programacion_visita": _format_date(inf.fecha_programacion_visita),
+            "fecha_asignacion": _format_date(inf.fecha_asignacion),
             "fecha_recibido_informe": _format_date(inf.fecha_recibido_informe),
             "fecha_aceptacion_informe": _format_date(inf.fecha_aceptacion_informe),
             "documento_informe_id": inf.documento_informe_id,
@@ -245,6 +281,9 @@ async def obtener_informes_tecnicos(
         "page": page,
         "limit": limit,
         "total_pages": max(1, -(-total // limit)),  # ceil division
+        # Fecha de programación más lejana sin advertencia si se asigna hoy
+        # (30 días hábiles); el modal de asignar avisa con ella.
+        "fecha_limite_programacion": limite_programacion(hoy_bogota()).isoformat(),
         "profesionales_disponibles": [
             {"id": uid, "nombre": info["nombre"]}
             for uid, info in users.items()
@@ -296,7 +335,7 @@ async def asignar_profesional(
     except ReviewError as e:
         await db.rollback()
         raise HTTPException(status_code=e.status_code, detail=e.detail)
-    _aplicar_datos_asignacion(informe, body)
+    advertencia = _aplicar_datos_asignacion(informe, body)
     await _commit_asignacion(db)
     await avisos.enviar()
 
@@ -306,6 +345,7 @@ async def asignar_profesional(
         "informe_id": informe_id,
         "proceso_id": proceso.id,
         "message": "Profesional asignado y proceso de revisión creado exitosamente",
+        "advertencia": advertencia,
     })
 
 
@@ -347,7 +387,7 @@ async def reasignar_profesional(
     except ReviewError as e:
         await db.rollback()
         raise HTTPException(status_code=e.status_code, detail=e.detail)
-    _aplicar_datos_asignacion(informe, body)
+    advertencia = _aplicar_datos_asignacion(informe, body)
     await _commit_asignacion(db)
     await avisos.enviar()
 
@@ -357,6 +397,7 @@ async def reasignar_profesional(
         "informe_id": informe_id,
         "proceso_id": proceso.id,
         "message": "Profesional reasignado y nuevo proceso de revisión creado",
+        "advertencia": advertencia,
     })
 
 
@@ -461,6 +502,7 @@ async def cambiar_modo_informe(
     informe.fecha_recibido_informe = None
     informe.fecha_aceptacion_informe = None
     informe.fecha_programacion_visita = None
+    informe.fecha_asignacion = None
     informe.modo = body.modo
     await db.execute(delete(InformeRecursoAfectado).where(InformeRecursoAfectado.informe_id == informe_id))
     await db.flush()
@@ -524,7 +566,8 @@ async def cargue_manual_informe(
     """
     Registra el cargue manual (histórico) de un informe técnico ya aceptado
     previamente fuera del sistema. El archivo ya debe estar subido en
-    app-docs (vía /files/upload) — aquí solo se vincula su file_id.
+    app-docs (vía /files/upload) — aquí solo se vincula su file_id. En los
+    informes de VISITA la matriz de recursos afectados es obligatoria.
     """
     user_id = verify_gateway_token(request)["user_id"]
     permisos = await verify_permission(user_id, MANUAL_UPLOAD)
@@ -559,12 +602,14 @@ async def cargue_manual_informe(
             raise HTTPException(status_code=400, detail="Formato de fecha de programación inválido")
 
     if body.profesional_id is not None:
-        if not await verify_permission(body.profesional_id, UPLOAD_REPORTS):
-            raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de infraccion_informes_subir")
+        if not await verify_permission(body.profesional_id, TECNICO):
+            raise HTTPException(status_code=400, detail=MSG_SIN_PERMISO_TECNICO)
 
     if body.revisor_id is not None:
-        if not await verify_permission(body.revisor_id, REVIEW_REPORTS):
-            raise HTTPException(status_code=400, detail="El usuario seleccionado no tiene permiso de infraccion_informes_revisar")
+        if not await verify_permission(body.revisor_id, LIDER_TECNICO):
+            raise HTTPException(status_code=400, detail=MSG_SIN_PERMISO_LIDER)
+
+    filas = validar_matriz(body.recursos_afectados) if aplica_matriz(informe) else None
 
     # Solo tocar el contador de uso si el archivo realmente cambió — reenviar
     # el mismo file_id (ej. edición que solo cambia fechas) no debe inflar el
@@ -589,6 +634,9 @@ async def cargue_manual_informe(
     informe.fecha_programacion_visita = fecha_programacion
     informe.profesional_asignado_id = body.profesional_id
     informe.revisor_asignado_id = body.revisor_id
+    _marcar_asignacion(informe)
+    if filas is not None:
+        await guardar_matriz(db, informe_id, filas)
 
     await db.commit()
 
@@ -615,11 +663,19 @@ async def obtener_mis_informes(
     """
     user_id = int(verify_gateway_token(request)["user_id"])
 
-    puede_subir = await verify_permission(user_id, UPLOAD_REPORTS)
-    puede_revisar = await verify_permission(user_id, REVIEW_REPORTS)
+    puede_subir = await verify_permission(user_id, TECNICO)
+    puede_revisar = await verify_permission(user_id, LIDER_TECNICO)
     if not (puede_subir or puede_revisar):
         raise HTTPException(status_code=403, detail="No tienes permiso para ver esta sección")
 
+    data = await filas_mis_informes(db, user_id, puede_subir=puede_subir, puede_revisar=puede_revisar)
+    return JSONResponse(content={"ok": True, "data": data})
+
+
+async def filas_mis_informes(db: AsyncSession, user_id: int, *, puede_subir: bool, puede_revisar: bool) -> list[dict]:
+    """Filas de /informes/mios (también las usa /mis-actuaciones)."""
+    if not (puede_subir or puede_revisar):
+        return []
     condiciones = []
     if puede_subir:
         condiciones.append(InformeTecnico.profesional_asignado_id == user_id)
@@ -652,6 +708,7 @@ async def obtener_mis_informes(
         informes_con_matriz = {row[0] for row in filas_result.all()}
 
     procesos = await procesos_vigentes(db, informe_ids)
+    con_concepto = await expedientes_con_concepto(db, expediente_ids)
 
     data = []
     for inf in informes:
@@ -664,42 +721,31 @@ async def obtener_mis_informes(
             "soy_profesional": inf.profesional_asignado_id == user_id,
             "soy_revisor": inf.revisor_asignado_id == user_id,
             "fecha_programacion_visita": _format_date(inf.fecha_programacion_visita),
+            "fecha_asignacion": _format_date(inf.fecha_asignacion),
             "fecha_recibido_informe": _format_date(inf.fecha_recibido_informe),
             "fecha_aceptacion_informe": _format_date(inf.fecha_aceptacion_informe),
             "documento_informe_id": inf.documento_informe_id,
             "aceptado": inf.fecha_aceptacion_informe is not None,
-            "puede_diligenciar_matriz": (
-                inf.tipo_informe == "VISITA"
-                and inf.fecha_aceptacion_informe is not None
-                and inf.profesional_asignado_id == user_id
-            ),
+            # El técnico edita la matriz (no el informe) hasta Acoger concepto.
+            "puede_editar_matriz": tecnico_puede_editar(inf, user_id, inf.expediente_id in con_concepto),
             "tiene_matriz": inf.id in informes_con_matriz,
             **resumen_proceso(procesos.get(inf.id), user_id, inf.revisor_asignado_id),
+            # Orden de /mis-actuaciones: último movimiento del proceso (o creación del informe).
+            "fecha_actualizacion": _iso(
+                procesos[inf.id].fecha_ultima_actualizacion if inf.id in procesos else None
+            ) or _iso(inf.fecha_creacion),
         })
+    return data
 
-    return JSONResponse(content={"ok": True, "data": data})
+
+def _iso(valor) -> Optional[str]:
+    return valor.isoformat() if valor else None
 
 
 # ─── Matriz de recursos afectados ─────────────────────────────────────────────
-
-async def _validar_permiso_matriz(informe: InformeTecnico, user_id: int) -> None:
-    if informe.tipo_informe != "VISITA":
-        raise HTTPException(status_code=400, detail="La matriz de recursos afectados solo aplica a informes de VISITA")
-    if informe.fecha_aceptacion_informe is None:
-        raise HTTPException(status_code=400, detail="El informe aún no ha sido aceptado")
-
-    if informe.profesional_asignado_id == user_id:
-        return
-
-    # El rol de cargue manual (infraccion_super_gestion) puede diligenciar la matriz
-    # directamente desde la etapa del expediente, pero solo si el informe
-    # también se cargó en modo manual — si fue por flujo, solo el profesional
-    # asignado la diligencia (desde "Mis Informes").
-    if informe.modo == "MANUAL" and await verify_permission(user_id, MANUAL_UPLOAD):
-        return
-
-    raise HTTPException(status_code=403, detail="No tienes permiso para diligenciar esta matriz")
-
+# Se diligencia (obligatoria) al cargar la versión final de un informe de
+# VISITA o en su cargue manual; aquí solo se consulta y se edita
+# (reglas en services/matriz_recursos.py).
 
 @router.get("/{informe_id}/recursos", status_code=200)
 async def obtener_matriz_recursos(
@@ -713,7 +759,7 @@ async def obtener_matriz_recursos(
     if not informe:
         raise HTTPException(status_code=404, detail="Informe técnico no encontrado")
 
-    if informe.tipo_informe != "VISITA" or informe.fecha_aceptacion_informe is None:
+    if not aplica_matriz(informe) or informe.fecha_aceptacion_informe is None:
         raise HTTPException(status_code=400, detail="La matriz de recursos afectados solo aplica a informes de VISITA ya aceptados")
 
     if informe.profesional_asignado_id != user_id and informe.revisor_asignado_id != user_id:
@@ -741,15 +787,8 @@ async def obtener_matriz_recursos(
     return JSONResponse(content={"ok": True, "data": data})
 
 
-class FilaRecursoRequest(BaseModel):
-    recurso: str
-    magnitud: Optional[str] = None
-    reversibilidad: Optional[str] = None
-    no_existe: bool = False
-
-
 class MatrizRecursosRequest(BaseModel):
-    filas: list[FilaRecursoRequest]
+    filas: list[FilaRecurso]
 
 
 @router.put("/{informe_id}/recursos", status_code=200)
@@ -759,46 +798,35 @@ async def actualizar_matriz_recursos(
     body: MatrizRecursosRequest,
     db: AsyncSession = Depends(get_db_managed),
 ):
+    """Edita la matriz (completa) de un informe de VISITA aceptado: el técnico
+    asignado mientras no exista Acoger concepto, o super gestión si el informe
+    es MANUAL. El informe (PDF, fechas) no se edita aquí."""
     user_id = verify_gateway_token(request)["user_id"]
 
     informe = await db.scalar(select(InformeTecnico).where(InformeTecnico.id == informe_id))
     if not informe:
         raise HTTPException(status_code=404, detail="Informe técnico no encontrado")
 
-    await _validar_permiso_matriz(informe, user_id)
+    await exigir_edicion_matriz(db, informe, user_id)
+    filas = validar_matriz(body.filas)
 
-    for fila in body.filas:
-        if fila.recurso not in RECURSOS_MATRIZ:
-            raise HTTPException(status_code=400, detail=f"Recurso inválido: {fila.recurso}")
-        if fila.magnitud and fila.magnitud not in ("LEVE", "MODERADO", "GRAVE"):
-            raise HTTPException(status_code=400, detail=f"Magnitud inválida: {fila.magnitud}")
-        if fila.reversibilidad and fila.reversibilidad not in ("REVERSIBLE", "IRREVERSIBLE"):
-            raise HTTPException(status_code=400, detail=f"Reversibilidad inválida: {fila.reversibilidad}")
-        if not fila.no_existe and not (fila.magnitud and fila.reversibilidad):
-            raise HTTPException(
-                status_code=400,
-                detail=f"El recurso {fila.recurso} debe marcar 'no existe' o tener magnitud y reversibilidad",
-            )
+    antes = await matriz_para_auditoria(db, informe_id)
+    await guardar_matriz(db, informe_id, filas)
 
-    existentes = (await db.execute(
-        select(InformeRecursoAfectado).where(InformeRecursoAfectado.informe_id == informe_id)
-    )).scalars().all()
-    existentes_map = {f.recurso: f for f in existentes}
-
-    for fila in body.filas:
-        actual = existentes_map.get(fila.recurso)
-        if actual:
-            actual.magnitud = None if fila.no_existe else fila.magnitud
-            actual.reversibilidad = None if fila.no_existe else fila.reversibilidad
-            actual.no_existe = fila.no_existe
-        else:
-            db.add(InformeRecursoAfectado(
-                informe_id=informe_id,
-                recurso=fila.recurso,
-                magnitud=None if fila.no_existe else fila.magnitud,
-                reversibilidad=None if fila.no_existe else fila.reversibilidad,
-                no_existe=fila.no_existe,
-            ))
+    audit_result = await insert_log(
+        db=db,
+        tipo_evento="EDITAR_MATRIZ_RECURSOS",
+        resultado="EXITOSO",
+        usuario_id=user_id,
+        detalle=f"Edición de la matriz de recursos afectados del informe {informe.tipo_informe}",
+        expediente_id=informe.expediente_id,
+        expediente_radicado=await _radicado(db, informe.expediente_id),
+        datos_anteriores={"informe_id": informe_id, "matriz": antes},
+        datos_nuevos={"informe_id": informe_id, "matriz": await matriz_para_auditoria(db, informe_id)},
+    )
+    if not audit_result.get("ok"):
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
 
     await db.commit()
 

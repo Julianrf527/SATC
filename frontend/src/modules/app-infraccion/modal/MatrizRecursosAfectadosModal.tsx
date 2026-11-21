@@ -3,27 +3,30 @@ import { Leaf } from "lucide-react";
 import { Modal } from "@shared/ui";
 import { detalleError } from "../api/errors";
 import { useGuardarMatrizMutation, useMatrizRecursosQuery } from "../api/informes";
-import {
-  MAGNITUDES,
-  RECURSO_LABELS,
-  REVERSIBILIDADES,
-  type Magnitud,
-  type Reversibilidad,
-} from "../informe-tecnico/recursos";
-import type { FilaRecursoAfectado, RecursoMatriz } from "../types";
+import MatrizRecursosEditor from "../informe-tecnico/MatrizRecursosEditor";
+import { errorMatriz, matrizInicial, normalizarMatriz } from "../informe-tecnico/recursos";
+import type { FilaRecursoAfectado } from "../types";
 
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   informeId: number;
+  /** Matriz ya cargada (p. ej. la de la etapa): evita volver a pedirla. */
+  filasIniciales?: FilaRecursoAfectado[] | null;
   setToast: (toast: { id: number; message: string; type: "success" | "error" }) => void;
 };
 
 const FORM_ID = "matriz-recursos-form";
 
-export default function MatrizRecursosAfectadosModal({ isOpen, onClose, informeId, setToast }: Props) {
-  const matriz = useMatrizRecursosQuery(informeId, isOpen);
+/**
+ * Editar la matriz de un informe de VISITA ya aceptado (PUT /informes/{id}/recursos).
+ * Solo la matriz: el informe no se toca. Puede el técnico asignado hasta
+ * Acoger concepto, y super gestión en informes MANUAL (lo decide el backend).
+ */
+export default function MatrizRecursosAfectadosModal({ isOpen, onClose, informeId, filasIniciales, setToast }: Props) {
+  const matriz = useMatrizRecursosQuery(informeId, isOpen && !filasIniciales);
   const guardar = useGuardarMatrizMutation(informeId);
+  const inicial = filasIniciales ?? matriz.data;
 
   return (
     <Modal
@@ -44,24 +47,17 @@ export default function MatrizRecursosAfectadosModal({ isOpen, onClose, informeI
             type="submit"
             form={FORM_ID}
             className="btn btn-success text-white btn-sm gap-2"
-            disabled={guardar.isPending || !matriz.data}
+            disabled={guardar.isPending || !inicial}
           >
             {guardar.isPending ? <span className="loading loading-spinner loading-xs" /> : "Guardar"}
           </button>
         </>
       }
     >
-      {matriz.isPending ? (
-        <div className="flex justify-center items-center min-h-[26rem]">
-          <span className="loading loading-spinner loading-md text-success" />
-        </div>
-      ) : matriz.isError ? (
-        <div role="alert" className="alert alert-error py-2 text-sm">
-          {detalleError(matriz.error) ?? "Error al cargar la matriz"}
-        </div>
-      ) : (
-        <MatrizEditor
-          inicial={matriz.data}
+      {inicial ? (
+        <FormularioMatriz
+          inicial={inicial}
+          ocupado={guardar.isPending}
           errorServidor={guardar.isError ? (detalleError(guardar.error) ?? "Error al guardar la matriz") : null}
           onGuardar={(filas) =>
             guardar.mutate(filas, {
@@ -72,112 +68,50 @@ export default function MatrizRecursosAfectadosModal({ isOpen, onClose, informeI
             })
           }
         />
+      ) : matriz.isError ? (
+        <div role="alert" className="alert alert-error py-2 text-sm">
+          {detalleError(matriz.error) ?? "Error al cargar la matriz"}
+        </div>
+      ) : (
+        <div className="flex justify-center items-center min-h-[26rem]">
+          <span className="loading loading-spinner loading-md text-success" />
+        </div>
       )}
     </Modal>
   );
 }
 
-function MatrizEditor({
+function FormularioMatriz({
   inicial,
+  ocupado,
   errorServidor,
   onGuardar,
 }: {
   inicial: FilaRecursoAfectado[];
+  ocupado: boolean;
   errorServidor: string | null;
   onGuardar: (filas: FilaRecursoAfectado[]) => void;
 }) {
-  const [filas, setFilas] = useState(inicial);
-  const [error, setError] = useState("");
-
-  const actualizar = (recurso: RecursoMatriz, cambio: (f: FilaRecursoAfectado) => FilaRecursoAfectado) => {
-    setFilas((prev) => prev.map((f) => (f.recurso === recurso ? cambio(f) : f)));
-    setError("");
-  };
-
-  const toggleMagnitud = (recurso: RecursoMatriz, m: Magnitud) =>
-    actualizar(recurso, (f) => (f.magnitud === m ? { ...f, magnitud: null, reversibilidad: null } : { ...f, magnitud: m }));
-
-  const toggleReversibilidad = (recurso: RecursoMatriz, r: Reversibilidad) =>
-    actualizar(recurso, (f) => ({ ...f, reversibilidad: f.reversibilidad === r ? null : r }));
+  const [filas, setFilas] = useState(() => matrizInicial(inicial));
+  const [error, setError] = useState<string | null>(null);
 
   const enviar = (e: FormEvent) => {
     e.preventDefault();
-    const incompletas = filas.filter((f) => f.magnitud && !f.reversibilidad);
-    if (incompletas.length > 0) {
-      setError(`Falta la reversibilidad de: ${incompletas.map((f) => RECURSO_LABELS[f.recurso]).join(", ")}`);
-      return;
-    }
-    onGuardar(filas.map((f) => ({ ...f, no_existe: !f.magnitud })));
+    const invalido = errorMatriz(filas);
+    if (invalido) return setError(invalido);
+    onGuardar(normalizarMatriz(filas));
   };
 
   return (
     <form id={FORM_ID} onSubmit={enviar} className="space-y-4">
-      <div className="overflow-x-auto">
-        <table className="table table-sm w-full">
-          <thead>
-            <tr>
-              <th rowSpan={2} className="align-bottom">Recurso Afectado</th>
-              <th colSpan={3} className="text-center border-l border-base-300">Magnitud</th>
-              <th colSpan={2} className="text-center border-l border-base-300">Reversibilidad</th>
-              <th rowSpan={2} className="text-center align-bottom border-l border-base-300">No existe</th>
-            </tr>
-            <tr>
-              <th className="text-center border-l border-base-300">Leve</th>
-              <th className="text-center">Moderado</th>
-              <th className="text-center">Grave</th>
-              <th className="text-center border-l border-base-300">Reversible</th>
-              <th className="text-center">Irreversible</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filas.map((f) => {
-              const noExiste = !f.magnitud;
-              const nombre = RECURSO_LABELS[f.recurso];
-              return (
-                <tr key={f.recurso}>
-                  <td className="font-medium">{nombre}</td>
-                  {MAGNITUDES.map((m, i) => (
-                    <td key={m} className={`text-center ${i === 0 ? "border-l border-base-300" : ""}`}>
-                      <input
-                        type="radio"
-                        aria-label={`${nombre}: ${m.toLowerCase()}`}
-                        className="radio radio-success radio-sm"
-                        checked={f.magnitud === m}
-                        onChange={() => {}}
-                        onClick={() => toggleMagnitud(f.recurso, m)}
-                      />
-                    </td>
-                  ))}
-                  {REVERSIBILIDADES.map((r, i) => (
-                    <td key={r} className={`text-center ${i === 0 ? "border-l border-base-300" : ""}`}>
-                      <input
-                        type="radio"
-                        aria-label={`${nombre}: ${r.toLowerCase()}`}
-                        className="radio radio-success radio-sm"
-                        checked={f.reversibilidad === r}
-                        disabled={noExiste}
-                        onChange={() => {}}
-                        onClick={() => toggleReversibilidad(f.recurso, r)}
-                      />
-                    </td>
-                  ))}
-                  <td className="text-center border-l border-base-300">
-                    <input
-                      type="checkbox"
-                      aria-label={`${nombre}: no existe`}
-                      className="checkbox checkbox-sm"
-                      checked={noExiste}
-                      disabled
-                      readOnly
-                    />
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
+      <MatrizRecursosEditor
+        filas={filas}
+        disabled={ocupado}
+        onChange={(nuevas) => {
+          setFilas(nuevas);
+          setError(null);
+        }}
+      />
       {(error || errorServidor) && (
         <div role="alert" className="alert alert-error py-2 text-sm">
           {error || errorServidor}

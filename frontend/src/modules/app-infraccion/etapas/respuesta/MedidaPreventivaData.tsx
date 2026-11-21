@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { ActoAdmin } from "@features/acto-administrativo";
+import ActoInfraccion from "../actos/ActoInfraccion";
 import type { MedidaInfo, MedidaPreventiva } from "../../types";
 import { useDatosActoAdmin } from "../../api/expediente";
 import { useGuardarMedidaMutation, useTiposMedidaQuery } from "../../api/etapas";
@@ -168,7 +168,9 @@ export default function MedidaPreventivaData({
 
         {/* ACTO ADMINISTRATIVO — siempre primero cuando existe medida */}
         {localMedida && (
-          <ActoAdmin
+          <ActoInfraccion
+            etapaTipo="medida_preventiva"
+            refId={localMedida.id}
             expedienteId={expedienteId}
             actoAdmin={localMedida.acto_admin ?? {}}
             etapaId={0}
@@ -181,6 +183,7 @@ export default function MedidaPreventivaData({
             endpoints={INFRACCION_ACTO_ENDPOINTS}
             stageBinding={{ type: "medida_preventiva", id: localMedida.id }}
             embedded
+            anidada
           />
         )}
 

@@ -16,6 +16,9 @@ import { useProcesoRevision } from "./useProcesoRevision";
 /** Slot: contenido fijo o función del detalle cargado. */
 export type SlotProceso<D> = ReactNode | ((detalle: D) => ReactNode);
 
+/** Desde este `max_devoluciones` el flujo se considera sin tope. */
+const SIN_TOPE_DEVOLUCIONES = 1000;
+
 export type ProcesoDetalleModalProps<D extends ProcesoDetalle> = {
   adapter: ProcesoAdapter<D>;
   /** Id que entiende el adapter. `null` = cerrado. */
@@ -156,7 +159,10 @@ export function ProcesoDetalleModal<D extends ProcesoDetalle>({
                   {detalle.numero_devoluciones > 0 && (
                     <span className="flex items-center gap-1 text-error font-semibold">
                       <XCircle size={14} />
-                      {detalle.numero_devoluciones}/{detalle.max_devoluciones} devoluciones
+                      {/* Flujos sin tope (max muy alto, p. ej. 9999): solo el conteo. */}
+                      {detalle.max_devoluciones >= SIN_TOPE_DEVOLUCIONES
+                        ? `${detalle.numero_devoluciones} ${detalle.numero_devoluciones === 1 ? "devolución" : "devoluciones"}`
+                        : `${detalle.numero_devoluciones}/${detalle.max_devoluciones} devoluciones`}
                     </span>
                   )}
                 </div>

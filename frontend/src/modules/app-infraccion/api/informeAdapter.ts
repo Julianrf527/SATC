@@ -15,10 +15,9 @@ export type ProcesoInformeDetalle = ProcesoDetalle & {
   asignador_id: number | null;
 };
 
-/** Respuesta de revisar / subir versión: `informe_aceptado` si el proceso aprobó. */
+/** Respuesta de revisar / subir versión. El informe solo se acepta con la versión final. */
 export type ResultadoInforme = ResultadoAccion & {
   informe_id?: number;
-  informe_aceptado?: boolean;
 };
 
 /**

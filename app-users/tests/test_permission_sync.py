@@ -86,6 +86,68 @@ async def test_sync_renombra_infraccion_cargue_y_conserva_roles(db_session, make
 
 
 @pytest.mark.asyncio
+async def test_sync_renombra_informes_infraccion_a_tecnico_y_lider(db_session, make_permiso, make_rol):
+    """infraccion_informes_subir/_revisar -> infraccion_tecnico/_lider_tecnico:
+    los roles los conservan y la descripción por defecto vieja se actualiza."""
+    subir = await make_permiso(
+        "infraccion_informes_subir", "/infraction/my-reports",
+        DESCRIPCIONES_ANTERIORES["infraccion_tecnico"][0],
+    )
+    revisar = await make_permiso(
+        "infraccion_informes_revisar", "/infraction/my-reports",
+        DESCRIPCIONES_ANTERIORES["infraccion_lider_tecnico"][0],
+    )
+    rol = await make_rol("informes", [subir, revisar])
+    await db_session.commit()
+
+    r = await _sync()
+    assert ("infraccion_informes_subir", "infraccion_tecnico") in r["renombrados"]
+    assert ("infraccion_informes_revisar", "infraccion_lider_tecnico") in r["renombrados"]
+    ids = await _ids_por_nombre()
+    assert ids["infraccion_tecnico"] == subir.id
+    assert ids["infraccion_lider_tecnico"] == revisar.id
+    assert {"infraccion_tecnico", "infraccion_lider_tecnico"} <= await _permisos_de_rol(rol.id)
+
+    actuales = {p["nombre"]: p["descripcion"] for p in PERMISOS}
+    async with engine.connect() as conn:
+        desc = dict((await conn.execute(text(
+            "SELECT nombre, descripcion FROM permiso WHERE nombre IN ('infraccion_tecnico', 'infraccion_lider_tecnico')"
+        ))).all())
+    assert desc == {n: actuales[n] for n in desc}
+    assert ("infraccion_tecnico", "infraccion_gestionar") in INCOMPATIBLES
+
+
+@pytest.mark.asyncio
+async def test_sync_crea_lider_proyecto_infraccion_y_actualiza_mis_actuaciones(db_session, make_permiso):
+    """infraccion_lider_proyecto (revisa los actos) requiere consultar; las
+    descripciones por defecto de "Mis informes" pasan a "Mis actuaciones"."""
+    await make_permiso(
+        "infraccion_tecnico", "/infraction/my-reports", DESCRIPCIONES_ANTERIORES["infraccion_tecnico"][-1],
+    )
+    await make_permiso(
+        "infraccion_super_gestion", "", DESCRIPCIONES_ANTERIORES["infraccion_super_gestion"][-1],
+    )
+    await db_session.commit()
+
+    await _sync()
+    assert DEPENDENCIAS["infraccion_lider_proyecto"] == ("infraccion_consultar",)
+    actuales = {p["nombre"]: p for p in PERMISOS}
+    assert actuales["infraccion_lider_proyecto"]["menu_path"] == "/infraction/my-reports"
+    async with engine.connect() as conn:
+        desc = dict((await conn.execute(text(
+            "SELECT nombre, descripcion FROM permiso WHERE nombre IN "
+            "('infraccion_lider_proyecto', 'infraccion_tecnico', 'infraccion_super_gestion')"
+        ))).all())
+        requiere = (await conn.execute(text(
+            "SELECT r.nombre FROM permiso_requiere pr JOIN permiso p ON p.id = pr.permiso_id "
+            "JOIN permiso r ON r.id = pr.requiere_id WHERE p.nombre = 'infraccion_lider_proyecto'"
+        ))).scalars().all()
+    assert desc == {n: actuales[n]["descripcion"] for n in desc} and len(desc) == 3
+    assert "Mis actuaciones" in desc["infraccion_tecnico"]
+    assert requiere == ["infraccion_consultar"]
+
+
+@pytest.mark.asyncio
 async def test_sync_con_ambos_nombres_no_borra_nada(db_session, make_permiso, make_rol):
     viejo = await make_permiso("infraccion_cargue")
     nuevo = await make_permiso("infraccion_super_gestion")
@@ -176,6 +238,28 @@ async def test_sync_no_modifica_roles_que_incumplen_y_los_reporta(db_session, ma
     r2 = await _sync()
     assert r2["otorgados_a_roles"] == []
     assert (await _estado())["roles"] == roles_antes
+
+
+@pytest.mark.asyncio
+async def test_sync_admin_siempre_queda_con_todos_los_permisos(db_session, make_permiso, make_rol):
+    # Base existente donde a admin le faltan permisos (no los tenía todos, así
+    # que el paso de "superadministrador" no lo alcanza).
+    consultar = await make_permiso("infraccion_consultar", "/infraction/consult")
+    await make_permiso("infraccion_lider_proyecto", "/infraction/my-reports")
+    ajeno = await make_permiso("permiso_manual_vm")
+    admin = await make_rol("admin", [consultar])
+    otro = await make_rol("consulta", [consultar])
+    await db_session.commit()
+
+    r = await _sync()
+    todos = {p["nombre"] for p in PERMISOS} | {ajeno.nombre}
+    assert await _permisos_de_rol(admin.id) == todos
+    assert r["otorgados_a_admin"] == len(todos) - 1
+    # Los demás roles no se tocan.
+    assert await _permisos_de_rol(otro.id) == {"infraccion_consultar"}
+
+    # Idempotente.
+    assert (await _sync())["otorgados_a_admin"] == 0
 
 
 @pytest.mark.asyncio

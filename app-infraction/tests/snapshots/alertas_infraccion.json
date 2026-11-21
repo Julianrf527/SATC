@@ -15,11 +15,11 @@
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 11.5,
+      "porcentaje_avance": 6.7,
       "urgencia": "baja",
-      "dias_transcurridos": 3,
-      "dias_restantes": 23,
-      "dias_totales": 26,
+      "dias_transcurridos": 1,
+      "dias_restantes": 14,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
@@ -37,11 +37,11 @@
      "semaforo": {
       "estado": "amarillo",
       "color_hex": "#f59e0b",
-      "porcentaje_avance": 59.1,
+      "porcentaje_avance": 60.0,
       "urgencia": "media",
-      "dias_transcurridos": 13,
-      "dias_restantes": 9,
-      "dias_totales": 22,
+      "dias_transcurridos": 9,
+      "dias_restantes": 6,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
@@ -61,9 +61,9 @@
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 24,
+      "dias_transcurridos": 16,
       "dias_restantes": 0,
-      "dias_totales": 21,
+      "dias_totales": 15,
       "esta_vencido": true
      },
      "es_responsable": true
@@ -83,9 +83,9 @@
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 84,
+      "dias_transcurridos": 57,
       "dias_restantes": 0,
-      "dias_totales": 24,
+      "dias_totales": 15,
       "esta_vencido": true
      },
      "es_responsable": true
@@ -103,33 +103,53 @@
      "semaforo": {
       "estado": "amarillo",
       "color_hex": "#f59e0b",
-      "porcentaje_avance": 54.5,
+      "porcentaje_avance": 53.3,
       "urgencia": "media",
-      "dias_transcurridos": 12,
-      "dias_restantes": 10,
-      "dias_totales": 22,
+      "dias_transcurridos": 8,
+      "dias_restantes": 7,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
     }
    },
    "CAR-0006": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    },
     "concepto_constancia_1": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2026-03-05 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2026-03-05 para notificar",
      "fecha_inicio": "2026-03-05",
      "fecha_limite": "2026-03-27",
      "semaforo": {
-      "estado": "amarillo",
-      "color_hex": "#f59e0b",
-      "porcentaje_avance": 50.0,
-      "urgencia": "media",
-      "dias_transcurridos": 11,
-      "dias_restantes": 11,
-      "dias_totales": 22,
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 46.7,
+      "urgencia": "baja",
+      "dias_transcurridos": 7,
+      "dias_restantes": 8,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
@@ -137,9 +157,9 @@
     "concepto_constancia_2": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2026-02-10 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2026-02-10 para notificar",
      "fecha_inicio": "2026-02-10",
      "fecha_limite": "2026-03-03",
      "semaforo": {
@@ -147,9 +167,9 @@
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 34,
+      "dias_transcurridos": 24,
       "dias_restantes": 0,
-      "dias_totales": 21,
+      "dias_totales": 15,
       "esta_vencido": true
      },
      "es_responsable": true
@@ -157,19 +177,19 @@
     "concepto_constancia_6": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2026-02-27 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2026-02-27 para notificar",
      "fecha_inicio": "2026-02-27",
      "fecha_limite": "2026-03-20",
      "semaforo": {
-      "estado": "rojo",
-      "color_hex": "#ef4444",
-      "porcentaje_avance": 81.0,
-      "urgencia": "alta",
-      "dias_transcurridos": 17,
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 73.3,
+      "urgencia": "media",
+      "dias_transcurridos": 11,
       "dias_restantes": 4,
-      "dias_totales": 21,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
@@ -180,39 +200,81 @@
      "accion_requerida": "El término de 10 días hábiles del concepto técnico está en curso",
      "plazo_legal": "10 días hábiles desde notificación del concepto",
      "msg": "Término de 10 días hábiles vence el 2026-03-25",
-     "fecha_inicio": "2026-03-11",
+     "fecha_inicio": "2026-03-10",
      "fecha_limite": "2026-03-25",
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 35.7,
+      "porcentaje_avance": 40.0,
       "urgencia": "baja",
-      "dias_transcurridos": 5,
-      "dias_restantes": 9,
-      "dias_totales": 14,
+      "dias_transcurridos": 4,
+      "dias_restantes": 6,
+      "dias_totales": 10,
       "esta_vencido": false
      },
      "es_responsable": true
     }
    },
    "CAR-0007": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    },
     "concepto_termino": {
      "tipo": "concepto_termino",
      "etapa": "Concepto",
      "accion_requerida": "El término de 30 días hábiles del concepto técnico está en curso",
      "plazo_legal": "30 días hábiles desde notificación del concepto",
      "msg": "Término de 30 días hábiles vence el 2026-03-17",
-     "fecha_inicio": "2026-02-02",
+     "fecha_inicio": "2026-02-03",
      "fecha_limite": "2026-03-17",
      "semaforo": {
       "estado": "rojo",
       "color_hex": "#ef4444",
-      "porcentaje_avance": 97.7,
+      "porcentaje_avance": 96.7,
       "urgencia": "alta",
-      "dias_transcurridos": 42,
+      "dias_transcurridos": 29,
       "dias_restantes": 1,
-      "dias_totales": 43,
+      "dias_totales": 30,
       "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0008": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
      },
      "es_responsable": true
     }
@@ -229,17 +291,37 @@
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 31.8,
+      "porcentaje_avance": 33.3,
       "urgencia": "baja",
-      "dias_transcurridos": 7,
-      "dias_restantes": 15,
-      "dias_totales": 22,
+      "dias_transcurridos": 5,
+      "dias_restantes": 10,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": false
     }
    },
    "CAR-0010": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "es_responsable": false
+    },
     "concepto_termino": {
      "tipo": "concepto_termino",
      "etapa": "Concepto",
@@ -253,31 +335,71 @@
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 13,
+      "dias_transcurridos": 9,
       "dias_restantes": 0,
-      "dias_totales": 7,
+      "dias_totales": 5,
       "esta_vencido": true
+     },
+     "es_responsable": false
+    },
+    "seguimiento_asignar": {
+     "tipo": "seguimiento_asignar",
+     "etapa": "Seguimiento",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el vencimiento del término del auto de requerimiento",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-03-10",
+     "fecha_limite": "2026-04-24",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 13.3,
+      "urgencia": "baja",
+      "dias_transcurridos": 4,
+      "dias_restantes": 26,
+      "dias_totales": 30,
+      "esta_vencido": false
      },
      "es_responsable": false
     }
    },
    "CAR-0011": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "es_responsable": false
+    },
     "concepto_constancia_8": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2026-03-12 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2026-03-12 para notificar",
      "fecha_inicio": "2026-03-12",
      "fecha_limite": "2026-04-07",
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 15.4,
+      "porcentaje_avance": 13.3,
       "urgencia": "baja",
-      "dias_transcurridos": 4,
-      "dias_restantes": 22,
-      "dias_totales": 26,
+      "dias_transcurridos": 2,
+      "dias_restantes": 13,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": false
@@ -293,13 +415,13 @@
      "fecha_inicio": "2026-02-28",
      "fecha_limite": "2026-03-20",
      "semaforo": {
-      "estado": "rojo",
-      "color_hex": "#ef4444",
-      "porcentaje_avance": 80.0,
-      "urgencia": "alta",
-      "dias_transcurridos": 16,
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 73.3,
+      "urgencia": "media",
+      "dias_transcurridos": 11,
       "dias_restantes": 4,
-      "dias_totales": 20,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
@@ -307,9 +429,9 @@
     "concepto_constancia_9": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar",
      "fecha_inicio": "2025-12-30",
      "fecha_limite": "2026-01-22",
      "semaforo": {
@@ -317,9 +439,9 @@
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 76,
+      "dias_transcurridos": 52,
       "dias_restantes": 0,
-      "dias_totales": 23,
+      "dias_totales": 15,
       "esta_vencido": true
      },
      "es_responsable": true
@@ -330,16 +452,16 @@
      "accion_requerida": "El término de 15 días hábiles del concepto técnico está en curso",
      "plazo_legal": "15 días hábiles desde notificación del concepto",
      "msg": "Término de 15 días hábiles vence el 2026-04-08",
-     "fecha_inicio": "2026-03-18",
+     "fecha_inicio": "2026-03-15",
      "fecha_limite": "2026-04-08",
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 0.0,
+      "porcentaje_avance": 6.7,
       "urgencia": "baja",
-      "dias_transcurridos": 0,
-      "dias_restantes": 23,
-      "dias_totales": 21,
+      "dias_transcurridos": 1,
+      "dias_restantes": 14,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
@@ -347,12 +469,12 @@
    }
   },
   "total_expedientes": 12,
-  "expedientes_con_alertas": 11,
+  "expedientes_con_alertas": 12,
   "estadisticas_semaforo": {
-   "verde": 5,
-   "amarillo": 3,
-   "rojo": 3,
-   "vencido": 5
+   "verde": 7,
+   "amarillo": 4,
+   "rojo": 1,
+   "vencido": 10
   }
  },
  "todas_mios": {
@@ -371,11 +493,11 @@
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 11.5,
+      "porcentaje_avance": 6.7,
       "urgencia": "baja",
-      "dias_transcurridos": 3,
-      "dias_restantes": 23,
-      "dias_totales": 26,
+      "dias_transcurridos": 1,
+      "dias_restantes": 14,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
@@ -393,11 +515,11 @@
      "semaforo": {
       "estado": "amarillo",
       "color_hex": "#f59e0b",
-      "porcentaje_avance": 59.1,
+      "porcentaje_avance": 60.0,
       "urgencia": "media",
-      "dias_transcurridos": 13,
-      "dias_restantes": 9,
-      "dias_totales": 22,
+      "dias_transcurridos": 9,
+      "dias_restantes": 6,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
@@ -417,9 +539,9 @@
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 24,
+      "dias_transcurridos": 16,
       "dias_restantes": 0,
-      "dias_totales": 21,
+      "dias_totales": 15,
       "esta_vencido": true
      },
      "es_responsable": true
@@ -439,9 +561,9 @@
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 84,
+      "dias_transcurridos": 57,
       "dias_restantes": 0,
-      "dias_totales": 24,
+      "dias_totales": 15,
       "esta_vencido": true
      },
      "es_responsable": true
@@ -459,33 +581,53 @@
      "semaforo": {
       "estado": "amarillo",
       "color_hex": "#f59e0b",
-      "porcentaje_avance": 54.5,
+      "porcentaje_avance": 53.3,
       "urgencia": "media",
-      "dias_transcurridos": 12,
-      "dias_restantes": 10,
-      "dias_totales": 22,
+      "dias_transcurridos": 8,
+      "dias_restantes": 7,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
     }
    },
    "CAR-0006": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    },
     "concepto_constancia_1": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2026-03-05 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2026-03-05 para notificar",
      "fecha_inicio": "2026-03-05",
      "fecha_limite": "2026-03-27",
      "semaforo": {
-      "estado": "amarillo",
-      "color_hex": "#f59e0b",
-      "porcentaje_avance": 50.0,
-      "urgencia": "media",
-      "dias_transcurridos": 11,
-      "dias_restantes": 11,
-      "dias_totales": 22,
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 46.7,
+      "urgencia": "baja",
+      "dias_transcurridos": 7,
+      "dias_restantes": 8,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
@@ -493,9 +635,9 @@
     "concepto_constancia_2": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2026-02-10 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2026-02-10 para notificar",
      "fecha_inicio": "2026-02-10",
      "fecha_limite": "2026-03-03",
      "semaforo": {
@@ -503,9 +645,9 @@
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 34,
+      "dias_transcurridos": 24,
       "dias_restantes": 0,
-      "dias_totales": 21,
+      "dias_totales": 15,
       "esta_vencido": true
      },
      "es_responsable": true
@@ -513,19 +655,19 @@
     "concepto_constancia_6": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2026-02-27 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2026-02-27 para notificar",
      "fecha_inicio": "2026-02-27",
      "fecha_limite": "2026-03-20",
      "semaforo": {
-      "estado": "rojo",
-      "color_hex": "#ef4444",
-      "porcentaje_avance": 81.0,
-      "urgencia": "alta",
-      "dias_transcurridos": 17,
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 73.3,
+      "urgencia": "media",
+      "dias_transcurridos": 11,
       "dias_restantes": 4,
-      "dias_totales": 21,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
@@ -536,39 +678,81 @@
      "accion_requerida": "El término de 10 días hábiles del concepto técnico está en curso",
      "plazo_legal": "10 días hábiles desde notificación del concepto",
      "msg": "Término de 10 días hábiles vence el 2026-03-25",
-     "fecha_inicio": "2026-03-11",
+     "fecha_inicio": "2026-03-10",
      "fecha_limite": "2026-03-25",
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 35.7,
+      "porcentaje_avance": 40.0,
       "urgencia": "baja",
-      "dias_transcurridos": 5,
-      "dias_restantes": 9,
-      "dias_totales": 14,
+      "dias_transcurridos": 4,
+      "dias_restantes": 6,
+      "dias_totales": 10,
       "esta_vencido": false
      },
      "es_responsable": true
     }
    },
    "CAR-0007": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    },
     "concepto_termino": {
      "tipo": "concepto_termino",
      "etapa": "Concepto",
      "accion_requerida": "El término de 30 días hábiles del concepto técnico está en curso",
      "plazo_legal": "30 días hábiles desde notificación del concepto",
      "msg": "Término de 30 días hábiles vence el 2026-03-17",
-     "fecha_inicio": "2026-02-02",
+     "fecha_inicio": "2026-02-03",
      "fecha_limite": "2026-03-17",
      "semaforo": {
       "estado": "rojo",
       "color_hex": "#ef4444",
-      "porcentaje_avance": 97.7,
+      "porcentaje_avance": 96.7,
       "urgencia": "alta",
-      "dias_transcurridos": 42,
+      "dias_transcurridos": 29,
       "dias_restantes": 1,
-      "dias_totales": 43,
+      "dias_totales": 30,
       "esta_vencido": false
+     },
+     "es_responsable": true
+    }
+   },
+   "CAR-0008": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
      },
      "es_responsable": true
     }
@@ -583,13 +767,13 @@
      "fecha_inicio": "2026-02-28",
      "fecha_limite": "2026-03-20",
      "semaforo": {
-      "estado": "rojo",
-      "color_hex": "#ef4444",
-      "porcentaje_avance": 80.0,
-      "urgencia": "alta",
-      "dias_transcurridos": 16,
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 73.3,
+      "urgencia": "media",
+      "dias_transcurridos": 11,
       "dias_restantes": 4,
-      "dias_totales": 20,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
@@ -597,9 +781,9 @@
     "concepto_constancia_9": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar",
      "fecha_inicio": "2025-12-30",
      "fecha_limite": "2026-01-22",
      "semaforo": {
@@ -607,9 +791,9 @@
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 76,
+      "dias_transcurridos": 52,
       "dias_restantes": 0,
-      "dias_totales": 23,
+      "dias_totales": 15,
       "esta_vencido": true
      },
      "es_responsable": true
@@ -620,16 +804,16 @@
      "accion_requerida": "El término de 15 días hábiles del concepto técnico está en curso",
      "plazo_legal": "15 días hábiles desde notificación del concepto",
      "msg": "Término de 15 días hábiles vence el 2026-04-08",
-     "fecha_inicio": "2026-03-18",
+     "fecha_inicio": "2026-03-15",
      "fecha_limite": "2026-04-08",
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 0.0,
+      "porcentaje_avance": 6.7,
       "urgencia": "baja",
-      "dias_transcurridos": 0,
-      "dias_restantes": 23,
-      "dias_totales": 21,
+      "dias_transcurridos": 1,
+      "dias_restantes": 14,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
@@ -637,12 +821,12 @@
    }
   },
   "total_expedientes": 9,
-  "expedientes_con_alertas": 8,
+  "expedientes_con_alertas": 9,
   "estadisticas_semaforo": {
-   "verde": 3,
-   "amarillo": 3,
-   "rojo": 3,
-   "vencido": 4
+   "verde": 4,
+   "amarillo": 4,
+   "rojo": 1,
+   "vencido": 7
   }
  },
  "todas_mios_8": {
@@ -661,33 +845,53 @@
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 31.8,
+      "porcentaje_avance": 33.3,
       "urgencia": "baja",
-      "dias_transcurridos": 7,
-      "dias_restantes": 15,
-      "dias_totales": 22,
+      "dias_transcurridos": 5,
+      "dias_restantes": 10,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
     }
    },
    "CAR-0011": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "es_responsable": true
+    },
     "concepto_constancia_8": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2026-03-12 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2026-03-12 para notificar",
      "fecha_inicio": "2026-03-12",
      "fecha_limite": "2026-04-07",
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 15.4,
+      "porcentaje_avance": 13.3,
       "urgencia": "baja",
-      "dias_transcurridos": 4,
-      "dias_restantes": 22,
-      "dias_totales": 26,
+      "dias_transcurridos": 2,
+      "dias_restantes": 13,
+      "dias_totales": 15,
       "esta_vencido": false
      },
      "es_responsable": true
@@ -700,7 +904,7 @@
    "verde": 2,
    "amarillo": 0,
    "rojo": 0,
-   "vencido": 0
+   "vencido": 1
   }
  },
  "todas_mios_50": {
@@ -731,11 +935,11 @@
     "semaforo": {
      "estado": "verde",
      "color_hex": "#22c55e",
-     "porcentaje_avance": 11.5,
+     "porcentaje_avance": 6.7,
      "urgencia": "baja",
-     "dias_transcurridos": 3,
-     "dias_restantes": 23,
-     "dias_totales": 26,
+     "dias_transcurridos": 1,
+     "dias_restantes": 14,
+     "dias_totales": 15,
      "esta_vencido": false
     }
    }
@@ -763,11 +967,11 @@
     "semaforo": {
      "estado": "amarillo",
      "color_hex": "#f59e0b",
-     "porcentaje_avance": 59.1,
+     "porcentaje_avance": 60.0,
      "urgencia": "media",
-     "dias_transcurridos": 13,
-     "dias_restantes": 9,
-     "dias_totales": 22,
+     "dias_transcurridos": 9,
+     "dias_restantes": 6,
+     "dias_totales": 15,
      "esta_vencido": false
     }
    }
@@ -797,9 +1001,9 @@
      "color_hex": "#1f2937",
      "porcentaje_avance": 100,
      "urgencia": "critico",
-     "dias_transcurridos": 24,
+     "dias_transcurridos": 16,
      "dias_restantes": 0,
-     "dias_totales": 21,
+     "dias_totales": 15,
      "esta_vencido": true
     }
    }
@@ -829,9 +1033,9 @@
      "color_hex": "#1f2937",
      "porcentaje_avance": 100,
      "urgencia": "critico",
-     "dias_transcurridos": 84,
+     "dias_transcurridos": 57,
      "dias_restantes": 0,
-     "dias_totales": 24,
+     "dias_totales": 15,
      "esta_vencido": true
     }
    }
@@ -859,11 +1063,11 @@
     "semaforo": {
      "estado": "amarillo",
      "color_hex": "#f59e0b",
-     "porcentaje_avance": 54.5,
+     "porcentaje_avance": 53.3,
      "urgencia": "media",
-     "dias_transcurridos": 12,
-     "dias_restantes": 10,
-     "dias_totales": 22,
+     "dias_transcurridos": 8,
+     "dias_restantes": 7,
+     "dias_totales": 15,
      "esta_vencido": false
     }
    }
@@ -880,31 +1084,50 @@
   "ok": true,
   "radicado": "CAR-0006",
   "alertas": {
+   "visita_asignar": {
+    "tipo": "visita_asignar",
+    "etapa": "Visita técnica",
+    "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+    "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+    "msg": "Asignar profesional y fecha de programación de la visita",
+    "fecha_inicio": "2026-01-05",
+    "fecha_limite": "2026-02-17",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#1f2937",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 49,
+     "dias_restantes": 0,
+     "dias_totales": 30,
+     "esta_vencido": true
+    }
+   },
    "concepto_constancia_1": {
     "tipo": "concepto_constancia",
     "etapa": "Concepto",
-    "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+    "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-    "msg": "15 días hábiles desde constancia del 2026-03-05 para notificar o cambiar a comunicación",
+    "msg": "15 días hábiles desde constancia del 2026-03-05 para notificar",
     "fecha_inicio": "2026-03-05",
     "fecha_limite": "2026-03-27",
     "semaforo": {
-     "estado": "amarillo",
-     "color_hex": "#f59e0b",
-     "porcentaje_avance": 50.0,
-     "urgencia": "media",
-     "dias_transcurridos": 11,
-     "dias_restantes": 11,
-     "dias_totales": 22,
+     "estado": "verde",
+     "color_hex": "#22c55e",
+     "porcentaje_avance": 46.7,
+     "urgencia": "baja",
+     "dias_transcurridos": 7,
+     "dias_restantes": 8,
+     "dias_totales": 15,
      "esta_vencido": false
     }
    },
    "concepto_constancia_2": {
     "tipo": "concepto_constancia",
     "etapa": "Concepto",
-    "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+    "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-    "msg": "15 días hábiles desde constancia del 2026-02-10 para notificar o cambiar a comunicación",
+    "msg": "15 días hábiles desde constancia del 2026-02-10 para notificar",
     "fecha_inicio": "2026-02-10",
     "fecha_limite": "2026-03-03",
     "semaforo": {
@@ -912,28 +1135,28 @@
      "color_hex": "#1f2937",
      "porcentaje_avance": 100,
      "urgencia": "critico",
-     "dias_transcurridos": 34,
+     "dias_transcurridos": 24,
      "dias_restantes": 0,
-     "dias_totales": 21,
+     "dias_totales": 15,
      "esta_vencido": true
     }
    },
    "concepto_constancia_6": {
     "tipo": "concepto_constancia",
     "etapa": "Concepto",
-    "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+    "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-    "msg": "15 días hábiles desde constancia del 2026-02-27 para notificar o cambiar a comunicación",
+    "msg": "15 días hábiles desde constancia del 2026-02-27 para notificar",
     "fecha_inicio": "2026-02-27",
     "fecha_limite": "2026-03-20",
     "semaforo": {
-     "estado": "rojo",
-     "color_hex": "#ef4444",
-     "porcentaje_avance": 81.0,
-     "urgencia": "alta",
-     "dias_transcurridos": 17,
+     "estado": "amarillo",
+     "color_hex": "#f59e0b",
+     "porcentaje_avance": 73.3,
+     "urgencia": "media",
+     "dias_transcurridos": 11,
      "dias_restantes": 4,
-     "dias_totales": 21,
+     "dias_totales": 15,
      "esta_vencido": false
     }
    },
@@ -943,49 +1166,100 @@
     "accion_requerida": "El término de 10 días hábiles del concepto técnico está en curso",
     "plazo_legal": "10 días hábiles desde notificación del concepto",
     "msg": "Término de 10 días hábiles vence el 2026-03-25",
-    "fecha_inicio": "2026-03-11",
+    "fecha_inicio": "2026-03-10",
     "fecha_limite": "2026-03-25",
     "semaforo": {
      "estado": "verde",
      "color_hex": "#22c55e",
-     "porcentaje_avance": 35.7,
+     "porcentaje_avance": 40.0,
      "urgencia": "baja",
-     "dias_transcurridos": 5,
-     "dias_restantes": 9,
-     "dias_totales": 14,
+     "dias_transcurridos": 4,
+     "dias_restantes": 6,
+     "dias_totales": 10,
      "esta_vencido": false
     }
    }
   },
-  "total_alertas": 4,
+  "total_alertas": 5,
   "estadisticas_semaforo": {
-   "verde": 1,
+   "verde": 2,
    "amarillo": 1,
-   "rojo": 1,
-   "vencido": 1
+   "rojo": 0,
+   "vencido": 2
   }
  },
  "expediente_7": {
   "ok": true,
   "radicado": "CAR-0007",
   "alertas": {
+   "visita_asignar": {
+    "tipo": "visita_asignar",
+    "etapa": "Visita técnica",
+    "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+    "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+    "msg": "Asignar profesional y fecha de programación de la visita",
+    "fecha_inicio": "2026-01-05",
+    "fecha_limite": "2026-02-17",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#1f2937",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 49,
+     "dias_restantes": 0,
+     "dias_totales": 30,
+     "esta_vencido": true
+    }
+   },
    "concepto_termino": {
     "tipo": "concepto_termino",
     "etapa": "Concepto",
     "accion_requerida": "El término de 30 días hábiles del concepto técnico está en curso",
     "plazo_legal": "30 días hábiles desde notificación del concepto",
     "msg": "Término de 30 días hábiles vence el 2026-03-17",
-    "fecha_inicio": "2026-02-02",
+    "fecha_inicio": "2026-02-03",
     "fecha_limite": "2026-03-17",
     "semaforo": {
      "estado": "rojo",
      "color_hex": "#ef4444",
-     "porcentaje_avance": 97.7,
+     "porcentaje_avance": 96.7,
      "urgencia": "alta",
-     "dias_transcurridos": 42,
+     "dias_transcurridos": 29,
      "dias_restantes": 1,
-     "dias_totales": 43,
+     "dias_totales": 30,
      "esta_vencido": false
+    }
+   }
+  },
+  "total_alertas": 2,
+  "estadisticas_semaforo": {
+   "verde": 0,
+   "amarillo": 0,
+   "rojo": 1,
+   "vencido": 1
+  }
+ },
+ "expediente_8": {
+  "ok": true,
+  "radicado": "CAR-0008",
+  "alertas": {
+   "visita_asignar": {
+    "tipo": "visita_asignar",
+    "etapa": "Visita técnica",
+    "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+    "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+    "msg": "Asignar profesional y fecha de programación de la visita",
+    "fecha_inicio": "2026-01-05",
+    "fecha_limite": "2026-02-17",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#1f2937",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 49,
+     "dias_restantes": 0,
+     "dias_totales": 30,
+     "esta_vencido": true
     }
    }
   },
@@ -993,20 +1267,8 @@
   "estadisticas_semaforo": {
    "verde": 0,
    "amarillo": 0,
-   "rojo": 1,
-   "vencido": 0
-  }
- },
- "expediente_8": {
-  "ok": true,
-  "radicado": "CAR-0008",
-  "alertas": {},
-  "total_alertas": 0,
-  "estadisticas_semaforo": {
-   "verde": 0,
-   "amarillo": 0,
    "rojo": 0,
-   "vencido": 0
+   "vencido": 1
   }
  },
  "expediente_9": {
@@ -1024,11 +1286,11 @@
     "semaforo": {
      "estado": "verde",
      "color_hex": "#22c55e",
-     "porcentaje_avance": 31.8,
+     "porcentaje_avance": 33.3,
      "urgencia": "baja",
-     "dias_transcurridos": 7,
-     "dias_restantes": 15,
-     "dias_totales": 22,
+     "dias_transcurridos": 5,
+     "dias_restantes": 10,
+     "dias_totales": 15,
      "esta_vencido": false
     }
    }
@@ -1045,6 +1307,25 @@
   "ok": true,
   "radicado": "CAR-0010",
   "alertas": {
+   "visita_asignar": {
+    "tipo": "visita_asignar",
+    "etapa": "Visita técnica",
+    "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+    "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+    "msg": "Asignar profesional y fecha de programación de la visita",
+    "fecha_inicio": "2026-01-05",
+    "fecha_limite": "2026-02-17",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#1f2937",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 49,
+     "dias_restantes": 0,
+     "dias_totales": 30,
+     "esta_vencido": true
+    }
+   },
    "concepto_termino": {
     "tipo": "concepto_termino",
     "etapa": "Concepto",
@@ -1058,51 +1339,89 @@
      "color_hex": "#1f2937",
      "porcentaje_avance": 100,
      "urgencia": "critico",
-     "dias_transcurridos": 13,
+     "dias_transcurridos": 9,
      "dias_restantes": 0,
-     "dias_totales": 7,
+     "dias_totales": 5,
      "esta_vencido": true
+    }
+   },
+   "seguimiento_asignar": {
+    "tipo": "seguimiento_asignar",
+    "etapa": "Seguimiento",
+    "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+    "plazo_legal": "30 días hábiles desde el vencimiento del término del auto de requerimiento",
+    "msg": "Asignar profesional y fecha de programación de la visita",
+    "fecha_inicio": "2026-03-10",
+    "fecha_limite": "2026-04-24",
+    "semaforo": {
+     "estado": "verde",
+     "color_hex": "#22c55e",
+     "porcentaje_avance": 13.3,
+     "urgencia": "baja",
+     "dias_transcurridos": 4,
+     "dias_restantes": 26,
+     "dias_totales": 30,
+     "esta_vencido": false
     }
    }
   },
-  "total_alertas": 1,
+  "total_alertas": 3,
   "estadisticas_semaforo": {
-   "verde": 0,
+   "verde": 1,
    "amarillo": 0,
    "rojo": 0,
-   "vencido": 1
+   "vencido": 2
   }
  },
  "expediente_11": {
   "ok": true,
   "radicado": "CAR-0011",
   "alertas": {
+   "visita_asignar": {
+    "tipo": "visita_asignar",
+    "etapa": "Visita técnica",
+    "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+    "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+    "msg": "Asignar profesional y fecha de programación de la visita",
+    "fecha_inicio": "2026-01-05",
+    "fecha_limite": "2026-02-17",
+    "semaforo": {
+     "estado": "vencido",
+     "color_hex": "#1f2937",
+     "porcentaje_avance": 100,
+     "urgencia": "critico",
+     "dias_transcurridos": 49,
+     "dias_restantes": 0,
+     "dias_totales": 30,
+     "esta_vencido": true
+    }
+   },
    "concepto_constancia_8": {
     "tipo": "concepto_constancia",
     "etapa": "Concepto",
-    "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+    "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-    "msg": "15 días hábiles desde constancia del 2026-03-12 para notificar o cambiar a comunicación",
+    "msg": "15 días hábiles desde constancia del 2026-03-12 para notificar",
     "fecha_inicio": "2026-03-12",
     "fecha_limite": "2026-04-07",
     "semaforo": {
      "estado": "verde",
      "color_hex": "#22c55e",
-     "porcentaje_avance": 15.4,
+     "porcentaje_avance": 13.3,
      "urgencia": "baja",
-     "dias_transcurridos": 4,
-     "dias_restantes": 22,
-     "dias_totales": 26,
+     "dias_transcurridos": 2,
+     "dias_restantes": 13,
+     "dias_totales": 15,
      "esta_vencido": false
     }
    }
   },
-  "total_alertas": 1,
+  "total_alertas": 2,
   "estadisticas_semaforo": {
    "verde": 1,
    "amarillo": 0,
    "rojo": 0,
-   "vencido": 0
+   "vencido": 1
   }
  },
  "expediente_12": {
@@ -1118,22 +1437,22 @@
     "fecha_inicio": "2026-02-28",
     "fecha_limite": "2026-03-20",
     "semaforo": {
-     "estado": "rojo",
-     "color_hex": "#ef4444",
-     "porcentaje_avance": 80.0,
-     "urgencia": "alta",
-     "dias_transcurridos": 16,
+     "estado": "amarillo",
+     "color_hex": "#f59e0b",
+     "porcentaje_avance": 73.3,
+     "urgencia": "media",
+     "dias_transcurridos": 11,
      "dias_restantes": 4,
-     "dias_totales": 20,
+     "dias_totales": 15,
      "esta_vencido": false
     }
    },
    "concepto_constancia_9": {
     "tipo": "concepto_constancia",
     "etapa": "Concepto",
-    "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+    "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-    "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar o cambiar a comunicación",
+    "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar",
     "fecha_inicio": "2025-12-30",
     "fecha_limite": "2026-01-22",
     "semaforo": {
@@ -1141,9 +1460,9 @@
      "color_hex": "#1f2937",
      "porcentaje_avance": 100,
      "urgencia": "critico",
-     "dias_transcurridos": 76,
+     "dias_transcurridos": 52,
      "dias_restantes": 0,
-     "dias_totales": 23,
+     "dias_totales": 15,
      "esta_vencido": true
     }
    },
@@ -1153,16 +1472,16 @@
     "accion_requerida": "El término de 15 días hábiles del concepto técnico está en curso",
     "plazo_legal": "15 días hábiles desde notificación del concepto",
     "msg": "Término de 15 días hábiles vence el 2026-04-08",
-    "fecha_inicio": "2026-03-18",
+    "fecha_inicio": "2026-03-15",
     "fecha_limite": "2026-04-08",
     "semaforo": {
      "estado": "verde",
      "color_hex": "#22c55e",
-     "porcentaje_avance": 0.0,
+     "porcentaje_avance": 6.7,
      "urgencia": "baja",
-     "dias_transcurridos": 0,
-     "dias_restantes": 23,
-     "dias_totales": 21,
+     "dias_transcurridos": 1,
+     "dias_restantes": 14,
+     "dias_totales": 15,
      "esta_vencido": false
     }
    }
@@ -1170,8 +1489,8 @@
   "total_alertas": 3,
   "estadisticas_semaforo": {
    "verde": 1,
-   "amarillo": 0,
-   "rojo": 1,
+   "amarillo": 1,
+   "rojo": 0,
    "vencido": 1
   }
  },
@@ -1189,11 +1508,11 @@
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 11.5,
+      "porcentaje_avance": 6.7,
       "urgencia": "baja",
-      "dias_transcurridos": 3,
-      "dias_restantes": 23,
-      "dias_totales": 26,
+      "dias_transcurridos": 1,
+      "dias_restantes": 14,
+      "dias_totales": 15,
       "esta_vencido": false
      }
     }
@@ -1210,11 +1529,11 @@
      "semaforo": {
       "estado": "amarillo",
       "color_hex": "#f59e0b",
-      "porcentaje_avance": 59.1,
+      "porcentaje_avance": 60.0,
       "urgencia": "media",
-      "dias_transcurridos": 13,
-      "dias_restantes": 9,
-      "dias_totales": 22,
+      "dias_transcurridos": 9,
+      "dias_restantes": 6,
+      "dias_totales": 15,
       "esta_vencido": false
      }
     }
@@ -1233,9 +1552,9 @@
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 24,
+      "dias_transcurridos": 16,
       "dias_restantes": 0,
-      "dias_totales": 21,
+      "dias_totales": 15,
       "esta_vencido": true
      }
     }
@@ -1254,9 +1573,9 @@
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 84,
+      "dias_transcurridos": 57,
       "dias_restantes": 0,
-      "dias_totales": 24,
+      "dias_totales": 15,
       "esta_vencido": true
      }
     }
@@ -1273,41 +1592,60 @@
      "semaforo": {
       "estado": "amarillo",
       "color_hex": "#f59e0b",
-      "porcentaje_avance": 54.5,
+      "porcentaje_avance": 53.3,
       "urgencia": "media",
-      "dias_transcurridos": 12,
-      "dias_restantes": 10,
-      "dias_totales": 22,
+      "dias_transcurridos": 8,
+      "dias_restantes": 7,
+      "dias_totales": 15,
       "esta_vencido": false
      }
     }
    },
    "CAR-0006": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     }
+    },
     "concepto_constancia_1": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2026-03-05 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2026-03-05 para notificar",
      "fecha_inicio": "2026-03-05",
      "fecha_limite": "2026-03-27",
      "semaforo": {
-      "estado": "amarillo",
-      "color_hex": "#f59e0b",
-      "porcentaje_avance": 50.0,
-      "urgencia": "media",
-      "dias_transcurridos": 11,
-      "dias_restantes": 11,
-      "dias_totales": 22,
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 46.7,
+      "urgencia": "baja",
+      "dias_transcurridos": 7,
+      "dias_restantes": 8,
+      "dias_totales": 15,
       "esta_vencido": false
      }
     },
     "concepto_constancia_2": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2026-02-10 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2026-02-10 para notificar",
      "fecha_inicio": "2026-02-10",
      "fecha_limite": "2026-03-03",
      "semaforo": {
@@ -1315,28 +1653,28 @@
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 34,
+      "dias_transcurridos": 24,
       "dias_restantes": 0,
-      "dias_totales": 21,
+      "dias_totales": 15,
       "esta_vencido": true
      }
     },
     "concepto_constancia_6": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2026-02-27 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2026-02-27 para notificar",
      "fecha_inicio": "2026-02-27",
      "fecha_limite": "2026-03-20",
      "semaforo": {
-      "estado": "rojo",
-      "color_hex": "#ef4444",
-      "porcentaje_avance": 81.0,
-      "urgencia": "alta",
-      "dias_transcurridos": 17,
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 73.3,
+      "urgencia": "media",
+      "dias_transcurridos": 11,
       "dias_restantes": 4,
-      "dias_totales": 21,
+      "dias_totales": 15,
       "esta_vencido": false
      }
     },
@@ -1346,38 +1684,78 @@
      "accion_requerida": "El término de 10 días hábiles del concepto técnico está en curso",
      "plazo_legal": "10 días hábiles desde notificación del concepto",
      "msg": "Término de 10 días hábiles vence el 2026-03-25",
-     "fecha_inicio": "2026-03-11",
+     "fecha_inicio": "2026-03-10",
      "fecha_limite": "2026-03-25",
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 35.7,
+      "porcentaje_avance": 40.0,
       "urgencia": "baja",
-      "dias_transcurridos": 5,
-      "dias_restantes": 9,
-      "dias_totales": 14,
+      "dias_transcurridos": 4,
+      "dias_restantes": 6,
+      "dias_totales": 10,
       "esta_vencido": false
      }
     }
    },
    "CAR-0007": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     }
+    },
     "concepto_termino": {
      "tipo": "concepto_termino",
      "etapa": "Concepto",
      "accion_requerida": "El término de 30 días hábiles del concepto técnico está en curso",
      "plazo_legal": "30 días hábiles desde notificación del concepto",
      "msg": "Término de 30 días hábiles vence el 2026-03-17",
-     "fecha_inicio": "2026-02-02",
+     "fecha_inicio": "2026-02-03",
      "fecha_limite": "2026-03-17",
      "semaforo": {
       "estado": "rojo",
       "color_hex": "#ef4444",
-      "porcentaje_avance": 97.7,
+      "porcentaje_avance": 96.7,
       "urgencia": "alta",
-      "dias_transcurridos": 42,
+      "dias_transcurridos": 29,
       "dias_restantes": 1,
-      "dias_totales": 43,
+      "dias_totales": 30,
       "esta_vencido": false
+     }
+    }
+   },
+   "CAR-0008": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
      }
     }
    },
@@ -1391,22 +1769,22 @@
      "fecha_inicio": "2026-02-28",
      "fecha_limite": "2026-03-20",
      "semaforo": {
-      "estado": "rojo",
-      "color_hex": "#ef4444",
-      "porcentaje_avance": 80.0,
-      "urgencia": "alta",
-      "dias_transcurridos": 16,
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 73.3,
+      "urgencia": "media",
+      "dias_transcurridos": 11,
       "dias_restantes": 4,
-      "dias_totales": 20,
+      "dias_totales": 15,
       "esta_vencido": false
      }
     },
     "concepto_constancia_9": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar",
      "fecha_inicio": "2025-12-30",
      "fecha_limite": "2026-01-22",
      "semaforo": {
@@ -1414,9 +1792,9 @@
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 76,
+      "dias_transcurridos": 52,
       "dias_restantes": 0,
-      "dias_totales": 23,
+      "dias_totales": 15,
       "esta_vencido": true
      }
     },
@@ -1426,28 +1804,28 @@
      "accion_requerida": "El término de 15 días hábiles del concepto técnico está en curso",
      "plazo_legal": "15 días hábiles desde notificación del concepto",
      "msg": "Término de 15 días hábiles vence el 2026-04-08",
-     "fecha_inicio": "2026-03-18",
+     "fecha_inicio": "2026-03-15",
      "fecha_limite": "2026-04-08",
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 0.0,
+      "porcentaje_avance": 6.7,
       "urgencia": "baja",
-      "dias_transcurridos": 0,
-      "dias_restantes": 23,
-      "dias_totales": 21,
+      "dias_transcurridos": 1,
+      "dias_restantes": 14,
+      "dias_totales": 15,
       "esta_vencido": false
      }
     }
    }
   },
   "total_expedientes": 9,
-  "expedientes_con_alertas": 8,
+  "expedientes_con_alertas": 9,
   "estadisticas_semaforo": {
-   "verde": 3,
-   "amarillo": 3,
-   "rojo": 3,
-   "vencido": 4
+   "verde": 4,
+   "amarillo": 4,
+   "rojo": 1,
+   "vencido": 7
   }
  },
  "reporte_semanal_8": {
@@ -1464,32 +1842,51 @@
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 31.8,
+      "porcentaje_avance": 33.3,
       "urgencia": "baja",
-      "dias_transcurridos": 7,
-      "dias_restantes": 15,
-      "dias_totales": 22,
+      "dias_transcurridos": 5,
+      "dias_restantes": 10,
+      "dias_totales": 15,
       "esta_vencido": false
      }
     }
    },
    "CAR-0011": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     }
+    },
     "concepto_constancia_8": {
      "tipo": "concepto_constancia",
      "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Si no hay notificación exitosa al vencer el plazo, cambiar a comunicación",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
      "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2026-03-12 para notificar o cambiar a comunicación",
+     "msg": "15 días hábiles desde constancia del 2026-03-12 para notificar",
      "fecha_inicio": "2026-03-12",
      "fecha_limite": "2026-04-07",
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 15.4,
+      "porcentaje_avance": 13.3,
       "urgencia": "baja",
-      "dias_transcurridos": 4,
-      "dias_restantes": 22,
-      "dias_totales": 26,
+      "dias_transcurridos": 2,
+      "dias_restantes": 13,
+      "dias_totales": 15,
       "esta_vencido": false
      }
     }
@@ -1501,7 +1898,7 @@
    "verde": 2,
    "amarillo": 0,
    "rojo": 0,
-   "vencido": 0
+   "vencido": 1
   }
  }
 }

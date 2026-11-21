@@ -177,20 +177,45 @@
 
 **Criterios de aceptación:**
 - Puedo ver la lista de expedientes que requieren informe técnico.
-- Puedo ver los profesionales disponibles (usuarios con `infraccion_informes_subir`) y los revisores disponibles (usuarios con `infraccion_informes_revisar`) para asignar.
+- Puedo ver los profesionales disponibles (usuarios con `infraccion_tecnico`) y los revisores disponibles (usuarios con `infraccion_lider_tecnico`) para asignar.
 - Si elijo un usuario que no tiene el permiso correspondiente, el servidor rechaza la asignación.
 - Puedo reasignar o cancelar una asignación existente.
 - Puedo ver el estado de cada informe (pendiente, en proceso, entregado) y confirmar su recepción.
 
 ### HU-INF-06 — Elaboración y entrega de informes técnicos
-**Permiso:** `infraccion_informes_subir` (exige `infraccion_consultar`)
-**Como** profesional técnico, **quiero** recibir asignaciones de informes técnicos y subir el archivo una vez completado, **para** cumplir con la parte técnica del proceso de infracción que me corresponde.
+**Permiso:** `infraccion_tecnico` (exige `infraccion_consultar`)
+**Como** técnico, **quiero** recibir asignaciones de informes técnicos y subir el archivo una vez completado, **para** cumplir con la parte técnica del proceso de infracción que me corresponde.
 
 **Criterios de aceptación:**
 - Recibo notificación cuando se me asigna un nuevo informe técnico.
 - Puedo ver mis informes pendientes de entrega.
-- Puedo subir el archivo del informe completado.
-- Accedo a mis asignaciones desde la entrada **Mis informes** de Infracciones (`/infraction/my-reports`).
+- Puedo subir el archivo del informe completado; el líder técnico (`infraccion_lider_tecnico`) lo aprueba para firma o lo devuelve.
+- Con el informe aprobado para firma, cargo la versión final firmada (PDF) y, si es de VISITA, la matriz de recursos afectados (obligatoria); el informe queda aceptado.
+- Después solo puedo editar la matriz (no el informe), hasta que el expediente tenga la etapa Acoger concepto.
+- No puedo tener `infraccion_gestionar` en el mismo rol (permisos incompatibles).
+- Accedo a mis asignaciones desde la entrada **Mis actuaciones** de Infracciones (`/infraction/my-reports`; antes "Mis informes"), donde también aparecen los actos administrativos.
+
+### HU-INF-07 — Proyección de los actos administrativos
+**Permiso:** `infraccion_gestionar` (ser el encargado actual del expediente)
+**Como** abogado encargado, **quiero** proyectar en la etapa el acto administrativo (medida preventiva, acoger concepto o cierre) y enviarlo a revisión, **para** que el líder de proyecto lo valide antes de firmarlo.
+
+**Criterios de aceptación:**
+- En la etapa sin acto subo el proyecto (PDF o Word) y queda "En revisión"; los líderes de proyecto reciben notificación.
+- Si me lo devuelven, subo una versión corregida (un archivo distinto a los ya cargados) desde "Ver proceso" y vuelve a revisión; no hay tope de devoluciones.
+- Aprobado para firma, cargo en la etapa el PDF firmado con tipo (AUTO/RES), numerado y fecha, y se crea el acto.
+- Solo el encargado actual sube versiones: si me reasignan el expediente, el proceso lo continúa el nuevo encargado, que recibe un aviso.
+- Puedo corregir tipo, numerado y fecha de un acto ya creado, pero no su PDF ni eliminarlo (eso es de super gestión).
+- Sigo mis actos en **Mis actuaciones**; "Ir a la etapa" me lleva a cargar la versión final.
+
+### HU-INF-08 — Revisión de los actos administrativos
+**Permiso:** `infraccion_lider_proyecto` (exige `infraccion_consultar`)
+**Como** líder de proyecto, **quiero** revisar los actos que proyectan los encargados, **para** aprobarlos para firma o devolverlos con observaciones.
+
+**Criterios de aceptación:**
+- Veo en **Mis actuaciones** los actos en revisión (sin asignación: cualquier líder de proyecto puede revisarlos) y los que ya revisé.
+- Puedo aprobar para firma o devolver con un comentario obligatorio y, si quiero, un documento de observaciones (PDF o Word).
+- No existe aprobación directa: el acto se crea cuando el encargado carga la versión firmada.
+- Recibo notificación cuando hay un acto nuevo o una corrección por revisar.
 
 ---
 

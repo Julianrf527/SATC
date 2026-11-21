@@ -9,14 +9,15 @@ ser futuras o NULL).
 Orden del proceso (el mismo de ``etapas_existentes`` en /completo y de
 ``TAB_TO_ETAPA`` en el frontend):
 
-    respuesta(1) < visita(2) < concepto(3) < seguimiento(4) < cierre(5)
+    respuesta(1) < visita(2) < concepto(3) < seguimiento(4)
+    < concepto_seguimiento(5) < cierre(6)
 
 El valor que se devuelve es el código estable (``respuesta``, ``visita``...);
 el frontend lo traduce a su etiqueta en un solo lugar.
 """
 from sqlalchemy import Integer, case, func, literal, select, union_all
 
-from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
+from db.models.etapa_acoger_concepto import INSTANCIA_SEGUIMIENTO, INSTANCIA_VISITA, EtapaAcogerConcepto
 from db.models.etapa_cierre import EtapaCierre
 from db.models.etapa_respuesta import EtapaRespuesta
 from db.models.informe_tecnico import InformeTecnico
@@ -27,7 +28,8 @@ ORDEN_ETAPAS: dict[str, int] = {
     "visita": 2,
     "concepto": 3,
     "seguimiento": 4,
-    "cierre": 5,
+    "concepto_seguimiento": 5,
+    "cierre": 6,
 }
 
 
@@ -45,8 +47,10 @@ def subquery_etapa_actual():
     etapas = union_all(
         _parte(EtapaRespuesta.expediente_id, "respuesta"),
         _parte(InformeTecnico.expediente_id, "visita").where(InformeTecnico.tipo_informe == "VISITA"),
-        _parte(EtapaAcogerConcepto.expediente_id, "concepto"),
+        _parte(EtapaAcogerConcepto.expediente_id, "concepto").where(EtapaAcogerConcepto.instancia == INSTANCIA_VISITA),
         _parte(InformeTecnico.expediente_id, "seguimiento").where(InformeTecnico.tipo_informe == "SEGUIMIENTO"),
+        _parte(EtapaAcogerConcepto.expediente_id, "concepto_seguimiento")
+        .where(EtapaAcogerConcepto.instancia == INSTANCIA_SEGUIMIENTO),
         _parte(EtapaCierre.expediente_id, "cierre"),
     ).subquery()
 
