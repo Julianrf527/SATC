@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { destinoAlerta, endpointConAlcance, resolverDestino } from "./alertasAlcance";
+import {
+  destinoAlerta,
+  endpointConAlcance,
+  opcionesAlcance,
+  resolverDestino,
+  textoRolesResponsables,
+} from "./alertasAlcance";
 
 const rutas = { gestion: "/x/manage", consulta: "/x/consult" };
 
@@ -72,5 +78,30 @@ describe("endpointConAlcance", () => {
 
   it("respeta un query string existente", () => {
     expect(endpointConAlcance("/svc/a?x=1", "todos")).toBe("/svc/a?x=1&alcance=todos");
+  });
+});
+
+describe("opcionesAlcance", () => {
+  it("por defecto: Mis expedientes / Todos", () => {
+    expect(opcionesAlcance().map((o) => o.label)).toEqual(["Mis expedientes", "Todos"]);
+  });
+
+  it("el módulo puede cambiar los textos", () => {
+    expect(opcionesAlcance({ mios: "Mis alertas", todos: "Todas" })).toEqual([
+      { value: "mios", label: "Mis alertas" },
+      { value: "todos", label: "Todas" },
+    ]);
+  });
+});
+
+describe("textoRolesResponsables", () => {
+  it("lista los roles responsables", () => {
+    const roles = [{ permiso: "a", etiqueta: "Líder técnico" }, { permiso: "b", etiqueta: "SIG" }];
+    expect(textoRolesResponsables({ roles_responsables: roles })).toBe("Pendiente: Líder técnico, SIG");
+  });
+
+  it("null si la alerta es del encargado", () => {
+    expect(textoRolesResponsables({})).toBeNull();
+    expect(textoRolesResponsables({ roles_responsables: [] })).toBeNull();
   });
 });

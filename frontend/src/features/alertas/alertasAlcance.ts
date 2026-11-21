@@ -5,10 +5,29 @@
 /** `mios`: expedientes a cargo del usuario (por defecto). `todos`: todos. */
 export type AlcanceAlertas = "mios" | "todos";
 
-export const ALCANCE_OPCIONES: { value: AlcanceAlertas; label: string }[] = [
-  { value: "mios", label: "Mis expedientes" },
-  { value: "todos", label: "Todos" },
-];
+/** Textos del selector de alcance (el módulo puede cambiarlos). */
+export type EtiquetasAlcance = { titulo: string; mios: string; todos: string };
+
+export const ETIQUETAS_ALCANCE: EtiquetasAlcance = { titulo: "Expedientes", mios: "Mis expedientes", todos: "Todos" };
+
+export function opcionesAlcance(
+  etiquetas: Partial<EtiquetasAlcance> = {},
+): { value: AlcanceAlertas; label: string }[] {
+  const e = { ...ETIQUETAS_ALCANCE, ...etiquetas };
+  return [
+    { value: "mios", label: e.mios },
+    { value: "todos", label: e.todos },
+  ];
+}
+
+/**
+ * "Pendiente: Líder técnico, SIG" si la alerta es de uno o varios roles
+ * (`roles_responsables`); null si es del encargado.
+ */
+export function textoRolesResponsables(alerta: { roles_responsables?: { etiqueta: string }[] | null }): string | null {
+  const roles = alerta.roles_responsables ?? [];
+  return roles.length ? `Pendiente: ${roles.map((r) => r.etiqueta).join(", ")}` : null;
+}
 
 /** Pantallas a las que lleva el enlace de una alerta (las define el módulo). */
 export type RutasAlertas = {
