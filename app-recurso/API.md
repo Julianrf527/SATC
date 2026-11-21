@@ -1074,3 +1074,5 @@ Cada alerta trae, además de `tipo`, `etapa`, `semaforo`, `expediente_id` y `pro
 - `roles_responsables`: `[{permiso, etiqueta}]`. Con elementos solo mientras el documento está **en revisión**: los roles del paso actual que aún no revisan. Vacío en los demás estados.
 - `estado_documento`: estado del proceso de revisión (informativo; `null` si aún no hay proceso).
 - `es_responsable`: si `roles_responsables` tiene elementos, el usuario tiene alguno de esos permisos; si no, es el `encargado_id`. `alcance=mios` filtra por este campo.
+
+**Correo semanal** (sin endpoint): los lunes 8:00 cada usuario recibe su "Mis alertas" con la misma regla de `es_responsable` (`services/alertas_correo.py`, envío por `users_client.send_alert_report`). Un solo envío por semana entre todos los workers (tabla `envio_alertas_semanal`). `ALERTAS_CORREO_SEMANAL=false` lo apaga.

@@ -30,5 +30,8 @@ redis==8.1.0
 # Días hábiles de Colombia (alertas)
 holidays==0.108
 
+# Correo semanal de alertas (services/alertas_correo.py)
+APScheduler==3.11.3
+
 # En Windows zoneinfo no trae la base IANA (en la imagen la da el paquete tzdata del sistema)
 tzdata>=2023.3; sys_platform == "win32"

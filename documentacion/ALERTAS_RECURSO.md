@@ -115,3 +115,15 @@ nueva **sin reiniciar el conteo**: sigue contando desde el registro del recurso.
 ## Pendiente de definir
 
 - Requerimientos de **memorias** y de **obras**: no tienen alertas todavía.
+
+## Correo semanal
+
+- Los **lunes a las 8:00** (America/Bogota) cada usuario recibe por correo su
+  "Mis alertas": las mismas que le aparecen en esa sub-pestaña (como encargado
+  o por su rol de revisor). Si no tiene alertas, no recibe correo.
+- Destinatarios: usuarios con `recurso_gestionar`, `recurso_tecnico` o algún
+  rol revisor. Fuente: `app-recurso/services/alertas_correo.py`.
+- Se envía una sola vez por semana aunque corran varios workers o el servicio
+  se reinicie (tabla `envio_alertas_semanal`). Si a las 8:00 el servicio estaba
+  caído, se envía al volver, hasta 12 horas después.
+- `ALERTAS_CORREO_SEMANAL=false` lo apaga.
