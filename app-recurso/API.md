@@ -287,10 +287,11 @@ Reglas comunes:
 
   | tipo_documento | etapa_tipo | Pasos |
   |---|---|---|
-  | `AUTO_ADMITE`, `REQUERIMIENTO`, `APRUEBA_MEMORIAS` | acto_admite / requerimiento / memorias_calculo | líder jurídico → líder del proyecto |
-  | `DECISION`, `RECURSO`, `AUTO_PRUEBAS` | decision / recurso_reposicion / practica_pruebas | líder jurídico → líder del proyecto **y** asesora de subdirección |
+  | `AUTO_ADMITE`, `REQUERIMIENTO`, `APRUEBA_MEMORIAS`, `AUTO_PRUEBAS` | acto_admite / requerimiento / memorias_calculo / practica_pruebas | líder jurídico → líder del proyecto |
+  | `DECISION`, `RECURSO` | decision / recurso_reposicion | líder jurídico → líder del proyecto **y** asesora de subdirección |
   | `RECONOCE_TERCERO`, `APRUEBA_OBRAS` | expediente_involucrado / recibo_satisfaccion_obras | provisional: como AUTO_ADMITE (`TODO(negocio)`) |
-  | `CONCEPTO_ETAPA2`, `CONCEPTO_PRUEBAS` | concepto_tecnico | líder técnico **y** SIG → líder del proyecto |
+  | `CONCEPTO_ETAPA2` | concepto_tecnico | líder técnico **y** SIG → líder del proyecto |
+  | `CONCEPTO_PRUEBAS` | concepto_tecnico | líder técnico → líder del proyecto |
   | `CONCEPTO_ADICIONAL`, `CONCEPTO_MEMORIAS`, `CONCEPTO_SUBSANACION`, `CONCEPTO_OBRAS`, `CONCEPTO_OBRAS_SEGUNDO` | concepto_tecnico | líder técnico |
 
 - Flujo: el proceso nace en `pendiente_carga` al asignarse el encargado (lo crea
@@ -914,10 +915,10 @@ al crear el recurso (los recursos anteriores al campo quedan en «No»):
 
 - **No**: un abogado se asigna directo el acto que resuelve.
 - **Sí**: cualquier abogado se asigna el **auto que admite y decreta práctica de pruebas**
-  (fila `practica_pruebas`, proceso `AUTO_PRUEBAS`, mismos revisores que el acto que
-  resuelve; el acto **solo se comunica**). Su versión final lleva técnico y fecha de visita
+  (fila `practica_pruebas`, proceso `AUTO_PRUEBAS`, revisan líder jurídico → líder del
+  proyecto; el acto **solo se comunica**). Su versión final lleva técnico y fecha de visita
   (sin aviso de plazo) y hace nacer el **concepto técnico de pruebas** (`tipo = pruebas`,
-  proceso `CONCEPTO_PRUEBAS`, mismos revisores que el de la etapa 2; su versión final solo
+  proceso `CONCEPTO_PRUEBAS`, revisan líder técnico → líder del proyecto; su versión final solo
   pide el PDF y la fecha del concepto). Mientras ese concepto no esté firmado, asignarse o
   cargar el acto que resuelve → 400 "Primero debe cargarse el concepto técnico de la
   práctica de pruebas" (en el árbol: `motivos_bloqueo` del nodo `recurso`, aunque exista).
