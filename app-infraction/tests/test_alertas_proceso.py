@@ -33,8 +33,9 @@ HOY = date(2026, 6, 10)  # miércoles
 BOG = ZoneInfo("America/Bogota")
 
 
-def _informe(id=1, profesional=None, programada=None, asignacion=None, aceptado=None):
-    return SimpleNamespace(id=id, profesional_asignado_id=profesional, fecha_programacion_visita=programada,
+def _informe(id=1, profesional=None, programada=None, asignacion=None, aceptado=None, revisor=None):
+    return SimpleNamespace(id=id, profesional_asignado_id=profesional, revisor_asignado_id=revisor,
+                           fecha_programacion_visita=programada,
                            fecha_asignacion=asignacion, fecha_aceptacion_informe=aceptado,
                            fecha_creacion=datetime(2026, 5, 1, tzinfo=BOG))
 
@@ -218,6 +219,65 @@ class TestMedida:
 
     def test_sin_medida_no_alerta(self):
         assert "medida_acto_proyectar" not in _calcular(_datos(), HOY)
+
+
+def _vigente(estado, id=40):
+    return SimpleNamespace(id=id, estado=estado)
+
+
+def _rol(alerta):
+    return [r["permiso"] for r in alerta["roles_responsables"]]
+
+
+class TestResponsable:
+    """De quién es cada alerta AHORA (encargado_id o roles_responsables)."""
+
+    def _visita(self, estado=None, version=True):
+        inf = _informe(profesional=5, revisor=6, programada=date(2026, 6, 20), asignacion=date(2026, 6, 1))
+        return _datos(abogado_id=7, expediente_id=2, informes={"VISITA": inf},
+                      primeras_versiones={("informe_tecnico", 1): date(2026, 6, 5)} if version else {},
+                      procesos={("informe_tecnico", 1): _vigente(estado)} if estado else {})
+
+    def test_asignar_visita_es_del_rol_que_asigna(self):
+        a = _calcular(_datos(abogado_id=7, informes={"VISITA": _informe()}), HOY)["visita_asignar"]
+        assert a["encargado_id"] is None
+        assert _rol(a) == ["infraccion_asignar_informes"]
+        assert a["informe_id"] == 1
+
+    def test_primera_version_es_del_tecnico(self):
+        a = _calcular(self._visita(version=False), HOY)["visita_primera_version"]
+        assert a["encargado_id"] == 5 and a["roles_responsables"] == []
+
+    def test_aprobacion_devuelta_es_del_tecnico(self):
+        a = _calcular(self._visita("rechazado"), HOY)["visita_aprobacion"]
+        assert a["encargado_id"] == 5
+        assert a["estado_documento"] == "rechazado" and a["proceso_id"] == 40
+
+    def test_aprobacion_en_revision_es_del_revisor(self):
+        a = _calcular(self._visita("en_revision"), HOY)["visita_aprobacion"]
+        assert a["encargado_id"] == 6 and a["roles_responsables"] == []
+
+    def test_aprobacion_finalizada_vuelve_a_quien_asigna(self):
+        a = _calcular(self._visita("finalizado"), HOY)["visita_aprobacion"]
+        assert a["encargado_id"] is None
+        assert _rol(a) == ["infraccion_asignar_informes"]
+
+    def test_acto_es_del_abogado_y_en_revision_del_lider_de_proyecto(self):
+        medida = SimpleNamespace(id=3, acto_administrativo_id=None)
+        base = dict(abogado_id=7, respuesta=_respuesta(date(2026, 6, 1), medida=True), medida=medida)
+        a = _calcular(_datos(**base), HOY)["medida_acto_proyectar"]
+        assert a["encargado_id"] == 7 and a["roles_responsables"] == []
+        versiones = {("medida_preventiva", 3): date(2026, 6, 3)}
+        a = _calcular(_datos(**base, primeras_versiones=versiones,
+                             procesos={("medida_preventiva", 3): _vigente("en_revision")}), HOY)
+        assert _rol(a["medida_acto_aprobacion"]) == ["infraccion_lider_proyecto"]
+        a = _calcular(_datos(**base, primeras_versiones=versiones,
+                             procesos={("medida_preventiva", 3): _vigente("rechazado")}), HOY)
+        assert a["medida_acto_aprobacion"]["encargado_id"] == 7
+
+    def test_respuesta_es_del_abogado(self):
+        a = _calcular(_datos(abogado_id=7, expediente_id=2, respuesta=None), HOY)["respuesta_plazo"]
+        assert a["encargado_id"] == 7 and a["expediente_id"] == 2
 
 
 class TestSemaforoHabiles:
