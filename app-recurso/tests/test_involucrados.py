@@ -211,7 +211,13 @@ async def test_no_se_gestiona_tercero_por_esta_ruta(client, h_gestor, crear_expe
     assert r.status_code == 400
 
 
-async def test_desvincular_con_notificaciones_409(client, h_gestor, crear_expediente, vincular, db_session, stubs):
+async def test_desvincular_con_notificaciones_avisa_y_las_elimina_al_confirmar(
+    client, h_gestor, crear_expediente, vincular, db_session, stubs,
+):
+    from sqlalchemy import select
+
+    from db.models import ExpedienteInvolucrado
+
     exp = await crear_expediente()
     v = await vincular(exp.id, 60)
     acto = ActoAdministrativo(medio="COMUNICA", numerado=1, fecha_numerado=date(2026, 4, 1),
@@ -219,14 +225,30 @@ async def test_desvincular_con_notificaciones_409(client, h_gestor, crear_expedi
     db_session.add(acto)
     await db_session.flush()
     db_session.add(ActoAdmite(expediente_id=exp.id, encargado_acto_id=10, acto_admin_id=acto.id))
-    db_session.add(Notificacion(acto_admin_id=acto.id, numerado=5, involucrado_id=60,
-                                fecha_numerado=date(2026, 4, 2), fecha_envio_citacion=date(2026, 4, 2),
-                                fecha_constancia_citacion=date(2026, 4, 3)))
+    citacion = stubs.files.registrar()
+    notif = Notificacion(acto_admin_id=acto.id, numerado=5, involucrado_id=60, documento_citacion_id=citacion,
+                         fecha_numerado=date(2026, 4, 2), fecha_envio_citacion=date(2026, 4, 2),
+                         fecha_constancia_citacion=date(2026, 4, 3))
+    db_session.add(notif)
+    await db_session.flush()
+    notif_id, vinculo_id = notif.id, v.id
     await db_session.commit()
 
+    # Sin confirmar: 428 con el aviso; no se borra nada.
     r = await client.delete(f"/involucrados/vinculos/{v.id}?version=1", headers=h_gestor)
-    assert r.status_code == 409
-    assert "notificaciones" in r.json()["detail"]
+    assert r.status_code == 428
+    assert "1 notificación" in r.json()["detail"] and "se eliminarán" in r.json()["detail"]
+
+    # Confirmando: se borran el vínculo y la notificación, y se libera su archivo.
+    r = await client.delete(
+        f"/involucrados/vinculos/{v.id}?version=1&confirmar_eliminar_notificaciones=true", headers=h_gestor,
+    )
+    assert r.status_code == 200, r.text
+    assert (await db_session.execute(select(Notificacion.id).where(Notificacion.id == notif_id))).first() is None
+    assert (await db_session.execute(
+        select(ExpedienteInvolucrado.id).where(ExpedienteInvolucrado.id == vinculo_id)
+    )).first() is None
+    assert citacion in stubs.files.decrementados
 
 
 async def test_listar_filtrando_tipo(client, h_consultor, crear_expediente, vincular):

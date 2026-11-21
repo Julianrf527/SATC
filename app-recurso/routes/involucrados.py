@@ -15,6 +15,7 @@ from core.permission import Permission
 from db.deps import get_db_managed
 from db.models import Expediente, TipoVinculo
 from services.concurrencia import bloquear_expediente
+from services.etapas import liberar_archivos
 from services.expediente_involucrados import (
     cambiar_representante,
     desvincular_involucrado,
@@ -133,14 +134,17 @@ async def desvincular_solicitante(
     request: Request,
     vinculo_id: int,
     version: int = Query(..., ge=1),
+    confirmar_eliminar_notificaciones: bool = Query(False),
     db: AsyncSession = Depends(get_db_managed),
 ):
     usuario = await requiere_gestion(request)
     vinculo = await _vinculo_bloqueado(db, vinculo_id)
     _solo_solicitante(vinculo)
     expediente = await _expediente(db, vinculo.expediente_id)
-    await desvincular_involucrado(
-        db, vinculo=vinculo, expediente=expediente, version=version, usuario=usuario, request=request
+    archivos = await desvincular_involucrado(
+        db, vinculo=vinculo, expediente=expediente, version=version, usuario=usuario, request=request,
+        confirmar_eliminar_notificaciones=confirmar_eliminar_notificaciones,
     )
     await db.commit()
+    await liberar_archivos(archivos)
     return {"ok": True, "message": "Solicitante desvinculado", "data": {"id": vinculo_id}}
