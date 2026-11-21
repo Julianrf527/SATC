@@ -1,8 +1,12 @@
 import asyncio
+import os
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 import logging
 
 from db.models.file_hash import FileHash
@@ -12,10 +16,15 @@ logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler()
 
+# Horas que un archivo sin uso se conserva desde su última subida. Cubre el
+# tiempo entre que se sube y que el módulo lo asocia (increment-usage): sin esto,
+# un archivo subido a las 23:58 se borraba a las 23:59 aunque se asociara después.
+GRACIA_HORAS = float(os.getenv("LIMPIEZA_GRACIA_HORAS", "24"))
+
 async def tarea_limpieza_temporales(db: AsyncSession):
     """
-    Tarea para eliminar archivos sin uso (numero_usos = 0).
-    Elimina los registros de la DB y sus archivos correspondientes en MinIO.
+    Elimina los archivos sin uso (numero_usos = 0) cuya última subida supera
+    el periodo de gracia: el registro en la BD y el objeto en MinIO.
     """
     logger.info("=" * 60)
     logger.info("Iniciando tarea de limpieza de archivos sin uso...")
@@ -24,9 +33,13 @@ async def tarea_limpieza_temporales(db: AsyncSession):
         # with_for_update bloquea las filas para que un increment_file_usage concurrente
         # (otro upload reutilizando el mismo hash) no quede huérfano si lo borramos aquí.
         # skip_locked evita esperar archivos que ya están siendo usados en este instante.
+        limite = datetime.now(ZoneInfo("America/Bogota")) - timedelta(hours=GRACIA_HORAS)
         stmt = (
             select(FileHash)
-            .where(FileHash.numero_usos == 0)
+            .where(
+                FileHash.numero_usos == 0,
+                func.coalesce(FileHash.ultima_subida, FileHash.created_at) < limite,
+            )
             .with_for_update(skip_locked=True)
         )
         result = await db.execute(stmt)

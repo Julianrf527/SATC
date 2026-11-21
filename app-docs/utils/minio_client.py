@@ -11,8 +11,9 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 from dotenv import load_dotenv
 import logging
-from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
 load_dotenv()
@@ -195,6 +196,24 @@ def get_file_from_minio(object_name: str) -> dict:
             "message": f"Error inesperado: {str(e)}"
         }
 
+def _nombre_objeto(object_name: str) -> str:
+    if object_name.startswith(f"{MINIO_BUCKET}/"):
+        return object_name[len(MINIO_BUCKET) + 1:]
+    return object_name
+
+
+def tamano_objeto(object_name: str) -> int:
+    """Tamaño en bytes del objeto (stat). Lanza S3Error si no existe."""
+    return minio_client.stat_object(MINIO_BUCKET, _nombre_objeto(object_name)).size
+
+
+def abrir_objeto(object_name: str, offset: int = 0, length: int = 0):
+    """Abre el objeto para leerlo por bloques (``length=0`` = hasta el final).
+    Devuelve la respuesta de urllib3: quien la use debe cerrarla y liberar la
+    conexión (``close()`` + ``release_conn()``). Lanza S3Error si no existe."""
+    return minio_client.get_object(MINIO_BUCKET, _nombre_objeto(object_name), offset=offset, length=length)
+
+
 def get_presigned_url(object_name: str, expires: timedelta = timedelta(hours=1)) -> dict:
     """
     URL pre-firmada para acceso temporal directo a un objeto.
@@ -274,131 +293,110 @@ def copy_file_in_minio(source_object: str, dest_object: str) -> dict:
             "message": f"Error inesperado: {str(e)}"
         }
 
-async def find_file_by_hash(db: Session, file_hash: str) -> Optional[dict]:
+async def find_file_by_hash(db: AsyncSession, file_hash: str) -> Optional[dict]:
     """
     Busca un archivo ya almacenado por su hash SHA256, o None si no existe.
     """
-    try:
-        from db.models.file_hash import FileHash
-        
-        stmt = select(FileHash).where(FileHash.file_hash == file_hash)
-        result = await db.execute(stmt)
-        file_record = result.scalar_one_or_none()
-        
-        if file_record:
-            logger.info(f"Archivo duplicado encontrado. Hash: {file_hash}, URL: {file_record.file_url}")
-            return {
-                "id": file_record.id,
-                "file_hash": file_record.file_hash,
-                "file_url": file_record.file_url,
-                "content_type": file_record.content_type,
-                "file_size": file_record.file_size,
-                "numero_usos": file_record.numero_usos
-            }
-        
-        return None
-        
-    except Exception as e:
-        logger.error(f"Error buscando archivo por hash: {e}")
-        return None
+    from db.models.file_hash import FileHash
 
-async def create_file_hash_record(
-    db: Session,
-    file_hash: str,
-    file_url: str,
-    content_type: str,
-    file_size: int
-) -> bool:
-    """
-    Crea un nuevo registro de hash de archivo en la base de datos.
-    """
-    try:
-        from db.models.file_hash import FileHash
+    file_record = await db.scalar(select(FileHash).where(FileHash.file_hash == file_hash))
+    if not file_record:
+        return None
+    return {
+        "id": file_record.id,
+        "file_hash": file_record.file_hash,
+        "file_url": file_record.file_url,
+        "content_type": file_record.content_type,
+        "file_size": file_record.file_size,
+        "numero_usos": file_record.numero_usos,
+    }
 
-        new_hash = FileHash(
-            file_hash=file_hash,
-            file_url=file_url,
-            content_type=content_type,
-            file_size=file_size,
-            created_at=datetime.now(ZoneInfo("America/Bogota"))
-        )
-        db.add(new_hash)
-        await db.commit()
-        
-        logger.info(f"Registro de hash creado. Hash: {file_hash}, URL: {file_url}")
-        return True
-        
-    except Exception as e:
-        logger.error(f"Error creando registro de hash: {e}")
-        await db.rollback()
-        return False
 
 async def upload_file_with_deduplication(
-    db: Session,
+    db: AsyncSession,
     file_data: bytes,
     original_filename: str,
     content_type: str = "application/octet-stream",
     object_name: str = None
 ) -> dict:
     """
-    Sube un archivo a MinIO con deduplicación por hash SHA256.
-    Si el archivo ya existe (mismo hash), retorna la URL existente.
-    Si no existe, lo sube y registra el hash.
-    """
-    try:
-        from utils.hash_utils import calcular_hash_archivo
+    Sube un archivo a MinIO con deduplicación por hash SHA256 y lo registra en
+    ``file_hash``. Si el hash ya existe reutiliza el objeto; en ambos casos
+    marca ``ultima_subida`` (periodo de gracia de la limpieza).
 
+    Hace commit propio a propósito: el objeto ya está en MinIO, así que su fila
+    debe quedar aunque la operación que lo usa falle después. Con numero_usos=0
+    la limpieza los borra a ambos pasado el periodo de gracia; con un rollback
+    quedaría un objeto en MinIO sin fila, que nada limpia. Quien llama no debe
+    tener cambios pendientes en la sesión.
+    """
+    from db.models.file_hash import FileHash
+    from utils.hash_utils import calcular_hash_archivo
+
+    try:
         file_hash = calcular_hash_archivo(file_data)
         file_size = len(file_data)
+        ahora = datetime.now(ZoneInfo("America/Bogota"))
 
-        logger.info(f"Hash calculado: {file_hash} para archivo: {original_filename}")
-
-        existing_file = await find_file_by_hash(db, file_hash)
-
-        if existing_file:
-            logger.info(f"Archivo duplicado reutilizado. Hash: {file_hash}, URL: {existing_file['file_url']}")
+        # Reutilización. El UPDATE espera si la limpieza tiene la fila bloqueada;
+        # si la terminó borrando no afecta filas y el archivo se sube de nuevo.
+        existente = (await db.execute(
+            update(FileHash)
+            .where(FileHash.file_hash == file_hash)
+            .values(ultima_subida=ahora)
+            .returning(FileHash.id, FileHash.file_url, FileHash.numero_usos)
+        )).first()
+        if existente is not None:
+            await db.commit()
+            logger.info(f"Archivo duplicado reutilizado. Hash: {file_hash}, URL: {existente.file_url}")
             return {
                 "ok": True,
-                "url": existing_file['file_url'],
+                "url": existente.file_url,
                 "message": "Archivo duplicado - URL reutilizada",
                 "deduplicated": True,
                 "file_hash": file_hash,
-                "id": existing_file['id'],
-                "numero_usos": existing_file['numero_usos']
+                "id": existente.id,
+                "numero_usos": existente.numero_usos,
             }
 
-        else:
-            if not object_name:
-                object_name = generate_hash_based_path(file_hash, original_filename)
-                logger.info(f"Ruta generada automáticamente: {object_name}")
+        if not object_name:
+            object_name = generate_hash_based_path(file_hash, original_filename)
+        upload_result = await asyncio.to_thread(upload_file_to_minio, file_data, object_name, content_type)
+        if not upload_result["ok"]:
+            return upload_result
 
-            upload_result = await asyncio.to_thread(upload_file_to_minio, file_data, object_name, content_type)
-
-            if not upload_result["ok"]:
-                return upload_result
-
-            await create_file_hash_record(
-                db=db,
+        # Upsert: dos subidas simultáneas del mismo archivo nuevo terminan en la
+        # misma fila (la ruta del objeto depende solo del hash) en vez de chocar
+        # con la restricción única.
+        fila = (await db.execute(
+            pg_insert(FileHash)
+            .values(
                 file_hash=file_hash,
                 file_url=upload_result["url"],
                 content_type=content_type,
-                file_size=file_size
+                file_size=file_size,
+                numero_usos=0,
+                created_at=ahora,
+                ultima_subida=ahora,
             )
-            
-            new_file = await find_file_by_hash(db, file_hash)
-            
-            logger.info(f"Archivo nuevo subido y registrado. Hash: {file_hash}, URL: {upload_result['url']}")
-            return {
-                "ok": True,
-                "url": upload_result["url"],
-                "message": "Archivo nuevo subido exitosamente",
-                "deduplicated": False,
-                "file_hash": file_hash,
-                "id": new_file['id'] if new_file else None,
-                "numero_usos": 0
-            }
-            
+            .on_conflict_do_update(index_elements=[FileHash.file_hash], set_={"ultima_subida": ahora})
+            .returning(FileHash.id, FileHash.file_url, FileHash.numero_usos)
+        )).one()
+        await db.commit()
+
+        logger.info(f"Archivo nuevo subido y registrado. Hash: {file_hash}, URL: {fila.file_url}")
+        return {
+            "ok": True,
+            "url": fila.file_url,
+            "message": "Archivo nuevo subido exitosamente",
+            "deduplicated": False,
+            "file_hash": file_hash,
+            "id": fila.id,
+            "numero_usos": fila.numero_usos,
+        }
+
     except Exception as e:
+        await db.rollback()
         logger.error(f"Error en upload con deduplicación: {e}")
         return {
             "ok": False,

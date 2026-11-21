@@ -1,6 +1,7 @@
 from utils.verify_token import verify_gateway_token, verify_service_token
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
+from minio.error import S3Error
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
@@ -8,12 +9,20 @@ from pydantic import BaseModel
 import asyncio
 import logging
 import os
-import io
 import tempfile
 
 from db.deps import get_db_managed
 from db.models.file_hash import FileHash
-from utils.minio_client import upload_file_with_deduplication, get_file_from_minio, descargar_a_archivo
+from utils.minio_client import upload_file_with_deduplication, abrir_objeto, descargar_a_archivo, tamano_objeto
+from utils.descarga import (
+    RangoNoSatisfacible,
+    cabeceras_seguridad,
+    etag,
+    iterar_objeto,
+    parse_range,
+    rango_vigente,
+    tipo_y_disposicion,
+)
 from utils.file_validator import validate_file_complete
 from utils.antivirus import escanear_archivo
 from core.permission import PERMISOS_ARCHIVOS
@@ -187,7 +196,9 @@ async def download_file_by_id(
     db: AsyncSession = Depends(get_db_managed)
 ):
     """
-    Descarga o visualiza un archivo desde MinIO dado su ID.
+    Descarga un archivo desde MinIO dado su ID, por bloques y con soporte de
+    rangos (``Range``/``If-Range`` -> 206, 416 si no cabe). Solo PDF e imágenes
+    se sirven ``inline``; el resto como adjunto ``application/octet-stream``.
     """
     await verify_internal_access(request)
 
@@ -199,19 +210,45 @@ async def download_file_by_id(
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
 
     object_name = file_record.file_url
-    result_minio = await asyncio.to_thread(get_file_from_minio, object_name)
-
-    if not result_minio.get("ok"):
+    try:
+        tamano = file_record.file_size
+        if tamano is None:
+            tamano = await asyncio.to_thread(tamano_objeto, object_name)
+    except S3Error:
         raise HTTPException(status_code=404, detail="Archivo no encontrado en almacenamiento")
 
-    file_data = result_minio["data"]
-    content_type = file_record.content_type or "application/octet-stream"
-    filename = object_name.split('/')[-1] if '/' in object_name else object_name
+    etag_actual = etag(file_record.file_hash)
+    media_type, disposicion = tipo_y_disposicion(file_record.content_type)
+    filename = object_name.rsplit("/", 1)[-1]
+    headers = {
+        **cabeceras_seguridad(),
+        "Accept-Ranges": "bytes",
+        "ETag": etag_actual,
+        "Content-Disposition": f'{disposicion}; filename="{filename}"',
+    }
 
+    rango = None
+    if rango_vigente(request.headers.get("if-range"), etag_actual):
+        try:
+            rango = parse_range(request.headers.get("range"), tamano)
+        except RangoNoSatisfacible:
+            return Response(status_code=416, headers={**headers, "Content-Range": f"bytes */{tamano}"})
+
+    inicio, fin = rango if rango else (0, tamano - 1)
+    longitud = fin - inicio + 1 if tamano else 0
+    try:
+        objeto = await asyncio.to_thread(abrir_objeto, object_name, inicio, longitud if rango else 0)
+    except S3Error:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado en almacenamiento")
+
+    headers["Content-Length"] = str(longitud)
+    if rango:
+        headers["Content-Range"] = f"bytes {inicio}-{fin}/{tamano}"
     return StreamingResponse(
-        io.BytesIO(file_data),
-        media_type=content_type,
-        headers={"Content-Disposition": f'inline; filename="{filename}"'}
+        iterar_objeto(objeto),
+        status_code=206 if rango else 200,
+        media_type=media_type,
+        headers=headers,
     )
 
 @router.put("/increment-usage")

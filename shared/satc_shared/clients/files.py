@@ -18,7 +18,8 @@ class FilesClient(ServiceClient):
 
     Nota de permisos en app-docs: ``/files/batch``, ``increment-usage``,
     ``decrement-usage`` y ``download-unified`` aceptan SOLO los callers de su
-    ``EXPECTED_CALLERS`` (hoy sanctioning-service e infraction-service).
+    ``EXPECTED_CALLERS`` (hoy sanctioning-service, infraction-service y
+    recurso-service).
     """
 
     target = "app-docs"
