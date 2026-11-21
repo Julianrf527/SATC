@@ -693,6 +693,11 @@ services:
       # File Security (Caso 8)
       MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-10}
       UPLOAD_DIR: /app/secure-uploads
+      # Horas que se conserva un archivo sin uso desde su última subida
+      LIMPIEZA_GRACIA_HORAS: ${LIMPIEZA_GRACIA_HORAS:-24}
+      # Asociar archivos ajenos: off | log (solo avisa) | on (rechaza con 403)
+      ARCHIVOS_VALIDAR_ASOCIACION: ${ARCHIVOS_VALIDAR_ASOCIACION:-log}
+      ARCHIVOS_VENTANA_SUBIDA_HORAS: ${ARCHIVOS_VENTANA_SUBIDA_HORAS:-24}
 
       # ClamAV Antivirus
       CLAMAV_ENABLED: ${CLAMAV_ENABLED:-true}
