@@ -82,6 +82,24 @@ def format_auditoria_response(auditoria: Auditoria, user_info: dict | None = Non
     }
 
 
+async def buscar_por_documento(
+    db: AsyncSession,
+    numero_documento,
+    tipo_documento: str,
+) -> Optional[Involucrado]:
+    """Involucrado con ese (número, tipo), sin mirar el dígito de verificación.
+
+    Es el chequeo de duplicados de /new y PUT: tiene que casar exactamente con
+    el índice UNIQUE (numero_documento, tipo_documento). Si filtrara por DV, un
+    NIT existente con otro DV pasaría el chequeo y reventaría en el flush.
+    """
+    stmt = select(Involucrado).where(
+        Involucrado.numero_documento == numero_documento,
+        Involucrado.tipo_documento == tipo_documento,
+    )
+    return (await db.execute(stmt)).scalars().first()
+
+
 async def verificar_involucrado_existe(
     db: AsyncSession,
     numero_documento: int,

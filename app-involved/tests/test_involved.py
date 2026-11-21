@@ -228,10 +228,26 @@ async def test_crear_registra_auditoria(client, con_gestion, db_session):
     assert auds[0].usuario_id == USER_ID
 
 
-async def test_crear_duplicado_400(client, con_gestion, make_involucrado):
+async def test_crear_duplicado_409(client, con_gestion, make_involucrado):
     await make_involucrado(numero_documento=BASE_NUEVO["numero_documento"], tipo_documento="CC")
     r = await client.post("/involved/new", json=BASE_NUEVO, headers=gateway_headers())
-    assert r.status_code == 400
+    assert r.status_code == 409
+
+
+async def test_crear_nit_existente_con_otro_dv_409(client, con_gestion, make_involucrado):
+    """El UNIQUE es (número, tipo): el DV no hace distinto a un NIT."""
+    await make_involucrado(numero_documento=900123456, tipo_documento="NIT", digito_verificacion="1")
+    payload = {**BASE_NUEVO, "numero_documento": 900123456, "tipo_documento": "NIT", "digito_verificacion": "7"}
+    r = await client.post("/involved/new", json=payload, headers=gateway_headers())
+    assert r.status_code == 409
+
+
+async def test_crear_descarta_dv_si_no_es_nit(client, con_gestion, db_session):
+    payload = {**BASE_NUEVO, "digito_verificacion": "5"}
+    r = await client.post("/involved/new", json=payload, headers=gateway_headers())
+    assert r.status_code == 201, r.text
+    inv = (await db_session.execute(select(Involucrado))).scalars().first()
+    assert inv.digito_verificacion is None
 
 
 async def test_crear_duplicado_carrera_409(client, con_gestion, make_involucrado, monkeypatch):
@@ -242,7 +258,7 @@ async def test_crear_duplicado_carrera_409(client, con_gestion, make_involucrado
     async def _nunca_existe(*args, **kwargs):
         return None
 
-    monkeypatch.setattr("routes.involved.verificar_involucrado_existe", _nunca_existe)
+    monkeypatch.setattr("routes.involved.buscar_por_documento", _nunca_existe)
 
     r = await client.post("/involved/new", json=BASE_NUEVO, headers=gateway_headers())
     assert r.status_code == 409
@@ -362,7 +378,7 @@ async def test_actualizar_registra_auditoria_con_datos_anteriores(
     assert aud.datos_nuevos["nombre"] == "Despues"
 
 
-async def test_actualizar_documento_a_uno_ocupado_400(client, con_gestion, make_involucrado):
+async def test_actualizar_documento_a_uno_ocupado_409(client, con_gestion, make_involucrado):
     ocupado = await make_involucrado(numero_documento=1555000111, tipo_documento="CC")
     inv = await make_involucrado(numero_documento=1555000222, tipo_documento="CC")
     r = await client.put(
@@ -370,7 +386,67 @@ async def test_actualizar_documento_a_uno_ocupado_400(client, con_gestion, make_
         json={"nombre": inv.nombre, "numero_documento": ocupado.numero_documento},
         headers=gateway_headers(),
     )
-    assert r.status_code == 400
+    assert r.status_code == 409
+
+
+async def test_actualizar_a_nit_existente_con_otro_dv_409_no_500(client, con_gestion, make_involucrado):
+    """Antes el chequeo previo filtraba por DV, dejaba pasar el cambio y el
+    UNIQUE reventaba en el flush con un 500."""
+    await make_involucrado(numero_documento=900555111, tipo_documento="NIT", digito_verificacion="3")
+    inv = await make_involucrado(numero_documento=900555222, tipo_documento="NIT", digito_verificacion="8")
+    r = await client.put(
+        f"/involved/{inv.id}",
+        json={"nombre": inv.nombre, "numero_documento": 900555111, "digito_verificacion": "9"},
+        headers=gateway_headers(),
+    )
+    assert r.status_code == 409
+
+
+async def test_actualizar_carrera_409(client, con_gestion, make_involucrado, monkeypatch):
+    ocupado = await make_involucrado(numero_documento=1555000555)
+    inv = await make_involucrado(numero_documento=1555000666)
+
+    async def _nunca_existe(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr("routes.involved.buscar_por_documento", _nunca_existe)
+    r = await client.put(
+        f"/involved/{inv.id}",
+        json={"nombre": inv.nombre, "numero_documento": ocupado.numero_documento},
+        headers=gateway_headers(),
+    )
+    assert r.status_code == 409
+
+
+@pytest.mark.parametrize("campo", ["numero_documento", "tipo_documento"])
+async def test_actualizar_null_explicito_en_documento_422(client, con_gestion, make_involucrado, db_session, campo):
+    inv = await make_involucrado()
+    doc_antes = (inv.numero_documento, inv.tipo_documento)
+    r = await client.put(
+        f"/involved/{inv.id}", json={"nombre": inv.nombre, campo: None}, headers=gateway_headers()
+    )
+    assert r.status_code == 422
+    await db_session.refresh(inv)
+    assert (inv.numero_documento, inv.tipo_documento) == doc_antes
+
+
+async def test_actualizar_de_nit_a_cc_limpia_el_dv(client, con_gestion, make_involucrado, db_session):
+    inv = await make_involucrado(numero_documento=900777111, tipo_documento="NIT", digito_verificacion="4")
+    r = await client.put(
+        f"/involved/{inv.id}", json={"nombre": inv.nombre, "tipo_documento": "CC"}, headers=gateway_headers()
+    )
+    assert r.status_code == 200, r.text
+    await db_session.refresh(inv)
+    assert inv.tipo_documento == "CC"
+    assert inv.digito_verificacion is None
+
+
+async def test_actualizar_nombre_de_nit_conserva_el_dv(client, con_gestion, make_involucrado, db_session):
+    inv = await make_involucrado(numero_documento=900777222, tipo_documento="NIT", digito_verificacion="6")
+    r = await client.put(f"/involved/{inv.id}", json={"nombre": "Otra Razon"}, headers=gateway_headers())
+    assert r.status_code == 200, r.text
+    await db_session.refresh(inv)
+    assert inv.digito_verificacion == "6"
 
 
 async def test_actualizar_documento_a_uno_libre_ok(client, con_gestion, make_involucrado, db_session):
