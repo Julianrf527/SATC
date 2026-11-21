@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, Path, Body
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, or_, func, false
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,9 +48,6 @@ BUSCAR_O_CREAR_INVOLUCRADO = [
     Permisos.RECURSO_MANAGE,
     Permisos.RECURSO_SUPER_MANAGE,
 ]
-
-# Techo duro para el filtrado en memoria del log de auditoría (ver obtener_auditoria).
-MAX_FILAS_POST_FILTRO = 5000
 
 
 async def _exigir_permiso(request: Request, permiso: str, mensaje: str) -> dict:
@@ -258,6 +255,31 @@ async def obtener_auditoria(
         except ValueError:
             raise HTTPException(status_code=400, detail="Formato de fecha_fin inválido. Use YYYY-MM-DD")
 
+    # nombre_usuario/documento_usuario viven en app-users, no en esta BD. Como
+    # los autores distintos del log son pocos (usuarios del sistema, no filas),
+    # se resuelven primero a la lista de usuario_id que coinciden y el filtro
+    # vuelve a SQL: paginación y conteo exactos, sin cargar el log en memoria.
+    users_info: dict = {}
+    if documento_usuario or nombre_usuario:
+        autores = (await db.execute(select(Auditoria.usuario_id).distinct())).scalars().all()
+        ids_conocidos = [uid for uid in autores if uid]
+        users_info = await get_user_info(ids_conocidos) if ids_conocidos else {}
+
+        def _coincide(uid) -> bool:
+            nombre, documento = resolver_identidad_usuario(uid, users_info.get(uid, {}))
+            if nombre_usuario and nombre_usuario.lower() not in nombre.lower():
+                return False
+            if documento_usuario and documento_usuario.strip() not in documento:
+                return False
+            return True
+
+        coincidentes = [uid for uid in autores if _coincide(uid)]
+        ids = [uid for uid in coincidentes if uid]
+        filtro_usuario = Auditoria.usuario_id.in_(ids) if ids else false()
+        if None in coincidentes:
+            filtro_usuario = or_(filtro_usuario, Auditoria.usuario_id.is_(None))
+        conditions.append(filtro_usuario)
+
     query = select(Auditoria)
     count_query = select(func.count()).select_from(Auditoria)
     if conditions:
@@ -267,37 +289,14 @@ async def obtener_auditoria(
     total_count = await db.scalar(count_query) or 0
     effective_offset = offset if offset is not None else (page - 1) * limit
 
-    # nombre_usuario/documento_usuario viven en app-users, no en esta BD, así que
-    # solo se pueden aplicar después de resolver los usuarios. Eso obliga a traer
-    # más filas de las que se devuelven; MAX_FILAS_POST_FILTRO acota el costo para
-    # que el endpoint no cargue la tabla de auditoría entera en memoria.
-    filtra_en_memoria = bool(documento_usuario or nombre_usuario)
-    query = query.order_by(Auditoria.fecha.desc())
-    if filtra_en_memoria:
-        query = query.limit(MAX_FILAS_POST_FILTRO)
-    else:
-        query = query.offset(effective_offset).limit(limit)
-
+    query = query.order_by(Auditoria.fecha.desc(), Auditoria.id.desc()).offset(effective_offset).limit(limit)
     auditorias = (await db.execute(query)).scalars().all()
 
-    user_ids = list({aud.usuario_id for aud in auditorias if aud.usuario_id})
-    users_info = await get_user_info(user_ids) if user_ids else {}
+    faltantes = list({aud.usuario_id for aud in auditorias if aud.usuario_id} - users_info.keys())
+    if faltantes:
+        users_info = {**users_info, **await get_user_info(faltantes)}
 
-    data = []
-    for aud in auditorias:
-        user_info = users_info.get(aud.usuario_id, {})
-        usuario_nombre, usuario_documento = resolver_identidad_usuario(aud.usuario_id, user_info)
-
-        if nombre_usuario and nombre_usuario.lower() not in usuario_nombre.lower():
-            continue
-        if documento_usuario and documento_usuario.strip() not in usuario_documento:
-            continue
-
-        data.append(format_auditoria_response(aud, user_info))
-
-    if filtra_en_memoria:
-        total_count = len(data)
-        data = data[effective_offset:effective_offset + limit]
+    data = [format_auditoria_response(aud, users_info.get(aud.usuario_id, {})) for aud in auditorias]
 
     return {
         "ok": True,
