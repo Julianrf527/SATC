@@ -197,8 +197,8 @@ class Permisos:
     def _limpiar_cache(self) -> None:
         from utils.cache import permission_cache, users_cache
 
-        permission_cache.cache.clear()
-        users_cache.cache.clear()
+        permission_cache._datos.clear()
+        users_cache._datos.clear()
 
     def dar(self, user_id: int, *permisos: str) -> None:
         self._por_usuario.setdefault(user_id, set()).update(permisos)

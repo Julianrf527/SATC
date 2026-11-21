@@ -63,18 +63,6 @@ async def get_file_info(file_id: int) -> Dict[str, Any]:
         return _error(e)
 
 
-async def get_files_batch(file_ids: List[int]) -> Dict[str, Any]:
-    """Información de múltiples archivos: {'ok': True, 'data': [...]}."""
-    if not file_ids:
-        return {"ok": True, "data": []}
-    try:
-        files = await files_client.batch(file_ids)
-        return {"ok": True, "data": [f.model_dump() for f in files]}
-    except Exception as e:
-        logger.error(f"Error getting files batch for files {file_ids}: {e}")
-        return _error(e)
-
-
 async def download_unified_pdf(file_ids: List[int], cookies: Dict[str, str]) -> Dict[str, Any]:
     """
     Combina varios archivos en un único PDF vía app-docs (orden = file_ids).

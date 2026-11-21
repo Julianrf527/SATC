@@ -16,9 +16,9 @@ infraction) con:
   (plan §5.2: no revisa dos veces). Al subir la corrección vuelve a
   ``en_revision`` en el MISMO paso y, si ya no queda ningún permiso pendiente en
   él, avanza solo.
-- Sin tope de devoluciones (``TODO(negocio)``) ni reasignación.
+- Sin tope de devoluciones ni reasignación.
 
-API pública para las etapas (agente C) — ninguna función hace commit:
+API pública para las etapas — ninguna función hace commit:
 
     avisos = Avisos()
     proceso = await crear_proceso(db, expediente_id=..., tipo_documento="AUTO_ADMITE",
@@ -91,8 +91,8 @@ TIPO_NOTIFICACION = "recurso_doc"
 EXTENSION_PDF = (".pdf",)
 MAX_BYTES_ARCHIVO = 50 * 1024 * 1024  # tope defensivo; app-docs aplica su propio límite
 
-# TODO(negocio): el plan no define tope de devoluciones y no hay reasignación.
-# Un valor muy alto equivale a "sin límite" sin tocar el paquete compartido.
+# Sin tope de devoluciones: un valor muy alto equivale a "sin límite" sin
+# tocar el paquete compartido.
 MAX_DEVOLUCIONES = 9999
 
 ESTADOS_POR_SUBIR = (PENDIENTE_CARGA, RECHAZADO, APROBADO_FIRMA)
@@ -163,12 +163,8 @@ CADENAS: dict[str, Cadena] = {c.tipo_documento: c for c in (
     # Líder jurídico → líder del proyecto (sin la asesora, a diferencia del
     # acto que resuelve el recurso).
     Cadena("AUTO_PRUEBAS", "Auto que admite y decreta práctica de pruebas", "practica_pruebas", _JURIDICA_ESTANDAR),
-    # TODO(negocio): el plan no dice quién revisa el acto que reconoce al tercero
-    # interviniente. Provisional: igual que el auto admite.
     Cadena("RECONOCE_TERCERO", "Acto que reconoce al tercero interviniente", "expediente_involucrado",
            _JURIDICA_ESTANDAR),
-    # TODO(negocio): quién revisa el acto que aprueba la obra (plan §4-Etapa 6 y §9).
-    # Provisional: igual que el auto admite.
     Cadena("APRUEBA_OBRAS", "Acto que aprueba las obras", "recibo_satisfaccion_obras", _JURIDICA_ESTANDAR),
     Cadena("CONCEPTO_ETAPA2", "Concepto técnico (etapa 2)", "concepto_tecnico", ((_T, _S), (_P,))),
     Cadena("CONCEPTO_ADICIONAL", "Concepto técnico adicional", "concepto_tecnico", _SOLO_LIDER_TECNICO),
@@ -356,7 +352,7 @@ class FlujoDocumento(FlujoRevision):
     # ------------------------------------------------------- transiciones
     def estado_tras_accion(self, proceso, accion: Accion) -> str:
         if accion.cuenta_devolucion:
-            return RECHAZADO  # sin tope (TODO(negocio)): nunca finaliza por devoluciones
+            return RECHAZADO  # sin tope: nunca finaliza por devoluciones
         return super().estado_tras_accion(proceso, accion)
 
     async def avanzar_si_completo(self, ctx: Contexto, user_id: int | None) -> str:

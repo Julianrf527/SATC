@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+.env.*
+tests/
+plan trabajo/
+*.xlsx
+*.md
+requirements-dev.txt
+pytest.ini

@@ -1,8 +1,13 @@
+import logging
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-import os
 
 # Cada módulo de routes/ define `router = APIRouter()`. Todos se registran aquí
 # (el orden de la lista es el orden de registro).
@@ -27,20 +32,23 @@ from routes import (
     alertas,
 )
 
-app = FastAPI()
+logger = logging.getLogger(__name__)
 
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Crea/migra las tablas y siembra los catálogos. Si falla, el servicio NO
+    arranca (sin tablas cualquier petición fallaría)."""
     from db.database import init_db
-    try:
-        await init_db()
-        print("Tablas de recurso_db inicializadas correctamente")
+    from db.seeds import seed_initial_data
 
-        from db.seeds import seed_initial_data
-        await seed_initial_data()
-    except Exception as e:
-        print(f"Error inicializando BD: {e}")
+    await init_db()
+    logger.info("Tablas de recurso_db inicializadas correctamente")
+    await seed_initial_data()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 class CharsetMiddleware(BaseHTTPMiddleware):
@@ -84,8 +92,13 @@ app.include_router(alertas.router, prefix="/alertas", tags=["Alertas"])
 
 @app.get("/health")
 async def health_check():
-    return {
-        "status": "healthy",
-        "service": "app-recurso",
-        "version": "1.0.0"
-    }
+    """200 si el servicio y su base de datos responden; 503 si la BD no."""
+    from db.database import engine
+
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception as e:
+        logger.error(f"Health check: la base de datos no responde: {e}")
+        return JSONResponse(status_code=503, content={"status": "unhealthy", "service": "app-recurso"})
+    return {"status": "healthy", "service": "app-recurso", "version": "1.0.0"}

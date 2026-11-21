@@ -11,7 +11,6 @@ from satc_shared.clients import UsersClient
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 from utils.cache import permission_cache, users_cache
@@ -54,31 +53,34 @@ async def get_users_by_permission(permission_name: str) -> dict:
 async def get_user_info(user_ids: list[int]) -> dict:
     """
     Obtiene info de múltiples usuarios por IDs.
-    Retorna {user_id: {nombre, correo, numero_documento}}
+    Retorna {user_id: {nombre, correo, numero_documento}}. Caché por usuario:
+    solo se piden a app-users los que no estén en caché.
     """
-    if not user_ids:
-        return {}
-
-    cache_key = f"users_batch:{sorted(user_ids)}"
-    cached = await users_cache.get(cache_key)
-    if cached is not None:
-        return cached
+    result: dict = {}
+    faltantes = []
+    for uid in dict.fromkeys(user_ids or []):
+        cached = await users_cache.get(f"user:{uid}")
+        if cached is None:
+            faltantes.append(uid)
+        else:
+            result[uid] = cached
+    if not faltantes:
+        return result
 
     try:
-        usuarios = await users_client.users_batch(user_ids)
+        usuarios = await users_client.users_batch(faltantes)
     except Exception as e:
         logger.error(f"get_user_info error: {e}", exc_info=True)
-        return {}
+        return result
 
-    result = {
-        u.id: {
+    for u in usuarios:
+        info = {
             "nombre": u.nombre,
             "correo": u.correo,
             "numero_documento": u.numero_documento if u.numero_documento is not None else "",
         }
-        for u in usuarios
-    }
-    await users_cache.set(cache_key, result)
+        result[u.id] = info
+        await users_cache.set(f"user:{u.id}", info)
     return result
 
 

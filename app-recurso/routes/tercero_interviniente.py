@@ -1,13 +1,9 @@
-"""Transversal · Tercero interviniente (plan §4 transversal, §3 punto 4; fase 6).
+"""Transversal · Tercero interviniente (plan §4 transversal, §3 punto 4).
 
 Se vincula en ``expediente_involucrado`` con ``tipo_vinculo =
-TERCERO_INTERVINIENTE`` (servicio de A) y se le expide un acto que lo reconoce
+TERCERO_INTERVINIENTE`` y se le expide un acto que lo reconoce
 (``RECONOCE_TERCERO``, enlazado en ``expediente_involucrado.acto_admin_id``).
-Sus notificaciones de las actuaciones se registran en ``/actos/notificaciones`` (B).
-
-TODO(negocio): plan §4 — no se sabe si la solicitud del tercero llega con
-radicado y documento; hoy solo se vincula la persona.
-TODO(negocio): el tercero aparece "en cualquier momento"; no se exige el auto admite (V4).
+Sus notificaciones de las actuaciones se registran en ``/actos/notificaciones``.
 
 Prefijo ``/terceros``:
 
@@ -138,7 +134,7 @@ async def desvincular_tercero(
 @router.post("/{vinculo_id}/asignarme")
 async def asignarme_reconocimiento(request: Request, vinculo_id: int, db: AsyncSession = Depends(get_db_managed)):
     """"Asignarme" el acto que reconoce al tercero: no hay columna de encargado,
-    el encargado es el creador del proceso (B); el índice único parcial del
+    el encargado es el creador del proceso; el índice único parcial del
     proceso vigente resuelve la carrera (409)."""
     usuario = await requiere_gestion(request)
     vinculo, exp = await _tercero(db, vinculo_id, bloquear=True)

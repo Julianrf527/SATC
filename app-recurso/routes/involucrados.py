@@ -1,9 +1,9 @@
-"""Solicitantes del expediente (plan §3 "Involucrados", fase 4).
+"""Solicitantes del expediente (plan §3 "Involucrados").
 
 Prefijo en main.py: ``/involucrados``. Se vinculan y desvinculan como los
 "posibles infractores" de app-infraction; puede haber varios por expediente.
 El tercero interviniente se vincula por ``routes/tercero_interviniente.py``
-(agente C) reutilizando ``services/expediente_involucrados.py``.
+reutilizando ``services/expediente_involucrados.py``.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse

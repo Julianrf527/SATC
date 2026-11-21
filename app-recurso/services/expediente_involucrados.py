@@ -2,7 +2,7 @@
 
 Reutilizable para cualquier ``tipo_vinculo``: las rutas de solicitantes
 (``routes/involucrados.py``) usan ``SOLICITANTE`` y las de tercero
-interviniente (agente C) ``TERCERO_INTERVINIENTE``.
+interviniente ``TERCERO_INTERVINIENTE``.
 
 Los datos de la persona viven en app-involved (solo se guarda el id).
 Ninguna función hace commit (lo hace la ruta). Todas las escrituras dejan

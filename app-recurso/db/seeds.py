@@ -1,11 +1,15 @@
 """Seed idempotente de recurso_db: municipios, veredas, tipo_fuente, fuente y
 tipo_notificacion. Solo inserta lo que falta (por id en municipio/vereda, por
 nombre en los catálogos)."""
+import logging
+
 from sqlalchemy import select, text
 
 from db.database import SessionLocal
 from db.models import Fuente, Municipio, TipoFuente, TipoNotificacion, Vereda
 from .seed_data import FUENTES, MUNICIPIOS, TIPOS_FUENTE, TIPOS_NOTIFICACION, VEREDAS
+
+logger = logging.getLogger(__name__)
 
 
 async def _insertar_por_nombre(session, modelo, nombres: list[str]) -> int:
@@ -42,11 +46,11 @@ async def seed_initial_data():
                     )
                 )
             await session.commit()
-            print(
+            logger.info(
                 f"Seed recurso_db: {len(municipios)} municipios, {len(veredas)} veredas, "
                 f"{tipos_fuente} tipos de fuente, {fuentes} fuentes, {tipos_notif} tipos de notificación"
             )
         except Exception as e:
             await session.rollback()
-            print(f"Error en seed de recurso_db: {e}")
+            logger.error(f"Error en seed de recurso_db: {e}")
             raise
