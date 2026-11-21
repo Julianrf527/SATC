@@ -11,6 +11,9 @@ export type Semaforo = {
   esta_vencido: boolean;
 };
 
+/** Rol responsable de una alerta: código de permiso y su nombre legible. */
+export type RolResponsable = { permiso: string; etiqueta: string };
+
 export type Alerta = {
   tipo: string;
   etapa: string;
@@ -21,8 +24,18 @@ export type Alerta = {
   fecha_inicio?: string;
   fecha_limite: string;
   semaforo: Semaforo;
-  /** Solo en "todas las alertas": el usuario es el responsable del expediente. */
+  /** Solo en "todas las alertas": la alerta es del usuario (ver `roles_responsables`). */
   es_responsable?: boolean;
+  /** Persona a cargo de la tarea (si la alerta no es por rol). */
+  encargado_id?: number | null;
+  /**
+   * Roles a los que corresponde la alerta (p. ej. quienes deben revisar el
+   * documento o quienes pueden asignar una visita). Si viene con elementos, la
+   * alerta es de todo usuario con alguno de esos permisos; si no, del encargado.
+   */
+  roles_responsables?: RolResponsable[];
+  /** Estado del documento de la tarea (informativo). */
+  estado_documento?: string | null;
   /** app-recurso: expediente de la alerta (para abrirlo al navegar). */
   expediente_id?: number;
   /** app-recurso: proceso de revisión donde se hace la tarea (null si aún no existe). */

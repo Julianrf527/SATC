@@ -5,7 +5,10 @@ import type { AlertaPaginada, EstadoSemaforo, SetToast } from "./types";
 import { TIPO_LABELS, formatFechaCorta } from "./alertasConfig";
 import { useAlertasPaginadasQuery, useErrorToast } from "./api/alertas";
 import {
-  ALCANCE_OPCIONES,
+  ETIQUETAS_ALCANCE,
+  opcionesAlcance,
+  textoRolesResponsables,
+  type EtiquetasAlcance,
   resolverDestino,
   type AlcanceAlertas,
   type DestinoAlerta,
@@ -38,6 +41,8 @@ type Props = {
    * `rutas` y `es_responsable`.
    */
   destino?: (alerta: AlertaPaginada) => DestinoAlerta | null;
+  /** Textos del selector de alcance (por defecto "Expedientes": "Mis expedientes / Todos"). */
+  etiquetasAlcance?: Partial<EtiquetasAlcance>;
 };
 
 const porRadicado = (alerta: AlertaPaginada) => ({ radicadoToSelect: alerta.radicado });
@@ -66,8 +71,13 @@ export default function AlertasExpediente({
   setToast,
   estadoNavegacion = porRadicado,
   destino: destinoModulo,
+  etiquetasAlcance,
 }: Props) {
   const navigate = useNavigate();
+  const alcanceUI = {
+    titulo: etiquetasAlcance?.titulo ?? ETIQUETAS_ALCANCE.titulo,
+    opciones: opcionesAlcance(etiquetasAlcance),
+  };
   const [alcance, setAlcance] = useState<AlcanceAlertas>("mios");
   const [radicadoFilter, setRadicadoFilter] = useState("");
   // Radicado que se consulta: el tecleado, tras DEBOUNCE_RADICADO_MS sin cambios.
@@ -181,9 +191,9 @@ export default function AlertasExpediente({
             <div className="card-body p-4">
               <div className="grid grid-cols-1 md:grid-cols-[repeat(4,minmax(0,1fr))_auto] gap-3 items-end">
                 <div className="flex flex-col gap-1">
-                  <span className="text-xs font-medium text-base-content/60">Expedientes</span>
+                  <span className="text-xs font-medium text-base-content/60">{alcanceUI.titulo}</span>
                   <div className="join w-full" role="group" aria-label="Alcance de las alertas">
-                    {ALCANCE_OPCIONES.map(({ value, label }) => (
+                    {alcanceUI.opciones.map(({ value, label }) => (
                       <button
                         key={value}
                         type="button"
@@ -323,6 +333,9 @@ export default function AlertasExpediente({
                                 </td>
                                 <td className="text-xs max-w-[12rem]">
                                   <p className="line-clamp-2">{alerta.accion_requerida}</p>
+                                  {textoRolesResponsables(alerta) && (
+                                    <p className="text-[10px] text-base-content/60">{textoRolesResponsables(alerta)}</p>
+                                  )}
                                 </td>
                                 <td className="w-48">
                                   <div className="flex flex-col gap-1">

@@ -6,15 +6,48 @@ Recibe las alertas ya calculadas en el formato de siempre
 devuelve una página de la lista plana, ordenada como lo hacía el frontend:
 por urgencia (crítico → baja) y luego por % de avance descendente; los
 empates conservan el orden de entrada (orden estable).
+
+Responsable de una alerta (``marcar_responsable``): cada alerta tiene un
+``encargado_id`` (persona) y, opcionalmente, ``roles_responsables`` (lista de
+``{"permiso", "etiqueta"}``). Si trae roles, la alerta es de todo usuario con
+alguno de esos permisos (p. ej. quienes deben revisar el documento o quienes
+pueden asignar una visita); si no, del encargado. ``estado_documento`` es solo
+informativo.
 """
 from __future__ import annotations
 
 import math
-from typing import Any, Mapping, Optional
+from typing import Any, Iterable, Mapping, Optional
 
 ESTADOS_SEMAFORO = ("verde", "amarillo", "rojo", "vencido")
 URGENCIA_ORDEN = {"critico": 0, "alta": 1, "media": 2, "baja": 3}
 LIMITE_MAXIMO = 100
+
+
+def roles_responsables(alerta: Mapping[str, Any]) -> list[dict]:
+    """Roles a los que corresponde la alerta (vacío si es del encargado)."""
+    return list(alerta.get("roles_responsables") or [])
+
+
+def es_responsable(alerta: Mapping[str, Any], user_id: Optional[int], permisos_usuario: Iterable[str]) -> bool:
+    """Por rol si la alerta trae ``roles_responsables``; si no, por ``encargado_id``."""
+    roles = roles_responsables(alerta)
+    if roles:
+        permisos = set(permisos_usuario)
+        return any(r.get("permiso") in permisos for r in roles)
+    return user_id is not None and alerta.get("encargado_id") == user_id
+
+
+def marcar_responsable(alerta: dict, user_id: Optional[int], permisos_usuario: Iterable[str]) -> dict:
+    """Agrega ``es_responsable`` a la alerta (la modifica y la devuelve)."""
+    alerta["es_responsable"] = es_responsable(alerta, user_id, permisos_usuario)
+    return alerta
+
+
+def permisos_de_roles(alertas: Iterable[Mapping[str, Any]]) -> set[str]:
+    """Permisos que aparecen en ``roles_responsables`` (para consultar al
+    usuario solo esos)."""
+    return {r["permiso"] for a in alertas for r in roles_responsables(a) if r.get("permiso")}
 
 
 def paginar_alertas(
