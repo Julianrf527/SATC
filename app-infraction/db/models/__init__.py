@@ -30,6 +30,7 @@ from .informe_proceso import (
 from .informe_recurso_afectado import InformeRecursoAfectado
 from .tipo_medida import TipoMedida
 from .medida_preventiva import MedidaPreventiva
+from .envio_alertas_semanal import EnvioAlertasSemanal
 
 __all__ = [
     "Base",
