@@ -62,11 +62,11 @@ Modelo: `documento_proceso` (+ version/revision/auditoria/revisor) con los mixin
 | `APRUEBA_MEMORIAS` | memorias_calculo | abogado | [{lider_juridico}], [{lider_proyecto}] |
 | `DECISION` | decision | abogado | [{lider_juridico}], [{lider_proyecto, asesora_subdireccion}] |
 | `RECURSO` | recurso_reposicion | abogado | [{lider_juridico}], [{lider_proyecto, asesora_subdireccion}] |
-| `AUTO_PRUEBAS` | practica_pruebas | abogado | igual que `RECURSO` |
+| `AUTO_PRUEBAS` | practica_pruebas | abogado | [{lider_juridico}], [{lider_proyecto}] |
 | `RECONOCE_TERCERO` | expediente_involucrado | abogado | `TODO(negocio)`: el plan no dice quién revisa. Provisional: igual que AUTO_ADMITE, configurable en un solo lugar |
 | `APRUEBA_OBRAS` | recibo_satisfaccion_obras | abogado | `TODO(negocio)` (plan §4-Etapa 6). Provisional: igual que AUTO_ADMITE |
 | `CONCEPTO_ETAPA2` | concepto_tecnico | técnico `tecnico_encargado_id` | [{lider_tecnico, sig}], [{lider_proyecto}] |
-| `CONCEPTO_PRUEBAS` | concepto_tecnico | técnico | igual que `CONCEPTO_ETAPA2` |
+| `CONCEPTO_PRUEBAS` | concepto_tecnico | técnico | [{lider_tecnico}], [{lider_proyecto}] |
 | `CONCEPTO_ADICIONAL` | concepto_tecnico | técnico | [{lider_tecnico}] |
 | `CONCEPTO_MEMORIAS` / `CONCEPTO_SUBSANACION` / `CONCEPTO_OBRAS` / `CONCEPTO_OBRAS_SEGUNDO` | concepto_tecnico | técnico | [{lider_tecnico}] |
 

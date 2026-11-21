@@ -2,7 +2,7 @@ import { useState } from "react";
 import { UserMinus, UserRoundPlus } from "lucide-react";
 import { Modal } from "@shared/ui";
 import { useDesvincularTerceroMutation } from "../../api/involucrados";
-import { mensajeError } from "../../api/errors";
+import { mensajeError, requiereConfirmacion } from "../../api/errors";
 import type { ExpedienteDetalle, NodoTercero, SetToast, VinculoInvolucrado } from "../../types";
 import { accionesNodo } from "../nodos";
 import { nombrePersona } from "../involucrados/personaForm";
@@ -31,18 +31,32 @@ export default function TercerosExpediente({ expediente, terceros, puedeVincular
   const [desvincularDe, setDesvincularDe] = useState<NodoTercero | null>(null);
   const quitar = useDesvincularTerceroMutation(expediente.id);
 
+  // Aviso del backend (428) cuando la persona tiene notificaciones: se eliminan si confirma.
+  const [avisoNotificaciones, setAvisoNotificaciones] = useState<string | null>(null);
+  const cerrarDesvincular = () => {
+    setDesvincularDe(null);
+    setAvisoNotificaciones(null);
+  };
+
   const confirmarDesvincular = () => {
     if (!desvincularDe) return;
-    quitar.mutate(desvincularDe, {
-      onSuccess: () => {
-        setToast({ id: Date.now(), message: "Tercero interviniente desvinculado", type: "success" });
-        setDesvincularDe(null);
+    quitar.mutate(
+      { id: desvincularDe.id, version: desvincularDe.version, confirmar: avisoNotificaciones !== null },
+      {
+        onSuccess: () => {
+          setToast({ id: Date.now(), message: "Tercero interviniente desvinculado", type: "success" });
+          cerrarDesvincular();
+        },
+        onError: (err) => {
+          if (requiereConfirmacion(err)) {
+            setAvisoNotificaciones(mensajeError(err, "La persona tiene notificaciones en este expediente"));
+            return;
+          }
+          setToast({ id: Date.now(), message: mensajeError(err, "Error al desvincular"), type: "error" });
+          cerrarDesvincular();
+        },
       },
-      onError: (err) => {
-        setToast({ id: Date.now(), message: mensajeError(err, "Error al desvincular"), type: "error" });
-        setDesvincularDe(null);
-      },
-    });
+    );
   };
 
   return (
@@ -116,19 +130,19 @@ export default function TercerosExpediente({ expediente, terceros, puedeVincular
 
       <Modal
         isOpen={desvincularDe !== null}
-        onClose={() => setDesvincularDe(null)}
+        onClose={cerrarDesvincular}
         size="sm"
         icon={<UserMinus size={20} />}
         title="Desvincular tercero interviniente"
         closeOnEsc={!quitar.isPending}
         footer={
           <>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDesvincularDe(null)} disabled={quitar.isPending}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={cerrarDesvincular} disabled={quitar.isPending}>
               Cancelar
             </button>
             <button type="button" className="btn btn-error btn-sm text-white" onClick={confirmarDesvincular} disabled={quitar.isPending}>
               {quitar.isPending && <span className="loading loading-spinner loading-xs" />}
-              Desvincular
+              {avisoNotificaciones ? "Desvincular y eliminar notificaciones" : "Desvincular"}
             </button>
           </>
         }

@@ -1,12 +1,15 @@
 """
 Flujo PROPIO de revisión del informe técnico (/revision-informes + /informes):
-asignar -> pendiente_carga, subir versiones, aprobar (exige PDF), aprobar para
-firma + versión firmada auto-aprobada, devolver con adjunto, 3 devoluciones ->
+asignar -> pendiente_carga, subir versiones, aprobar para firma (no hay
+aprobación directa) + "Cargar versión final" (PDF firmado y, en VISITA, matriz
+de recursos afectados obligatoria), devolver con adjunto, 3 devoluciones ->
 finalizado + reasignación, permisos y descargas. FilesClient y UsersClient
 se sustituyen por stubs (conftest.stubs_clientes).
 """
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
+import json
 
 import pytest
 from sqlalchemy import select
@@ -14,7 +17,8 @@ from sqlalchemy import select
 import routes.reports as reports_mod
 import services.users as users_svc
 from core.permission import Permission
-from db.models.informe_proceso import InformeProceso, InformeProcesoRevision
+from db.models.documento_proceso import DocumentoProceso, DocumentoProcesoRevision
+from db.models.informe_recurso_afectado import RECURSOS_MATRIZ, InformeRecursoAfectado
 from db.models.informe_tecnico import InformeTecnico
 from tests.conftest import gateway_headers
 
@@ -29,9 +33,9 @@ def _permisos(monkeypatch, stubs_clientes):
     async def _verify(user_id, permission):
         if permission == Permission.ASSIGN_REPORTS:
             return int(user_id) == ASIGNADOR
-        if permission == Permission.UPLOAD_REPORTS:
+        if permission == Permission.TECNICO:
             return int(user_id) == PROFESIONAL or int(user_id) == 11
-        if permission == Permission.REVIEW_REPORTS:
+        if permission == Permission.LIDER_TECNICO:
             return int(user_id) == REVISOR
         return True
 
@@ -77,6 +81,26 @@ async def _revisar(client, pid, accion, adjunto=None, user=REVISOR, comentario="
         f"/revision-informes/{pid}/revisiones",
         data={"accion": accion, "comentario": comentario},
         files=files,
+        headers=gateway_headers(user),
+    )
+
+
+def _matriz() -> str:
+    return json.dumps([
+        {"recurso": r, "magnitud": "MODERADO", "reversibilidad": "REVERSIBLE"} if r == "SUELO"
+        else {"recurso": r, "no_existe": True}
+        for r in RECURSOS_MATRIZ
+    ])
+
+
+async def _version_final(client, pid, archivo=None, matriz=None, user=PROFESIONAL):
+    data = {"comentario": "firmado"}
+    if matriz is not None:
+        data["recursos_afectados"] = matriz
+    return await client.post(
+        f"/revision-informes/{pid}/version-final",
+        files={"archivo": archivo or ("firmado.pdf", b"%PDF firmado", "application/pdf")},
+        data=data,
         headers=gateway_headers(user),
     )
 
@@ -140,66 +164,58 @@ class TestSubirYAprobar:
         assert stubs.files.incrementados == [101]
         assert any("Nueva versión (v1)" in m for m in stubs.users.para(REVISOR))
 
-    async def test_aprobar_con_word_bloqueado(self, client, asignar):
+    async def test_no_hay_aprobacion_directa(self, client, asignar):
         _, pid = await asignar()
-        await _subir(client, pid, DOCX)
+        await _subir(client, pid, PDF)
 
         d = (await _detalle(client, pid, REVISOR)).json()
         acciones = {a["codigo"]: a for a in d["acciones_disponibles"]}
-        assert set(acciones) == {"aprobado", "devuelto", "aprobado_firma"}
-        assert "PDF" in acciones["aprobado"]["bloqueada"]
+        assert set(acciones) == {"devuelto", "aprobado_firma"}
         assert acciones["aprobado_firma"]["bloqueada"] is None
         assert acciones["aprobado_firma"]["icono"] == "firmar"
 
         resp = await _revisar(client, pid, "aprobado")
         assert resp.status_code == 400
-        assert "PDF" in resp.json()["detail"]
 
-    async def test_aprobar_pdf_acepta_informe_en_la_misma_transaccion(self, client, asignar, stubs, db_session):
+    async def test_aprobar_firma_y_version_final_con_matriz(self, client, asignar, stubs, db_session):
         informe, pid = await asignar()
-        await _subir(client, pid, PDF)
-        resp = await _revisar(client, pid, "aprobado")
+        await _subir(client, pid, DOCX)
+        resp = await _revisar(client, pid, "aprobado_firma")
         assert resp.status_code == 200, resp.text
-        assert resp.json()["informe_aceptado"] is True
+        body = resp.json()
+        assert body["estado"]["codigo"] == "aprobado_firma"
+        assert "informe_aceptado" not in body
+        assert any("firma" in m for m in stubs.users.para(PROFESIONAL))
+
+        # La firmada ya no va por /versiones: se carga con "Cargar versión final".
+        d = (await _detalle(client, pid, PROFESIONAL)).json()
+        assert d["subida_version"]["permitida"] is False
+        assert d["subida_version"]["extensiones"] == [".pdf"]
+        assert "Cargar versión final" in d["subida_version"]["motivo"]
+        resp = await _subir(client, pid, PDF)
+        assert resp.status_code == 409
+
+        resp = await _version_final(client, pid, matriz=_matriz())
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["informe_aceptado"] is True and body["tiene_matriz"] is True
+        assert body["estado"]["codigo"] == "aprobado"
+        assert body["version"] == 2
 
         await db_session.refresh(informe)
         hoy = datetime.now(ZoneInfo("America/Bogota")).date()
         assert informe.fecha_aceptacion_informe == hoy
         assert informe.fecha_recibido_informe == hoy
-        assert informe.documento_informe_id == 101
-        # Uso de la versión + uso propio del informe.
-        assert stubs.files.incrementados == [101, 101]
-        assert any("aceptado" in m for m in stubs.users.para(ABOGADO))
-        assert any("aprobado" in m for m in stubs.users.para(PROFESIONAL))
-
-    async def test_aprobar_firma_y_firmada_pdf_auto_aprobada(self, client, asignar, stubs, db_session):
-        informe, pid = await asignar()
-        await _subir(client, pid, DOCX)
-        resp = await _revisar(client, pid, "aprobado_firma")
-        assert resp.status_code == 200
-        assert resp.json()["estado"]["codigo"] == "aprobado_firma"
-        assert resp.json()["informe_aceptado"] is False
-        assert any("firma" in m for m in stubs.users.para(PROFESIONAL))
-
-        # La firmada debe ser PDF.
-        d = (await _detalle(client, pid, PROFESIONAL)).json()
-        assert d["subida_version"] == {"permitida": True, "extensiones": [".pdf"], "motivo": None}
-        resp = await _subir(client, pid, ("firmado.docx", b"PK otro", DOCX[2]))
-        assert resp.status_code == 400
-
-        resp = await _subir(client, pid, ("firmado.pdf", b"%PDF firmado", "application/pdf"))
-        assert resp.status_code == 200, resp.text
-        body = resp.json()
-        assert body["auto_aprobado"] is True and body["informe_aceptado"] is True
-        assert body["estado"]["codigo"] == "aprobado"
-
-        await db_session.refresh(informe)
-        assert informe.fecha_aceptacion_informe is not None
         assert informe.documento_informe_id == 102  # la versión firmada
+        filas = (await db_session.execute(
+            select(InformeRecursoAfectado).where(InformeRecursoAfectado.informe_id == informe.id)
+        )).scalars().all()
+        assert len(filas) == len(RECURSOS_MATRIZ)
+        suelo = next(f for f in filas if f.recurso == "SUELO")
+        assert (suelo.magnitud, suelo.reversibilidad, suelo.no_existe) == ("MODERADO", "REVERSIBLE", False)
 
         d = (await _detalle(client, pid, REVISOR)).json()
         assert d["revisiones"][0]["accion"] == "aprobado"
-        # Historial en participio y auditoría con etiqueta/tono del flujo.
         assert [(r["accion_etiqueta"], r["tono"]) for r in d["revisiones"][:2]] == [
             ("Aprobado", "success"), ("Aprobado para firma", "success"),
         ]
@@ -207,9 +223,55 @@ class TestSubirYAprobar:
         assert eventos["aprobar_firma"] == ("Aprobado para firma", "success")
         assert eventos["aprobar"] == ("Aprobado", "success")
         assert eventos["crear"] == ("Proceso creado", "info")
-        assert d["revisiones"][0]["revisor_id"] == REVISOR
         assert d["acciones_disponibles"] == []
         assert any("aceptado" in m for m in stubs.users.para(ABOGADO))
+
+    async def _en_firma(self, client, asignar, tipo="VISITA"):
+        informe, pid = await asignar(tipo=tipo)
+        await _subir(client, pid, DOCX)
+        assert (await _revisar(client, pid, "aprobado_firma")).status_code == 200
+        return informe, pid
+
+    async def test_version_final_visita_sin_matriz_400(self, client, asignar, stubs, db_session):
+        informe, pid = await self._en_firma(client, asignar)
+        resp = await _version_final(client, pid)
+        assert resp.status_code == 400
+        assert "matriz" in resp.json()["detail"]
+        assert stubs.files.subidos == ["informe.docx"]  # no se subió nada
+        await db_session.refresh(informe)
+        assert informe.fecha_aceptacion_informe is None
+
+    async def test_version_final_matriz_mal_formada_400(self, client, asignar):
+        _, pid = await self._en_firma(client, asignar)
+        assert (await _version_final(client, pid, matriz="{no json")).status_code == 400
+        incompleta = json.dumps(json.loads(_matriz())[:2])
+        resp = await _version_final(client, pid, matriz=incompleta)
+        assert resp.status_code == 400
+        assert "Falta diligenciar" in resp.json()["detail"]
+
+    async def test_version_final_exige_pdf(self, client, asignar, stubs):
+        _, pid = await self._en_firma(client, asignar)
+        resp = await _version_final(client, pid, archivo=("firmado.docx", b"PK otro", DOCX[2]), matriz=_matriz())
+        assert resp.status_code == 400
+        assert stubs.files.subidos == ["informe.docx"]
+
+    async def test_version_final_solo_el_tecnico(self, client, asignar):
+        _, pid = await self._en_firma(client, asignar)
+        assert (await _version_final(client, pid, matriz=_matriz(), user=REVISOR)).status_code == 403
+        assert (await _version_final(client, pid, matriz=_matriz(), user=EXTRANO)).status_code == 403
+
+    async def test_version_final_fuera_de_aprobado_firma_409(self, client, asignar):
+        _, pid = await asignar()
+        await _subir(client, pid, DOCX)  # en_revision
+        assert (await _version_final(client, pid, matriz=_matriz())).status_code == 409
+
+    async def test_version_final_seguimiento_sin_matriz(self, client, asignar, db_session):
+        informe, pid = await self._en_firma(client, asignar, tipo="SEGUIMIENTO")
+        resp = await _version_final(client, pid)
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["tiene_matriz"] is False
+        await db_session.refresh(informe)
+        assert informe.fecha_aceptacion_informe is not None
 
 
 class TestDevoluciones:
@@ -221,7 +283,7 @@ class TestDevoluciones:
         assert resp.json()["estado"]["codigo"] == "rechazado"
         assert resp.json()["numero_devoluciones"] == 1
 
-        rev = await db_session.scalar(select(InformeProcesoRevision).where(InformeProcesoRevision.proceso_id == pid))
+        rev = await db_session.scalar(select(DocumentoProcesoRevision).where(DocumentoProcesoRevision.proceso_id == pid))
         assert rev.adjunto_nombre == "observaciones.pdf" and rev.adjunto_file_id == 102
         assert 102 in stubs.files.incrementados
         assert any("devuelto (1/3), con documento de observaciones" in m for m in stubs.users.para(PROFESIONAL))
@@ -240,7 +302,7 @@ class TestDevoluciones:
     async def test_adjunto_solo_al_devolver(self, client, asignar, stubs):
         _, pid = await asignar()
         await _subir(client, pid, PDF)
-        resp = await _revisar(client, pid, "aprobado", adjunto=("obs.pdf", b"%PDF", "application/pdf"))
+        resp = await _revisar(client, pid, "aprobado_firma", adjunto=("obs.pdf", b"%PDF", "application/pdf"))
         assert resp.status_code == 400
 
     async def test_tres_devoluciones_finaliza_y_permite_reasignar(self, client, asignar, stubs, db_session):
@@ -265,7 +327,7 @@ class TestDevoluciones:
         assert resp.status_code == 200, resp.text
         nuevo = resp.json()["proceso_id"]
         assert nuevo != pid
-        viejo = await db_session.get(InformeProceso, pid, populate_existing=True)
+        viejo = await db_session.get(DocumentoProceso, pid, populate_existing=True)
         assert viejo.activo is False
         d = (await _detalle(client, nuevo, 11)).json()
         assert d["estado"]["codigo"] == "pendiente_carga" and d["numero_devoluciones"] == 0
@@ -283,7 +345,7 @@ class TestReasignar:
         assert resp.status_code == 200, resp.text
         nuevo = resp.json()["proceso_id"]
 
-        viejo = await db_session.get(InformeProceso, pid, populate_existing=True)
+        viejo = await db_session.get(DocumentoProceso, pid, populate_existing=True)
         assert viejo.estado == "finalizado" and viejo.activo is False
         assert any("reasignado" in m for m in stubs.users.para(PROFESIONAL))
         await db_session.refresh(informe)
@@ -300,7 +362,7 @@ class TestReasignar:
             f"/informes/{informe.id}/cambiar-modo", json={"modo": "MANUAL"}, headers=gateway_headers(ASIGNADOR)
         )
         assert resp.status_code == 200
-        proceso = await db_session.get(InformeProceso, pid, populate_existing=True)
+        proceso = await db_session.get(DocumentoProceso, pid, populate_existing=True)
         assert proceso.estado == "finalizado" and proceso.activo is False
 
 
@@ -315,8 +377,8 @@ class TestPermisos:
         _, pid = await asignar()
         assert (await _subir(client, pid, PDF, user=REVISOR)).status_code == 403
         await _subir(client, pid, PDF)
-        assert (await _revisar(client, pid, "aprobado", user=PROFESIONAL)).status_code == 403
-        assert (await _revisar(client, pid, "aprobado", user=ASIGNADOR)).status_code == 403
+        assert (await _revisar(client, pid, "aprobado_firma", user=PROFESIONAL)).status_code == 403
+        assert (await _revisar(client, pid, "aprobado_firma", user=ASIGNADOR)).status_code == 403
 
     async def test_asignar_sin_permiso_403(self, client, make_expediente, db_session):
         exp = await make_expediente(abogado_responsable_id=ABOGADO)

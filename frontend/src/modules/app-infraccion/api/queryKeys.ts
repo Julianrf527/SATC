@@ -18,6 +18,8 @@ export const infraccionKeys = {
     [...infraccionKeys.expediente(expedienteId), "etapa", "respuesta"] as const,
   concepto: (expedienteId: number) =>
     [...infraccionKeys.expediente(expedienteId), "etapa", "concepto"] as const,
+  conceptoSeguimiento: (expedienteId: number) =>
+    [...infraccionKeys.expediente(expedienteId), "etapa", "concepto-seguimiento"] as const,
   cierre: (expedienteId: number) =>
     [...infraccionKeys.expediente(expedienteId), "etapa", "cierre"] as const,
 

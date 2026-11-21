@@ -29,19 +29,13 @@ HOY = date(2026, 3, 16)  # lunes; el 23-mar-2026 es festivo (San José)
 BOG = ZoneInfo("America/Bogota")
 
 
-class _FechaFija(date):
-    @classmethod
-    def today(cls):
-        return HOY
-
-
 @pytest.fixture
 def fecha_fija(monkeypatch):
     import routes.file_alerts as rutas
     import services.alertas_scheduler as sched
 
-    monkeypatch.setattr(rutas, "date", _FechaFija)
-    monkeypatch.setattr(sched, "date", _FechaFija)
+    monkeypatch.setattr(rutas, "hoy_bogota", lambda: HOY)
+    monkeypatch.setattr(sched, "hoy_bogota", lambda: HOY)
 
 
 @pytest.fixture

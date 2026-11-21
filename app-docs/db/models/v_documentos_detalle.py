@@ -1,5 +1,4 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text
-from datetime import datetime
 from sqlalchemy.orm import DeclarativeBase
 
 
@@ -25,8 +24,9 @@ class VDocumentoDetalle(ViewBase):
     version_actual = Column(Integer, default=1)
     numero_devoluciones = Column(Integer, default=0)
     creador_id = Column(Integer, nullable=False)
-    fecha_creacion = Column(DateTime, default=datetime.utcnow)
-    fecha_ultima_actualizacion = Column(DateTime, default=datetime.utcnow)
+    # La vista expone timestamptz: sin timezone=True asyncpg rechaza los filtros por fecha.
+    fecha_creacion = Column(DateTime(timezone=True))
+    fecha_ultima_actualizacion = Column(DateTime(timezone=True))
 
     total_revisiones = Column(Integer, default=0)
     total_revisores = Column(Integer, default=0)

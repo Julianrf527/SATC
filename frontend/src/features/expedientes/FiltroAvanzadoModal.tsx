@@ -16,6 +16,8 @@ type Props<T extends ExpedienteBase, F extends FiltroAvanzadoBase> = {
   isOpen: boolean;
   onClose: () => void;
   onApplyFilters: (filtros: F) => void;
+  /** Últimos filtros aplicados: el modal reabre con ellos para afinar la búsqueda. */
+  filtrosIniciales?: F | null;
   adapter: ExpedientesAdapter<T, F>;
   config: ExpedientesConfig<T, F>;
   municipioList: Municipio[];
@@ -24,13 +26,16 @@ type Props<T extends ExpedienteBase, F extends FiltroAvanzadoBase> = {
 };
 
 const esVacio = (v: unknown) =>
-  v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
+  v === undefined ||
+  v === null ||
+  (typeof v === "string" && v.trim() === "") ||
+  (Array.isArray(v) && v.length === 0);
 
-/** Quita claves vacías; `valor_exacto` siempre viaja. */
+/** Quita claves vacías y recorta el texto; `valor_exacto` siempre viaja. */
 function limpiarFiltros<F extends FiltroAvanzadoBase>(filtros: F): F {
   const limpio: Record<string, unknown> = {};
   Object.entries(filtros).forEach(([k, v]) => {
-    if (k === "valor_exacto" || !esVacio(v)) limpio[k] = v;
+    if (k === "valor_exacto" || !esVacio(v)) limpio[k] = typeof v === "string" ? v.trim() : v;
   });
   return limpio as F;
 }
@@ -59,14 +64,17 @@ export default function FiltroAvanzadoModal<T extends ExpedienteBase, F extends 
   isOpen,
   onClose,
   onApplyFilters,
+  filtrosIniciales,
   adapter,
   config,
   municipioList,
   recursoAfectadoList,
   renderExtra,
 }: Props<T, F>) {
-  const [filtros, setFiltrosState] = useState<F>({ valor_exacto: false } as F);
-  const setFiltros = (updater: (prev: F) => F) => setFiltrosState(updater);
+  const [filtros, setFiltrosState] = useState<F>(
+    () => filtrosIniciales ?? ({ valor_exacto: false } as F),
+  );
+  const setFiltros = setFiltrosState;
 
   const { data: veredas = [], isFetching: loadingVeredas } = useVeredasMunicipioQuery(
     adapter,

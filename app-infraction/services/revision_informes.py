@@ -1,14 +1,21 @@
 """Flujo de revisión PROPIO del informe técnico (antes en app-docs).
 
 - ``FlujoInformeTecnico``: extiende ``FlujoRevision`` de satc_shared con
-  ``aprobado_firma`` (admite borrador Word; la versión firmada, en PDF, se
-  auto-aprueba), regla "aprobar exige PDF" y permisos del informe.
+  ``aprobado_firma`` y permisos del informe. Como en app-recurso, el líder
+  técnico NO aprueba directo: solo aprueba para firma (o devuelve), y el
+  técnico carga la versión firmada en PDF (con la matriz de recursos si es
+  VISITA) con ``cargar_version_final``, que la auto-aprueba y acepta el informe.
 - Helpers transaccionales que usan las rutas (``/informes`` y
   ``/revision-informes``): crear/cerrar el proceso vigente y aplicar la
   aprobación al ``InformeTecnico`` en la MISMA transacción que la revisión.
 - Notificaciones (las que antes enviaba app-docs + las propias de
   infracciones). Se acumulan durante la operación y se envían DESPUÉS del
   commit (best-effort, nunca abortan la operación).
+
+Los procesos viven en la tabla única ``documento_proceso`` (informes y actos)
+con ``etapa_tipo = 'informe_tecnico'`` y ``etapa_ref_id`` = id del informe.
+Este flujo solo opera procesos de informe: cualquier otro se trata como
+inexistente para él.
 
 Ninguna función hace commit: el llamador hace commit/rollback.
 """
@@ -30,16 +37,27 @@ from satc_shared.review_process import (
     PENDIENTE_CARGA,
     RECHAZADO,
     Accion,
+    ArchivoRef,
     ErrorUsoArchivo,
     Estado,
     FlujoRevision,
+    PermisoDenegado,
     ProcesoNoEncontrado,
     ProcesoRevisionService,
+    ResultadoVersion,
+    ReviewError,
+    SubidaVersion,
+    ValidacionError,
 )
 
 from core.permission import Permission
 from db.models.expediente import Expediente
-from db.models.informe_proceso import MODELOS_INFORME, InformeProceso
+from db.models.documento_proceso import (
+    ETAPA_INFORME,
+    MODELOS_DOCUMENTO,
+    DocumentoProceso,
+    tipo_documento_informe,
+)
 from db.models.informe_tecnico import InformeTecnico
 import services.docs as docs_svc
 import services.notification as notif_svc
@@ -64,38 +82,40 @@ class FlujoInformeTecnico(FlujoRevision):
             estado_destino=APROBADO_FIRMA, auditoria="aprobar_firma", icono="firmar",
         ),
     )
-    # Tras "aprobado para firma" el profesional sube la versión firmada.
+    # Tras "aprobado para firma" el técnico carga la versión firmada, pero
+    # solo por ``cargar_version_final`` (ver ServicioInforme.subida_version).
     estados_subida = FlujoRevision.estados_subida | {APROBADO_FIRMA}
 
     # ---------------------------------------------------------- permisos
+    # Solo procesos de informe (la tabla también guarda los de actos).
     async def puede_ver(self, ctx, user_id: int) -> bool:
         p = ctx.proceso
+        if not p.es_informe:
+            return False
         if user_id in (p.creador_id, p.asignador_id):
             return True
         if user_id in await ctx.revisores_ids():
             return True
         return await users_svc.verify_permission(user_id, Permission.ASSIGN_REPORTS)
 
-    # Revisar: revisor asignado (default). Subir: profesional = creador (default).
+    # Revisar: líder técnico asignado. Subir: técnico = creador.
+    async def puede_revisar(self, ctx, user_id: int) -> bool:
+        return ctx.proceso.es_informe and await super().puede_revisar(ctx, user_id)
+
+    async def puede_subir_version(self, ctx, user_id: int) -> bool:
+        return ctx.proceso.es_informe and await super().puede_subir_version(ctx, user_id)
 
     # ------------------------------------------------------- validaciones
+    def accion_aplicable(self, proceso, accion: Accion) -> bool:
+        # "Aprobar" solo existe como cierre interno (auto-aprobación de la
+        # versión firmada); el líder técnico aprueba para firma o devuelve.
+        return accion.codigo != APROBADO
+
     def extensiones_subida(self, proceso) -> tuple[str, ...]:
         # La versión firmada se auto-aprueba y se une al PDF del expediente.
         if proceso.estado == APROBADO_FIRMA:
             return EXTENSION_PDF
         return super().extensiones_subida(proceso)
-
-    async def validar_accion(self, ctx, accion: Accion, user_id: int) -> str | None:
-        motivo = await super().validar_accion(ctx, accion, user_id)
-        if motivo or accion.codigo != APROBADO:
-            return motivo
-        version = await ctx.ultima_version()
-        if version is None or not version.archivo_nombre.lower().endswith(".pdf"):
-            return (
-                "Para aprobar el informe técnico la versión debe estar en PDF. "
-                "Devuélvelo pidiendo la versión en PDF o apruébalo para firma."
-            )
-        return None
 
     # ------------------------------------------------------- transiciones
     async def despues_de_subida(self, ctx, version, user_id: int, estado_anterior: str) -> str:
@@ -113,10 +133,61 @@ class FlujoInformeTecnico(FlujoRevision):
 
 FLUJO = FlujoInformeTecnico()
 
+MOTIVO_VERSION_FINAL = (
+    "Aprobado para firma: carga la versión firmada (PDF) con \"Cargar versión final\""
+)
+MOTIVO_EN_REVISION = "El informe está en revisión; podrás subir una nueva versión si te lo devuelven"
 
-def servicio() -> ProcesoRevisionService:
+
+class ServicioInforme(ProcesoRevisionService):
+    """En ``aprobado_firma`` la subida normal no aplica: la versión firmada va
+    por ``cargar_version_final`` (con la matriz si es VISITA), como en recurso."""
+
+    async def subida_version(self, ctx, user_id: int) -> SubidaVersion | None:
+        if not await self.flujo.puede_subir_version(ctx, user_id):
+            return None
+        p = ctx.proceso
+        if not p.activo:
+            return SubidaVersion(permitida=False, extensiones=[], motivo="Este proceso ya no está vigente")
+        if p.estado == APROBADO_FIRMA:
+            return SubidaVersion(permitida=False, extensiones=list(EXTENSION_PDF), motivo=MOTIVO_VERSION_FINAL)
+        if p.estado == EN_REVISION:
+            return SubidaVersion(
+                permitida=False, extensiones=list(self.flujo.extensiones_subida(p)), motivo=MOTIVO_EN_REVISION,
+            )
+        return await super().subida_version(ctx, user_id)
+
+
+def servicio() -> ServicioInforme:
     # files_client se resuelve en cada llamada para que los tests puedan sustituirlo.
-    return ProcesoRevisionService(MODELOS_INFORME, FLUJO, files=docs_svc.files_client)
+    return ServicioInforme(MODELOS_DOCUMENTO, FLUJO, files=docs_svc.files_client)
+
+
+class Conflicto(ReviewError):
+    status_code = 409
+
+
+async def cargar_version_final(
+    db: AsyncSession, proceso_id: int, *, user_id: int, archivo: ArchivoRef, comentario: Optional[str]
+) -> ResultadoVersion:
+    """Versión firmada del informe: valida que el proceso esté vigente y en
+    ``aprobado_firma``, que ``user_id`` sea el técnico y que sea PDF; la
+    registra y el flujo la auto-aprueba (``aprobado``). No hace commit."""
+    svc = servicio()
+    ctx = await svc.contexto(db, proceso_id, para_actualizar=True)
+    p = ctx.proceso
+    if not await FLUJO.puede_subir_version(ctx, user_id):
+        raise PermisoDenegado("Solo el técnico asignado puede cargar la versión final")
+    if not p.activo:
+        raise Conflicto("Este proceso de revisión ya no está vigente. Recarga")
+    if p.estado != APROBADO_FIRMA:
+        raise Conflicto(
+            "El informe aún no está aprobado para firma "
+            f"(estado: {FLUJO.estado_info(p.estado).etiqueta}). Recarga"
+        )
+    if not archivo.tiene_extension(EXTENSION_PDF):
+        raise ValidacionError("La versión final firmada debe ser un PDF")
+    return await svc._agregar_version(ctx, archivo, user_id, comentario)
 
 
 # ══════════════════════════════════════════════════════════ notificaciones
@@ -160,29 +231,37 @@ def _encabezado(radicado: str) -> str:
 
 # ══════════════════════════════════════════════════════ proceso vigente
 
+def _de_informe(*condiciones):
+    return (DocumentoProceso.etapa_tipo == ETAPA_INFORME, *condiciones)
+
+
 async def proceso_vigente(
     db: AsyncSession, informe_id: int, *, para_actualizar: bool = False
-) -> Optional[InformeProceso]:
-    stmt = select(InformeProceso).where(InformeProceso.informe_id == informe_id, InformeProceso.activo.is_(True))
+) -> Optional[DocumentoProceso]:
+    stmt = select(DocumentoProceso).where(
+        *_de_informe(DocumentoProceso.etapa_ref_id == informe_id, DocumentoProceso.activo.is_(True))
+    )
     if para_actualizar:
         stmt = stmt.with_for_update()
     return await db.scalar(stmt)
 
 
-async def procesos_vigentes(db: AsyncSession, informe_ids: list[int]) -> dict[int, InformeProceso]:
+async def procesos_vigentes(db: AsyncSession, informe_ids: list[int]) -> dict[int, DocumentoProceso]:
     if not informe_ids:
         return {}
     filas = (await db.execute(
-        select(InformeProceso).where(InformeProceso.informe_id.in_(informe_ids), InformeProceso.activo.is_(True))
+        select(DocumentoProceso).where(
+            *_de_informe(DocumentoProceso.etapa_ref_id.in_(informe_ids), DocumentoProceso.activo.is_(True))
+        )
     )).scalars().all()
-    return {p.informe_id: p for p in filas}
+    return {p.etapa_ref_id: p for p in filas}
 
 
-def es_final(proceso: Optional[InformeProceso]) -> bool:
+def es_final(proceso: Optional[DocumentoProceso]) -> bool:
     return proceso is not None and proceso.estado in (APROBADO, FINALIZADO)
 
 
-def resumen_proceso(proceso: Optional[InformeProceso], user_id: int, revisor_id: Optional[int] = None) -> dict:
+def resumen_proceso(proceso: Optional[DocumentoProceso], user_id: int, revisor_id: Optional[int] = None) -> dict:
     """Campos del proceso vigente para listados (/informes, /informes/mios, etapa)."""
     if proceso is None:
         return {
@@ -220,7 +299,7 @@ async def crear_proceso_informe(
     radicado: str,
     avisos: Avisos,
     reasignacion: bool = False,
-) -> InformeProceso:
+) -> DocumentoProceso:
     """Crea el proceso (sin archivo -> ``pendiente_carga``) y lo deja vigente."""
     tipo = informe.tipo_informe or "VISITA"
     proceso = await servicio().crear_proceso(
@@ -233,7 +312,14 @@ async def crear_proceso_informe(
         creador_id=profesional_id,
         revisores_ids=[revisor_id],
         usuario_id=asignador_id,
-        campos={"informe_id": informe.id, "asignador_id": asignador_id, "activo": True},
+        campos={
+            "expediente_id": informe.expediente_id,
+            "tipo_documento": tipo_documento_informe(informe.tipo_informe),
+            "etapa_tipo": ETAPA_INFORME,
+            "etapa_ref_id": informe.id,
+            "asignador_id": asignador_id,
+            "activo": True,
+        },
     )
     avisos.agregar(profesional_id, f"{_encabezado(radicado)}Informe técnico de {tipo} asignado")
     avisos.agregar(revisor_id, f"{_encabezado(radicado)}Asignado para revisión: informe técnico de {tipo}")
@@ -242,7 +328,7 @@ async def crear_proceso_informe(
 
 async def cerrar_proceso_vigente(
     db: AsyncSession, informe_id: int, *, usuario_id: int, descripcion: str
-) -> Optional[InformeProceso]:
+) -> Optional[DocumentoProceso]:
     """Finaliza (si no es final) y desactiva el proceso vigente."""
     proceso = await proceso_vigente(db, informe_id, para_actualizar=True)
     if proceso is None:
@@ -254,7 +340,7 @@ async def cerrar_proceso_vigente(
     return proceso
 
 
-async def aplicar_aprobacion(db: AsyncSession, proceso: InformeProceso, avisos: Avisos, radicado: str) -> InformeTecnico:
+async def aplicar_aprobacion(db: AsyncSession, proceso: DocumentoProceso, avisos: Avisos, radicado: str) -> InformeTecnico:
     """Rama de éxito del antiguo ``_sincronizar_informe``, en la misma transacción
     que la revisión/subida que aprobó el proceso: fechas, archivo del informe
     (que el PDF unificado del expediente toma de ``documento_informe_id``),
@@ -301,7 +387,7 @@ def _fecha_bogota(valor) -> Optional[date]:
     return valor
 
 
-def avisos_revision(avisos: Avisos, proceso: InformeProceso, accion: str, estado_nuevo: str,
+def avisos_revision(avisos: Avisos, proceso: DocumentoProceso, accion: str, estado_nuevo: str,
                     radicado: str, con_adjunto: bool, revisores: list[int]) -> None:
     enc = _encabezado(radicado)
     profesional = proceso.creador_id
@@ -323,7 +409,7 @@ def avisos_revision(avisos: Avisos, proceso: InformeProceso, accion: str, estado
         )
 
 
-def avisos_version(avisos: Avisos, proceso: InformeProceso, numero: int, estado_nuevo: str,
+def avisos_version(avisos: Avisos, proceso: DocumentoProceso, numero: int, estado_nuevo: str,
                    radicado: str, revisores: list[int]) -> None:
     enc = _encabezado(radicado)
     if estado_nuevo == EN_REVISION:

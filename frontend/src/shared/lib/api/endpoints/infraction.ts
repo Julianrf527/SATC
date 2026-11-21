@@ -73,6 +73,10 @@ export const INFRACTION_ENDPOINTS = {
     `/infraction/etapas/concepto/${expediente_id}`,
   INFRACTION_CREATE_CONCEPTO: (expediente_id: number) =>
     `/infraction/etapas/concepto/${expediente_id}`,
+  INFRACTION_GET_CONCEPTO_SEGUIMIENTO: (expediente_id: number) =>
+    `/infraction/etapas/concepto-seguimiento/${expediente_id}`,
+  INFRACTION_CREATE_CONCEPTO_SEGUIMIENTO: (expediente_id: number) =>
+    `/infraction/etapas/concepto-seguimiento/${expediente_id}`,
   INFRACTION_PUT_CONCEPTO: (etapa_concepto_id: number) =>
     `/infraction/etapas/concepto/${etapa_concepto_id}`,
   INFRACTION_CREATE_OFICIO_REMITE: (etapa_concepto_id: number) =>
@@ -123,8 +127,34 @@ export const INFRACTION_ENDPOINTS = {
     `/infraction/revision-informes/${proceso_id}/revisiones`,
   INFRACTION_REVISION_VERSIONES: (proceso_id: number) =>
     `/infraction/revision-informes/${proceso_id}/versiones`,
+  /** POST multipart: versión firmada (PDF) + matriz de recursos (VISITA) en aprobado_firma. */
+  INFRACTION_REVISION_VERSION_FINAL: (proceso_id: number) =>
+    `/infraction/revision-informes/${proceso_id}/version-final`,
   INFRACTION_REVISION_DESCARGA_VERSION: (proceso_id: number, version_id: number) =>
     `/infraction/revision-informes/${proceso_id}/versiones/${version_id}/descarga`,
   INFRACTION_REVISION_ADJUNTO: (proceso_id: number, revision_id: number) =>
     `/infraction/revision-informes/${proceso_id}/revisiones/${revision_id}/adjunto`,
+
+  // revision-actos route (proceso de revisión de los actos administrativos)
+  /** Estado del acto de una etapa: proceso vigente (o null) y qué puede hacer el usuario. */
+  INFRACTION_ACTO_REV_ETAPA: (etapa_tipo: string, etapa_ref_id: number) =>
+    `/infraction/revision-actos/etapa/${etapa_tipo}/${etapa_ref_id}`,
+  /** POST multipart (etapa_tipo, etapa_ref_id, archivo, comentario): el encargado proyecta el acto. */
+  INFRACTION_ACTO_REV_INICIAR: "/infraction/revision-actos/iniciar",
+  INFRACTION_ACTO_REV_DETALLE: (proceso_id: number) =>
+    `/infraction/revision-actos/${proceso_id}`,
+  INFRACTION_ACTO_REV_REVISAR: (proceso_id: number) =>
+    `/infraction/revision-actos/${proceso_id}/revisiones`,
+  INFRACTION_ACTO_REV_VERSIONES: (proceso_id: number) =>
+    `/infraction/revision-actos/${proceso_id}/versiones`,
+  /** POST multipart: PDF firmado + tipo_acto, numerado, fecha_numerado (aprobado_firma): crea el acto. */
+  INFRACTION_ACTO_REV_VERSION_FINAL: (proceso_id: number) =>
+    `/infraction/revision-actos/${proceso_id}/version-final`,
+  INFRACTION_ACTO_REV_DESCARGA_VERSION: (proceso_id: number, version_id: number) =>
+    `/infraction/revision-actos/${proceso_id}/versiones/${version_id}/descarga`,
+  INFRACTION_ACTO_REV_ADJUNTO: (proceso_id: number, revision_id: number) =>
+    `/infraction/revision-actos/${proceso_id}/revisiones/${revision_id}/adjunto`,
+
+  // mis-actuaciones route (pantalla Mis actuaciones: informes + actos)
+  INFRACTION_MIS_ACTUACIONES: "/infraction/mis-actuaciones",
 };

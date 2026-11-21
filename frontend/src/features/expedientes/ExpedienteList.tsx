@@ -57,6 +57,8 @@ export default function ExpedienteList<T extends ExpedienteBase, F extends Filtr
 }: ExpedienteListProps<T, F>) {
   const [showAdvancedModal, setShowAdvancedModal] = useState(false);
   const [resultadoAvanzado, setResultadoAvanzado] = useState<T[] | null>(null);
+  // Filtros de la búsqueda avanzada vigente (el modal se desmonta al cerrarse).
+  const [filtrosAvanzados, setFiltrosAvanzados] = useState<F | null>(null);
   const [isAdding, setIsAdding] = useState(false);
 
   const filtroAvanzado = useFiltroAvanzadoMutation(adapter);
@@ -70,6 +72,7 @@ export default function ExpedienteList<T extends ExpedienteBase, F extends Filtr
     filtroAvanzado.mutate(f, {
       onSuccess: (lista) => {
         setResultadoAvanzado(lista);
+        setFiltrosAvanzados(f);
         setToast({
           id: Date.now(),
           message: `Se encontraron ${lista.length} expedientes`,
@@ -84,6 +87,7 @@ export default function ExpedienteList<T extends ExpedienteBase, F extends Filtr
   const limpiarTodo = () => {
     filtros.limpiar();
     setResultadoAvanzado(null);
+    setFiltrosAvanzados(null);
   };
 
   const editable = !!renderNuevoExpediente;
@@ -197,6 +201,7 @@ export default function ExpedienteList<T extends ExpedienteBase, F extends Filtr
           isOpen={showAdvancedModal}
           onClose={() => setShowAdvancedModal(false)}
           onApplyFilters={aplicarFiltrosAvanzados}
+          filtrosIniciales={filtrosAvanzados}
           adapter={adapter}
           config={config}
           municipioList={municipioList}

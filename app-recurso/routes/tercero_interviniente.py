@@ -1,13 +1,9 @@
-"""Transversal · Tercero interviniente (plan §4 transversal, §3 punto 4; fase 6).
+"""Transversal · Tercero interviniente (plan §4 transversal, §3 punto 4).
 
 Se vincula en ``expediente_involucrado`` con ``tipo_vinculo =
-TERCERO_INTERVINIENTE`` (servicio de A) y se le expide un acto que lo reconoce
+TERCERO_INTERVINIENTE`` y se le expide un acto que lo reconoce
 (``RECONOCE_TERCERO``, enlazado en ``expediente_involucrado.acto_admin_id``).
-Sus notificaciones de las actuaciones se registran en ``/actos/notificaciones`` (B).
-
-TODO(negocio): plan §4 — no se sabe si la solicitud del tercero llega con
-radicado y documento; hoy solo se vincula la persona.
-TODO(negocio): el tercero aparece "en cualquier momento"; no se exige el auto admite (V4).
+Sus notificaciones de las actuaciones se registran en ``/actos/notificaciones``.
 
 Prefijo ``/terceros``:
 
@@ -34,6 +30,7 @@ from services.etapas import (
     auditar,
     cargar_acto_final,
     crear_proceso_etapa,
+    liberar_archivos,
     ok,
 )
 from services.etapas_lectura import leer_etapas
@@ -121,7 +118,8 @@ async def editar_representante(
 
 @router.delete("/{vinculo_id}")
 async def desvincular_tercero(
-    request: Request, vinculo_id: int, version: int = Query(..., ge=1), db: AsyncSession = Depends(get_db_managed),
+    request: Request, vinculo_id: int, version: int = Query(..., ge=1),
+    confirmar_eliminar_notificaciones: bool = Query(False), db: AsyncSession = Depends(get_db_managed),
 ):
     usuario = await requiere_gestion(request)
     vinculo, exp = await _tercero(db, vinculo_id, bloquear=True)
@@ -129,16 +127,19 @@ async def desvincular_tercero(
         raise HTTPException(
             status_code=409, detail="No se puede desvincular: el acto que lo reconoce está en proyección",
         )
-    await desvincular_involucrado(db, vinculo=vinculo, expediente=exp, version=version, usuario=usuario,
-                                  request=request)
+    archivos = await desvincular_involucrado(
+        db, vinculo=vinculo, expediente=exp, version=version, usuario=usuario, request=request,
+        confirmar_eliminar_notificaciones=confirmar_eliminar_notificaciones,
+    )
     await db.commit()
+    await liberar_archivos(archivos)
     return ok("Tercero interviniente desvinculado", {"id": vinculo_id})
 
 
 @router.post("/{vinculo_id}/asignarme")
 async def asignarme_reconocimiento(request: Request, vinculo_id: int, db: AsyncSession = Depends(get_db_managed)):
     """"Asignarme" el acto que reconoce al tercero: no hay columna de encargado,
-    el encargado es el creador del proceso (B); el índice único parcial del
+    el encargado es el creador del proceso; el índice único parcial del
     proceso vigente resuelve la carrera (409)."""
     usuario = await requiere_gestion(request)
     vinculo, exp = await _tercero(db, vinculo_id, bloquear=True)

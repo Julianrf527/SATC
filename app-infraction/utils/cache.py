@@ -70,3 +70,8 @@ permission_cache = SimpleCache(ttl_seconds=300)
 
 # TTL más largo para usuarios (10 min) ya que cambian menos frecuentemente
 users_cache = SimpleCache(ttl_seconds=600)
+
+# Listas de usuarios por permiso: dependen de asignaciones de rol que cambian
+# en app-users sin invalidar este caché. TTL corto para que un usuario recién
+# asignado aparezca en los selectores (asignar profesional/revisor) en ≤60s.
+users_by_permission_cache = SimpleCache(ttl_seconds=60)

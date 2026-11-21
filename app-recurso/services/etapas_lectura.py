@@ -130,7 +130,7 @@ class _Lector:
                 "fecha_creacion": _iso(acto.fecha_creacion),
                 "involucrados": [serializar_notificacion(n) for n in notifs],
             },
-            # Regla provisional de B (TODO(negocio)): ≥1 notificación y todas exitosas.
+            # V13: ≥1 notificación y todas exitosas.
             "notificado": bool(notifs) and exitosas == len(notifs),
         }
         acciones: list[str] = []

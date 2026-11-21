@@ -1,4 +1,4 @@
-"""Super gestión — cargue directo / histórico (plan §2.1, fase 12).
+"""Super gestión — cargue directo / histórico (plan §2.1).
 
 Solo ``recurso_super_gestion``. Carga cualquier etapa con su documento final y
 sus datos **omitiendo** la revisión, la asignación ("Asignarme") y las

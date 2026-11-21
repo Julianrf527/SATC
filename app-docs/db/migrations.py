@@ -15,7 +15,10 @@ Cambios (flujo genérico sobre satc_shared.review_process, origen fuera de app-d
   4. ``DROP COLUMN documentos.origen`` (y su índice) — SOLO si no quedan filas con
      ``origen`` no nulo; si las hay se omite y se registra un WARNING: borrarlas
      es una decisión de negocio, no de la migración.
-  5. Recrea la vista sin ``origen`` y con los nombres del contrato
+  5. ``file_hash.ultima_subida`` (periodo de gracia de la limpieza), rellenada
+     con ``created_at`` en las filas existentes.
+  6. Dueños (``file_uso``) de los archivos del módulo Documentos.
+  7. Recrea la vista sin ``origen`` y con los nombres del contrato
      (``creador_id``; sin el duplicado ``documento_id``). Como el paso 1 la
      borra antes, ``CREATE OR REPLACE`` puede renombrar/quitar columnas.
 
@@ -68,6 +71,7 @@ _DDL_COLUMNAS = (
     "ALTER TABLE revisiones ADD COLUMN IF NOT EXISTS archivo_adjunto_nombre VARCHAR(255)",
     "ALTER TABLE revisiones ADD COLUMN IF NOT EXISTS adjunto_file_id INTEGER",
     "ALTER TABLE revisiones ADD COLUMN IF NOT EXISTS adjunto_size BIGINT",
+    "ALTER TABLE file_hash ADD COLUMN IF NOT EXISTS ultima_subida TIMESTAMPTZ",
 )
 
 _BACKFILL = (
@@ -86,7 +90,25 @@ _BACKFILL = (
       AND r.archivo_adjunto_url IS NOT NULL
       AND r.archivo_adjunto_url = fh.file_url
     """,
+    # Periodo de gracia de la limpieza: los archivos previos parten de su creación.
+    "UPDATE file_hash SET ultima_subida = created_at WHERE ultima_subida IS NULL",
 )
+
+
+# Dueños de los archivos del propio módulo Documentos (servicio "docs"). Las
+# tablas file_uso/file_subida las crea create_all; los demás módulos registran
+# los suyos con POST /files/registrar-usos.
+_BACKFILL_USOS_DOCS = """
+INSERT INTO file_uso (file_id, servicio, entidad, entidad_id, creado_en)
+SELECT DISTINCT u.file_id, 'docs', 'documento', u.documento_id::text, now()
+FROM (
+    SELECT file_id, documento_id FROM versiones_documento WHERE file_id IS NOT NULL
+    UNION
+    SELECT adjunto_file_id, documento_id FROM revisiones WHERE adjunto_file_id IS NOT NULL
+) u
+JOIN file_hash fh ON fh.id = u.file_id
+ON CONFLICT ON CONSTRAINT uq_file_uso DO NOTHING
+"""
 
 
 async def _columna_existe(conn: AsyncConnection, tabla: str, columna: str) -> bool:
@@ -107,6 +129,8 @@ async def aplicar_migraciones(conn: AsyncConnection) -> dict:
     resumen = {"versiones_backfill": 0, "revisiones_backfill": 0, "origen_eliminado": False}
     resumen["versiones_backfill"] = (await conn.execute(text(_BACKFILL[0]))).rowcount or 0
     resumen["revisiones_backfill"] = (await conn.execute(text(_BACKFILL[1]))).rowcount or 0
+    await conn.execute(text(_BACKFILL[2]))
+    resumen["usos_docs_backfill"] = (await conn.execute(text(_BACKFILL_USOS_DOCS))).rowcount or 0
 
     if await _columna_existe(conn, "documentos", "origen"):
         pendientes = await conn.scalar(text("SELECT COUNT(*) FROM documentos WHERE origen IS NOT NULL"))

@@ -14,6 +14,8 @@ type Props = {
   onClose: () => void;
   onSave: (data: ActoAdminFormData) => Promise<ActoAdminSaveResult>;
   editActoAdmin: ActoAdministrativo | null;
+  /** En edición, permitir reemplazar el PDF (default true). */
+  allowDocumentChange?: boolean;
 };
 
 export default function ActoAdminModal({
@@ -21,6 +23,7 @@ export default function ActoAdminModal({
   onClose,
   onSave,
   editActoAdmin,
+  allowDocumentChange = true,
 }: Props) {
   const [tipoActo, setTipoActo] = useState<"AUTO" | "RES">("AUTO");
   const [numerado, setNumerado] = useState("");
@@ -211,6 +214,7 @@ export default function ActoAdminModal({
           />
         </div>
 
+        {(!editActoAdmin || allowDocumentChange) && (
         <div>
           <label className="block text-sm font-medium text-base-content/70 mb-1">
             Documento PDF{" "}
@@ -254,6 +258,7 @@ export default function ActoAdminModal({
             </p>
           )}
         </div>
+        )}
 
         {errorGeneral && (
           <div className="alert alert-error">

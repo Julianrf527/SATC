@@ -1,6 +1,6 @@
 """/mis-documentos — pestaña "Mis actuaciones" (plan §1 y §5.5).
 
-Una sola lista paginada ``documentos`` con TODOS los procesos del usuario
+Una sola lista paginada (``data``) con TODOS los procesos del usuario
 actual, en cualquier estado y vigentes o no (``activo = false``: cerrados o
 reemplazados; son su histórico), igual que "Mis Informes" de infraction:
 
@@ -18,9 +18,9 @@ Si el usuario es encargado y revisor del mismo proceso sale UNA fila con
 ``roles = ["encargado", "revisor"]`` (como infraction: una fila por informe
 con las marcas de rol); ``rol`` es el rol principal (encargado primero).
 
-Paginación como el listado de informes de infraction (``page``, ``limit`` →
-``total``, ``page``, ``limit``, ``total_pages``). Los ``conteos`` y ``total``
-son sobre todo el conjunto filtrado, no sobre la página. Filtro, conteos, orden
+Respuesta paginada estándar (``satc_shared.paginacion``): ``data``, ``total``,
+``page``, ``limit``, ``total_pages``, más ``conteos`` y ``filtros``. Los
+``conteos`` son sobre todo el conjunto filtrado, no sobre la página. Filtro, conteos, orden
 y paginación se resuelven en SQL (``_puedo_revisar_sql`` traduce las cadenas de
 revisión a condiciones por paso/permiso): solo se cargan los procesos de la
 página, así el costo no crece con el histórico del usuario. Resúmenes,
@@ -44,6 +44,7 @@ from db.deps import get_db_managed
 from db.models import Expediente
 from db.models.documento_proceso import DocumentoProceso, DocumentoProcesoRevision
 from services.etapas import etapas_padre
+from satc_shared.paginacion import ESCAPE, patron_contiene, respuesta_paginada
 from services.revision_documentos import (
     APROBADO,
     APROBADO_FIRMA,
@@ -162,9 +163,11 @@ async def mis_documentos(
     if estado:
         filtros.append(DocumentoProceso.estado == estado)
     if expediente and expediente.strip():
-        patron = f"%{expediente.strip()}%"
+        patron = patron_contiene(expediente)
         filtros.append(DocumentoProceso.expediente_id.in_(
-            select(Expediente.id).where(or_(Expediente.radicado.ilike(patron), Expediente.expediente.ilike(patron)))
+            select(Expediente.id).where(or_(
+                Expediente.radicado.ilike(patron, escape=ESCAPE), Expediente.expediente.ilike(patron, escape=ESCAPE),
+            ))
         ))
 
     ver_encargado = rol in (None, ENCARGADO)
@@ -236,19 +239,12 @@ async def mis_documentos(
         for p, f in pagina
     ]
 
-    return JSONResponse(content={
-        "ok": True,
-        "data": {
-            "documentos": documentos,
-            "conteos": conteos,
-            "filtros": {
-                "tipos_documento": [{"codigo": t, "etiqueta": c.etiqueta} for t, c in CADENAS.items()],
-                "estados": [FLUJO.estado_info(e).model_dump() for e in ESTADOS_LISTA],
-                "roles": list(ROLES),
-            },
+    return JSONResponse(content=respuesta_paginada(
+        documentos, total=total, page=page, limit=limit,
+        conteos=conteos,
+        filtros={
+            "tipos_documento": [{"codigo": t, "etiqueta": c.etiqueta} for t, c in CADENAS.items()],
+            "estados": [FLUJO.estado_info(e).model_dump() for e in ESTADOS_LISTA],
+            "roles": list(ROLES),
         },
-        "total": total,
-        "page": page,
-        "limit": limit,
-        "total_pages": max(1, -(-total // limit)),  # ceil division
-    })
+    ))

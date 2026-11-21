@@ -18,3 +18,7 @@ class FileHash(Base):
         default=lambda: datetime.now(ZoneInfo("America/Bogota")),
         nullable=False
     )
+    # Última vez que alguien subió estos bytes (nuevo o deduplicado). La
+    # limpieza solo borra archivos sin uso cuya última subida supera el periodo
+    # de gracia: así no borra uno recién subido que el módulo aún no asocia.
+    ultima_subida = Column(TIMESTAMP(timezone=True), nullable=True)

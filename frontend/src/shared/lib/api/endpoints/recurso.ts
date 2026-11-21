@@ -25,8 +25,8 @@ export const RECURSO_ENDPOINTS = {
   RECURSO_VINCULOS: "/recurso/involucrados/vinculos",
   RECURSO_VINCULO_REPRESENTANTE: (vinculoId: number) =>
     `/recurso/involucrados/vinculos/${vinculoId}/representante`,
-  RECURSO_VINCULO_DELETE: (vinculoId: number, version: number) =>
-    `/recurso/involucrados/vinculos/${vinculoId}?version=${version}`,
+  RECURSO_VINCULO_DELETE: (vinculoId: number, version: number, confirmar = false) =>
+    `/recurso/involucrados/vinculos/${vinculoId}?version=${version}${confirmar ? "&confirmar_eliminar_notificaciones=true" : ""}`,
 
   // === A.5 Descarga del expediente completo ===
   RECURSO_EXPEDIENTE_DOCUMENTOS: (expedienteId: number) =>
@@ -104,7 +104,8 @@ export const RECURSO_ENDPOINTS = {
   // C.10 Tercero interviniente
   RECURSO_TERCEROS: "/recurso/terceros",
   RECURSO_TERCERO_REPRESENTANTE: (vinculoId: number) => `/recurso/terceros/${vinculoId}/representante`,
-  RECURSO_TERCERO_DELETE: (vinculoId: number, version: number) => `/recurso/terceros/${vinculoId}?version=${version}`,
+  RECURSO_TERCERO_DELETE: (vinculoId: number, version: number, confirmar = false) =>
+    `/recurso/terceros/${vinculoId}?version=${version}${confirmar ? "&confirmar_eliminar_notificaciones=true" : ""}`,
   RECURSO_TERCERO_ASIGNARME: (vinculoId: number) => `/recurso/terceros/${vinculoId}/asignarme`,
   RECURSO_TERCERO_VERSION_FINAL: (vinculoId: number) => `/recurso/terceros/${vinculoId}/version-final`,
   // C.11 Documentos anexos

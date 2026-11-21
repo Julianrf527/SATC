@@ -82,7 +82,7 @@ MSG_SOLO_TECNICO = "Solo el técnico seleccionado puede cargar este concepto (V3
 
 # ───────────────────────────────────────────────────────── catálogos de C
 
-# Sub-procesos de concepto técnico: slug de la URL → tipo_documento (cadena de B).
+# Sub-procesos de concepto técnico: slug de la URL → tipo_documento (cadena de revisión).
 TIPOS_CONCEPTO: dict[str, str] = {
     "etapa2": "CONCEPTO_ETAPA2",
     "adicional": "CONCEPTO_ADICIONAL",
@@ -118,9 +118,7 @@ PADRES_CONCEPTO: dict[str, tuple[str, str]] = {
 # GET /etapas/conceptos/{id} (Mis actuaciones) y el nodo de concepto del árbol
 # GET /etapas/{exp} (services/etapas_lectura.py). El front arma sus formularios
 # con ``definicion_campos_concepto`` y no guarda copia.
-# TODO(negocio): plan §4-Etapa 2 — confirmar si los 4 datos de caudal son suficientes.
-# TODO(negocio): el concepto adicional es "igual al de la etapa 2 pero sin visita"; sus
-# caudales quedan opcionales porque el plan no dice si se vuelven a registrar.
+# En el concepto adicional los caudales son opcionales.
 CAUDALES = ("caudal_fuente", "caudal_disponible", "caudal_otorgado", "num_usuarios")
 
 # tipo de concepto → (campos permitidos, obligatorios), además de file_id y fecha_aceptacion.
@@ -614,7 +612,7 @@ async def cargar_acto_final(
     datos: ActoFinalIn, usuario: Usuario, avisos: Avisos,
 ) -> ActoAdministrativo:
     """"Cargar versión final" de una etapa con acto (plan §4-E.3): el encargado
-    sube el PDF firmado + numerado + fecha → proceso ``aprobado`` (B) y se crea
+    sube el PDF firmado + numerado + fecha → proceso ``aprobado`` y se crea
     y enlaza el ``acto_administrativo``."""
     if fila.acto_admin_id:
         raise HTTPException(status_code=409, detail=MSG_YA_TIENE_ACTO)

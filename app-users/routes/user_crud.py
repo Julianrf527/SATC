@@ -1,6 +1,7 @@
 """Gestión de usuarios por administradores: alta, listado, estado y rol."""
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
+from satc_shared.permisos_version import incrementar_version_permisos
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, exists, insert, update
 from pydantic import BaseModel, EmailStr, validator
@@ -465,6 +466,7 @@ async def admin_actualizar_usuario(
         raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
 
     await db.commit()
+    await incrementar_version_permisos()
 
     return JSONResponse({
         "ok": True,

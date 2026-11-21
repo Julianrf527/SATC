@@ -16,6 +16,7 @@ from services.alertas import (
     calcular_alertas_expediente,
     calcular_alertas_expedientes,
     fecha_limite_habiles,
+    hoy_bogota,
 )
 from satc_shared.alertas import LIMITE_MAXIMO, paginar_alertas
 
@@ -87,7 +88,7 @@ async def obtener_alertas_todos_expedientes_infraccion(
         stmt = stmt.where(Expediente.abogado_responsable_id == user_id)
     expedientes = (await db.execute(stmt)).all()
 
-    fecha_hoy = date.today()
+    fecha_hoy = hoy_bogota()
     alertas_totales = {}
     estadisticas = {"verde": 0, "amarillo": 0, "rojo": 0, "vencido": 0}
 
@@ -143,7 +144,7 @@ async def obtener_alertas_expediente_infraccion(
     row = await exigir_lectura_expediente(db, expediente_id, user_id)
     radicado = row.radicado
 
-    fecha_hoy = date.today()
+    fecha_hoy = hoy_bogota()
     alertas = await calcular_alertas_expediente(expediente_id, db, fecha_hoy)
 
     estadisticas = {"verde": 0, "amarillo": 0, "rojo": 0, "vencido": 0}

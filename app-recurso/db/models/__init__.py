@@ -32,8 +32,10 @@ from .documento_proceso import (
     DocumentoProcesoVersion,
 )
 from .auditoria import Auditoria
+from .envio_alertas_semanal import EnvioAlertasSemanal
 
 __all__ = [
+    "EnvioAlertasSemanal",
     "Base",
     "VersionadoMixin",
     "MedioActo",

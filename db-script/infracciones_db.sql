@@ -148,7 +148,8 @@ CREATE TABLE public.etapa_acoger_concepto (
     dias_termino integer,
     fecha_termino_calculada date,
     acto_administrativo_id integer,
-    fecha_creacion timestamp with time zone NOT NULL
+    fecha_creacion timestamp with time zone NOT NULL,
+    instancia character varying(15) DEFAULT 'VISITA'::character varying NOT NULL
 );
 
 
@@ -202,6 +203,17 @@ CREATE SEQUENCE public.etapa_cierre_id_seq
 --
 
 ALTER SEQUENCE public.etapa_cierre_id_seq OWNED BY public.etapa_cierre.id;
+
+
+--
+-- Name: envio_alertas_semanal; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.envio_alertas_semanal (
+    semana date NOT NULL,
+    fecha_inicio timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT envio_alertas_semanal_pkey PRIMARY KEY (semana)
+);
 
 
 --
@@ -563,7 +575,8 @@ CREATE TABLE public.informe_tecnico (
     fecha_aceptacion_informe date,
     documento_informe_id integer,
     tipo_informe character varying(20),
-    fecha_creacion timestamp with time zone NOT NULL
+    fecha_creacion timestamp with time zone NOT NULL,
+    fecha_asignacion date
 );
 
 
@@ -840,7 +853,10 @@ CREATE TABLE public.solicitud_informacion (
     etapa_acoger_concepto_id integer NOT NULL,
     radicado character varying(11) NOT NULL,
     fecha_radicado character varying(10) NOT NULL,
-    archivo_solicitud_id integer NOT NULL
+    archivo_solicitud_id integer NOT NULL,
+    radicado_respuesta character varying(11),
+    fecha_radicado_respuesta character varying(10),
+    archivo_respuesta_id integer
 );
 
 
@@ -1203,7 +1219,7 @@ COPY public.comunicacion (id, numerado, fecha_numerado, fecha_envio, acto_admini
 -- Data for Name: etapa_acoger_concepto; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.etapa_acoger_concepto (id, tipo_acogida_concepto, expediente_id, dias_termino, fecha_termino_calculada, acto_administrativo_id, fecha_creacion) FROM stdin;
+COPY public.etapa_acoger_concepto (id, tipo_acogida_concepto, expediente_id, dias_termino, fecha_termino_calculada, acto_administrativo_id, fecha_creacion, instancia) FROM stdin;
 \.
 
 
@@ -1410,7 +1426,7 @@ COPY public.recurso_afectado (id, nombre) FROM stdin;
 -- Data for Name: solicitud_informacion; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-COPY public.solicitud_informacion (id, etapa_acoger_concepto_id, radicado, fecha_radicado, archivo_solicitud_id) FROM stdin;
+COPY public.solicitud_informacion (id, etapa_acoger_concepto_id, radicado, fecha_radicado, archivo_solicitud_id, radicado_respuesta, fecha_radicado_respuesta, archivo_respuesta_id) FROM stdin;
 \.
 
 
@@ -2437,6 +2453,13 @@ CREATE INDEX ix_acto_admin_fecha_creacion ON public.acto_administrativo USING bt
 --
 
 CREATE INDEX ix_etapa_acoger_concepto_expediente ON public.etapa_acoger_concepto USING btree (expediente_id);
+
+
+--
+-- Name: uq_etapa_acoger_concepto_instancia; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_etapa_acoger_concepto_instancia ON public.etapa_acoger_concepto USING btree (expediente_id, instancia);
 
 
 --

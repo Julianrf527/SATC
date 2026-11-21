@@ -30,7 +30,8 @@ class Expediente(Base):
     etapa_respuesta = relationship("EtapaRespuesta", back_populates="expediente", cascade="all, delete-orphan")
     etapa_cierre = relationship("EtapaCierre", back_populates="expediente", cascade="all, delete-orphan")
     informes_tecnicos = relationship("InformeTecnico", back_populates="expediente", cascade="all, delete-orphan")
-    etapa_acoger_concepto = relationship("EtapaAcogerConcepto", back_populates="expediente", uselist=False, cascade="all, delete-orphan")
+    # Dos instancias como máximo: la de la visita y la del seguimiento.
+    etapa_acoger_concepto = relationship("EtapaAcogerConcepto", back_populates="expediente", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('ix_expediente_fecha_creacion', 'fecha_creacion'),

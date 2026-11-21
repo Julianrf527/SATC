@@ -1,4 +1,4 @@
-"""Etapa 6 · Recibo a satisfacción de obras (plan §4-Etapa 6, fase 9; V10–V12).
+"""Etapa 6 · Recibo a satisfacción de obras (plan §4-Etapa 6; V10–V12).
 
 Ciclo: informe del usuario → concepto con visita (``/conceptos/obras``) → si
 no cumple, requerimiento (``/requerimientos/obras``) → nuevo informe →
@@ -45,7 +45,6 @@ MSG_SIN_OBRAS = "Primero debe registrarse el informe del usuario (recibo de obra
 async def registrar_informe(
     request: Request, expediente_id: int, body: RadicadoIn, db: AsyncSession = Depends(get_db_managed),
 ):
-    # TODO(negocio): el plan no dice quién registra el informe: cualquier usuario con recurso_gestionar.
     usuario = await requiere_gestion(request)
     exp = await bloquear_expediente(db, expediente_id)
     e = await cargar_estado(db, exp)

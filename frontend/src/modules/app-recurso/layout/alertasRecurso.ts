@@ -33,6 +33,8 @@ export function estadoExpedienteAlerta(alerta: AlertaPaginada): NavegacionExpedi
 /**
  * A dónde lleva el botón de una alerta (técnico y gestionar no van juntos en
  * un rol; si llegaran a ir, manda técnico):
+ * - Revisor de turno (alerta por rol que le corresponde, con proceso):
+ *   "Actuación" abre el proceso en Mis actuaciones.
  * - Técnico: si la tarea es suya y ya tiene proceso, "Actuación" abre ese
  *   proceso en Mis actuaciones; si no, Consulta del expediente.
  * - Gestionar: Gestionar (o Consultar si es de otro responsable), en la
@@ -45,18 +47,16 @@ export function destinoAlertaRecurso(
 ): DestinoAlerta {
   const tiene = new Set(permisos);
   const consulta: DestinoAlerta = { ruta: RUTA_CONSULTA, accion: "Consultar", estado: estadoExpedienteAlerta(alerta) };
-  if (tiene.has("recurso_tecnico")) {
-    if (alerta.es_responsable !== false && alerta.proceso_id) {
-      return {
-        ruta: RUTA_MIS_ACTUACIONES,
-        accion: "Actuación",
-        principal: true,
-        title: "Abrir el proceso en Mis actuaciones",
-        estado: { procesoIdToSelect: alerta.proceso_id },
-      };
-    }
-    return consulta;
-  }
+  const propia = alerta.es_responsable !== false && !!alerta.proceso_id;
+  const actuacion: DestinoAlerta = {
+    ruta: RUTA_MIS_ACTUACIONES,
+    accion: "Actuación",
+    principal: true,
+    title: "Abrir el proceso en Mis actuaciones",
+    estado: { procesoIdToSelect: alerta.proceso_id },
+  };
+  if (propia && (alerta.roles_responsables?.length ?? 0) > 0) return actuacion;
+  if (tiene.has("recurso_tecnico")) return propia ? actuacion : consulta;
   if (tiene.has("recurso_gestionar")) {
     return {
       ruta: RUTA_GESTION,

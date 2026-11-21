@@ -46,6 +46,7 @@ export function useInformesTecnicos() {
     informes: query.data?.data ?? [],
     profesionales: query.data?.profesionales_disponibles ?? [],
     revisores: query.data?.revisores_disponibles ?? [],
+    fechaLimiteProgramacion: query.data?.fecha_limite_programacion ?? null,
     totalCount: query.data?.total ?? 0,
     totalPages: query.data?.total_pages ?? 1,
     loading: query.isPending,

@@ -12,9 +12,10 @@ import math
 import os
 import re
 from typing import Optional
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func, or_, select
@@ -38,7 +39,7 @@ from db.models.revisiones import Revision
 from db.models.v_documentos_detalle import VDocumentoDetalle
 from db.models.versiones_documento import VersionDocumento
 from services.notification import notify_assignment, notify_new_version
-from services.revision_documentos import FLUJO, http_error, prevalidar_subida, servicio
+from services.revision_documentos import FLUJO, SERVICIO_DOCS, http_error, prevalidar_subida, servicio
 from services.users import get_user_names, verify_permission
 from utils.antivirus import escanear_archivo
 from utils.file_validator import validate_file_complete
@@ -58,6 +59,8 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 init_minio()
+
+ZONA_SATC = ZoneInfo("America/Bogota")
 
 CONTENT_TYPES = {
     ".pdf": "application/pdf",
@@ -104,14 +107,15 @@ async def _procesar_archivo_seguro(archivo: UploadFile):
     return file_hash, sanitized_filename, mime_type, archivo_size, file_data
 
 
-async def subir_archivo(db: AsyncSession, archivo: UploadFile) -> tuple[ArchivoRef, str]:
+async def subir_archivo(db: AsyncSession, archivo: UploadFile, user_id: int) -> tuple[ArchivoRef, str]:
     """Pipeline de seguridad + subida deduplicada. Devuelve (ArchivoRef, sha256).
 
     No registra el uso: lo hace el servicio de revisión (UsoArchivosLocal) en la
     misma transacción que la versión/revisión que referencia el archivo."""
     file_hash, sanitized_filename, mime_type, archivo_size, file_data = await _procesar_archivo_seguro(archivo)
     resultado = await upload_file_with_deduplication(
-        db=db, file_data=file_data, original_filename=sanitized_filename, content_type=mime_type
+        db=db, file_data=file_data, original_filename=sanitized_filename, content_type=mime_type,
+        subida=(user_id, SERVICIO_DOCS),
     )
     if not resultado["ok"]:
         raise HTTPException(
@@ -181,10 +185,10 @@ class DocumentoResumen(BaseModel):
 async def listar_documentos(
     request: Request,
     estado: Optional[str] = None,
-    fecha_desde: Optional[str] = None,
-    fecha_hasta: Optional[str] = None,
-    page: int = 1,
-    page_size: int = 20,
+    fecha_desde: Optional[date] = None,
+    fecha_hasta: Optional[date] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db_managed)
 ):
     token_data = verify_gateway_token(request)
@@ -207,10 +211,12 @@ async def listar_documentos(
 
     if estado:
         stmt = stmt.where(VDocumentoDetalle.estado == estado)
+    # Fechas por día local (Bogotá); fecha_hasta incluye el día completo.
     if fecha_desde:
-        stmt = stmt.where(VDocumentoDetalle.fecha_creacion >= fecha_desde)
+        stmt = stmt.where(VDocumentoDetalle.fecha_creacion >= datetime.combine(fecha_desde, time.min, ZONA_SATC))
     if fecha_hasta:
-        stmt = stmt.where(VDocumentoDetalle.fecha_creacion <= fecha_hasta)
+        siguiente = datetime.combine(fecha_hasta + timedelta(days=1), time.min, ZONA_SATC)
+        stmt = stmt.where(VDocumentoDetalle.fecha_creacion < siguiente)
 
     count_subq = stmt.with_only_columns(VDocumentoDetalle.id).distinct().subquery()
     total = (await db.execute(select(func.count()).select_from(count_subq))).scalar() or 0
@@ -324,7 +330,7 @@ async def crear_documento(
             raise HTTPException(status_code=400, detail=f"El usuario {revisor_id} no tiene permiso de revisor")
 
     _validar_extension(archivo.filename)
-    ref, file_hash = await subir_archivo(db, archivo)
+    ref, file_hash = await subir_archivo(db, archivo, user_id)
 
     try:
         documento = await servicio(db).crear_proceso(
@@ -388,7 +394,7 @@ async def subir_nueva_version(
     except ReviewError as e:
         raise http_error(e)
 
-    ref, file_hash = await subir_archivo(db, archivo)
+    ref, file_hash = await subir_archivo(db, archivo, user_id)
 
     try:
         resultado = await svc.subir_version(db, documento_id, user_id=user_id, archivo=ref, comentario=comentario)

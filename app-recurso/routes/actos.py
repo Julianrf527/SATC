@@ -160,7 +160,7 @@ async def eliminar_acto(
 ):
     """Solo super gestión (cargue histórico): el acto nace de la versión final
     aprobada de la etapa y borrarlo dejaría la etapa sin acto con el proceso
-    aprobado. TODO(negocio): confirmar si el encargado puede eliminarlo.
+    aprobado.
     Desenlaza la etapa, borra comunicación y notificaciones (cascada) y
     descuenta el uso de sus archivos."""
     usuario, acto, etapa = await _contexto_escritura(db, request, acto_id, expediente_id)

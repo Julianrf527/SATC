@@ -8,10 +8,11 @@ cada función recibe una ``Cascada`` donde anota lo encontrado y, solo si
 
 Orden del proceso (``services.etapa_actual.ORDEN_ETAPAS``):
 
-    respuesta < visita < concepto < seguimiento < cierre
+    respuesta < visita < concepto < seguimiento < concepto_seguimiento < cierre
 
-Al cambiar el modo de un informe de VISITA se borran concepto, seguimiento y
-cierre; al cambiar el de SEGUIMIENTO, solo el cierre.
+Al cambiar el modo de un informe de VISITA se borran concepto, seguimiento,
+concepto · seguimiento y cierre; al cambiar el de SEGUIMIENTO, el concepto ·
+seguimiento y el cierre.
 
 Usos de archivo (``numero_usos`` en app-docs): cada registro que guarda un
 archivo le sumó UN uso al crearse (``increment_file_usage`` con los ids del
@@ -36,14 +37,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models.acto_administrativo import ActoAdministrativo
 from db.models.comunicacion import Comunicacion
-from db.models.etapa_acoger_concepto import EtapaAcogerConcepto
+from db.models.etapa_acoger_concepto import INSTANCIA_SEGUIMIENTO, INSTANCIA_VISITA, EtapaAcogerConcepto
 from db.models.etapa_cierre import EtapaCierre
-from db.models.informe_proceso import MODELOS_INFORME
+from db.models.documento_proceso import ETAPA_CIERRE, ETAPA_CONCEPTO, ETAPA_INFORME, MODELOS_DOCUMENTO
 from db.models.informe_recurso_afectado import InformeRecursoAfectado
 from db.models.informe_tecnico import InformeTecnico
 from db.models.notificacion import Notificacion
 from db.models.oficio_remite import OficioRemite
 from db.models.solicitud_informacion import SolicitudInformacion
+from services.conceptos import CODIGO_ETAPA
 from services.etapa_actual import ORDEN_ETAPAS
 
 logger = logging.getLogger(__name__)
@@ -53,6 +55,7 @@ ETIQUETAS = {
     "visita": "Visita técnica",
     "concepto": "Acoger concepto",
     "seguimiento": "Visita de seguimiento",
+    "concepto_seguimiento": "Acoger concepto · seguimiento",
     "cierre": "Cierre",
 }
 
@@ -142,6 +145,61 @@ class Cascada:
 
 # ═══════════════════════════════════════════════════════════════ piezas
 
+async def _anotar_procesos(
+    db: AsyncSession, etapa_tipo: str, ref_ids: list[int], etapa: EtapaEliminada, cascada: Cascada
+) -> list[int]:
+    """Procesos de revisión (tabla única) de esas filas de etapa: los anota con
+    sus versiones y revisiones y resta el uso de sus archivos. Devuelve los ids
+    para ``_borrar_procesos``. Bloquea los procesos si ``cascada.ejecutar``."""
+    if not ref_ids:
+        return []
+    M = MODELOS_DOCUMENTO
+    pstmt = select(M.proceso).where(
+        M.proceso.etapa_tipo == etapa_tipo, M.proceso.etapa_ref_id.in_(ref_ids)
+    ).order_by(M.proceso.id)
+    if cascada.ejecutar:
+        pstmt = pstmt.with_for_update()
+    proceso_ids = [p.id for p in (await db.execute(pstmt)).scalars().all()]
+    if not proceso_ids:
+        return []
+    for pid in proceso_ids:
+        etapa.anotar("procesos", pid)
+    versiones = (await db.execute(
+        select(M.version.id, M.version.file_id).where(M.version.proceso_id.in_(proceso_ids)).order_by(M.version.id)
+    )).all()
+    for vid, fid in versiones:
+        etapa.anotar("versiones", vid)
+        cascada.restar(fid)
+    revisiones = (await db.execute(
+        select(M.revision.id, M.revision.adjunto_file_id)
+        .where(M.revision.proceso_id.in_(proceso_ids)).order_by(M.revision.id)
+    )).all()
+    for rid, adjunto in revisiones:
+        etapa.anotar("revisiones", rid)
+        cascada.restar(adjunto)
+    return proceso_ids
+
+
+async def _borrar_procesos(db: AsyncSession, proceso_ids: list[int]) -> None:
+    if not proceso_ids:
+        return
+    M = MODELOS_DOCUMENTO
+    for modelo in (M.auditoria, M.revision, M.version, M.asignacion):
+        await db.execute(delete(modelo).where(modelo.proceso_id.in_(proceso_ids)))
+    await db.execute(delete(M.proceso).where(M.proceso.id.in_(proceso_ids)))
+    await db.flush()
+
+
+async def _eliminar_procesos_acto(
+    db: AsyncSession, etapa_tipo: str, ref_id: int, etapa: EtapaEliminada, cascada: Cascada
+) -> None:
+    """Procesos de revisión del acto de una fila de etapa (medida, concepto o
+    cierre): se borran con el acto, también al cambiar el tipo de concepto."""
+    proceso_ids = await _anotar_procesos(db, etapa_tipo, [ref_id], etapa, cascada)
+    if cascada.ejecutar:
+        await _borrar_procesos(db, proceso_ids)
+
+
 async def _eliminar_acto(db: AsyncSession, acto_id: Optional[int], etapa: EtapaEliminada, cascada: Cascada) -> bool:
     """Acto + sus notificaciones (citación/notificación) y comunicaciones.
     El dueño (concepto/cierre) debe soltar ``acto_administrativo_id`` antes
@@ -190,9 +248,11 @@ async def eliminar_datos_concepto(
 ) -> EtapaEliminada:
     """Acto (con notificaciones y comunicaciones) y oficio remite del
     concepto; la solicitud de información solo si ``incluir_solicitud`` (al
-    cambiar el TIPO de concepto se conserva: es independiente del tipo)."""
-    etapa = cascada.etapa("concepto")
+    cambiar el TIPO de concepto se conserva: es independiente del tipo).
+    Se anota en la etapa de su instancia (concepto o concepto_seguimiento)."""
+    etapa = cascada.etapa(CODIGO_ETAPA[concepto.instancia])
     await _soltar_y_eliminar_acto(db, concepto, etapa, cascada)
+    await _eliminar_procesos_acto(db, ETAPA_CONCEPTO, concepto.id, etapa, cascada)
 
     oficio = await db.scalar(select(OficioRemite).where(OficioRemite.etapa_acoger_concepto_id == concepto.id))
     if oficio is not None:
@@ -208,26 +268,40 @@ async def eliminar_datos_concepto(
         )
         if solicitud is not None:
             etapa.anotar("solicitudes", solicitud.id)
-            cascada.restar(solicitud.archivo_solicitud_id)
+            cascada.restar(solicitud.archivo_solicitud_id, solicitud.archivo_respuesta_id)
             if cascada.ejecutar:
                 await db.delete(solicitud)
                 await db.flush()
     return etapa
 
 
-async def eliminar_concepto(db: AsyncSession, expediente_id: int, cascada: Cascada) -> None:
-    """Etapa Acoger concepto completa: acto, notificaciones, comunicaciones,
-    oficio remite, solicitud de información y la propia etapa."""
+async def _eliminar_instancia_concepto(
+    db: AsyncSession, expediente_id: int, instancia: str, cascada: Cascada
+) -> bool:
+    """Etapa Acoger concepto de una instancia, completa: acto, notificaciones,
+    comunicaciones, oficio remite, solicitud de información y la etapa."""
     conceptos = (await db.execute(
-        select(EtapaAcogerConcepto).where(EtapaAcogerConcepto.expediente_id == expediente_id)
+        select(EtapaAcogerConcepto)
+        .where(EtapaAcogerConcepto.expediente_id == expediente_id, EtapaAcogerConcepto.instancia == instancia)
         .order_by(EtapaAcogerConcepto.id)
     )).scalars().all()
     for concepto in conceptos:
         await eliminar_datos_concepto(db, concepto, cascada, incluir_solicitud=True)
-        cascada.etapa("concepto").ids.setdefault("etapa", []).append(concepto.id)
+        cascada.etapa(CODIGO_ETAPA[instancia]).ids.setdefault("etapa", []).append(concepto.id)
         if cascada.ejecutar:
             await db.delete(concepto)
             await db.flush()
+    return bool(conceptos)
+
+
+async def eliminar_concepto(db: AsyncSession, expediente_id: int, cascada: Cascada) -> bool:
+    """Acoger concepto de la visita (etapa 3)."""
+    return await _eliminar_instancia_concepto(db, expediente_id, INSTANCIA_VISITA, cascada)
+
+
+async def eliminar_concepto_seguimiento(db: AsyncSession, expediente_id: int, cascada: Cascada) -> bool:
+    """Acoger concepto · seguimiento (etapa 5)."""
+    return await _eliminar_instancia_concepto(db, expediente_id, INSTANCIA_SEGUIMIENTO, cascada)
 
 
 async def eliminar_cierre(db: AsyncSession, expediente_id: int, cascada: Cascada) -> bool:
@@ -239,6 +313,7 @@ async def eliminar_cierre(db: AsyncSession, expediente_id: int, cascada: Cascada
         etapa = cascada.etapa("cierre")
         etapa.ids.setdefault("etapa", []).append(cierre.id)
         await _soltar_y_eliminar_acto(db, cierre, etapa, cascada)
+        await _eliminar_procesos_acto(db, ETAPA_CIERRE, cierre.id, etapa, cascada)
         if cascada.ejecutar:
             await db.delete(cierre)
             await db.flush()
@@ -251,7 +326,6 @@ async def eliminar_seguimiento(db: AsyncSession, expediente_id: int, cascada: Ca
 
     Bloqueos: primero los informes (por id) y después sus procesos — el
     mismo orden informe -> proceso de /informes y /revision-informes."""
-    M = MODELOS_INFORME
     stmt = (
         select(InformeTecnico)
         .where(InformeTecnico.expediente_id == expediente_id, InformeTecnico.tipo_informe == "SEGUIMIENTO")
@@ -265,32 +339,10 @@ async def eliminar_seguimiento(db: AsyncSession, expediente_id: int, cascada: Ca
     etapa = cascada.etapa("seguimiento")
     informe_ids = [i.id for i in informes]
 
-    pstmt = select(M.proceso).where(M.proceso.informe_id.in_(informe_ids)).order_by(M.proceso.id)
-    if cascada.ejecutar:
-        pstmt = pstmt.with_for_update()
-    procesos = (await db.execute(pstmt)).scalars().all()
-    proceso_ids = [p.id for p in procesos]
-
     for informe in informes:
         etapa.anotar("informes", informe.id)
         cascada.restar(informe.documento_informe_id)  # uso propio del informe aceptado
-
-    for p in procesos:
-        etapa.anotar("procesos", p.id)
-    if proceso_ids:
-        versiones = (await db.execute(
-            select(M.version.id, M.version.file_id).where(M.version.proceso_id.in_(proceso_ids)).order_by(M.version.id)
-        )).all()
-        for vid, fid in versiones:
-            etapa.anotar("versiones", vid)
-            cascada.restar(fid)
-        revisiones = (await db.execute(
-            select(M.revision.id, M.revision.adjunto_file_id)
-            .where(M.revision.proceso_id.in_(proceso_ids)).order_by(M.revision.id)
-        )).all()
-        for rid, adjunto in revisiones:
-            etapa.anotar("revisiones", rid)
-            cascada.restar(adjunto)
+    proceso_ids = await _anotar_procesos(db, ETAPA_INFORME, informe_ids, etapa, cascada)
 
     filas = (await db.execute(
         select(InformeRecursoAfectado.id).where(InformeRecursoAfectado.informe_id.in_(informe_ids))
@@ -300,10 +352,7 @@ async def eliminar_seguimiento(db: AsyncSession, expediente_id: int, cascada: Ca
 
     if not cascada.ejecutar:
         return
-    if proceso_ids:
-        for modelo in (M.auditoria, M.revision, M.version, M.asignacion):
-            await db.execute(delete(modelo).where(modelo.proceso_id.in_(proceso_ids)))
-        await db.execute(delete(M.proceso).where(M.proceso.id.in_(proceso_ids)))
+    await _borrar_procesos(db, proceso_ids)
     await db.execute(delete(InformeRecursoAfectado).where(InformeRecursoAfectado.informe_id.in_(informe_ids)))
     for informe in informes:
         await db.delete(informe)
@@ -313,13 +362,14 @@ async def eliminar_seguimiento(db: AsyncSession, expediente_id: int, cascada: Ca
 # ═════════════════════════════════════════════════════════════ orquestador
 
 ETAPAS_POSTERIORES = {
-    "visita": ("concepto", "seguimiento", "cierre"),
-    "seguimiento": ("cierre",),
+    "visita": ("concepto", "seguimiento", "concepto_seguimiento", "cierre"),
+    "seguimiento": ("concepto_seguimiento", "cierre"),
 }
 
 _ELIMINADORES = {
     "concepto": eliminar_concepto,
     "seguimiento": eliminar_seguimiento,
+    "concepto_seguimiento": eliminar_concepto_seguimiento,
     "cierre": eliminar_cierre,
 }
 
@@ -333,7 +383,8 @@ async def eliminar_etapas_posteriores(
 ) -> Cascada:
     """Borra (o, con ``ejecutar=False``, solo calcula) las etapas posteriores
     a ``desde`` ('visita' | 'seguimiento'). Se borran de la última a la
-    primera (cierre, seguimiento, concepto) para no violar FKs."""
+    primera (cierre, concepto · seguimiento, seguimiento, concepto) para no
+    violar FKs."""
     cascada = Cascada(ejecutar=ejecutar)
     for codigo in reversed(ETAPAS_POSTERIORES.get(desde or "", ())):
         await _ELIMINADORES[codigo](db, expediente_id, cascada)

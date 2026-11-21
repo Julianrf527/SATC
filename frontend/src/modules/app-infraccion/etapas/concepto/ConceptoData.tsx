@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Modal } from "@shared/ui";
-import type { TipoAcogidaConcepto } from "../../types";
+import type { InstanciaConcepto, TipoAcogidaConcepto } from "../../types";
 import { useActualizarConceptoMutation } from "../../api/etapas";
 import { detalleError, esErrorDeConexion } from "../../api/errors";
 
@@ -32,6 +32,7 @@ type Props = {
   etapaConceptoId: number;
   expedienteId: number;
   tipoActual: TipoAcogidaConcepto;
+  instancia?: InstanciaConcepto;
   isEditable: boolean;
   setToast: (t: { id: number; message: string; type: "success" | "error" }) => void;
 };
@@ -40,6 +41,7 @@ export default function ConceptoData({
   etapaConceptoId,
   expedienteId,
   tipoActual,
+  instancia = "VISITA",
   isEditable,
   setToast,
 }: Props) {
@@ -89,7 +91,7 @@ export default function ConceptoData({
           setToast({
             id: Date.now(),
             message: res.message || "Tipo de acogida actualizado",
-            type: res.cierre_eliminado ? "error" : "success",
+            type: res.cierre_eliminado || res.concepto_seguimiento_eliminado ? "error" : "success",
           });
           setShowEdit(false);
         },
@@ -226,9 +228,13 @@ export default function ConceptoData({
         </p>
         <ul className="text-sm text-base-content/60 list-disc list-inside mb-4 space-y-1">
           <li>Acto administrativo y notificaciones</li>
-          <li>Comunicaciones registradas</li>
           <li>Oficio remite</li>
           <li>Días de término y fecha calculada</li>
+          {instancia === "VISITA" ? (
+            <li>Las etapas Acoger concepto · seguimiento y Cierre, si existen</li>
+          ) : (
+            <li>La etapa de Cierre, si existe</li>
+          )}
         </ul>
         <p className="text-sm font-medium text-base-content">¿Está seguro de que desea continuar?</p>
       </Modal>

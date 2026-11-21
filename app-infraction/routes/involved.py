@@ -209,11 +209,13 @@ async def desvincular_involucrado_a_expediente(
             if medida and medida.acto_administrativo_id:
                 actos_ids.append(medida.acto_administrativo_id)
 
-        concepto = await db.scalar(
-            select(EtapaAcogerConcepto).where(EtapaAcogerConcepto.expediente_id == expediente_id)
-        )
-        if concepto and concepto.acto_administrativo_id:
-            actos_ids.append(concepto.acto_administrativo_id)
+        # Acoger concepto de la visita y del seguimiento.
+        actos_ids.extend((await db.execute(
+            select(EtapaAcogerConcepto.acto_administrativo_id).where(
+                EtapaAcogerConcepto.expediente_id == expediente_id,
+                EtapaAcogerConcepto.acto_administrativo_id.isnot(None),
+            )
+        )).scalars().all())
 
         cierre = await db.scalar(
             select(EtapaCierre).where(EtapaCierre.expediente_id == expediente_id)

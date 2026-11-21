@@ -44,6 +44,9 @@ Cambios:
      con su última versión subida o, si no hay, ``fecha_aceptacion``; la
      respuesta con su auditoría ``RESPUESTA_REQUERIMIENTO`` o, si no hay,
      ``fecha_oficio_entrada``.
+  8. Búsqueda parcial (``ILIKE '%texto%'``) del listado de expedientes:
+     extensión ``pg_trgm`` e índices GIN trigram en ``expediente.radicado``,
+     ``expediente.expediente`` y ``expediente.numero_vital``.
 
 Corre en la transacción de ``init_db`` con ``pg_advisory_xact_lock`` para que
 varios workers de Gunicorn arrancando a la vez no ejecuten el DDL en paralelo.
@@ -183,6 +186,11 @@ _DDL = (
         BEFORE INSERT OR UPDATE OF doc_oficio_entrada_id ON requerimiento
         FOR EACH ROW EXECUTE FUNCTION trg_requerimiento_fecha_respuesta()
     """,
+    # 8. Índices trigram para la búsqueda parcial del listado.
+    "CREATE EXTENSION IF NOT EXISTS pg_trgm",
+    "CREATE INDEX IF NOT EXISTS ix_expediente_radicado_trgm ON expediente USING gin (radicado gin_trgm_ops)",
+    "CREATE INDEX IF NOT EXISTS ix_expediente_expediente_trgm ON expediente USING gin (expediente gin_trgm_ops)",
+    "CREATE INDEX IF NOT EXISTS ix_expediente_numero_vital_trgm ON expediente USING gin (numero_vital gin_trgm_ops)",
 )
 
 

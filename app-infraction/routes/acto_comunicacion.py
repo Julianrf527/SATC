@@ -52,12 +52,18 @@ async def crear_comunicacion(
     if not str(numerado).isdigit() or len(str(numerado)) > 4:
         raise HTTPException(status_code=400, detail="El numerado debe tener como máximo 4 dígitos")
 
-    _, acto_admin, _, etapa_expediente_id, radicado, encargado_id = await _get_acto_context(db, acto_admin_id)
+    tipo_etapa, acto_admin, _, etapa_expediente_id, radicado, encargado_id = await _get_acto_context(db, acto_admin_id)
 
     if etapa_expediente_id != expediente_id:
         raise HTTPException(status_code=400, detail="El expediente no corresponde al acto administrativo")
     if encargado_id != user_id:
         raise HTTPException(status_code=403, detail="No tiene permisos para modificar esta infracción")
+    if tipo_etapa == "concepto":
+        # Visita y seguimiento: el acto de acoger concepto siempre se notifica.
+        raise HTTPException(
+            status_code=400,
+            detail="El acto de acoger concepto se notifica; no admite comunicación",
+        )
 
     existing = await db.scalar(
         select(Comunicacion).where(Comunicacion.acto_administrativo_id == acto_admin_id)

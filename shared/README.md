@@ -51,6 +51,49 @@ await files.increment_usage([subido.file_id])
 Los clientes **lanzan**; la política ante fallo (fail-closed, `{}` vacío...) la
 decide el wrapper de cada servicio (`services/users.py`, `services/docs.py`...).
 
+### Archivos: dueños, subidas y descargas
+
+app-docs guarda quién usa cada archivo (`file_uso`: servicio, entidad,
+entidad_id) y quién lo subió (`file_subida`). El servicio lo pone app-docs a
+partir del service-token.
+
+```python
+# Subir a nombre del usuario (queda registrado quién lo subió)
+subido = await files.upload("acta.pdf", data, "application/pdf", usuario_id=user_id)
+
+# Asociar a una entidad del módulo (idempotente). Si app-docs tiene activa la
+# validación (ARCHIVOS_VALIDAR_ASOCIACION=on) y el usuario no subió el archivo
+# ni ya era de esa entidad, devuelve ok=False con `rechazados` (no lanza).
+r = await files.increment_usage(
+    usos=[{"file_id": subido.file_id, "entidad": "acto", "entidad_id": acto.id}],
+    usuario_id=user_id,
+)
+if not r.ok:
+    raise HTTPException(403, "Archivo no permitido")
+
+# Desvincular
+await files.decrement_usage(usos=[{"file_id": f, "entidad": "acto", "entidad_id": acto.id}])
+
+# Carga inicial de asociaciones que ya existían (no toca numero_usos)
+await files.registrar_usos([{"file_id": f, "entidad": "acto", "entidad_id": a} for f, a in filas])
+```
+
+`increment_usage([ids])` / `decrement_usage([ids])` con el formato anterior
+siguen funcionando durante la transición.
+
+Descarga para el navegador (`GET /<modulo>/archivos/{file_id}`): el módulo valida
+con sus tablas que el usuario puede ver la entidad y responde con
+`satc_shared.archivos.respuesta_archivo`, que transmite los bytes por bloques,
+reenvía `Range`/`If-Range` (pdf.js), devuelve 200/206/416 y pone el nombre
+original en `Content-Disposition`:
+
+```python
+from satc_shared.archivos import respuesta_archivo
+
+return await respuesta_archivo(files, file_id, request.headers, nombre=acto.nombre_archivo)
+# NotFoundError -> 404; otro ServiceClientError -> 502 (lo decide el módulo)
+```
+
 ## Proceso de revisión
 
 1. Modelos concretos con el `Base` y tablas de la app:

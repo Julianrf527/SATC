@@ -159,7 +159,7 @@ async def make_file_hash(db_session):
     async def _make(**overrides) -> FileHash:
         n = next(_id_counter)
         defaults = dict(
-            file_hash=f"hash{n:064d}"[:64],
+            file_hash=f"{n:064x}",  # único por archivo (antes "hash"+ceros: todos iguales)
             file_url=f"satc-documentos/hash{n}/archivo.pdf",
             content_type="application/pdf",
             file_size=1234,
