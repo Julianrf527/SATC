@@ -40,8 +40,7 @@ const NOMBRES_MIS_INFORMES = ["informes subir", "informes revisar"];
 // Concesiones de Aguas: los permisos de revisor y técnico apuntan todos a
 // /recurso/my-reports (una sola entrada "Mis actuaciones"); recurso_gestionar
 // también ve Mis actuaciones y recurso_super_gestion (sin menu_path) entra a
-// Gestionar. Alertas: recurso_gestionar o recurso_consultar (no tiene
-// menu_path propio).
+// Gestionar. Alertas: recurso_alertas.
 const RECURSO_RUTAS = {
   gestionar: "/recurso/manage",
   consultar: "/recurso/consult",
@@ -60,7 +59,7 @@ function menuRecurso(permission: { name: string; path: string }[]) {
     items.push({ name: "Gestionar", url: RECURSO_RUTAS.gestionar, originalName: "recurso_gestionar" });
   if (urls.has(RECURSO_RUTAS.consultar))
     items.push({ name: "Consultar", url: RECURSO_RUTAS.consultar, originalName: "recurso_consultar" });
-  if (nombres.has("recurso_gestionar") || nombres.has("recurso_consultar"))
+  if (nombres.has("recurso_alertas"))
     items.push({ name: "Alertas", url: RECURSO_RUTAS.alertas, originalName: "recurso_alertas" });
   if (nombres.has("recurso_gestionar") || urls.has(RECURSO_RUTAS.misActuaciones))
     items.push({ name: "Mis actuaciones", url: RECURSO_RUTAS.misActuaciones, originalName: "recurso_mis_actuaciones" });

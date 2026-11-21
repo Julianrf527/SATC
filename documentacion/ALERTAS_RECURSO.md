@@ -26,9 +26,18 @@ Inventario de las alertas de vencimiento que calcula app-recurso para la pestañ
 
 ### Quién la ve y a dónde lleva
 
-- La pestaña se ve con `recurso_gestionar` o `recurso_consultar`.
-- **Mis expedientes**: alertas cuyo encargado es el usuario. **Todos**: todas.
+- La pestaña se ve con `recurso_alertas` (menú, ruta y endpoint).
+- **Mis alertas**: las que le corresponden al usuario. **Todas**: todas (quien
+  no tiene nada a su cargo ve "Mis alertas" vacía, pero puede ver "Todas").
+- **Responsable**: la alerta es del encargado de la columna "Encargado",
+  salvo mientras el documento está **en revisión**: entonces es de los roles
+  del paso actual que aún no han revisado (p. ej. líder técnico y SIG en el
+  concepto de la etapa 2; luego el líder del proyecto). Es por rol: todos los
+  usuarios con ese permiso la ven en "Mis alertas". Si el documento se
+  devuelve o queda aprobado para firma, vuelve al encargado. El plazo no
+  cambia. La tabla muestra "Pendiente: <roles>".
 - Botón de cada alerta:
+  - **Revisor de turno**: **Actuación** abre el proceso en Mis actuaciones.
   - **Técnico** (`recurso_tecnico`): si la tarea es suya y ya tiene proceso,
     **Actuación** abre ese proceso en Mis actuaciones; si no, Consulta.
   - **Gestionar** (`recurso_gestionar`): abre el expediente en Gestionar.

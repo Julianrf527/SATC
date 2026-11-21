@@ -67,6 +67,15 @@ describe("destinoAlertaRecurso", () => {
     });
   });
 
+  it("revisor de turno (alerta por rol suya con proceso): Actuación en Mis actuaciones", () => {
+    const roles = [{ permiso: "recurso_lider_tecnico", etiqueta: "Líder técnico" }];
+    expect(destinoAlertaRecurso(alerta({ roles_responsables: roles }), ["recurso_consultar", "recurso_lider_tecnico"]))
+      .toMatchObject({ ruta: "/recurso/my-reports", accion: "Actuación", estado: { procesoIdToSelect: 9 } });
+    // El encargado (técnico) ya no es el responsable mientras revisan: Consulta.
+    expect(destinoAlertaRecurso(alerta({ roles_responsables: roles, es_responsable: false }), TECNICO).ruta)
+      .toBe("/recurso/consult");
+  });
+
   it("solo consultar: Consulta del expediente", () => {
     expect(destinoAlertaRecurso(alerta({}), ["recurso_consultar", "recurso_revisor_tecnico"])).toEqual({
       ruta: "/recurso/consult", accion: "Consultar", estado: expediente,

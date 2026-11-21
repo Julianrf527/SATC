@@ -5,6 +5,7 @@ import pytest
 
 import routes.alertas as rutas_alertas
 from services import alertas as svc
+from core.permission import Permission
 from services.revision_documentos import CADENAS
 from tests.fixtures_etapas import *  # noqa: F401,F403
 from tests.fixtures_etapas import REVISOR_POR_PERMISO
@@ -126,6 +127,10 @@ async def test_flujo_auto_admite_y_concepto(client, stubs, expediente):
     assert (await subir(client, cpid, user=TECNICO)).status_code == 200
     alertas = await _del_expediente(client, exp_id)
     assert list(alertas) == ["concepto_version_final"] and alertas["concepto_version_final"]["proceso_id"] == cpid
+    # En revisión la alerta es del líder técnico y SIG (primer paso de la cadena), no del técnico.
+    cv = alertas["concepto_version_final"]
+    assert [r["permiso"] for r in cv["roles_responsables"]] == [Permission.LIDER_TECNICO, Permission.SIG]
+    assert cv["estado_documento"] == "en_revision" and cv["es_responsable"] is False
 
     # Versión final del concepto → sin alertas del concepto.
     await _aprobar_pasos(client, cpid, TECNICO)
@@ -162,6 +167,9 @@ async def test_vencida_y_devolucion_no_reinicia(client, monkeypatch, expediente)
     pid = (await post(client, f"/etapas/{exp_id}/admite/asignarme")).json()["data"]["proceso_id"]
     await subir(client, pid)
     await revisar(client, pid, "devuelto", JURIDICO)
+    # Devuelto: vuelve al encargado.
+    a = (await _del_expediente(client, exp_id))["admite_revision"]
+    assert a["roles_responsables"] == [] and a["es_responsable"] is True
     await subir(client, pid)
     a = (await _del_expediente(client, exp_id))["admite_revision"]
     assert a["fecha_inicio"] == svc.hoy_bogota().isoformat()  # sigue contando desde la versión 1
@@ -189,11 +197,13 @@ async def test_alcance_mios_todos_y_permisos(client, crear_expediente, rv_permis
     filtrada = await _todas(client, ABOGADO, "todos", radicado=e2.radicado.lower())
     assert [a["radicado"] for a in filtrada["alertas"]] == [e2.radicado]
 
-    # La pestaña es de recurso_gestionar o recurso_consultar (ven todas; "mías" según el encargado).
+    # La pestaña es de recurso_alertas (ven todas; "mías" según el responsable).
     lector = await _todas(client, LECTOR, "todos")
     assert lector["total"] == 2 and {a["es_responsable"] for a in lector["alertas"]} == {False}
     assert (await _todas(client, LECTOR, "mios"))["total"] == 0
-    await _todas(client, TECNICO, esperado=403)  # solo recurso_tecnico, sin gestionar ni consultar
+    await _todas(client, TECNICO, esperado=403)  # sin recurso_alertas
+    rv_permisos.permisos.dar(77, Permission.MANAGE)
+    await _todas(client, 77, esperado=403)  # gestionar no basta: hace falta recurso_alertas
     assert (await client.get(f"/alertas/{e1.id}", headers=headers(LECTOR))).status_code == 200
     assert (await client.get(f"/alertas/{e1.id}", headers=headers(EXTRANO))).status_code == 403
     assert (await client.get("/alertas/999999", headers=headers(ABOGADO))).status_code == 404
@@ -508,3 +518,37 @@ async def test_migracion_fechas_de_alertas_en_filas_existentes(expediente, db_se
     assert (await db_session.execute(text(
         "SELECT count(*) FROM pg_trigger WHERE tgname IN ('concepto_fecha_version_final', 'requerimiento_fecha_respuesta')"
     ))).scalar_one() == 2
+
+
+async def test_en_revision_la_alerta_es_de_los_roles_pendientes(client, rv_permisos, expediente):
+    """Mientras el documento está en revisión, la alerta es de los roles del
+    paso actual que aún no revisan; aprobado para firma vuelve al encargado."""
+    exp_id = expediente.id
+    for uid in (JURIDICO, PROYECTO):
+        rv_permisos.permisos.dar(uid, Permission.ALERTAS)
+    pid = (await post(client, f"/etapas/{exp_id}/admite/asignarme")).json()["data"]["proceso_id"]
+
+    a = (await _del_expediente(client, exp_id))["admite_primera_version"]
+    assert a["roles_responsables"] == [] and a["es_responsable"] is True
+
+    await subir(client, pid)
+    a = (await _del_expediente(client, exp_id))["admite_revision"]
+    assert a["roles_responsables"] == [{"permiso": Permission.LIDER_JURIDICO, "etiqueta": "Líder jurídico"}]
+    assert a["es_responsable"] is False  # el abogado ya no es el responsable
+    assert (await _todas(client, ABOGADO, "mios"))["total"] == 0
+    mias = await _todas(client, JURIDICO, "mios")
+    assert [x["tipo"] for x in mias["alertas"]] == ["admite_revision"] and mias["alertas"][0]["proceso_id"] == pid
+    assert (await _todas(client, PROYECTO, "mios"))["total"] == 0
+
+    # Aprueba el líder jurídico: pasa al líder del proyecto (mismo plazo).
+    assert (await revisar(client, pid, "aprobado", JURIDICO)).status_code == 200
+    a = (await _del_expediente(client, exp_id))["admite_revision"]
+    assert [r["permiso"] for r in a["roles_responsables"]] == [Permission.LIDER_PROYECTO]
+    assert (await _todas(client, JURIDICO, "mios"))["total"] == 0
+    assert (await _todas(client, PROYECTO, "mios"))["total"] == 1
+
+    # Aprobado para firma: vuelve al abogado para la versión final.
+    assert (await revisar(client, pid, "aprobado", PROYECTO)).status_code == 200
+    a = (await _del_expediente(client, exp_id))["admite_version_final"]
+    assert a["roles_responsables"] == [] and a["es_responsable"] is True
+    assert (await _todas(client, PROYECTO, "mios"))["total"] == 0

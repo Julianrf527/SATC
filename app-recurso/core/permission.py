@@ -5,6 +5,7 @@ class Permission:
     MANAGE = "recurso_gestionar"
     CONSULT = "recurso_consultar"
     SUPER_MANAGE = "recurso_super_gestion"
+    ALERTAS = "recurso_alertas"
 
     # Revisores
     LIDER_JURIDICO = "recurso_lider_juridico"

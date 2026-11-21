@@ -159,6 +159,11 @@ PERMISOS: list[dict] = [
         "descripcion": "Desbloquea la pantalla Consulta de concesiones. Sirve para ver cualquier expediente en solo lectura y descargarlo completo.",
     },
     {
+        "nombre": "recurso_alertas",
+        "menu_path": "/recurso/alerts",
+        "descripcion": "Desbloquea la pestaña Alertas de concesiones. Sirve para ver los vencimientos que le corresponden (Mis alertas) o los de todos los expedientes.",
+    },
+    {
         "nombre": "recurso_super_gestion",
         "menu_path": "",
         "descripcion": "Desbloquea el cargue histórico de concesiones. Sirve para cargar directamente cualquier etapa de expedientes viejos sin revisión ni asignación.",
@@ -207,6 +212,7 @@ DEPENDENCIAS: dict[str, tuple[str, ...]] = {
     "infraccion_super_gestion": ("infraccion_gestionar",),
     "documento_crear": ("documento_gestionar",),
     "documento_revisar": ("documento_gestionar",),
+    "recurso_alertas": ("recurso_consultar",),
     "recurso_super_gestion": ("recurso_gestionar",),
     "recurso_tecnico": ("recurso_consultar",),
     "recurso_lider_juridico": ("recurso_consultar",),
@@ -248,6 +254,15 @@ DESCRIPCIONES_ANTERIORES: dict[str, tuple[str, ...]] = {
     ),
 }
 
+# Permiso nuevo -> permisos de los roles que lo reciben al crearse (una sola
+# vez, cuando el permiso no existía). Mantiene el acceso que esos roles ya
+# tenían: la pestaña Alertas de concesiones se abría con gestionar o
+# consultar; solo se da a quien tiene consultar porque recurso_alertas lo
+# exige (un rol con solo gestionar quedaría incumpliendo la dependencia).
+OTORGAR_AL_CREAR: dict[str, tuple[str, ...]] = {
+    "recurso_alertas": ("recurso_consultar",),
+}
+
 # (nombre viejo, nombre nuevo), en orden de aplicación.
 RENOMBRES: tuple[tuple[str, str], ...] = (
     ("infraccion_cargue", "infraccion_super_gestion"),
@@ -280,6 +295,10 @@ def _validar_catalogo() -> None:
         # Si uno exige al otro, el permiso dependiente no se podría otorgar nunca.
         if b in DEPENDENCIAS.get(a, ()) or a in DEPENDENCIAS.get(b, ()):
             raise ValueError(f"{a} y {b} no pueden ser incompatibles: uno exige al otro")
+    for permiso, origen in OTORGAR_AL_CREAR.items():
+        for r in (permiso, *origen):
+            if r not in conocidos:
+                raise ValueError(f"OTORGAR_AL_CREAR menciona un permiso fuera del catálogo: {r}")
     for permiso, anteriores in DESCRIPCIONES_ANTERIORES.items():
         if permiso not in conocidos:
             raise ValueError(f"DESCRIPCIONES_ANTERIORES menciona un permiso fuera del catálogo: {permiso}")

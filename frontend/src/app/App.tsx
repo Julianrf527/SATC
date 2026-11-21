@@ -104,7 +104,7 @@ const inferPermissionFromPath = (path: string): string | string[] => {
     // === CONCESIONES DE AGUAS (app-recurso) ===
     "/recurso/manage": ["recurso_gestionar", "recurso_super_gestion"],
     "/recurso/consult": "recurso_consultar",
-    "/recurso/alerts": ["recurso_gestionar", "recurso_consultar"],
+    "/recurso/alerts": "recurso_alertas",
     // Quien sube (abogado o técnico) o revisa documentos (permisos de revisor).
     "/recurso/my-reports": [
       "recurso_gestionar",
