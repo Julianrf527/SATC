@@ -13,12 +13,14 @@ import pytz
 from db.deps import get_db_managed
 from db.models.expediente import Expediente
 from services.alertas import (
+    agrupar_alertas,
+    calcular_alertas_activas,
     calcular_alertas_expediente,
-    calcular_alertas_expedientes,
     fecha_limite_habiles,
     hoy_bogota,
 )
-from satc_shared.alertas import LIMITE_MAXIMO, paginar_alertas
+from satc_shared.alertas import LIMITE_MAXIMO, marcar_responsable, paginar_alertas, permisos_de_roles
+import services.etapas as etapas_mod
 
 from core.permission import Permission
 ASSIGN_PERMISSION = Permission.ASSIGN_PERMISSION
@@ -52,6 +54,20 @@ _calcular_alertas_expediente_infraccion = calcular_alertas_expediente
 
 # ── ALERTAS DE INFRACCIONES ────────────────────────────────────────────────────
 
+async def permisos_del_usuario(user_id: int, alertas) -> set[str]:
+    """Permisos del usuario entre los que piden las alertas por rol (solo
+    se consultan esos). Pasa por ``services.etapas`` para que los tests
+    sustituyan ``verify_permission`` en un solo sitio."""
+    return {p for p in permisos_de_roles(alertas) if await etapas_mod.verify_permission(user_id, p)}
+
+
+def estadisticas_semaforo(alertas) -> dict:
+    estadisticas = {"verde": 0, "amarillo": 0, "rojo": 0, "vencido": 0}
+    for a in alertas:
+        estadisticas[a["semaforo"]["estado"]] += 1
+    return estadisticas
+
+
 @router.get("/alertas/todas")
 async def obtener_alertas_todos_expedientes_infraccion(
     request: Request,
@@ -63,14 +79,18 @@ async def obtener_alertas_todos_expedientes_infraccion(
     tipo: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db_managed),
 ):
-    """Alertas de la pestaña Alertas.
+    """Alertas de la pestaña Alertas (exige ``infraccion_alertas``, el permiso
+    que desbloquea la pestaña; con él se ven las dos vistas).
 
-    - ``alcance=mios`` (por defecto): los expedientes a cargo del usuario
-      (comportamiento previo, sin cambios).
-    - ``alcance=todos``: todos los expedientes; exige ``infraccion_alertas``.
+    - ``alcance=mios`` (por defecto, "Mis alertas"): las alertas de las que el
+      usuario es responsable AHORA: como persona (``encargado_id``: abogado,
+      técnico o líder técnico asignado) o por rol (``roles_responsables``:
+      asignar informes, líder de proyecto). Pueden ser de cualquier
+      expediente; si no tiene nada asignado, la lista sale vacía.
+    - ``alcance=todos`` ("Todas"): todas las alertas.
 
-    Cada alerta trae ``es_responsable`` (el usuario es el abogado responsable
-    de ese expediente) para que el frontend enlace a Gestionar o a Consultar.
+    Cada alerta trae ``es_responsable`` (``satc_shared.alertas.marcar_responsable``).
+    Los expedientes archivados no tienen alertas.
 
     Sin ``page`` responde como siempre (``alertas[radicado][clave]``; los
     filtros se ignoran). Con ``page`` responde una página de la lista plana
@@ -80,56 +100,30 @@ async def obtener_alertas_todos_expedientes_infraccion(
     alcance completo, sin filtros).
     """
     user_id = verify_gateway_token(request)["user_id"]
+    await exigir_permiso(user_id, Permission.FILE_ALERTS)
 
-    stmt = select(Expediente.id, Expediente.radicado, Expediente.abogado_responsable_id).order_by(Expediente.id)
-    if alcance == "todos":
-        await exigir_permiso(user_id, Permission.FILE_ALERTS)
-    else:
-        stmt = stmt.where(Expediente.abogado_responsable_id == user_id)
-    expedientes = (await db.execute(stmt)).all()
+    radicados, por_expediente = await calcular_alertas_activas(db, hoy_bogota())
+    permisos = await permisos_del_usuario(
+        user_id, [a for alertas in por_expediente.values() for a in alertas.values()]
+    )
 
-    fecha_hoy = hoy_bogota()
-    alertas_totales = {}
-    estadisticas = {"verde": 0, "amarillo": 0, "rojo": 0, "vencido": 0}
-
-    if expedientes:
-        por_expediente = await calcular_alertas_expedientes([e[0] for e in expedientes], db, fecha_hoy)
-        for exp_id, radicado_exp, abogado_id in expedientes:
-            alertas = por_expediente.get(exp_id)
-            if alertas:
-                es_responsable = abogado_id == user_id
-                for a in alertas.values():
-                    a["es_responsable"] = es_responsable
-                    estadisticas[a["semaforo"]["estado"]] += 1
-                alertas_totales[radicado_exp] = alertas
+    alertas_totales = agrupar_alertas(radicados, por_expediente, user_id, permisos, alcance == "mios")
 
     base = {
         "ok": True,
         "alcance": alcance,
-        "total_expedientes": len(expedientes),
+        # "Todas": expedientes activos; "Mis alertas": los que tienen alguna mía.
+        "total_expedientes": len(radicados) if alcance == "todos" else len(alertas_totales),
         "expedientes_con_alertas": len(alertas_totales),
-        "estadisticas_semaforo": estadisticas,
+        "estadisticas_semaforo": estadisticas_semaforo(
+            a for alertas in alertas_totales.values() for a in alertas.values()
+        ),
     }
     if page is not None:
         pagina = paginar_alertas(alertas_totales, page=page, limit=limit,
                                  radicado=radicado, estado=estado, tipo=tipo)
         return JSONResponse(content={**base, **pagina}, status_code=200)
-
-    if not expedientes:
-        return JSONResponse(content={
-            "ok": True, "alcance": alcance, "alertas": {}, "total_expedientes": 0,
-            "expedientes_con_alertas": 0,
-            "estadisticas_semaforo": {"verde": 0, "amarillo": 0, "rojo": 0, "vencido": 0},
-        }, status_code=200)
-
-    return JSONResponse(content={
-        "ok": True,
-        "alcance": alcance,
-        "alertas": alertas_totales,
-        "total_expedientes": len(expedientes),
-        "expedientes_con_alertas": len(alertas_totales),
-        "estadisticas_semaforo": estadisticas,
-    }, status_code=200)
+    return JSONResponse(content={**base, "alertas": alertas_totales}, status_code=200)
 
 
 @router.get("/alertas/{expediente_id}")
@@ -146,10 +140,10 @@ async def obtener_alertas_expediente_infraccion(
 
     fecha_hoy = hoy_bogota()
     alertas = await calcular_alertas_expediente(expediente_id, db, fecha_hoy)
-
-    estadisticas = {"verde": 0, "amarillo": 0, "rojo": 0, "vencido": 0}
+    permisos = await permisos_del_usuario(user_id, alertas.values())
     for a in alertas.values():
-        estadisticas[a["semaforo"]["estado"]] += 1
+        marcar_responsable(a, user_id, permisos)
+    estadisticas = estadisticas_semaforo(alertas.values())
 
     return JSONResponse(content={
         "ok": True,

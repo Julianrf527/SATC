@@ -359,9 +359,36 @@ Cada alerta:
     "estado": "amarillo", "color_hex": "#f59e0b", "porcentaje_avance": 61.9,
     "urgencia": "media", "dias_transcurridos": 13, "dias_restantes": 8,
     "dias_totales": 21, "esta_vencido": false
-  }
+  },
+  "expediente_id": 12,
+  "encargado_id": 7,
+  "roles_responsables": [],
+  "estado_documento": null,
+  "proceso_id": null,
+  "informe_id": null,
+  "es_responsable": true
 }
 ```
+
+**Responsable** (de quién es la tarea AHORA; contrato de `satc_shared.alertas`):
+
+- `encargado_id`: la persona a cargo; `roles_responsables`: lista de
+  `{"permiso", "etiqueta"}`. Si `roles_responsables` trae elementos, la alerta
+  es de **todo** usuario con alguno de esos permisos y `encargado_id` es
+  `null`; si viene vacía, es del `encargado_id`.
+- `es_responsable`: la alerta es del usuario de la petición (según la regla
+  anterior).
+- `estado_documento` / `proceso_id`: estado e id del proceso de revisión
+  vigente del documento de la tarea (`null` si aún no hay proceso).
+  `informe_id`: el informe técnico de las alertas de visita y seguimiento.
+
+| Alerta | Responsable |
+|---|---|
+| `visita_asignar`, `seguimiento_asignar` | Rol **Asignar informes** (`infraccion_asignar_informes`) |
+| `*_primera_version` | El técnico asignado al informe |
+| `*_aprobacion` (informe) | El técnico; con el proceso `en_revision`, el líder técnico asignado (`revisor_asignado_id`); `finalizado` (devoluciones agotadas, hay que reasignar), rol **Asignar informes** |
+| `*_acto_aprobacion` (actos de concepto, medida y cierre) | El abogado; con el proceso `en_revision`, rol **Líder de proyecto** (`infraccion_lider_proyecto`) |
+| Las demás (respuesta, proyectar actos, solicitud, constancia, término) | El abogado responsable del expediente |
 
 Reglas: todos los plazos en **días hábiles** con festivos de Colombia (el día
 de inicio no cuenta); "hoy" es el día en Bogotá. Una alerta existe mientras
@@ -407,15 +434,23 @@ la fecha límite, `vencido`. `dias_totales`, `dias_transcurridos` y
 
 | Param | Tipo | |
 |---|---|---|
-| `alcance` | `mios` (default) \| `todos` | `todos` exige `infraccion_alertas` |
+| `alcance` | `mios` (default, "Mis alertas") \| `todos` ("Todas") | |
 | `page` | int ≥ 1 | si llega, respuesta paginada |
 | `limit` | int 1–100 (default 10) | |
 | `radicado` | str | contiene (solo con `page`) |
 | `estado` | `verde` \| `amarillo` \| `rojo` \| `vencido` | solo con `page` |
 | `tipo` | str | solo con `page` |
 
-Cada alerta trae además `es_responsable` (el usuario es el encargado) para
-enlazar a Gestionar o a Consulta.
+Exige `infraccion_alertas` (el permiso de la pestaña) en los **dos**
+alcances; sin él, 403.
+
+- `mios`: solo las alertas con `es_responsable = true` (de cualquier
+  expediente: como abogado, técnico, líder técnico, o por rol). Si no tiene
+  ninguna, la lista sale vacía (el usuario mira "Todas").
+  `total_expedientes` = expedientes con alguna alerta suya.
+- `todos`: todas las alertas; `total_expedientes` = expedientes no archivados.
+
+Cada alerta trae los campos de responsable (arriba).
 
 Sin `page` (forma anterior, ignora filtros):
 
@@ -441,8 +476,10 @@ además `radicado` y `clave`. Campos: `alertas`, `total`, `page`, `limit`,
 ```
 
 **Correo semanal**: todos los lunes a las 8:00 (America/Bogota) se envía a
-cada usuario con `infraccion_gestionar` el resumen de alertas de sus
-expedientes (vía app-users). No es un endpoint.
+cada usuario con `infraccion_gestionar`, `infraccion_tecnico`,
+`infraccion_lider_tecnico`, `infraccion_lider_proyecto` o
+`infraccion_asignar_informes` su "Mis alertas" (misma regla que `alcance=mios`;
+sin alertas, no hay correo), vía app-users. No es un endpoint.
 
 ### A.10 Descarga del expediente completo
 

@@ -2,6 +2,14 @@
  "todas_todos": {
   "ok": true,
   "alcance": "todos",
+  "total_expedientes": 12,
+  "expedientes_con_alertas": 12,
+  "estadisticas_semaforo": {
+   "verde": 7,
+   "amarillo": 4,
+   "rojo": 1,
+   "vencido": 10
+  },
   "alertas": {
    "CAR-0001": {
     "respuesta_plazo": {
@@ -22,6 +30,12 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 1,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -44,6 +58,12 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 2,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -66,6 +86,12 @@
       "dias_totales": 15,
       "esta_vencido": true
      },
+     "expediente_id": 3,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -88,6 +114,12 @@
       "dias_totales": 15,
       "esta_vencido": true
      },
+     "expediente_id": 4,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -110,6 +142,12 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 5,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -132,6 +170,17 @@
       "dias_totales": 30,
       "esta_vencido": true
      },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 6,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
     "concepto_constancia_1": {
@@ -152,6 +201,12 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 6,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
     "concepto_constancia_2": {
@@ -172,6 +227,12 @@
       "dias_totales": 15,
       "esta_vencido": true
      },
+     "expediente_id": 6,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
     "concepto_constancia_6": {
@@ -192,6 +253,12 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 6,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
     "concepto_termino": {
@@ -212,6 +279,12 @@
       "dias_totales": 10,
       "esta_vencido": false
      },
+     "expediente_id": 6,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -234,6 +307,17 @@
       "dias_totales": 30,
       "esta_vencido": true
      },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 7,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
     "concepto_termino": {
@@ -254,6 +338,12 @@
       "dias_totales": 30,
       "esta_vencido": false
      },
+     "expediente_id": 7,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -276,6 +366,17 @@
       "dias_totales": 30,
       "esta_vencido": true
      },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 8,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -298,6 +399,12 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 9,
+     "encargado_id": 8,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": false
     }
    },
@@ -320,7 +427,18 @@
       "dias_totales": 30,
       "esta_vencido": true
      },
-     "es_responsable": false
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 10,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     },
     "concepto_termino": {
      "tipo": "concepto_termino",
@@ -340,6 +458,12 @@
       "dias_totales": 5,
       "esta_vencido": true
      },
+     "expediente_id": 10,
+     "encargado_id": null,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": false
     },
     "seguimiento_asignar": {
@@ -360,7 +484,18 @@
       "dias_totales": 30,
       "esta_vencido": false
      },
-     "es_responsable": false
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 10,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     }
    },
    "CAR-0011": {
@@ -382,7 +517,18 @@
       "dias_totales": 30,
       "esta_vencido": true
      },
-     "es_responsable": false
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 11,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     },
     "concepto_constancia_8": {
      "tipo": "concepto_constancia",
@@ -402,6 +548,12 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 11,
+     "encargado_id": 8,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": false
     }
    },
@@ -424,6 +576,12 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 12,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
     "concepto_constancia_9": {
@@ -444,6 +602,12 @@
       "dias_totales": 15,
       "esta_vencido": true
      },
+     "expediente_id": 12,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
     "concepto_termino": {
@@ -464,22 +628,28 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 12,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    }
-  },
-  "total_expedientes": 12,
-  "expedientes_con_alertas": 12,
-  "estadisticas_semaforo": {
-   "verde": 7,
-   "amarillo": 4,
-   "rojo": 1,
-   "vencido": 10
   }
  },
  "todas_mios": {
   "ok": true,
   "alcance": "mios",
+  "total_expedientes": 11,
+  "expedientes_con_alertas": 11,
+  "estadisticas_semaforo": {
+   "verde": 5,
+   "amarillo": 4,
+   "rojo": 1,
+   "vencido": 9
+  },
   "alertas": {
    "CAR-0001": {
     "respuesta_plazo": {
@@ -500,6 +670,12 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 1,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -522,6 +698,12 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 2,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -544,6 +726,12 @@
       "dias_totales": 15,
       "esta_vencido": true
      },
+     "expediente_id": 3,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -566,6 +754,12 @@
       "dias_totales": 15,
       "esta_vencido": true
      },
+     "expediente_id": 4,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -588,6 +782,12 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 5,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -610,6 +810,17 @@
       "dias_totales": 30,
       "esta_vencido": true
      },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 6,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
     "concepto_constancia_1": {
@@ -630,6 +841,12 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 6,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
     "concepto_constancia_2": {
@@ -650,6 +867,12 @@
       "dias_totales": 15,
       "esta_vencido": true
      },
+     "expediente_id": 6,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
     "concepto_constancia_6": {
@@ -670,6 +893,12 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 6,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
     "concepto_termino": {
@@ -690,6 +919,12 @@
       "dias_totales": 10,
       "esta_vencido": false
      },
+     "expediente_id": 6,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -712,6 +947,17 @@
       "dias_totales": 30,
       "esta_vencido": true
      },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 7,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
     "concepto_termino": {
@@ -732,6 +978,12 @@
       "dias_totales": 30,
       "esta_vencido": false
      },
+     "expediente_id": 7,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -754,104 +1006,81 @@
       "dias_totales": 30,
       "esta_vencido": true
      },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 8,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
-   "CAR-0012": {
-    "respuesta_plazo": {
-     "tipo": "respuesta_plazo",
-     "etapa": "Respuesta",
-     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
-     "plazo_legal": "15 días hábiles desde la creación del expediente",
-     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
-     "fecha_inicio": "2026-02-28",
-     "fecha_limite": "2026-03-20",
-     "semaforo": {
-      "estado": "amarillo",
-      "color_hex": "#f59e0b",
-      "porcentaje_avance": 73.3,
-      "urgencia": "media",
-      "dias_transcurridos": 11,
-      "dias_restantes": 4,
-      "dias_totales": 15,
-      "esta_vencido": false
-     },
-     "es_responsable": true
-    },
-    "concepto_constancia_9": {
-     "tipo": "concepto_constancia",
-     "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
-     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar",
-     "fecha_inicio": "2025-12-30",
-     "fecha_limite": "2026-01-22",
+   "CAR-0010": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
      "semaforo": {
       "estado": "vencido",
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 52,
+      "dias_transcurridos": 49,
       "dias_restantes": 0,
-      "dias_totales": 15,
+      "dias_totales": 30,
       "esta_vencido": true
      },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 10,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
-    "concepto_termino": {
-     "tipo": "concepto_termino",
-     "etapa": "Concepto",
-     "accion_requerida": "El término de 15 días hábiles del concepto técnico está en curso",
-     "plazo_legal": "15 días hábiles desde notificación del concepto",
-     "msg": "Término de 15 días hábiles vence el 2026-04-08",
-     "fecha_inicio": "2026-03-15",
-     "fecha_limite": "2026-04-08",
+    "seguimiento_asignar": {
+     "tipo": "seguimiento_asignar",
+     "etapa": "Seguimiento",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el vencimiento del término del auto de requerimiento",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-03-10",
+     "fecha_limite": "2026-04-24",
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 6.7,
+      "porcentaje_avance": 13.3,
       "urgencia": "baja",
-      "dias_transcurridos": 1,
-      "dias_restantes": 14,
-      "dias_totales": 15,
+      "dias_transcurridos": 4,
+      "dias_restantes": 26,
+      "dias_totales": 30,
       "esta_vencido": false
      },
-     "es_responsable": true
-    }
-   }
-  },
-  "total_expedientes": 9,
-  "expedientes_con_alertas": 9,
-  "estadisticas_semaforo": {
-   "verde": 4,
-   "amarillo": 4,
-   "rojo": 1,
-   "vencido": 7
-  }
- },
- "todas_mios_8": {
-  "ok": true,
-  "alcance": "mios",
-  "alertas": {
-   "CAR-0009": {
-    "respuesta_plazo": {
-     "tipo": "respuesta_plazo",
-     "etapa": "Respuesta",
-     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
-     "plazo_legal": "15 días hábiles desde la creación del expediente",
-     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
-     "fecha_inicio": "2026-03-09",
-     "fecha_limite": "2026-03-31",
-     "semaforo": {
-      "estado": "verde",
-      "color_hex": "#22c55e",
-      "porcentaje_avance": 33.3,
-      "urgencia": "baja",
-      "dias_transcurridos": 5,
-      "dias_restantes": 10,
-      "dias_totales": 15,
-      "esta_vencido": false
-     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 10,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    },
@@ -874,6 +1103,335 @@
       "dias_totales": 30,
       "esta_vencido": true
      },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 11,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0012": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-02-28",
+     "fecha_limite": "2026-03-20",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 73.3,
+      "urgencia": "media",
+      "dias_transcurridos": 11,
+      "dias_restantes": 4,
+      "dias_totales": 15,
+      "esta_vencido": false
+     },
+     "expediente_id": 12,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    },
+    "concepto_constancia_9": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar",
+     "fecha_inicio": "2025-12-30",
+     "fecha_limite": "2026-01-22",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 52,
+      "dias_restantes": 0,
+      "dias_totales": 15,
+      "esta_vencido": true
+     },
+     "expediente_id": 12,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    },
+    "concepto_termino": {
+     "tipo": "concepto_termino",
+     "etapa": "Concepto",
+     "accion_requerida": "El término de 15 días hábiles del concepto técnico está en curso",
+     "plazo_legal": "15 días hábiles desde notificación del concepto",
+     "msg": "Término de 15 días hábiles vence el 2026-04-08",
+     "fecha_inicio": "2026-03-15",
+     "fecha_limite": "2026-04-08",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 6.7,
+      "urgencia": "baja",
+      "dias_transcurridos": 1,
+      "dias_restantes": 14,
+      "dias_totales": 15,
+      "esta_vencido": false
+     },
+     "expediente_id": 12,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   }
+  }
+ },
+ "todas_mios_8": {
+  "ok": true,
+  "alcance": "mios",
+  "total_expedientes": 6,
+  "expedientes_con_alertas": 6,
+  "estadisticas_semaforo": {
+   "verde": 3,
+   "amarillo": 0,
+   "rojo": 0,
+   "vencido": 5
+  },
+  "alertas": {
+   "CAR-0006": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 6,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0007": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 7,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0008": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 8,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0009": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-09",
+     "fecha_limite": "2026-03-31",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 33.3,
+      "urgencia": "baja",
+      "dias_transcurridos": 5,
+      "dias_restantes": 10,
+      "dias_totales": 15,
+      "esta_vencido": false
+     },
+     "expediente_id": 9,
+     "encargado_id": 8,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0010": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 10,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    },
+    "seguimiento_asignar": {
+     "tipo": "seguimiento_asignar",
+     "etapa": "Seguimiento",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el vencimiento del término del auto de requerimiento",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-03-10",
+     "fecha_limite": "2026-04-24",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 13.3,
+      "urgencia": "baja",
+      "dias_transcurridos": 4,
+      "dias_restantes": 26,
+      "dias_totales": 30,
+      "esta_vencido": false
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 10,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0011": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 11,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     },
     "concepto_constancia_8": {
@@ -894,30 +1452,225 @@
       "dias_totales": 15,
       "esta_vencido": false
      },
+     "expediente_id": 11,
+     "encargado_id": 8,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
      "es_responsable": true
     }
    }
-  },
-  "total_expedientes": 2,
-  "expedientes_con_alertas": 2,
-  "estadisticas_semaforo": {
-   "verde": 2,
-   "amarillo": 0,
-   "rojo": 0,
-   "vencido": 1
   }
  },
  "todas_mios_50": {
   "ok": true,
   "alcance": "mios",
-  "alertas": {},
-  "total_expedientes": 0,
-  "expedientes_con_alertas": 0,
+  "total_expedientes": 5,
+  "expedientes_con_alertas": 5,
   "estadisticas_semaforo": {
-   "verde": 0,
+   "verde": 1,
    "amarillo": 0,
    "rojo": 0,
-   "vencido": 0
+   "vencido": 5
+  },
+  "alertas": {
+   "CAR-0006": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 6,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0007": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 7,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0008": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 8,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0010": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 10,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    },
+    "seguimiento_asignar": {
+     "tipo": "seguimiento_asignar",
+     "etapa": "Seguimiento",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el vencimiento del término del auto de requerimiento",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-03-10",
+     "fecha_limite": "2026-04-24",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 13.3,
+      "urgencia": "baja",
+      "dias_transcurridos": 4,
+      "dias_restantes": 26,
+      "dias_totales": 30,
+      "esta_vencido": false
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 10,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0011": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 11,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   }
   }
  },
  "expediente_1": {
@@ -941,7 +1694,14 @@
      "dias_restantes": 14,
      "dias_totales": 15,
      "esta_vencido": false
-    }
+    },
+    "expediente_id": 1,
+    "encargado_id": 7,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    }
   },
   "total_alertas": 1,
@@ -973,7 +1733,14 @@
      "dias_restantes": 6,
      "dias_totales": 15,
      "esta_vencido": false
-    }
+    },
+    "expediente_id": 2,
+    "encargado_id": 7,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    }
   },
   "total_alertas": 1,
@@ -1005,7 +1772,14 @@
      "dias_restantes": 0,
      "dias_totales": 15,
      "esta_vencido": true
-    }
+    },
+    "expediente_id": 3,
+    "encargado_id": 7,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    }
   },
   "total_alertas": 1,
@@ -1037,7 +1811,14 @@
      "dias_restantes": 0,
      "dias_totales": 15,
      "esta_vencido": true
-    }
+    },
+    "expediente_id": 4,
+    "encargado_id": 7,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    }
   },
   "total_alertas": 1,
@@ -1069,7 +1850,14 @@
      "dias_restantes": 7,
      "dias_totales": 15,
      "esta_vencido": false
-    }
+    },
+    "expediente_id": 5,
+    "encargado_id": 7,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    }
   },
   "total_alertas": 1,
@@ -1101,7 +1889,19 @@
      "dias_restantes": 0,
      "dias_totales": 30,
      "esta_vencido": true
-    }
+    },
+    "encargado_id": null,
+    "roles_responsables": [
+     {
+      "permiso": "infraccion_asignar_informes",
+      "etiqueta": "Asignar informes"
+     }
+    ],
+    "expediente_id": 6,
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    },
    "concepto_constancia_1": {
     "tipo": "concepto_constancia",
@@ -1120,7 +1920,14 @@
      "dias_restantes": 8,
      "dias_totales": 15,
      "esta_vencido": false
-    }
+    },
+    "expediente_id": 6,
+    "encargado_id": 7,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    },
    "concepto_constancia_2": {
     "tipo": "concepto_constancia",
@@ -1139,7 +1946,14 @@
      "dias_restantes": 0,
      "dias_totales": 15,
      "esta_vencido": true
-    }
+    },
+    "expediente_id": 6,
+    "encargado_id": 7,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    },
    "concepto_constancia_6": {
     "tipo": "concepto_constancia",
@@ -1158,7 +1972,14 @@
      "dias_restantes": 4,
      "dias_totales": 15,
      "esta_vencido": false
-    }
+    },
+    "expediente_id": 6,
+    "encargado_id": 7,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    },
    "concepto_termino": {
     "tipo": "concepto_termino",
@@ -1177,7 +1998,14 @@
      "dias_restantes": 6,
      "dias_totales": 10,
      "esta_vencido": false
-    }
+    },
+    "expediente_id": 6,
+    "encargado_id": 7,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    }
   },
   "total_alertas": 5,
@@ -1209,7 +2037,19 @@
      "dias_restantes": 0,
      "dias_totales": 30,
      "esta_vencido": true
-    }
+    },
+    "encargado_id": null,
+    "roles_responsables": [
+     {
+      "permiso": "infraccion_asignar_informes",
+      "etiqueta": "Asignar informes"
+     }
+    ],
+    "expediente_id": 7,
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    },
    "concepto_termino": {
     "tipo": "concepto_termino",
@@ -1228,7 +2068,14 @@
      "dias_restantes": 1,
      "dias_totales": 30,
      "esta_vencido": false
-    }
+    },
+    "expediente_id": 7,
+    "encargado_id": 7,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    }
   },
   "total_alertas": 2,
@@ -1260,7 +2107,19 @@
      "dias_restantes": 0,
      "dias_totales": 30,
      "esta_vencido": true
-    }
+    },
+    "encargado_id": null,
+    "roles_responsables": [
+     {
+      "permiso": "infraccion_asignar_informes",
+      "etiqueta": "Asignar informes"
+     }
+    ],
+    "expediente_id": 8,
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    }
   },
   "total_alertas": 1,
@@ -1292,7 +2151,14 @@
      "dias_restantes": 10,
      "dias_totales": 15,
      "esta_vencido": false
-    }
+    },
+    "expediente_id": 9,
+    "encargado_id": 8,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": false
    }
   },
   "total_alertas": 1,
@@ -1324,7 +2190,19 @@
      "dias_restantes": 0,
      "dias_totales": 30,
      "esta_vencido": true
-    }
+    },
+    "encargado_id": null,
+    "roles_responsables": [
+     {
+      "permiso": "infraccion_asignar_informes",
+      "etiqueta": "Asignar informes"
+     }
+    ],
+    "expediente_id": 10,
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    },
    "concepto_termino": {
     "tipo": "concepto_termino",
@@ -1343,7 +2221,14 @@
      "dias_restantes": 0,
      "dias_totales": 5,
      "esta_vencido": true
-    }
+    },
+    "expediente_id": 10,
+    "encargado_id": null,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": false
    },
    "seguimiento_asignar": {
     "tipo": "seguimiento_asignar",
@@ -1362,7 +2247,19 @@
      "dias_restantes": 26,
      "dias_totales": 30,
      "esta_vencido": false
-    }
+    },
+    "encargado_id": null,
+    "roles_responsables": [
+     {
+      "permiso": "infraccion_asignar_informes",
+      "etiqueta": "Asignar informes"
+     }
+    ],
+    "expediente_id": 10,
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    }
   },
   "total_alertas": 3,
@@ -1394,7 +2291,19 @@
      "dias_restantes": 0,
      "dias_totales": 30,
      "esta_vencido": true
-    }
+    },
+    "encargado_id": null,
+    "roles_responsables": [
+     {
+      "permiso": "infraccion_asignar_informes",
+      "etiqueta": "Asignar informes"
+     }
+    ],
+    "expediente_id": 11,
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    },
    "concepto_constancia_8": {
     "tipo": "concepto_constancia",
@@ -1413,7 +2322,14 @@
      "dias_restantes": 13,
      "dias_totales": 15,
      "esta_vencido": false
-    }
+    },
+    "expediente_id": 11,
+    "encargado_id": 8,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": false
    }
   },
   "total_alertas": 2,
@@ -1445,7 +2361,14 @@
      "dias_restantes": 4,
      "dias_totales": 15,
      "esta_vencido": false
-    }
+    },
+    "expediente_id": 12,
+    "encargado_id": 7,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    },
    "concepto_constancia_9": {
     "tipo": "concepto_constancia",
@@ -1464,7 +2387,14 @@
      "dias_restantes": 0,
      "dias_totales": 15,
      "esta_vencido": true
-    }
+    },
+    "expediente_id": 12,
+    "encargado_id": 7,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    },
    "concepto_termino": {
     "tipo": "concepto_termino",
@@ -1483,7 +2413,14 @@
      "dias_restantes": 14,
      "dias_totales": 15,
      "esta_vencido": false
-    }
+    },
+    "expediente_id": 12,
+    "encargado_id": 7,
+    "roles_responsables": [],
+    "estado_documento": null,
+    "proceso_id": null,
+    "informe_id": null,
+    "es_responsable": true
    }
   },
   "total_alertas": 3,
@@ -1514,7 +2451,14 @@
       "dias_restantes": 14,
       "dias_totales": 15,
       "esta_vencido": false
-     }
+     },
+     "expediente_id": 1,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     }
    },
    "CAR-0002": {
@@ -1535,7 +2479,14 @@
       "dias_restantes": 6,
       "dias_totales": 15,
       "esta_vencido": false
-     }
+     },
+     "expediente_id": 2,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     }
    },
    "CAR-0003": {
@@ -1556,7 +2507,14 @@
       "dias_restantes": 0,
       "dias_totales": 15,
       "esta_vencido": true
-     }
+     },
+     "expediente_id": 3,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     }
    },
    "CAR-0004": {
@@ -1577,7 +2535,14 @@
       "dias_restantes": 0,
       "dias_totales": 15,
       "esta_vencido": true
-     }
+     },
+     "expediente_id": 4,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     }
    },
    "CAR-0005": {
@@ -1598,7 +2563,14 @@
       "dias_restantes": 7,
       "dias_totales": 15,
       "esta_vencido": false
-     }
+     },
+     "expediente_id": 5,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     }
    },
    "CAR-0006": {
@@ -1619,7 +2591,19 @@
       "dias_restantes": 0,
       "dias_totales": 30,
       "esta_vencido": true
-     }
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 6,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     },
     "concepto_constancia_1": {
      "tipo": "concepto_constancia",
@@ -1638,7 +2622,14 @@
       "dias_restantes": 8,
       "dias_totales": 15,
       "esta_vencido": false
-     }
+     },
+     "expediente_id": 6,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     },
     "concepto_constancia_2": {
      "tipo": "concepto_constancia",
@@ -1657,7 +2648,14 @@
       "dias_restantes": 0,
       "dias_totales": 15,
       "esta_vencido": true
-     }
+     },
+     "expediente_id": 6,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     },
     "concepto_constancia_6": {
      "tipo": "concepto_constancia",
@@ -1676,7 +2674,14 @@
       "dias_restantes": 4,
       "dias_totales": 15,
       "esta_vencido": false
-     }
+     },
+     "expediente_id": 6,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     },
     "concepto_termino": {
      "tipo": "concepto_termino",
@@ -1695,7 +2700,14 @@
       "dias_restantes": 6,
       "dias_totales": 10,
       "esta_vencido": false
-     }
+     },
+     "expediente_id": 6,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     }
    },
    "CAR-0007": {
@@ -1716,7 +2728,19 @@
       "dias_restantes": 0,
       "dias_totales": 30,
       "esta_vencido": true
-     }
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 7,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     },
     "concepto_termino": {
      "tipo": "concepto_termino",
@@ -1735,7 +2759,14 @@
       "dias_restantes": 1,
       "dias_totales": 30,
       "esta_vencido": false
-     }
+     },
+     "expediente_id": 7,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     }
    },
    "CAR-0008": {
@@ -1756,99 +2787,83 @@
       "dias_restantes": 0,
       "dias_totales": 30,
       "esta_vencido": true
-     }
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 8,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     }
    },
-   "CAR-0012": {
-    "respuesta_plazo": {
-     "tipo": "respuesta_plazo",
-     "etapa": "Respuesta",
-     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
-     "plazo_legal": "15 días hábiles desde la creación del expediente",
-     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
-     "fecha_inicio": "2026-02-28",
-     "fecha_limite": "2026-03-20",
-     "semaforo": {
-      "estado": "amarillo",
-      "color_hex": "#f59e0b",
-      "porcentaje_avance": 73.3,
-      "urgencia": "media",
-      "dias_transcurridos": 11,
-      "dias_restantes": 4,
-      "dias_totales": 15,
-      "esta_vencido": false
-     }
-    },
-    "concepto_constancia_9": {
-     "tipo": "concepto_constancia",
-     "etapa": "Concepto",
-     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
-     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
-     "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar",
-     "fecha_inicio": "2025-12-30",
-     "fecha_limite": "2026-01-22",
+   "CAR-0010": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
      "semaforo": {
       "estado": "vencido",
       "color_hex": "#1f2937",
       "porcentaje_avance": 100,
       "urgencia": "critico",
-      "dias_transcurridos": 52,
+      "dias_transcurridos": 49,
       "dias_restantes": 0,
-      "dias_totales": 15,
+      "dias_totales": 30,
       "esta_vencido": true
-     }
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 10,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     },
-    "concepto_termino": {
-     "tipo": "concepto_termino",
-     "etapa": "Concepto",
-     "accion_requerida": "El término de 15 días hábiles del concepto técnico está en curso",
-     "plazo_legal": "15 días hábiles desde notificación del concepto",
-     "msg": "Término de 15 días hábiles vence el 2026-04-08",
-     "fecha_inicio": "2026-03-15",
-     "fecha_limite": "2026-04-08",
+    "seguimiento_asignar": {
+     "tipo": "seguimiento_asignar",
+     "etapa": "Seguimiento",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el vencimiento del término del auto de requerimiento",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-03-10",
+     "fecha_limite": "2026-04-24",
      "semaforo": {
       "estado": "verde",
       "color_hex": "#22c55e",
-      "porcentaje_avance": 6.7,
+      "porcentaje_avance": 13.3,
       "urgencia": "baja",
-      "dias_transcurridos": 1,
-      "dias_restantes": 14,
-      "dias_totales": 15,
+      "dias_transcurridos": 4,
+      "dias_restantes": 26,
+      "dias_totales": 30,
       "esta_vencido": false
-     }
-    }
-   }
-  },
-  "total_expedientes": 9,
-  "expedientes_con_alertas": 9,
-  "estadisticas_semaforo": {
-   "verde": 4,
-   "amarillo": 4,
-   "rojo": 1,
-   "vencido": 7
-  }
- },
- "reporte_semanal_8": {
-  "alertas": {
-   "CAR-0009": {
-    "respuesta_plazo": {
-     "tipo": "respuesta_plazo",
-     "etapa": "Respuesta",
-     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
-     "plazo_legal": "15 días hábiles desde la creación del expediente",
-     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
-     "fecha_inicio": "2026-03-09",
-     "fecha_limite": "2026-03-31",
-     "semaforo": {
-      "estado": "verde",
-      "color_hex": "#22c55e",
-      "porcentaje_avance": 33.3,
-      "urgencia": "baja",
-      "dias_transcurridos": 5,
-      "dias_restantes": 10,
-      "dias_totales": 15,
-      "esta_vencido": false
-     }
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 10,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     }
    },
    "CAR-0011": {
@@ -1869,7 +2884,335 @@
       "dias_restantes": 0,
       "dias_totales": 30,
       "esta_vencido": true
-     }
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 11,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0012": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-02-28",
+     "fecha_limite": "2026-03-20",
+     "semaforo": {
+      "estado": "amarillo",
+      "color_hex": "#f59e0b",
+      "porcentaje_avance": 73.3,
+      "urgencia": "media",
+      "dias_transcurridos": 11,
+      "dias_restantes": 4,
+      "dias_totales": 15,
+      "esta_vencido": false
+     },
+     "expediente_id": 12,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    },
+    "concepto_constancia_9": {
+     "tipo": "concepto_constancia",
+     "etapa": "Concepto",
+     "accion_requerida": "Constancia de citación registrada. Notificar el acto antes de que venza el plazo",
+     "plazo_legal": "15 días hábiles desde fecha de constancia de citación",
+     "msg": "15 días hábiles desde constancia del 2025-12-30 para notificar",
+     "fecha_inicio": "2025-12-30",
+     "fecha_limite": "2026-01-22",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 52,
+      "dias_restantes": 0,
+      "dias_totales": 15,
+      "esta_vencido": true
+     },
+     "expediente_id": 12,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    },
+    "concepto_termino": {
+     "tipo": "concepto_termino",
+     "etapa": "Concepto",
+     "accion_requerida": "El término de 15 días hábiles del concepto técnico está en curso",
+     "plazo_legal": "15 días hábiles desde notificación del concepto",
+     "msg": "Término de 15 días hábiles vence el 2026-04-08",
+     "fecha_inicio": "2026-03-15",
+     "fecha_limite": "2026-04-08",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 6.7,
+      "urgencia": "baja",
+      "dias_transcurridos": 1,
+      "dias_restantes": 14,
+      "dias_totales": 15,
+      "esta_vencido": false
+     },
+     "expediente_id": 12,
+     "encargado_id": 7,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   }
+  },
+  "total_expedientes": 11,
+  "expedientes_con_alertas": 11,
+  "estadisticas_semaforo": {
+   "verde": 5,
+   "amarillo": 4,
+   "rojo": 1,
+   "vencido": 9
+  }
+ },
+ "reporte_semanal_8": {
+  "alertas": {
+   "CAR-0006": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 6,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0007": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 7,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0008": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 8,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0009": {
+    "respuesta_plazo": {
+     "tipo": "respuesta_plazo",
+     "etapa": "Respuesta",
+     "accion_requerida": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "plazo_legal": "15 días hábiles desde la creación del expediente",
+     "msg": "Registrar la etapa de respuesta con radicado y fecha de radicado",
+     "fecha_inicio": "2026-03-09",
+     "fecha_limite": "2026-03-31",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 33.3,
+      "urgencia": "baja",
+      "dias_transcurridos": 5,
+      "dias_restantes": 10,
+      "dias_totales": 15,
+      "esta_vencido": false
+     },
+     "expediente_id": 9,
+     "encargado_id": 8,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0010": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 10,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    },
+    "seguimiento_asignar": {
+     "tipo": "seguimiento_asignar",
+     "etapa": "Seguimiento",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el vencimiento del término del auto de requerimiento",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-03-10",
+     "fecha_limite": "2026-04-24",
+     "semaforo": {
+      "estado": "verde",
+      "color_hex": "#22c55e",
+      "porcentaje_avance": 13.3,
+      "urgencia": "baja",
+      "dias_transcurridos": 4,
+      "dias_restantes": 26,
+      "dias_totales": 30,
+      "esta_vencido": false
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 10,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
+    }
+   },
+   "CAR-0011": {
+    "visita_asignar": {
+     "tipo": "visita_asignar",
+     "etapa": "Visita técnica",
+     "accion_requerida": "Asignar profesional y fecha de programación de la visita",
+     "plazo_legal": "30 días hábiles desde el registro de la respuesta",
+     "msg": "Asignar profesional y fecha de programación de la visita",
+     "fecha_inicio": "2026-01-05",
+     "fecha_limite": "2026-02-17",
+     "semaforo": {
+      "estado": "vencido",
+      "color_hex": "#1f2937",
+      "porcentaje_avance": 100,
+      "urgencia": "critico",
+      "dias_transcurridos": 49,
+      "dias_restantes": 0,
+      "dias_totales": 30,
+      "esta_vencido": true
+     },
+     "encargado_id": null,
+     "roles_responsables": [
+      {
+       "permiso": "infraccion_asignar_informes",
+       "etiqueta": "Asignar informes"
+      }
+     ],
+     "expediente_id": 11,
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     },
     "concepto_constancia_8": {
      "tipo": "concepto_constancia",
@@ -1888,17 +3231,24 @@
       "dias_restantes": 13,
       "dias_totales": 15,
       "esta_vencido": false
-     }
+     },
+     "expediente_id": 11,
+     "encargado_id": 8,
+     "roles_responsables": [],
+     "estado_documento": null,
+     "proceso_id": null,
+     "informe_id": null,
+     "es_responsable": true
     }
    }
   },
-  "total_expedientes": 2,
-  "expedientes_con_alertas": 2,
+  "total_expedientes": 6,
+  "expedientes_con_alertas": 6,
   "estadisticas_semaforo": {
-   "verde": 2,
+   "verde": 3,
    "amarillo": 0,
    "rojo": 0,
-   "vencido": 1
+   "vencido": 5
   }
  }
 }

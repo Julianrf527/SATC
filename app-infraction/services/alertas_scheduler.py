@@ -1,24 +1,34 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from datetime import date, datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import date, timedelta
+from typing import Iterable, Optional
 from dotenv import load_dotenv
 import os
 import logging
 
 
 #DB MODELS Y PERMISOS
-from db.models.expediente import Expediente
 from db.models.envio_alertas_semanal import EnvioAlertasSemanal
 from services.users import get_users_by_permission, users_client
-from services.alertas import calcular_alertas_expedientes, hoy_bogota
+from services.alertas import agrupar_alertas, calcular_alertas_activas, hoy_bogota
+from satc_shared.alertas import permisos_de_roles
+import services.etapas as etapas_mod
 from core.permission import Permission
 
 load_dotenv()
 FILE_MANAGE = Permission.FILE_MANAGE
+# Quienes pueden ser responsables de una alerta: abogado (gestionar),
+# técnico / líder técnico (conceptos), líder de proyecto (revisa actos) y
+# quien asigna visitas. Cada uno recibe sus "Mis alertas".
+PERMISOS_DESTINATARIOS = (
+    Permission.FILE_MANAGE,
+    Permission.TECNICO,
+    Permission.LIDER_TECNICO,
+    Permission.LIDER_PROYECTO,
+    Permission.ASSIGN_REPORTS,
+)
 scheduler = AsyncIOScheduler()
 
 #LOGGER
@@ -27,49 +37,40 @@ logger = logging.getLogger(__name__)
 #FUNCIONES HELPER
 
 
-async def obtener_alertas_usuario(user_id: int, db: AsyncSession) -> dict:
-    """
-    Obtiene las alertas de todos los expedientes de infracción a cargo del abogado.
+async def obtener_alertas_usuario(
+    user_id: int,
+    db: AsyncSession,
+    permisos: Optional[Iterable[str]] = None,
+    calculadas: Optional[tuple[dict, dict]] = None,
+) -> Optional[dict]:
+    """"Mis alertas" del usuario para el reporte semanal: las que le tocan
+    como persona (``encargado_id``) o por rol (``roles_responsables``), igual
+    que la pestaña. ``None`` si no tiene ninguna (no se envía correo).
+
+    ``permisos``: los del usuario entre los roles de las alertas; si no
+    llegan, se consultan. ``calculadas``: resultado de
+    ``calcular_alertas_activas`` para no recalcular por cada destinatario.
     """
     try:
-        stmt = select(Expediente.id, Expediente.radicado).where(
-            Expediente.abogado_responsable_id == user_id
-        ).order_by(Expediente.id)
-        result = await db.execute(stmt)
-        expedientes = result.all()
+        radicados, por_expediente = calculadas or await calcular_alertas_activas(db, hoy_bogota())
+        if permisos is None:
+            roles = permisos_de_roles(a for alertas in por_expediente.values() for a in alertas.values())
+            permisos = {p for p in roles if await etapas_mod.verify_permission(user_id, p)}
 
-        if not expedientes:
-            return None
-
-        alertas_totales = {}
-        fecha_hoy = hoy_bogota()
-
-        por_expediente = await calcular_alertas_expedientes([e[0] for e in expedientes], db, fecha_hoy)
-        for expediente_id, radicado in expedientes:
-            alertas = por_expediente.get(expediente_id)
-            if alertas:
-                alertas_totales[radicado] = alertas
-
+        alertas_totales = agrupar_alertas(radicados, por_expediente, user_id, permisos, solo_mias=True)
         if not alertas_totales:
             return None  # Sin alertas = no enviar email
 
-        estadisticas = {
-            "verde": 0,
-            "amarillo": 0,
-            "rojo": 0,
-            "vencido": 0
-        }
-
-        for radicado, alertas_expediente in alertas_totales.items():
+        estadisticas = {"verde": 0, "amarillo": 0, "rojo": 0, "vencido": 0}
+        for alertas_expediente in alertas_totales.values():
             for alerta in alertas_expediente.values():
-                estado = alerta["semaforo"]["estado"]
-                estadisticas[estado] += 1
+                estadisticas[alerta["semaforo"]["estado"]] += 1
 
         return {
             "alertas": alertas_totales,
-            "total_expedientes": len(expedientes),
+            "total_expedientes": len(alertas_totales),
             "expedientes_con_alertas": len(alertas_totales),
-            "estadisticas_semaforo": estadisticas
+            "estadisticas_semaforo": estadisticas,
         }
 
     except Exception as e:
@@ -92,12 +93,20 @@ async def enviar_reporte_alertas(email: str, alertas_data: dict) -> bool:
 async def tarea_envio_alertas_semanal(db: AsyncSession):
 
     try:
-        # Obtener todos los usuarios con permiso de gestión de infracciones
-        usuarios = await get_users_by_permission(FILE_MANAGE)
+        # Destinatarios: todo el que pueda ser responsable de una alerta, con
+        # sus permisos de rol (de los mismos listados, sin consultar uno a uno).
+        usuarios: dict = {}
+        permisos_por_usuario: dict = {}
+        for permiso in PERMISOS_DESTINATARIOS:
+            for uid, datos in (await get_users_by_permission(permiso)).items():
+                usuarios.setdefault(uid, datos)
+                permisos_por_usuario.setdefault(uid, set()).add(permiso)
 
         if not usuarios:
-            logger.warning("No hay usuarios con permiso de infracciones")
+            logger.warning("No hay usuarios con permisos de infracciones")
             return
+
+        calculadas = await calcular_alertas_activas(db, hoy_bogota())
 
         logger.info(f"Procesando {len(usuarios)} usuarios...")
 
@@ -116,7 +125,9 @@ async def tarea_envio_alertas_semanal(db: AsyncSession):
             try:
                 logger.info(f"  Procesando: {nombre} ({email})")
 
-                alertas_data = await obtener_alertas_usuario(user_id, db)
+                alertas_data = await obtener_alertas_usuario(
+                    user_id, db, permisos=permisos_por_usuario[user_id], calculadas=calculadas
+                )
 
                 if alertas_data:
                     resultado = await enviar_reporte_alertas(email, alertas_data)
@@ -173,7 +184,7 @@ async def ejecutar_envio_semanal(get_db) -> bool:
     """Job del lunes: envía el reporte si este worker reclama la semana.
     Devuelve si envió."""
     async for db in get_db():
-        semana = lunes_de(datetime.now(ZoneInfo("America/Bogota")).date())
+        semana = lunes_de(hoy_bogota())
         if not await reclamar_envio(db, semana):
             logger.info(f"Reporte semanal de alertas {semana} ya enviado por otro proceso")
             return False

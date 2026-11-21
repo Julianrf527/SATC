@@ -33,6 +33,22 @@ Alertas (clave → plazo, inicio → fin):
   inicia cuando el cierre queda habilitado (RESOLUCION_ARCHIVO: como el acto
   del concepto; OFICIO: remisión del oficio; auto de requerimiento de
   seguimiento: primera notificación exitosa de su acto).
+
+Responsable (de quién es la tarea AHORA; el plazo no cambia). Cada alerta
+trae ``expediente_id``, ``encargado_id`` (persona), ``roles_responsables``
+(``[{permiso, etiqueta}]``: si no está vacío, la alerta es de todo usuario con
+alguno de esos permisos y ``encargado_id`` no cuenta), ``estado_documento``
+(estado del proceso de revisión vigente, informativo), ``proceso_id`` e
+``informe_id`` (para abrir la tarea en Mis actuaciones). El endpoint decide
+``es_responsable`` con ``satc_shared.alertas.marcar_responsable``.
+
+- Por defecto: el abogado responsable del expediente.
+- Asignar visita / seguimiento: rol asignar informes.
+- Primera versión del informe: el técnico asignado. Aprobación del informe:
+  en revisión, el líder técnico asignado; finalizado por devoluciones, el rol
+  asignar informes (hay que reasignar); si no, el técnico.
+- Aprobación de un acto: en revisión, el rol líder de proyecto (los actos se
+  revisan por permiso); si no, el abogado.
 """
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -45,6 +61,10 @@ import holidays
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from satc_shared.alertas import marcar_responsable
+from satc_shared.review_process import EN_REVISION, FINALIZADO
+
+from core.permission import Permission
 from db.models.documento_proceso import (
     ETAPA_CIERRE,
     ETAPA_CONCEPTO,
@@ -81,6 +101,10 @@ PLAZO_PROYECTAR_ACTO = 17
 PLAZO_APROBACION_ACTO = 25
 # Aviso (no bloquea) de la fecha de programación de la visita.
 PLAZO_PROGRAMACION_VISITA = 30
+
+# Responsables por rol (``roles_responsables``).
+ROL_ASIGNAR_INFORMES = {"permiso": Permission.ASSIGN_REPORTS, "etiqueta": "Asignar informes"}
+ROL_LIDER_PROYECTO = {"permiso": Permission.LIDER_PROYECTO, "etiqueta": "Líder de proyecto"}
 
 
 # ───────────────────────────────────────────────────────────── días hábiles
@@ -212,9 +236,22 @@ def _alerta(tipo: str, etapa: str, accion: str, plazo: str,
 
 
 def _alerta_plazo(alertas: dict, clave: str, etapa: str, accion: str, dias: int, desde: str,
-                  inicio: date, hoy: date) -> None:
-    alertas[clave] = _alerta(clave, etapa, accion, f"{dias} días hábiles desde {desde}",
-                             inicio, fecha_limite_habiles(inicio, dias), hoy)
+                  inicio: date, hoy: date, **responsable) -> None:
+    """``responsable``: ``encargado_id``, ``roles_responsables``,
+    ``proceso_id``, ``informe_id``, ``estado_documento`` (lo que falte lo
+    completa ``_completar_responsable``)."""
+    alertas[clave] = {**_alerta(clave, etapa, accion, f"{dias} días hábiles desde {desde}",
+                                inicio, fecha_limite_habiles(inicio, dias), hoy), **responsable}
+
+
+def _por_rol(rol: dict, **extra) -> dict:
+    return {"encargado_id": None, "roles_responsables": [rol], **extra}
+
+
+def _del_proceso(proceso) -> dict:
+    if proceso is None:
+        return {}
+    return {"proceso_id": proceso.id, "estado_documento": proceso.estado}
 
 
 # ───────────────────────────────────────────────────── datos de un expediente
@@ -223,6 +260,8 @@ def _alerta_plazo(alertas: dict, clave: str, etapa: str, accion: str, dias: int,
 class _Datos:
     """Lo que necesitan las reglas de UN expediente (ya cargado)."""
     fecha_creacion: date
+    expediente_id: Optional[int] = None
+    abogado_id: Optional[int] = None
     tiene_respuesta: bool = False
     respuesta: object = None                 # primera fila de etapa_respuesta
     medida: object = None                    # su medida preventiva
@@ -236,27 +275,35 @@ class _Datos:
     cierre: object = None
     primeras_versiones: dict = field(default_factory=dict)  # (etapa_tipo, ref_id) -> date
     primera_exitosa: dict = field(default_factory=dict)     # acto_id -> date
+    procesos: dict = field(default_factory=dict)            # (etapa_tipo, ref_id) -> proceso vigente
 
     def primera_version(self, etapa_tipo: str, fila) -> Optional[date]:
         return self.primeras_versiones.get((etapa_tipo, fila.id)) if fila is not None else None
+
+    def proceso(self, etapa_tipo: str, fila):
+        """Proceso de revisión vigente del documento de ``fila`` (o None)."""
+        return self.procesos.get((etapa_tipo, fila.id)) if fila is not None else None
 
 
 # ────────────────────────────────────────────────────────────────── reglas
 
 def _alertas_acto(alertas: dict, prefijo: str, etapa: str, documento: str, inicio: Optional[date],
-                  desde: str, primera: Optional[date], listo: bool, hoy: date) -> None:
-    """Proyectar (17) → aprobar hasta la versión firmada (25) de un acto."""
+                  desde: str, primera: Optional[date], listo: bool, hoy: date, proceso=None) -> None:
+    """Proyectar (17) → aprobar hasta la versión firmada (25) de un acto.
+    Responsable: el abogado; en revisión, el rol líder de proyecto."""
     if listo:
         return
+    del_proceso = _del_proceso(proceso)
     if primera is None:
         if inicio is not None:
             _alerta_plazo(alertas, f"{prefijo}_proyectar", etapa,
                           f"Proyectar el {documento}: cargar la primera versión",
-                          PLAZO_PROYECTAR_ACTO, desde, inicio, hoy)
+                          PLAZO_PROYECTAR_ACTO, desde, inicio, hoy, **del_proceso)
         return
+    turno = _por_rol(ROL_LIDER_PROYECTO) if proceso is not None and proceso.estado == EN_REVISION else {}
     _alerta_plazo(alertas, f"{prefijo}_aprobacion", etapa,
                   f"Aprobar el {documento} y cargar la versión firmada",
-                  PLAZO_APROBACION_ACTO, "la primera versión", primera, hoy)
+                  PLAZO_APROBACION_ACTO, "la primera versión", primera, hoy, **del_proceso, **turno)
 
 
 def _alertas_informe(alertas: dict, d: _Datos, prefijo: str, etapa: str, documento: str, informe,
@@ -266,22 +313,33 @@ def _alertas_informe(alertas: dict, d: _Datos, prefijo: str, etapa: str, documen
         return
     asignado = (informe is not None and informe.profesional_asignado_id
                 and informe.fecha_programacion_visita is not None)
+    informe_id = {"informe_id": informe.id} if informe is not None else {}
     if not asignado:
         if inicio_asignar is not None:
             _alerta_plazo(alertas, f"{prefijo}_asignar", etapa,
                           "Asignar profesional y fecha de programación de la visita",
-                          PLAZO_ASIGNAR_VISITA, desde_asignar, inicio_asignar, hoy)
+                          PLAZO_ASIGNAR_VISITA, desde_asignar, inicio_asignar, hoy,
+                          **_por_rol(ROL_ASIGNAR_INFORMES, **informe_id))
         return
+    proceso = d.proceso(ETAPA_INFORME, informe)
+    del_informe = {**informe_id, **_del_proceso(proceso), "encargado_id": informe.profesional_asignado_id}
     primera = d.primera_version(ETAPA_INFORME, informe)
     if primera is None:
         inicio = informe.fecha_asignacion or _fecha_local(informe.fecha_creacion)
         _alerta_plazo(alertas, f"{prefijo}_primera_version", etapa,
                       f"Cargar la primera versión del {documento}",
-                      PLAZO_PRIMERA_VERSION_INFORME, "la asignación de la visita", inicio, hoy)
+                      PLAZO_PRIMERA_VERSION_INFORME, "la asignación de la visita", inicio, hoy, **del_informe)
         return
+    # De quién es el turno: en revisión, del líder técnico asignado;
+    # finalizado por devoluciones, de quien asigna (hay que reasignar).
+    estado = proceso.estado if proceso is not None else None
+    if estado == EN_REVISION:
+        del_informe["encargado_id"] = informe.revisor_asignado_id
+    elif estado == FINALIZADO:
+        del_informe.update(_por_rol(ROL_ASIGNAR_INFORMES))
     _alerta_plazo(alertas, f"{prefijo}_aprobacion", etapa,
                   f"Aprobar el {documento} y cargar la versión firmada",
-                  PLAZO_APROBACION_INFORME, "la primera versión", primera, hoy)
+                  PLAZO_APROBACION_INFORME, "la primera versión", primera, hoy, **del_informe)
 
 
 def _alertas_concepto_acto(alertas: dict, d: _Datos, concepto, aceptacion: Optional[date], *,
@@ -312,7 +370,8 @@ def _alertas_concepto_acto(alertas: dict, d: _Datos, concepto, aceptacion: Optio
                           PLAZO_PROYECTAR_ACTO, desde, inicio, hoy)
     elif tipo == AUTO_REQUERIMIENTO:
         _alertas_acto(alertas, f"{prefijo}_acto", etapa, "auto de requerimiento", inicio, desde,
-                      d.primera_version(ETAPA_CONCEPTO, concepto), bool(concepto.acto_administrativo_id), hoy)
+                      d.primera_version(ETAPA_CONCEPTO, concepto), bool(concepto.acto_administrativo_id), hoy,
+                      d.proceso(ETAPA_CONCEPTO, concepto))
     return inicio, desde
 
 
@@ -401,7 +460,8 @@ def _calcular(d: _Datos, hoy: date) -> dict:
         _alertas_acto(alertas, "medida_acto", "Respuesta", "acto de la medida preventiva",
                       inicio_respuesta, "el registro de la respuesta",
                       d.primera_version(ETAPA_MEDIDA, d.medida),
-                      bool(d.medida is not None and d.medida.acto_administrativo_id), hoy)
+                      bool(d.medida is not None and d.medida.acto_administrativo_id), hoy,
+                      d.proceso(ETAPA_MEDIDA, d.medida))
 
     # 2-4. Visita técnica.
     visita = d.informes.get("VISITA")
@@ -438,8 +498,21 @@ def _calcular(d: _Datos, hoy: date) -> dict:
     inicio, desde = _inicio_cierre(d, inicio_visita, inicio_seg)
     _alertas_acto(alertas, "cierre_acto", "Cierre", "acto de cierre", inicio, desde,
                   d.primera_version(ETAPA_CIERRE, d.cierre),
-                  bool(d.cierre is not None and d.cierre.acto_administrativo_id), hoy)
+                  bool(d.cierre is not None and d.cierre.acto_administrativo_id), hoy,
+                  d.proceso(ETAPA_CIERRE, d.cierre))
+    for alerta in alertas.values():
+        _completar_responsable(alerta, d)
     return alertas
+
+
+def _completar_responsable(alerta: dict, d: _Datos) -> None:
+    """Campos de responsable que la regla no fijó: por defecto, el abogado."""
+    alerta["expediente_id"] = d.expediente_id
+    alerta.setdefault("encargado_id", d.abogado_id)
+    alerta.setdefault("roles_responsables", [])
+    alerta.setdefault("estado_documento", None)
+    alerta.setdefault("proceso_id", None)
+    alerta.setdefault("informe_id", None)
 
 
 # ─────────────────────────────────────────────────────────── carga en bloque
@@ -469,11 +542,12 @@ async def calcular_alertas_expedientes(
         return {}
 
     datos: dict[int, _Datos] = {}
-    for exp_id, fc, archivado in await _todas(db, ids, lambda lote: select(
-        Expediente.id, Expediente.fecha_creacion, Expediente.archivado
+    for exp_id, fc, archivado, abogado in await _todas(db, ids, lambda lote: select(
+        Expediente.id, Expediente.fecha_creacion, Expediente.archivado, Expediente.abogado_responsable_id,
     ).where(Expediente.id.in_(lote))):
         if not archivado:
-            datos[exp_id] = _Datos(fecha_creacion=fc.date() if hasattr(fc, "date") else fc)
+            datos[exp_id] = _Datos(fecha_creacion=fc.date() if hasattr(fc, "date") else fc,
+                                   expediente_id=exp_id, abogado_id=abogado)
     ids = [i for i in ids if i in datos]
     if not ids:
         return {}
@@ -497,7 +571,8 @@ async def calcular_alertas_expedientes(
     # Informes técnicos (el primero de cada tipo).
     for inf in await _todas(db, ids, lambda lote: select(
         InformeTecnico.id, InformeTecnico.expediente_id, InformeTecnico.tipo_informe,
-        InformeTecnico.profesional_asignado_id, InformeTecnico.fecha_programacion_visita,
+        InformeTecnico.profesional_asignado_id, InformeTecnico.revisor_asignado_id,
+        InformeTecnico.fecha_programacion_visita,
         InformeTecnico.fecha_asignacion, InformeTecnico.fecha_aceptacion_informe, InformeTecnico.fecha_creacion,
     ).where(InformeTecnico.expediente_id.in_(lote)).order_by(InformeTecnico.id)):
         datos[inf.expediente_id].informes.setdefault((inf.tipo_informe or "").upper(), inf)
@@ -541,6 +616,13 @@ async def calcular_alertas_expedientes(
       .group_by(DocumentoProceso.expediente_id, DocumentoProceso.etapa_tipo, DocumentoProceso.etapa_ref_id)):
         datos[exp_id].primeras_versiones[(etapa_tipo, ref_id)] = _fecha_local(primera)
 
+    # Proceso vigente de cada documento (estado = de quién es el turno).
+    for pr in await _todas(db, ids, lambda lote: select(
+        DocumentoProceso.id, DocumentoProceso.expediente_id, DocumentoProceso.etapa_tipo,
+        DocumentoProceso.etapa_ref_id, DocumentoProceso.estado,
+    ).where(DocumentoProceso.expediente_id.in_(lote), DocumentoProceso.activo.is_(True))):
+        datos[pr.expediente_id].procesos[(pr.etapa_tipo, pr.etapa_ref_id)] = pr
+
     # Notificaciones de los actos de auto de requerimiento.
     actos = {}
     for d in datos.values():
@@ -573,6 +655,39 @@ async def calcular_alertas_expedientes(
             d.notifs_seguimiento = notifs_por_acto.get(d.concepto_seguimiento.acto_administrativo_id, [])
         resultado[exp_id] = _calcular(d, fecha_hoy)
     return resultado
+
+
+async def calcular_alertas_activas(db: AsyncSession, fecha_hoy: date) -> tuple[dict[int, str], dict[int, dict]]:
+    """Alertas de TODOS los expedientes no archivados (la pestaña filtra
+    "Mis alertas" por responsable, que puede ser de cualquier expediente).
+    Devuelve ``({expediente_id: radicado}, {expediente_id: {clave: alerta}})``."""
+    radicados = dict((await db.execute(
+        select(Expediente.id, Expediente.radicado)
+        .where(Expediente.archivado.isnot(True)).order_by(Expediente.id)
+    )).all())
+    return radicados, await calcular_alertas_expedientes(list(radicados), db, fecha_hoy)
+
+
+def agrupar_alertas(
+    radicados: dict[int, str],
+    por_expediente: dict[int, dict],
+    user_id: Optional[int],
+    permisos: Iterable[str],
+    solo_mias: bool,
+) -> dict[str, dict]:
+    """``{radicado: {clave: alerta}}`` marcando ``es_responsable`` para el
+    usuario; con ``solo_mias`` deja solo las suyas ("Mis alertas") y quita
+    los expedientes que quedan vacíos. Copia cada alerta: el reporte semanal
+    reutiliza el mismo cálculo para todos los destinatarios."""
+    permisos = set(permisos)
+    salida = {}
+    for exp_id, alertas in por_expediente.items():
+        marcadas = {k: marcar_responsable(dict(a), user_id, permisos) for k, a in alertas.items()}
+        if solo_mias:
+            marcadas = {k: a for k, a in marcadas.items() if a["es_responsable"]}
+        if marcadas:
+            salida[radicados[exp_id]] = marcadas
+    return salida
 
 
 async def calcular_alertas_expediente(expediente_id: int, db: AsyncSession, fecha_hoy: date) -> dict:
