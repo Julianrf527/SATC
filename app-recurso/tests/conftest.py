@@ -223,6 +223,10 @@ class UsersClientStub:
     def __init__(self, permisos: Permisos):
         self.permisos = permisos
         self.notificaciones: list[dict] = []
+        self.reportes_alertas: list[dict] = []
+
+    async def send_alert_report(self, emails, alertas_data, *, title, timeout=30.0):
+        self.reportes_alertas.append({"emails": list(emails), "datos": alertas_data, "title": title})
 
     async def verify_permission(self, user_id, permission):
         return self.permisos.tiene(user_id, permission)

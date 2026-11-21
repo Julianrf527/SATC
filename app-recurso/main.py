@@ -38,14 +38,26 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Crea/migra las tablas y siembra los catálogos. Si falla, el servicio NO
-    arranca (sin tablas cualquier petición fallaría)."""
+    arranca (sin tablas cualquier petición fallaría). Programa el correo
+    semanal de alertas (``ALERTAS_CORREO_SEMANAL=false`` lo apaga)."""
     from db.database import init_db
     from db.seeds import seed_initial_data
 
     await init_db()
     logger.info("Tablas de recurso_db inicializadas correctamente")
     await seed_initial_data()
+
+    scheduler = None
+    if os.getenv("ALERTAS_CORREO_SEMANAL", "true").lower() != "false":
+        from db.database import SessionLocal
+        from services.alertas_correo import crear_scheduler
+
+        scheduler = crear_scheduler(SessionLocal)
+        scheduler.start()
+        logger.info("Correo semanal de alertas programado: lunes 8:00 (America/Bogota)")
     yield
+    if scheduler is not None:
+        scheduler.shutdown(wait=False)
 
 
 app = FastAPI(lifespan=lifespan)

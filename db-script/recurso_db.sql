@@ -572,6 +572,16 @@ ALTER SEQUENCE public.documentos_anexos_id_seq OWNED BY public.documentos_anexos
 
 
 --
+-- Name: envio_alertas_semanal; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.envio_alertas_semanal (
+    semana date NOT NULL,
+    fecha_inicio timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: expediente; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2479,6 +2489,14 @@ ALTER TABLE ONLY public.expediente_involucrado
 
 ALTER TABLE ONLY public.expediente_involucrado
     ADD CONSTRAINT expediente_involucrado_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: envio_alertas_semanal envio_alertas_semanal_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.envio_alertas_semanal
+    ADD CONSTRAINT envio_alertas_semanal_pkey PRIMARY KEY (semana);
 
 
 --
