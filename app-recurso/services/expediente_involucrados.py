@@ -239,7 +239,7 @@ async def desvincular_involucrado(
     usuario: Usuario,
     request: Request | None = None,
     confirmar_eliminar_notificaciones: bool = False,
-) -> list[int]:
+) -> list[dict]:
     """Borra el vínculo (bloqueo optimista con ``version``).
 
     - Con un acto que la reconoce → 409 (no se puede desvincular).
@@ -247,8 +247,8 @@ async def desvincular_involucrado(
       se eliminarán; con ``confirmar_eliminar_notificaciones`` se borran junto
       con el vínculo (como app-infraction).
 
-    Devuelve los archivos de las notificaciones borradas: la ruta los libera en
-    app-docs DESPUÉS del commit (``etapas.liberar_archivos``).
+    Devuelve los usos (app-docs) de las notificaciones borradas: la ruta los
+    libera DESPUÉS del commit (``etapas.liberar_archivos``).
     """
     if vinculo.acto_admin_id is not None:
         raise HTTPException(
@@ -285,9 +285,11 @@ async def desvincular_involucrado(
     if resultado.rowcount == 0:
         raise HTTPException(status_code=409, detail=MSG_MODIFICADO)
 
-    archivos: list[int] = []
+    from services.archivos_entidades import usos_de_fila
+
+    archivos: list[dict] = []
     for n in notificaciones:
-        archivos += [f for f in (n.documento_citacion_id, n.documento_notificacion_id) if f]
+        archivos += usos_de_fila(n)
         await db.delete(n)
 
     audit = await insert_log(

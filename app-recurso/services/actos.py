@@ -42,6 +42,7 @@ from db.models import (
 )
 from db.models.documento_proceso import DocumentoProceso
 import services.docs as docs_svc
+from services.archivos_entidades import como_liberacion, usos
 
 logger = logging.getLogger(__name__)
 
@@ -131,22 +132,30 @@ def validar_clase_acto(clase_acto: Any) -> str:
     return valor
 
 
-async def _incrementar(file_ids: list[int]) -> None:
-    file_ids = [f for f in file_ids if f]
-    if not file_ids:
+async def _incrementar(usos: list[dict], usuario_id: Optional[int]) -> None:
+    """Asocia en app-docs los ``usos`` (``archivos_entidades.usos``) a nombre
+    de ``usuario_id``. Antes del commit: 502 si app-docs falla."""
+    if not usos:
         return
-    resultado = await docs_svc.increment_file_usage(file_ids)
+    resultado = await docs_svc.increment_file_usage(usos=usos, usuario_id=usuario_id)
     if not resultado.get("ok"):
         # Antes del commit: un archivo referenciado con numero_usos=0 se borraría.
         raise HTTPException(status_code=502, detail="No se pudo registrar el uso del archivo en el gestor documental")
 
 
-async def _decrementar(file_ids: list[int]) -> None:
-    file_ids = [f for f in file_ids if f]
-    if file_ids:
-        resultado = await docs_svc.decrement_file_usage(file_ids)
+async def _decrementar(liberar: Any) -> None:
+    """Suelta en app-docs (después del commit, best-effort) una
+    ``Liberacion`` o una lista de usos."""
+    lib = como_liberacion(liberar)
+    if lib.usos:
+        resultado = await docs_svc.decrement_file_usage(usos=lib.usos)
         if not resultado.get("ok"):  # inocuo: el archivo queda con un uso de más
-            logger.warning(f"No se pudo decrementar el uso de {file_ids}: {resultado}")
+            logger.warning(f"No se pudo liberar el uso de {lib.usos}: {resultado}")
+    ids = [f for f in lib.file_ids if f]
+    if ids:
+        resultado = await docs_svc.decrement_file_usage(ids)
+        if not resultado.get("ok"):
+            logger.warning(f"No se pudo decrementar el uso de {ids}: {resultado}")
 
 
 async def validar_numerado_disponible(
@@ -204,7 +213,7 @@ async def crear_acto(
     )
     db.add(acto)
     await db.flush()
-    await _incrementar([int(documento_id)])
+    await _incrementar(usos(acto, [documento_id]), user_id)
     logger.info(f"Acto {clase} {numero} ({etapa_tipo}, {medio.value}) creado por {user_id} (id {acto.id})")
     return acto
 

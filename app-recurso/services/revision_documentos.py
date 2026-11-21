@@ -974,9 +974,10 @@ async def resumen_proceso(
 
 # ═════════════════════════════════════════════════════════════ archivos
 
-async def subir_a_docs(archivo: UploadFile) -> ArchivoRef:
-    """Sube un ``UploadFile`` a app-docs (/files/upload: valida y pasa ClamAV) y
-    devuelve la referencia. Igual que infraction. 400/413/502 como HTTPException."""
+async def subir_a_docs(archivo: UploadFile, usuario_id: int) -> ArchivoRef:
+    """Sube un ``UploadFile`` a app-docs (/files/upload: valida y pasa ClamAV) a
+    nombre de ``usuario_id`` (app-docs registra quién lo subió) y devuelve la
+    referencia. 400/413/502 como HTTPException."""
     nombre = (archivo.filename or "").strip()
     if not nombre:
         raise HTTPException(status_code=400, detail="Archivo sin nombre")
@@ -986,7 +987,9 @@ async def subir_a_docs(archivo: UploadFile) -> ArchivoRef:
     if len(data) > MAX_BYTES_ARCHIVO:
         raise HTTPException(status_code=413, detail="El archivo supera el tamaño máximo permitido (50 MB)")
     try:
-        subido = await docs_svc.files_client.upload(nombre, data, archivo.content_type or "application/octet-stream")
+        subido = await docs_svc.files_client.upload(
+            nombre, data, archivo.content_type or "application/octet-stream", usuario_id=usuario_id,
+        )
     except ServiceClientError as e:
         if e.status_code and 400 <= e.status_code < 500 and e.status_code not in (401, 403):
             detalle = e.body

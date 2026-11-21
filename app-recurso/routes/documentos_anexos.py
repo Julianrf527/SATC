@@ -33,6 +33,7 @@ from core.acceso import requiere_gestion, requiere_lectura
 from db.deps import get_db_managed
 from db.models import DocumentoAnexo
 from services.concurrencia import bloquear_expediente
+from services.archivos_entidades import usos_de_fila, usos_liberados
 from services.etapas import (
     ETAPA_TIPOS_ANEXO,
     auditar,
@@ -127,7 +128,7 @@ async def crear_anexo(request: Request, body: AnexoIn, db: AsyncSession = Depend
     )
     db.add(anexo)
     await db.flush()
-    await registrar_archivos([body.documento_anexo_id])
+    await registrar_archivos(anexo, [body.documento_anexo_id], usuario.user_id)
     await auditar(db, usuario, exp, "CREAR_ANEXO", f"Anexo '{body.nombre}' en {body.etapa_tipo} {body.etapa_ref_id}",
                   body.model_dump(), request)
     data = serializar_anexo(anexo)
@@ -148,7 +149,7 @@ async def editar_anexo(request: Request, anexo_id: int, body: AnexoEditar, db: A
     anexo.nombre = body.nombre
     await db.flush()
     if anterior is not None:
-        await registrar_archivos([nuevo])
+        await registrar_archivos(anexo, [nuevo], usuario.user_id)
     detalle = f"Anexo {anexo_id} editado" + (" (PDF reemplazado)" if anterior is not None else "")
     await auditar(db, usuario, exp, "EDITAR_ANEXO", detalle,
                   {"nombre": body.nombre, "documento_anexo_id": anexo.documento_anexo_id,
@@ -156,7 +157,7 @@ async def editar_anexo(request: Request, anexo_id: int, body: AnexoEditar, db: A
     data = serializar_anexo(anexo)
     await db.commit()
     if anterior:
-        await liberar_archivos([anterior])
+        await liberar_archivos(usos_liberados(anexo, [anterior]))
     return ok("Documento anexo actualizado", data)
 
 
@@ -166,10 +167,10 @@ async def eliminar_anexo(
 ):
     usuario = await requiere_gestion(request)
     anexo, exp = await _anexo(db, anexo_id, expediente_id)
-    file_id = anexo.documento_anexo_id
+    liberar = usos_de_fila(anexo)
     datos = serializar_anexo(anexo)
     await db.delete(anexo)
     await auditar(db, usuario, exp, "ELIMINAR_ANEXO", f"Anexo '{datos['nombre']}' eliminado", datos, request)
     await db.commit()
-    await liberar_archivos([file_id])
+    await liberar_archivos(liberar)
     return ok("Documento anexo eliminado", {"id": anexo_id})

@@ -197,7 +197,7 @@ async def crear_recurso(
     async with integridad_a_409(db, "El expediente ya tiene recurso de reposición"):
         db.add(fila)
         await db.flush()
-    await registrar_archivos([body.file_id])
+    await registrar_archivos(fila, [body.file_id], usuario.user_id)
     await auditar(db, usuario, exp, "CREAR_RECURSO", f"Recurso de reposición radicado {body.radicado}",
                   body.model_dump(), request)
     data = datos_fila(fila, "radicado", "fecha_radicado", "doc_recurso_id", "requiere_pruebas")
@@ -226,7 +226,7 @@ async def requiere_pruebas_recurso(
     anterior = bool(e.recurso.requiere_pruebas)
     if anterior == body.requiere_pruebas:
         return ok("Sin cambios", datos_fila(e.recurso, "requiere_pruebas"))
-    eliminado, archivos = None, []
+    eliminado, archivos = None, None
     if not body.requiere_pruebas and e.pruebas is not None:
         if not body.confirmar_eliminar_pruebas:
             raise HTTPException(status_code=409, detail=aviso_eliminar_practica_pruebas(e.pruebas))

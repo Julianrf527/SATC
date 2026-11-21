@@ -45,7 +45,7 @@ Endpoints (prefijo ``/super-gestion``):
 """
 import logging
 from datetime import date
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -81,6 +81,7 @@ from services.validaciones import (
     motivo_cambio_requiere_pruebas,
 )
 from services.concurrencia import MSG_MODIFICADO, bloquear_expediente, integridad_a_409
+from services.archivos_entidades import Liberacion, usos_liberados
 from services.etapas import (
     AMBITOS_REQUERIMIENTO,
     PADRES_CONCEPTO,
@@ -198,8 +199,11 @@ class Cargue:
     def __init__(self, db: AsyncSession, usuario: Usuario):
         self.db = db
         self.usuario = usuario
-        self.nuevos: list[int] = []
-        self.anteriores: list[int] = []
+        # (fila, file_id): la fila puede no tener id hasta el flush de terminar().
+        self.nuevos: list[tuple[Any, int]] = []
+        self.anteriores: list[tuple[Any, int]] = []
+        # Filas borradas en cascada (eliminar_requerimiento / práctica de pruebas).
+        self.liberar = Liberacion()
         self.actos: list[int] = []
 
     async def campos(self, fila, valores: dict, docs: dict[str, str] | None = None) -> None:
@@ -213,9 +217,9 @@ class Cargue:
                 if anterior == v:
                     continue
                 await validar_pdf(v, docs[campo])
-                self.nuevos.append(v)
+                self.nuevos.append((fila, v))
                 if anterior:
-                    self.anteriores.append(anterior)
+                    self.anteriores.append((fila, anterior))
             setattr(fila, campo, v)
 
     async def acto(self, fila, etapa_tipo: str, datos: Optional[ActoSuper]) -> None:
@@ -239,10 +243,13 @@ class Cargue:
 
     async def terminar(self, exp, evento: str, detalle: str, datos: dict, request: Request) -> None:
         await self.db.flush()
-        await registrar_archivos(self.nuevos)
+        for fila, file_id in self.nuevos:
+            await registrar_archivos(fila, [file_id], self.usuario.user_id)
         await auditar(self.db, self.usuario, exp, evento, detalle, datos, request)
         await self.db.commit()
-        await liberar_archivos(self.anteriores)
+        for fila, file_id in self.anteriores:  # solo si la fila ya no lo usa en otra columna
+            self.liberar.agregar(usos_liberados(fila, [file_id]))
+        await liberar_archivos(self.liberar)
 
 
 def _version(fila, version: Optional[int]) -> None:
@@ -392,7 +399,7 @@ async def super_concepto(request: Request, expediente_id: int, tipo: str, body: 
             raise HTTPException(status_code=409, detail=aviso_eliminar_requerimiento(e.req3))
         eliminado, archivos = await eliminar_requerimiento_etapa3(db, e.req3)
         e.req3 = None
-        c.anteriores.extend(archivos)
+        c.liberar.agregar(archivos)
     if concepto is None:
         if body.tecnico_encargado_id is None:
             raise HTTPException(status_code=400, detail="Para crear el concepto falta: técnico encargado")
@@ -522,7 +529,7 @@ async def super_recurso(request: Request, expediente_id: int, body: RecursoSuper
                     raise HTTPException(status_code=409, detail=aviso_eliminar_practica_pruebas(e.pruebas))
                 eliminado, archivos = await eliminar_practica_pruebas(db, e.pruebas)
                 e.pruebas = None
-                c.anteriores.extend(archivos)
+                c.liberar.agregar(archivos)
             fila.requiere_pruebas = body.requiere_pruebas
         subir_version(fila)
     await c.campos(fila, {"radicado": body.radicado, "fecha_radicado": body.fecha_radicado,

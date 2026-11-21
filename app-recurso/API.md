@@ -288,6 +288,71 @@ Errores: `403`, `404` (expediente inexistente o sin documentos), `502`
 Errores: `403`, `404` (expediente inexistente o sin documentos), `502`
 (app-docs no generó el PDF).
 
+### A.6 Ver un documento del expediente (lectura)
+
+#### `GET /recurso/expedientes/{id}/archivos/{file_id}`
+
+Sirve un documento del expediente para los botones "Ver documento" del
+detalle, de Mis actuaciones (concepto final y edición) y de los actos. El
+navegador ya no pide el archivo directo a app-docs.
+
+- Solo sirve archivos que están en el índice `GET /recurso/expedientes/{id}/documentos`
+  (documentos finales del expediente). Otro `file_id` responde `404`, aunque
+  exista en app-docs.
+- Respuesta en streaming desde app-docs (`satc_shared.archivos.respuesta_archivo`):
+  `Content-Disposition: inline; filename="<descripción>.pdf"`,
+  `X-Content-Type-Options: nosniff`. Reenvía `Range` / `If-Range` (el visor de
+  PDF pide por rangos y recibe `206`).
+- Auditoría `VER_DOCUMENTO` solo en la petición sin `Range` (una por apertura).
+
+Errores: `403` (sin lectura), `404` (expediente inexistente, archivo que no es
+del expediente o que no está en el gestor documental), `502` (app-docs no
+respondió).
+
+En el front, `DocumentosExpediente` (`etapas/comun`) envuelve el contenido y
+`useDocumentos().abrir(fileId)` usa esta ruta; fuera de un provider se sigue
+abriendo desde app-docs (infracción y sancionatorio sin cambios).
+
+### A.7 Dueños de los archivos en app-docs
+
+Cada archivo que usa recurso se registra en app-docs (`file_uso`) con
+`entidad` = nombre de la tabla y `entidad_id` = id de la fila. Las columnas
+están en `services/archivos_entidades.py` (`COLUMNAS_ARCHIVO`); una columna de
+archivo nueva se agrega ahí. Las subidas (`subir_a_docs`) envían el
+`usuario_id` de quien sube.
+
+Todas las escrituras de recurso asocian y sueltan archivos con ese formato:
+
+- Asociar (antes del commit, 502 si app-docs falla):
+  `etapas.registrar_archivos(fila, file_ids, usuario_id)` o
+  `actos._incrementar(usos(fila, file_ids), usuario_id)`. app-docs suma un uso
+  solo por asociación nueva (repetir no cuenta dos veces).
+- Reemplazar (después del commit): `liberar_archivos(usos_liberados(fila, [anterior]))`.
+  Solo suelta el archivo si la fila ya no lo usa en otra columna (citación y
+  notificación, documentos del auto que admite).
+- Borrar una fila: `usos_de_fila(fila)` antes del `delete`. Los borrados en
+  cascada (`eliminar_requerimiento_etapa3`, `eliminar_practica_pruebas`)
+  devuelven una `Liberacion`.
+- Compensación si la petición falla tras asociar (`services/usos_archivos.py`):
+  solo se deshace si todas las asociaciones del lote eran nuevas. Si alguna
+  ya existía, el archivo queda con un uso de más, que es lo seguro.
+
+Excepción: las versiones y adjuntos del proceso de revisión siguen con el
+formato anterior (`file_ids`): los maneja el servicio de revisión, compartido
+con infracción. No entran en la carga inicial.
+
+Si la carga inicial no se corre, soltar un archivo anterior al despliegue no
+le resta el uso (app-docs no encuentra la asociación). Nunca se borra un
+archivo en uso, pero el contador queda alto.
+
+Carga inicial de los archivos que ya existen (una vez tras desplegar,
+idempotente, lotes de 1000 con `/files/registrar-usos`, no cambia
+`numero_usos`):
+
+```sh
+docker compose exec app-recurso python -m services.archivos_entidades
+```
+
 ## B — Revisión de documentos, Mis actuaciones y actos
 
 Reglas comunes:

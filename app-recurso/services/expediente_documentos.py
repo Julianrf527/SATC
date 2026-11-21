@@ -51,6 +51,7 @@ from db.models import (
     Subsanacion,
     TipoVinculo,
 )
+from services.archivos_entidades import uso
 
 
 @dataclass
@@ -58,10 +59,19 @@ class _Colector:
     db: AsyncSession
     documentos: list[dict] = field(default_factory=list)
     actos: list[int] = field(default_factory=list)
+    # Usos en app-docs (entidad, fila) de cada referencia, para liberarlos al
+    # borrar (``eliminar_*``). ``documentos`` lista cada archivo una sola vez.
+    usos: list[dict] = field(default_factory=list)
     _vistos: set[int] = field(default_factory=set)
 
-    def doc(self, file_id: int | None, descripcion: str) -> None:
-        if file_id and file_id not in self._vistos:
+    def doc(self, file_id: int | None, descripcion: str, fila=None) -> None:
+        if not file_id:
+            return
+        if fila is not None:
+            u = uso(fila, file_id)
+            if u not in self.usos:
+                self.usos.append(u)
+        if file_id not in self._vistos:
             self._vistos.add(file_id)
             self.documentos.append({"file_id": file_id, "descripcion": descripcion})
 
@@ -72,18 +82,18 @@ class _Colector:
         if acto is None:
             return
         self.actos.append(acto.id)
-        self.doc(acto.documento_acto_administrativo_id, f"{nombre} No. {acto.numerado}")
+        self.doc(acto.documento_acto_administrativo_id, f"{nombre} No. {acto.numerado}", acto)
         comunicacion = await self.db.scalar(
             select(Comunicacion).where(Comunicacion.acto_administrativo_id == acto.id)
         )
         if comunicacion:
-            self.doc(comunicacion.documento_comunicacion_id, f"Comunicación de {nombre}")
+            self.doc(comunicacion.documento_comunicacion_id, f"Comunicación de {nombre}", comunicacion)
         notificaciones = (await self.db.execute(
             select(Notificacion).where(Notificacion.acto_admin_id == acto.id).order_by(Notificacion.id)
         )).scalars().all()
         for n in notificaciones:
-            self.doc(n.documento_citacion_id, f"Citación de {nombre} (involucrado {n.involucrado_id})")
-            self.doc(n.documento_notificacion_id, f"Notificación de {nombre} (involucrado {n.involucrado_id})")
+            self.doc(n.documento_citacion_id, f"Citación de {nombre} (involucrado {n.involucrado_id})", n)
+            self.doc(n.documento_notificacion_id, f"Notificación de {nombre} (involucrado {n.involucrado_id})", n)
 
     async def anexos(self, etapa_tipo: str, ref_id: int | None, nombre: str) -> None:
         if not ref_id:
@@ -94,7 +104,7 @@ class _Colector:
             .order_by(DocumentoAnexo.fecha_subida, DocumentoAnexo.id)
         )).scalars().all()
         for a in anexos:
-            self.doc(a.documento_anexo_id, f"{nombre} - anexo: {a.nombre}")
+            self.doc(a.documento_anexo_id, f"{nombre} - anexo: {a.nombre}", a)
 
     async def concepto(self, concepto_id: int | None, nombre: str) -> None:
         if not concepto_id:
@@ -102,7 +112,7 @@ class _Colector:
         concepto = await self.db.get(ConceptoTecnico, concepto_id)
         if concepto is None:
             return
-        self.doc(concepto.doc_concepto_tecnico_id, nombre)
+        self.doc(concepto.doc_concepto_tecnico_id, nombre, concepto)
         await self.anexos("concepto_tecnico", concepto.id, nombre)
 
     async def requerimiento(self, requerimiento_id: int | None, nombre: str) -> None:
@@ -112,7 +122,7 @@ class _Colector:
         if req is None:
             return
         await self.acto(req.acto_admin_id, nombre)
-        self.doc(req.doc_oficio_entrada_id, f"Respuesta al {nombre.lower()}")
+        self.doc(req.doc_oficio_entrada_id, f"Respuesta al {nombre.lower()}", req)
         await self.concepto(req.concepto_tecnico_id, f"Concepto técnico adicional ({nombre.lower()})")
         await self.anexos("requerimiento", req.id, nombre)
 
@@ -129,7 +139,7 @@ class _Colector:
             return
         informe = await self.db.get(InformeUsuario, informe_id)
         if informe:
-            self.doc(informe.doc_informe_usuario_id, nombre)
+            self.doc(informe.doc_informe_usuario_id, nombre, informe)
             await self.anexos("informe_usuario", informe.id, nombre)
 
 

@@ -268,6 +268,14 @@ class FilesClientStub:
         self.unificados: list[list[int]] = []
         self.fallar_incremento = False
         self.fallar_unificado = False
+        self.subidos_por: dict[int, int | None] = {}
+        self.descargas: list[tuple[int, str | None]] = []
+        self.usos_registrados: list[dict] = []
+        # file_uso de app-docs: (file_id, entidad, entidad_id) -> usuario_id
+        self.asociaciones: dict[tuple[int, str, str], int | None] = {}
+        # Las filas de los fixtures se crean directo en BD: se asume que la
+        # carga inicial (registrar-usos) ya registro sus asociaciones.
+        self.carga_inicial = True
 
     def registrar(self, content: bytes = b"%PDF-1.4", content_type: str = "application/pdf") -> int:
         """Simula un archivo ya subido a app-docs; devuelve su id."""
@@ -301,28 +309,82 @@ class FilesClientStub:
 
         yield _Respuesta()
 
-    async def upload(self, filename, content, content_type="application/octet-stream", *, timeout=60.0):
+    async def upload(self, filename, content, content_type="application/octet-stream", *, usuario_id=None,
+                     timeout=60.0):
         from satc_shared.clients import UploadResult
 
         self._siguiente += 1
         fid = self._siguiente
         self.contenidos[fid] = (content, content_type)
         self.subidos.append(filename)
+        self.subidos_por[fid] = usuario_id
         return UploadResult(ok=True, file_id=fid, file_url=f"/files/{fid}", file_hash=f"hash{fid}")
 
-    async def increment_usage(self, file_ids):
+    async def registrar_usos(self, usos):
+        from satc_shared.clients import UsageResult
+
+        self.usos_registrados.extend(dict(u) for u in usos)
+        for u in usos:
+            self.asociaciones.setdefault(self._clave(u), None)
+        return UsageResult(ok=True)
+
+    @staticmethod
+    def _clave(u) -> tuple[int, str, str]:
+        return (int(u["file_id"]), u["entidad"], str(u["entidad_id"]))
+
+    @contextlib.asynccontextmanager
+    async def download_stream(self, file_id, *, range=None, if_range=None, timeout=300.0):
+        from satc_shared.clients import NotFoundError
+
+        if file_id not in self.contenidos:
+            raise NotFoundError("no existe", service="app-docs", status_code=404)
+        contenido = self.contenidos[file_id][0]
+        self.descargas.append((file_id, range))
+
+        class _Respuesta:
+            status_code = 206 if range else 200
+            headers = {"content-type": "application/pdf", "content-disposition": "inline",
+                       "content-length": str(len(contenido))}
+
+            async def aiter_bytes(self):
+                yield contenido
+
+        yield _Respuesta()
+
+    async def increment_usage(self, file_ids=None, *, usos=None, usuario_id=None):
+        """Como app-docs: con ``usos`` cada asociación nueva suma un uso
+        (repetirla no); ``incrementados`` lleva un file_id por uso sumado."""
         from satc_shared.clients import ServiceClientError, UsageResult
 
         if self.fallar_incremento:
             raise ServiceClientError("app-docs caído", service="app-docs", status_code=503)
-        self.incrementados.extend(file_ids)
-        return UsageResult(ok=True)
+        if usos is None:
+            self.incrementados.extend(file_ids)
+            return UsageResult(ok=True)
+        registrados = 0
+        for u in usos:
+            clave = self._clave(u)
+            if clave not in self.asociaciones:
+                self.asociaciones[clave] = usuario_id
+                self.incrementados.append(clave[0])
+                registrados += 1
+        return UsageResult(ok=True, registrados=registrados)
 
-    async def decrement_usage(self, file_ids):
+    async def decrement_usage(self, file_ids=None, *, usos=None):
+        """Con ``usos`` borra la asociación y resta solo si existía."""
         from satc_shared.clients import UsageResult
 
-        self.decrementados.extend(file_ids)
-        return UsageResult(ok=True)
+        if usos is None:
+            self.decrementados.extend(file_ids)
+            return UsageResult(ok=True)
+        quitados = 0
+        for u in usos:
+            clave = self._clave(u)
+            if clave in self.asociaciones or self.carga_inicial:
+                self.asociaciones.pop(clave, None)
+                self.decrementados.append(clave[0])
+                quitados += 1
+        return UsageResult(ok=True, quitados=quitados)
 
     def download(self, file_id, *, timeout=120.0):
         from contextlib import asynccontextmanager

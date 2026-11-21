@@ -23,6 +23,7 @@ from core.acceso import requiere_gestion, requiere_lectura
 from db.deps import get_db_managed
 from db.models import ActoAdmite
 from services.concurrencia import MSG_ASIGNADO, actualizar_versionado, bloquear_expediente
+from services.archivos_entidades import usos_liberados
 from services.etapas import (
     MSG_NO_TECNICO,
     ActoFinalIn,
@@ -161,8 +162,10 @@ async def documentos_admite(
         await validar_pdf(file_id, CAMPOS_DOCUMENTOS[campo])
     anteriores = {k: getattr(e.admite, k) for k in enviados}
     nueva = await actualizar_versionado(db, ActoAdmite, e.admite.id, body.version, enviados)
-    await registrar_archivos(v for k, v in enviados.items() if v != anteriores[k])
+    await registrar_archivos(e.admite, (v for k, v in enviados.items() if v != anteriores[k]), usuario.user_id)
     await auditar(db, usuario, exp, "DOCUMENTOS_AUTO_ADMITE", "Documentos del auto que admite", enviados, request)
+    actuales = {**{c: getattr(e.admite, c) for c in CAMPOS_DOCUMENTOS}, **enviados}.values()
+    liberar = usos_liberados(e.admite, (v for k, v in anteriores.items() if v != enviados[k]), actuales)
     await db.commit()
-    await liberar_archivos(v for k, v in anteriores.items() if v and v != enviados[k])
+    await liberar_archivos(liberar)
     return ok("Documentos del auto que admite guardados", {"id": e.admite.id, "version": nueva, **enviados})

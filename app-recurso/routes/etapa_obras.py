@@ -60,7 +60,7 @@ async def registrar_informe(
         fila = ReciboSatisfaccionObras(expediente_id=exp.id, informe_usuario_id=informe.id)
         db.add(fila)
         await db.flush()
-    await registrar_archivos([body.file_id])
+    await registrar_archivos(informe, [body.file_id], usuario.user_id)
     await auditar(db, usuario, exp, "REGISTRAR_INFORME_OBRAS", f"Informe del usuario radicado {body.radicado}",
                   body.model_dump(), request)
     data = {**datos_fila(fila, "informe_usuario_id"), "informe": datos_fila(informe, "radicado", "fecha_radicado")}
@@ -87,7 +87,7 @@ async def registrar_nuevo_informe(
         db.add(informe)
         await db.flush()
         await enlazar_hijo(db, e.obras, "nuevo_informe_usuario_id", informe.id)
-    await registrar_archivos([body.file_id])
+    await registrar_archivos(informe, [body.file_id], usuario.user_id)
     await auditar(db, usuario, exp, "REGISTRAR_NUEVO_INFORME", f"Nuevo informe del usuario radicado {body.radicado}",
                   body.model_dump(), request)
     data = datos_fila(informe, "radicado", "fecha_radicado", "doc_informe_usuario_id")

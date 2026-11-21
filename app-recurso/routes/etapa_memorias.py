@@ -62,7 +62,7 @@ async def registrar_planos(
     async with integridad_a_409(db, "Ya existe, otra persona lo creó al mismo tiempo o el radicado ya está registrado"):
         db.add(fila)
         await db.flush()
-    await registrar_archivos([body.file_id])
+    await registrar_archivos(fila, [body.file_id], usuario.user_id)
     await auditar(db, usuario, exp, "REGISTRAR_PLANOS", f"Radicado de planos {body.radicado}", body.model_dump(), request)
     data = datos_fila(fila, "radicado", "fecha_radicado", "doc_planos_id")
     await db.commit()
@@ -87,7 +87,7 @@ async def registrar_subsanacion(
         db.add(fila)
         await db.flush()
         await enlazar_hijo(db, e.memorias, "subsanacion_id", fila.id)
-    await registrar_archivos([body.file_id])
+    await registrar_archivos(fila, [body.file_id], usuario.user_id)
     await auditar(db, usuario, exp, "REGISTRAR_SUBSANACION", f"Subsanación radicado {body.radicado}",
                   body.model_dump(), request)
     data = datos_fila(fila, "radicado", "fecha_radicado", "doc_planos_ajustados_id")

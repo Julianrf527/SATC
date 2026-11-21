@@ -10,8 +10,9 @@ técnico de pruebas: con el concepto el cambio se bloquea
 - los documentos anexos de la práctica;
 - su proceso de revisión (versiones, revisiones, auditoría: cascada en BD).
 
-Devuelve los ``file_id`` a descontar en app-docs DESPUÉS del commit
-(``liberar_archivos``). No hace commit.
+Devuelve la ``Liberacion`` para app-docs DESPUÉS del commit
+(``liberar_archivos``): usos de cada fila borrada y ``file_ids`` de las
+versiones/adjuntos de revisión. No hace commit.
 """
 from __future__ import annotations
 
@@ -20,29 +21,30 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import ActoAdministrativo, DocumentoAnexo, PracticaPruebas
 from db.models.documento_proceso import DocumentoProceso, DocumentoProcesoRevision, DocumentoProcesoVersion
+from services.archivos_entidades import Liberacion
 from services.expediente_documentos import _Colector
 
 
-async def eliminar_practica_pruebas(db: AsyncSession, pruebas: PracticaPruebas) -> tuple[dict, list[int]]:
+async def eliminar_practica_pruebas(db: AsyncSession, pruebas: PracticaPruebas) -> tuple[dict, Liberacion]:
     """Borra ``pruebas`` (sin concepto) y lo que cuelga de ella.
 
-    Devuelve ``(resumen para auditoría, file_ids a liberar)``."""
+    Devuelve ``(resumen para auditoría, Liberacion)``."""
     if pruebas.concepto_tecnico_id:
         raise ValueError("La práctica de pruebas con concepto técnico no se elimina")
     acto_id = pruebas.acto_admin_id
 
     colector = _Colector(db)
     await colector.practica_pruebas(pruebas)
-    archivos = [d["file_id"] for d in colector.documentos]
+    archivos = Liberacion(usos=list(colector.usos))
 
     procesos = list((await db.execute(select(DocumentoProceso.id).where(
         DocumentoProceso.etapa_tipo == "practica_pruebas", DocumentoProceso.etapa_ref_id == pruebas.id,
     ))).scalars().all())
     if procesos:
-        archivos += [f for f in (await db.execute(
+        archivos.file_ids += [f for f in (await db.execute(
             select(DocumentoProcesoVersion.file_id).where(DocumentoProcesoVersion.proceso_id.in_(procesos))
         )).scalars().all() if f]
-        archivos += [f for f in (await db.execute(
+        archivos.file_ids += [f for f in (await db.execute(
             select(DocumentoProcesoRevision.adjunto_file_id).where(DocumentoProcesoRevision.proceso_id.in_(procesos))
         )).scalars().all() if f]
         await db.execute(delete(DocumentoProceso).where(DocumentoProceso.id.in_(procesos)))
