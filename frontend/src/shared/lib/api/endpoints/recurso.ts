@@ -31,6 +31,9 @@ export const RECURSO_ENDPOINTS = {
   // === A.5 Descarga del expediente completo ===
   RECURSO_EXPEDIENTE_DOCUMENTOS: (expedienteId: number) =>
     `/recurso/expedientes/${expedienteId}/documentos`,
+  /** Un documento del expediente (recurso valida que sea de ese expediente). */
+  RECURSO_EXPEDIENTE_ARCHIVO: (expedienteId: number, fileId: number) =>
+    `/recurso/expedientes/${expedienteId}/archivos/${fileId}`,
   RECURSO_EXPEDIENTE_DESCARGAR: (expedienteId: number) =>
     `/recurso/expedientes/${expedienteId}/descargar`,
 

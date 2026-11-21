@@ -6,6 +6,7 @@ import { mensajeEscritura } from "../../api/errors";
 import type { ConceptoParaTecnico } from "../../types";
 import { CampoPdf } from "../../etapas/comun/campos/Campos";
 import CamposConcepto from "../../etapas/comun/campos/CamposConcepto";
+import DocumentosExpediente from "../../etapas/comun/DocumentosExpediente";
 import {
   bodyConceptoFinal,
   conceptoFinalInicial,
@@ -82,6 +83,7 @@ function Formulario({ concepto, onCerrar }: { concepto: ConceptoParaTecnico; onC
           </p>
         </div>
       </div>
+      <DocumentosExpediente expedienteId={concepto.expediente.id}>
       <fieldset disabled={editar.isPending} className="space-y-4">
         <CampoPdf
           etiqueta="Nuevo concepto firmado (PDF)"
@@ -91,6 +93,7 @@ function Formulario({ concepto, onCerrar }: { concepto: ConceptoParaTecnico; onC
         />
         <CamposConcepto form={form} onChange={(c) => setForm((f) => ({ ...f, ...c }))} campos={concepto.campos} />
       </fieldset>
+      </DocumentosExpediente>
       {error && (
         <div role="alert" className="alert alert-error py-2 text-sm">
           <AlertCircle size={16} />

@@ -1,6 +1,6 @@
 import { Eye, FileText, X } from "lucide-react";
 import { Campo } from "@shared/ui/form/Campo";
-import { openDocumentById } from "@shared/lib/documentViewer";
+import { useDocumentos } from "@shared/lib/documentos";
 import { formatFileSize } from "@shared/lib/format";
 
 type Props = {
@@ -17,6 +17,7 @@ type Props = {
  * igual que los archivos de infraction; aquí solo se elige el archivo.
  */
 export default function ComprobantePagoField({ archivo, onChange, fileIdActual = null, disabled = false }: Props) {
+  const documentos = useDocumentos();
   return (
     <Campo
       etiqueta="Comprobante de pago (PDF) *"
@@ -26,7 +27,7 @@ export default function ComprobantePagoField({ archivo, onChange, fileIdActual =
         <button
           type="button"
           className="btn btn-ghost btn-xs gap-1 text-success self-start mb-1 -ml-2"
-          onClick={() => openDocumentById(fileIdActual)}
+          onClick={() => documentos.abrir(fileIdActual)}
         >
           <Eye size={14} />
           Ver comprobante actual

@@ -288,6 +288,47 @@ Errores: `403`, `404` (expediente inexistente o sin documentos), `502`
 Errores: `403`, `404` (expediente inexistente o sin documentos), `502`
 (app-docs no generó el PDF).
 
+### A.6 Ver un documento del expediente (lectura)
+
+#### `GET /recurso/expedientes/{id}/archivos/{file_id}`
+
+Sirve un documento del expediente para los botones "Ver documento" del
+detalle, de Mis actuaciones (concepto final y edición) y de los actos. El
+navegador ya no pide el archivo directo a app-docs.
+
+- Solo sirve archivos que están en el índice `GET /recurso/expedientes/{id}/documentos`
+  (documentos finales del expediente). Otro `file_id` responde `404`, aunque
+  exista en app-docs.
+- Respuesta en streaming desde app-docs (`satc_shared.archivos.respuesta_archivo`):
+  `Content-Disposition: inline; filename="<descripción>.pdf"`,
+  `X-Content-Type-Options: nosniff`. Reenvía `Range` / `If-Range` (el visor de
+  PDF pide por rangos y recibe `206`).
+- Auditoría `VER_DOCUMENTO` solo en la petición sin `Range` (una por apertura).
+
+Errores: `403` (sin lectura), `404` (expediente inexistente, archivo que no es
+del expediente o que no está en el gestor documental), `502` (app-docs no
+respondió).
+
+En el front, `DocumentosExpediente` (`etapas/comun`) envuelve el contenido y
+`useDocumentos().abrir(fileId)` usa esta ruta; fuera de un provider se sigue
+abriendo desde app-docs (infracción y sancionatorio sin cambios).
+
+### A.7 Dueños de los archivos en app-docs
+
+Cada archivo que usa recurso se registra en app-docs (`file_uso`) con
+`entidad` = nombre de la tabla y `entidad_id` = id de la fila. Las columnas
+están en `services/archivos_entidades.py` (`COLUMNAS_ARCHIVO`); una columna de
+archivo nueva se agrega ahí. Las subidas (`subir_a_docs`) envían el
+`usuario_id` de quien sube.
+
+Carga inicial de los archivos que ya existen (una vez tras desplegar,
+idempotente, lotes de 1000 con `/files/registrar-usos`, no cambia
+`numero_usos`):
+
+```sh
+docker compose exec app-recurso python -m services.archivos_entidades
+```
+
 ## B — Revisión de documentos, Mis actuaciones y actos
 
 Reglas comunes:

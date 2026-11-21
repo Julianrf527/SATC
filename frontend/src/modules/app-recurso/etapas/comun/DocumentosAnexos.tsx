@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { FileText, Paperclip, Pencil, Plus, Trash2 } from "lucide-react";
 import { RECURSO_ENDPOINTS } from "@shared/lib/api";
-import { openDocumentById } from "@shared/lib/documentViewer";
+import { useDocumentos } from "@shared/lib/documentos";
 import { formatDate } from "@shared/lib/format";
 import { Modal } from "@shared/ui";
 import type { AnexoEtapa, SetToast } from "../../types";
@@ -47,6 +47,7 @@ export default function DocumentosAnexos({
   const [editando, setEditando] = useState<AnexoEtapa | null>(null);
   const [eliminar, setEliminar] = useState<AnexoEtapa | null>(null);
   const { ejecutar, ocupado } = useEscritura(expedienteId, setToast);
+  const documentos = useDocumentos();
 
   if (anexos.length === 0 && !puedeGestionar) return null;
 
@@ -122,7 +123,7 @@ export default function DocumentosAnexos({
                   )}
                   <button
                     type="button"
-                    onClick={() => openDocumentById(a.documento_anexo_id)}
+                    onClick={() => documentos.abrir(a.documento_anexo_id)}
                     className="btn btn-success btn-sm gap-1 px-2 tooltip"
                     data-tip="Ver documento PDF"
                   >

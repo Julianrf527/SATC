@@ -7,6 +7,7 @@ import { useInvalidarExpediente } from "../../api/invalidar";
 import type { ConceptoParaTecnico } from "../../types";
 import { CampoPdf } from "../../etapas/comun/campos/Campos";
 import CamposConcepto from "../../etapas/comun/campos/CamposConcepto";
+import DocumentosExpediente from "../../etapas/comun/DocumentosExpediente";
 import {
   bodyConceptoFinal,
   conceptoFinalInicial,
@@ -81,6 +82,7 @@ function Formulario({ concepto, onCargado }: { concepto: ConceptoParaTecnico; on
           </p>
         </div>
       </div>
+      <DocumentosExpediente expedienteId={concepto.expediente.id}>
       <fieldset disabled={cargar.isPending} className="space-y-4">
         <CampoPdf
           etiqueta="Concepto firmado (PDF)"
@@ -90,6 +92,7 @@ function Formulario({ concepto, onCargado }: { concepto: ConceptoParaTecnico; on
         />
         <CamposConcepto form={form} onChange={(c) => setForm((f) => ({ ...f, ...c }))} campos={concepto.campos} />
       </fieldset>
+      </DocumentosExpediente>
       {error && (
         <div role="alert" className="alert alert-error py-2 text-sm">
           <AlertCircle size={16} />

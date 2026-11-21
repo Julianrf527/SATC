@@ -268,6 +268,9 @@ class FilesClientStub:
         self.unificados: list[list[int]] = []
         self.fallar_incremento = False
         self.fallar_unificado = False
+        self.subidos_por: dict[int, int | None] = {}
+        self.descargas: list[tuple[int, str | None]] = []
+        self.usos_registrados: list[dict] = []
 
     def registrar(self, content: bytes = b"%PDF-1.4", content_type: str = "application/pdf") -> int:
         """Simula un archivo ya subido a app-docs; devuelve su id."""
@@ -301,14 +304,41 @@ class FilesClientStub:
 
         yield _Respuesta()
 
-    async def upload(self, filename, content, content_type="application/octet-stream", *, timeout=60.0):
+    async def upload(self, filename, content, content_type="application/octet-stream", *, usuario_id=None,
+                     timeout=60.0):
         from satc_shared.clients import UploadResult
 
         self._siguiente += 1
         fid = self._siguiente
         self.contenidos[fid] = (content, content_type)
         self.subidos.append(filename)
+        self.subidos_por[fid] = usuario_id
         return UploadResult(ok=True, file_id=fid, file_url=f"/files/{fid}", file_hash=f"hash{fid}")
+
+    async def registrar_usos(self, usos):
+        from satc_shared.clients import UsageResult
+
+        self.usos_registrados.extend(dict(u) for u in usos)
+        return UsageResult(ok=True)
+
+    @contextlib.asynccontextmanager
+    async def download_stream(self, file_id, *, range=None, if_range=None, timeout=300.0):
+        from satc_shared.clients import NotFoundError
+
+        if file_id not in self.contenidos:
+            raise NotFoundError("no existe", service="app-docs", status_code=404)
+        contenido = self.contenidos[file_id][0]
+        self.descargas.append((file_id, range))
+
+        class _Respuesta:
+            status_code = 206 if range else 200
+            headers = {"content-type": "application/pdf", "content-disposition": "inline",
+                       "content-length": str(len(contenido))}
+
+            async def aiter_bytes(self):
+                yield contenido
+
+        yield _Respuesta()
 
     async def increment_usage(self, file_ids):
         from satc_shared.clients import ServiceClientError, UsageResult

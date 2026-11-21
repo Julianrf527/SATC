@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { FileText } from "lucide-react";
-import { isValidDocumentId, openDocumentById } from "@shared/lib/documentViewer";
+import { isValidDocumentId } from "@shared/lib/documentViewer";
+import { useDocumentos } from "@shared/lib/documentos";
 
 type DatoProps = { icono: ReactNode; label: string; children: ReactNode; destacado?: boolean };
 
@@ -28,13 +29,14 @@ export const SinDato = ({ texto = "Sin registrar" }: { texto?: string }) => (
   <span className="text-base-content/60 italic font-normal">{texto}</span>
 );
 
-/** Botón para abrir un PDF de app-docs (o "Sin documento"). */
+/** Botón para abrir un documento del expediente (o "Sin documento"). */
 export function VerDocumento({ fileId, texto = "Ver documento" }: { fileId: number | null | undefined; texto?: string }) {
+  const documentos = useDocumentos();
   if (!isValidDocumentId(fileId)) return <SinDato texto="Sin documento" />;
   return (
     <button
       type="button"
-      onClick={() => openDocumentById(fileId)}
+      onClick={() => documentos.abrir(fileId)}
       className="btn btn-ghost btn-xs gap-1 text-success px-1"
       title={texto}
     >
