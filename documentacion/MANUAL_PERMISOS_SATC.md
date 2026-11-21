@@ -146,7 +146,7 @@ En la pantalla Informes solo se pueden elegir como profesional usuarios con
 | ------------------------------- | ---------------------- | ----------- |
 | `recurso_gestionar`             | `/recurso/manage`      | Desbloquea la pantalla Gestionar de concesiones. Sirve para crear y editar expedientes, asignarse procesos y proyectar los documentos de cada etapa. |
 | `recurso_consultar`             | `/recurso/consult`     | Desbloquea la pantalla Consulta de concesiones. Sirve para ver cualquier expediente en solo lectura y descargarlo completo. |
-| `recurso_alertas`               | `/recurso/alerts`      | Desbloquea la pestaña Alertas de concesiones. Sirve para ver los vencimientos que le corresponden (Mis alertas) o los de todos los expedientes. Al crearse se otorgó a los roles que tenían `recurso_gestionar` o `recurso_consultar`. |
+| `recurso_alertas`               | `/recurso/alerts`      | Desbloquea la pestaña Alertas de concesiones. Sirve para ver los vencimientos que le corresponden (Mis alertas) o los de todos los expedientes. Al crearse se otorgó a los roles que tenían `recurso_consultar`. |
 | `recurso_super_gestion`         | —                      | Desbloquea el cargue histórico de concesiones. Sirve para cargar directamente cualquier etapa de expedientes viejos sin revisión ni asignación. |
 | `recurso_lider_juridico`        | `/recurso/my-reports`  | Desbloquea Mis actuaciones de concesiones como líder jurídico. Sirve para revisar los actos administrativos en el primer paso de su cadena. |
 | `recurso_lider_proyecto`        | `/recurso/my-reports`  | Desbloquea Mis actuaciones de concesiones como líder del proyecto. Sirve para revisar tras el líder jurídico o técnico/SIG y aprobar para firma. |
@@ -204,6 +204,7 @@ solo sentido: tener el permiso requerido no obliga a tener el dependiente.
 | `infraccion_super_gestion`       | `infraccion_gestionar`    |
 | `documento_crear`                | `documento_gestionar`     |
 | `documento_revisar`              | `documento_gestionar`     |
+| `recurso_alertas`                | `recurso_consultar`       |
 | `recurso_super_gestion`          | `recurso_gestionar`       |
 | `recurso_tecnico`                | `recurso_consultar`       |
 | `recurso_lider_juridico`         | `recurso_consultar`       |

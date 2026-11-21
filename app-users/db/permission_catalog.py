@@ -212,6 +212,7 @@ DEPENDENCIAS: dict[str, tuple[str, ...]] = {
     "infraccion_super_gestion": ("infraccion_gestionar",),
     "documento_crear": ("documento_gestionar",),
     "documento_revisar": ("documento_gestionar",),
+    "recurso_alertas": ("recurso_consultar",),
     "recurso_super_gestion": ("recurso_gestionar",),
     "recurso_tecnico": ("recurso_consultar",),
     "recurso_lider_juridico": ("recurso_consultar",),
@@ -255,9 +256,11 @@ DESCRIPCIONES_ANTERIORES: dict[str, tuple[str, ...]] = {
 
 # Permiso nuevo -> permisos de los roles que lo reciben al crearse (una sola
 # vez, cuando el permiso no existía). Mantiene el acceso que esos roles ya
-# tenían: la pestaña Alertas de concesiones se abría con gestionar o consultar.
+# tenían: la pestaña Alertas de concesiones se abría con gestionar o
+# consultar; solo se da a quien tiene consultar porque recurso_alertas lo
+# exige (un rol con solo gestionar quedaría incumpliendo la dependencia).
 OTORGAR_AL_CREAR: dict[str, tuple[str, ...]] = {
-    "recurso_alertas": ("recurso_gestionar", "recurso_consultar"),
+    "recurso_alertas": ("recurso_consultar",),
 }
 
 # (nombre viejo, nombre nuevo), en orden de aplicación.

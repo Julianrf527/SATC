@@ -411,6 +411,7 @@ COPY public.permiso_requiere (permiso_id, requiere_id) FROM stdin;
 22	16
 23	17
 26	24
+33	25
 27	25
 28	25
 29	25
