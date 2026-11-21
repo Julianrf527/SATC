@@ -95,6 +95,7 @@ class ServiceClient:
         json: Any = None,
         params: Mapping[str, Any] | None = None,
         files: Any = None,
+        data: Mapping[str, Any] | None = None,
         cookies: Mapping[str, str] | None = None,
         timeout: float | None = None,
         ok: tuple[int, ...] = (200,),
@@ -104,7 +105,7 @@ class ServiceClient:
         try:
             async with self._client(timeout, cookies) as client:
                 response = await client.request(
-                    method, url, json=json, params=params, files=files, headers=headers,
+                    method, url, json=json, params=params, files=files, data=data, headers=headers,
                 )
         except httpx.TimeoutException as e:
             raise ServiceTimeoutError(f"Timeout llamando a {self.target}: {e}", service=self.target) from e
@@ -121,15 +122,19 @@ class ServiceClient:
         *,
         json: Any = None,
         timeout: float | None = None,
+        headers: Mapping[str, str] | None = None,
+        ok: tuple[int, ...] = (200,),
     ) -> AsyncIterator[httpx.Response]:
-        headers = self.headers()
+        """``headers`` se suman a las de autenticación; ``ok``: status que no
+        lanzan (p. ej. 206/416 en descargas por rango)."""
+        headers = {**dict(headers or {}), **self.headers()}  # la autenticación no se puede pisar
         url = f"{self.base_url}{path}"
         try:
             async with self._client(timeout) as client:
                 async with client.stream(method, url, json=json, headers=headers) as response:
-                    if response.status_code != 200:
+                    if response.status_code not in ok:
                         await response.aread()
-                    self._raise_for_status(response)
+                    self._raise_for_status(response, ok)
                     yield response
         except httpx.TimeoutException as e:
             raise ServiceTimeoutError(f"Timeout llamando a {self.target}: {e}", service=self.target) from e

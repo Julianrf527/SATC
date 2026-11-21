@@ -3,7 +3,9 @@ Tests de routes/files.py: subida con deduplicación, acceso interno por token,
 y contadores de uso (increment/decrement).
 """
 import io
+import os
 import pytest
+from minio.error import S3Error
 
 from conftest import gateway_headers, service_headers
 
@@ -41,9 +43,52 @@ def _pdf():
     return {"archivo": ("a.pdf", io.BytesIO(b"%PDF-1.4"), "application/pdf")}
 
 
+class _ObjetoFalso:
+    """Imita la respuesta de urllib3 que devuelve minio.get_object."""
+
+    def __init__(self, data: bytes):
+        self.data = data
+        self.cerrado = False
+
+    def stream(self, n):
+        for i in range(0, len(self.data), n):
+            yield self.data[i:i + n]
+
+    def close(self):
+        self.cerrado = True
+
+    def release_conn(self):
+        pass
+
+
+CONTENIDO = b"%PDF-1.4 0123456789"
+
+
+class _NoExiste(S3Error):
+    """S3Error sin depender de la firma del constructor según la versión de minio."""
+
+    def __init__(self):
+        Exception.__init__(self, "NoSuchKey")
+
+
 @pytest.fixture
 def stub_minio(monkeypatch):
-    monkeypatch.setattr(f"{MODULE}.get_file_from_minio", lambda name: {"ok": True, "data": b"%PDF-1.4 x"})
+    """MinIO falso: {file_url: bytes}; por defecto todo objeto vale CONTENIDO."""
+    objetos = {}
+    abiertos = []
+
+    def fake_abrir(name, offset=0, length=0):
+        data = objetos.get(name, CONTENIDO)
+        if data is None:
+            raise _NoExiste()
+        objeto = _ObjetoFalso(data[offset:offset + length] if length else data[offset:])
+        abiertos.append(objeto)
+        return objeto
+
+    monkeypatch.setattr(f"{MODULE}.abrir_objeto", fake_abrir)
+    monkeypatch.setattr(f"{MODULE}.tamano_objeto", lambda name: len(objetos.get(name, CONTENIDO)))
+    objetos["_abiertos"] = abiertos
+    return objetos
 
 
 # --- upload -----------------------------------------------------------------
@@ -96,7 +141,7 @@ async def test_download_gateway_con_permiso_de_modulo_ok(client, perms, make_fil
     perms[(7, permiso)] = True
     r = await client.get(f"/files/download/{fh.id}", headers=gateway_headers(7))
     assert r.status_code == 200
-    assert r.content == b"%PDF-1.4 x"
+    assert r.content == CONTENIDO
 
 
 async def test_download_gateway_falso_403(client, perms, make_file_hash, stub_minio):
@@ -182,6 +227,89 @@ async def test_increment_sin_ids_400(client):
     assert r.status_code == 400
 
 
+# --- download: rangos y cabeceras ----------------------------------------------
+
+async def _archivo(make_file_hash, **kw):
+    return await make_file_hash(file_size=len(CONTENIDO), **kw)
+
+
+async def test_download_completo_anuncia_rangos_y_longitud(client, make_file_hash, stub_minio):
+    fh = await _archivo(make_file_hash)
+    r = await client.get(f"/files/download/{fh.id}", headers=service_headers())
+    assert r.status_code == 200
+    assert r.content == CONTENIDO
+    assert r.headers["accept-ranges"] == "bytes"
+    assert r.headers["content-length"] == str(len(CONTENIDO))
+    assert r.headers["etag"] == f'"{fh.file_hash}"'
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["referrer-policy"] == "no-referrer"
+    assert "content-encoding" not in r.headers
+    assert r.headers["content-disposition"].startswith("inline;")
+    assert r.headers["content-type"].startswith("application/pdf")
+    assert all(o.cerrado for o in stub_minio["_abiertos"])
+
+
+@pytest.mark.parametrize("rango,esperado,content_range", [
+    ("bytes=0-3", CONTENIDO[0:4], "bytes 0-3/19"),
+    ("bytes=9-", CONTENIDO[9:], "bytes 9-18/19"),
+    ("bytes=-5", CONTENIDO[-5:], "bytes 14-18/19"),
+    ("bytes=10-999", CONTENIDO[10:], "bytes 10-18/19"),
+])
+async def test_download_rango_206(client, make_file_hash, stub_minio, rango, esperado, content_range):
+    fh = await _archivo(make_file_hash)
+    r = await client.get(f"/files/download/{fh.id}", headers={**service_headers(), "Range": rango})
+    assert r.status_code == 206
+    assert r.content == esperado
+    assert r.headers["content-range"] == content_range
+    assert r.headers["content-length"] == str(len(esperado))
+
+
+async def test_download_rango_fuera_del_archivo_416(client, make_file_hash, stub_minio):
+    fh = await _archivo(make_file_hash)
+    r = await client.get(f"/files/download/{fh.id}", headers={**service_headers(), "Range": "bytes=50-60"})
+    assert r.status_code == 416
+    assert r.headers["content-range"] == f"bytes */{len(CONTENIDO)}"
+
+
+@pytest.mark.parametrize("rango", ["bytes=0-1,4-5", "items=0-3", "bytes=5-2"])
+async def test_download_rango_no_soportado_sirve_completo(client, make_file_hash, stub_minio, rango):
+    fh = await _archivo(make_file_hash)
+    r = await client.get(f"/files/download/{fh.id}", headers={**service_headers(), "Range": rango})
+    assert r.status_code == 200
+    assert r.content == CONTENIDO
+
+
+async def test_download_if_range_distinto_sirve_completo(client, make_file_hash, stub_minio):
+    fh = await _archivo(make_file_hash)
+    h = {**service_headers(), "Range": "bytes=0-3"}
+    r = await client.get(f"/files/download/{fh.id}", headers={**h, "If-Range": '"otro"'})
+    assert r.status_code == 200 and r.content == CONTENIDO
+    r = await client.get(f"/files/download/{fh.id}", headers={**h, "If-Range": f'"{fh.file_hash}"'})
+    assert r.status_code == 206 and r.content == CONTENIDO[:4]
+
+
+async def test_download_tipo_no_seguro_va_como_adjunto(client, make_file_hash, stub_minio):
+    fh = await _archivo(make_file_hash, content_type="text/plain", file_url="satc-documentos/files/ab/x.txt")
+    r = await client.get(f"/files/download/{fh.id}", headers=service_headers())
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/octet-stream")
+    assert r.headers["content-disposition"].startswith("attachment;")
+
+
+async def test_download_sin_tamano_en_bd_lo_consulta(client, make_file_hash, stub_minio):
+    fh = await make_file_hash(file_size=None)
+    r = await client.get(f"/files/download/{fh.id}", headers={**service_headers(), "Range": "bytes=0-3"})
+    assert r.status_code == 206
+    assert r.headers["content-range"] == f"bytes 0-3/{len(CONTENIDO)}"
+
+
+async def test_download_objeto_ausente_404(client, make_file_hash, stub_minio):
+    fh = await _archivo(make_file_hash)
+    stub_minio[fh.file_url] = None
+    r = await client.get(f"/files/download/{fh.id}", headers=service_headers())
+    assert r.status_code == 404
+
+
 # --- download-unified -------------------------------------------------------
 
 def _pdf_de(paginas: int) -> bytes:
@@ -241,3 +369,23 @@ async def test_download_unified_solo_servicios(client, perms, make_file_hash, st
     a = await make_file_hash()
     r = await client.post("/files/download-unified", headers=gateway_headers(7), json={"file_ids": [a.id]})
     assert r.status_code in (401, 403)
+
+
+# --- punta a punta: FilesClient -> app-docs -> respuesta_archivo -----------------
+
+async def test_respuesta_archivo_contra_app_docs_real(client, make_file_hash, stub_minio):
+    import httpx
+    import main as main_module
+    from satc_shared.archivos import respuesta_archivo
+    from satc_shared.clients import FilesClient
+
+    fh = await make_file_hash(file_size=len(CONTENIDO))
+    files = FilesClient(
+        "http://test", service_name="sanctioning-service", secret_key=os.environ["SANCTIONING_SERVICE_SECRET"],
+        transport=httpx.ASGITransport(app=main_module.app),
+    )
+    r = await respuesta_archivo(files, fh.id, {"range": "bytes=0-7"}, nombre="Acta nº 3.pdf")
+    cuerpo = b"".join([b async for b in r.body_iterator])
+    assert r.status_code == 206 and cuerpo == CONTENIDO[:8]
+    assert r.headers["content-range"] == f"bytes 0-7/{len(CONTENIDO)}"
+    assert r.headers["content-disposition"].startswith('inline; filename="Acta no 3.pdf"; filename*=UTF-8')

@@ -61,7 +61,7 @@ async def revisar_documento(
     except ReviewError as e:
         raise http_error(e)
 
-    ref = (await subir_archivo(db, adjunto))[0] if tiene_adjunto else None
+    ref = (await subir_archivo(db, adjunto, user_id))[0] if tiene_adjunto else None
 
     try:
         resultado = await svc.revisar(

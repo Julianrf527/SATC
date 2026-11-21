@@ -285,6 +285,9 @@ async def test_create_ok(client, perms, stub_externos, db_session, make_file_has
     assert asig.revisor_id == 2 and asig.notificado is True
     await db_session.refresh(fh)
     assert fh.numero_usos == 1
+    from db.models.file_uso import FileUso
+    dueno = await db_session.scalar(select(FileUso).where(FileUso.file_id == fh.id))
+    assert (dueno.servicio, dueno.entidad, dueno.entidad_id) == ("docs", "documento", str(doc_id))
     assert [n for n, _ in stub_externos["notificaciones"]] == ["notify_assignment"]
 
 
@@ -576,8 +579,12 @@ async def test_migracion_backfill_e_idempotencia():
         resumen = await aplicar_migraciones(conn)
     assert resumen["versiones_backfill"] == 1
     assert resumen["revisiones_backfill"] == 1
+    assert resumen["usos_docs_backfill"] == 2  # versión + adjunto, dueños "docs"
 
     async with engine.connect() as conn:
+        duenos = (await conn.execute(text(
+            "SELECT file_id, servicio, entidad, entidad_id FROM file_uso ORDER BY file_id"))).all()
+        assert [tuple(d) for d in duenos] == [(fh_v, "docs", "documento", str(doc)), (fh_a, "docs", "documento", str(doc))]
         assert await conn.scalar(text("SELECT file_id FROM versiones_documento WHERE documento_id = :d"), {"d": doc}) == fh_v
         fila = (await conn.execute(text(
             "SELECT adjunto_file_id, adjunto_size FROM revisiones WHERE documento_id = :d"), {"d": doc})).one()
@@ -589,7 +596,9 @@ async def test_migracion_backfill_e_idempotencia():
     # Idempotente: una segunda pasada no toca nada.
     async with engine.begin() as conn:
         resumen = await aplicar_migraciones(conn)
-    assert resumen == {"versiones_backfill": 0, "revisiones_backfill": 0, "origen_eliminado": False}
+    assert resumen == {
+        "versiones_backfill": 0, "revisiones_backfill": 0, "origen_eliminado": False, "usos_docs_backfill": 0,
+    }
 
 
 async def test_migracion_no_borra_origen_si_quedan_procesos_de_otras_apps():

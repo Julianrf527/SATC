@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class _Abierto(BaseModel):
@@ -62,6 +62,32 @@ class UploadResult(_Abierto):
 class UsageResult(_Abierto):
     ok: bool
     message: str | None = None
+    # Formato nuevo (usos): asociaciones creadas/borradas, ids inexistentes y,
+    # con la validación activa, los archivos ajenos que hicieron rechazar el lote.
+    registrados: int = 0
+    quitados: int = 0
+    no_encontrados: list[int] = []
+    rechazados: list[int] = []
+
+
+class UsoArchivo(BaseModel):
+    """Entidad de un módulo que usa un archivo. ``servicio`` no va: app-docs lo
+    toma del service-token."""
+
+    file_id: int
+    entidad: str
+    entidad_id: str
+
+    @field_validator("entidad_id", mode="before")
+    @classmethod
+    def _a_texto(cls, v: Any) -> Any:
+        return str(v) if isinstance(v, int) else v
+
+
+class UsosRequest(BaseModel):
+    file_ids: list[int] | None = None
+    usos: list[UsoArchivo] | None = None
+    usuario_id: int | None = None
 
 
 # --------------------------------------------------------------- app-involved
