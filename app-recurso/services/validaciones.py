@@ -10,7 +10,7 @@ definición de cada regla.
 V1 (permiso de gestión) → ``core.acceso.requiere_gestion``; V2 (encargado) →
 ``etapas.exigir_encargado`` y la asignación atómica; V3 (técnico) →
 ``etapas.crear_concepto`` / ``cargar_concepto_final``; V14 → servicio de
-involucrados (A); V15 → ``etapas.enlazar_hijo`` + ``unique``; V16 → ``unique``
+involucrados; V15 → ``etapas.enlazar_hijo`` + ``unique``; V16 → ``unique``
 de ``expediente_id`` (``integridad_a_409``).
 """
 from __future__ import annotations
@@ -140,9 +140,7 @@ def v11_requerimiento_obras(e) -> Motivo:
 
 def v12_aprueba_memorias(e) -> Motivo:
     """V12: acto que aprueba memorias solo si el ÚLTIMO concepto (subsanación
-    si existe, si no el de memorias) dice ``cumple = true``.
-    TODO(negocio): si el concepto de la subsanación tampoco cumple, el modelo
-    no admite otro ciclo (el plan "asume que cumple")."""
+    si existe, si no el de memorias) dice ``cumple = true``."""
     if e.memorias is None:
         return "Primero debe registrarse el radicado de los planos"
     concepto = e.ultimo_concepto_memorias()
@@ -152,9 +150,7 @@ def v12_aprueba_memorias(e) -> Motivo:
 
 
 def v12_aprueba_obras(e) -> Motivo:
-    """V12: acto que aprueba obras solo si el último concepto dice ``cumple = true``.
-    TODO(negocio): el plan dice que el acto puede "exigir corregir o demoler" la
-    obra, pero V12 lo limita a cuando cumple; se aplica V12."""
+    """V12: acto que aprueba obras solo si el último concepto dice ``cumple = true``."""
     if e.obras is None:
         return "Primero debe registrarse el informe del usuario"
     concepto = e.ultimo_concepto_obras()
@@ -165,7 +161,7 @@ def v12_aprueba_obras(e) -> Motivo:
 
 def v13_recurso(e) -> Motivo:
     """V13: recurso de reposición solo si la decisión está notificada
-    (``services.actos.acto_notificado``, regla provisional de B)."""
+    (``services.actos.acto_notificado``)."""
     if e.decision is None or not e.decision.acto_admin_id:
         return "Primero debe existir la decisión firmada y numerada"
     if not e.decision_notificada:

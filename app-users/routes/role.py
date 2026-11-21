@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
+from satc_shared.permisos_version import incrementar_version_permisos
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete, update, insert
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -369,6 +370,7 @@ async def actualizar_rol(
         )
 
     await db.commit()
+    await incrementar_version_permisos()
 
     return JSONResponse(content={"ok": True}, status_code=200)
 
@@ -457,6 +459,7 @@ async def eliminar_rol(
         )
 
     await db.commit()
+    await incrementar_version_permisos()
 
     return JSONResponse(content={"ok": True}, status_code=200)
 
@@ -598,6 +601,7 @@ async def actualizar_permiso(
         )
 
     await db.commit()
+    await incrementar_version_permisos()
     return JSONResponse(content={"ok": True, "message": "Permiso actualizado correctamente"}, status_code=200)
 
 @router.delete("/permission/delete/{permiso_id}")
@@ -661,6 +665,7 @@ async def eliminar_permiso(
         )
 
     await db.commit()
+    await incrementar_version_permisos()
 
     msg = f"Permiso eliminado correctamente"
     if cantidad_roles > 0:

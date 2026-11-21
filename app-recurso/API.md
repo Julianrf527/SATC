@@ -76,9 +76,14 @@ Orden: más recientes primero (`fecha_creacion` desc).
     "involucrados": [{"involucrado_id": 3, "tipo_vinculo": "SOLICITANTE", "nombre": "Ana Pérez",
                       "tipo_documento": "CC", "numero_documento": 1020304050}]
   }],
-  "page": 1, "limit": 10, "totalCount": 1
+  "total": 1, "page": 1, "limit": 10, "total_pages": 1
 }
 ```
+
+Respuesta paginada estándar de app-recurso (`satc_shared.paginacion`): `data`,
+`total` (tras los filtros), `page`, `limit`, `total_pages` (mínimo 1). Los
+filtros de texto buscan «contiene» sin distinguir mayúsculas; `%` y `_` se
+buscan literales.
 
 Errores: `403`, `422` (params inválidos).
 
@@ -235,10 +240,16 @@ Errores: `400` (NIT sin representante; vínculo de tercero interviniente),
 Desvincula un solicitante. Respuesta: `{"ok": true, "message": "Solicitante
 desvinculado", "data": {"id": 15}}`.
 
+Si la persona tiene notificaciones en los actos del expediente responde `428`
+con el aviso en `detail` («tiene N notificaciones… se eliminarán»); el front lo
+muestra y, si el usuario confirma, repite la petición con
+`&confirmar_eliminar_notificaciones=true`: se borran el vínculo y sus
+notificaciones, se liberan sus archivos en app-docs y la auditoría guarda qué
+notificaciones se eliminaron.
+
 Errores: `400` (vínculo de tercero interviniente), `403`, `404`, `409`
-(versión vieja; o la persona ya tiene notificaciones registradas en el
-expediente o un acto que la reconoce — `TODO(negocio)`: confirmar qué hacer en
-esos casos; hoy se bloquea y no se borra nada), `422` (falta `version`).
+(versión vieja, o la persona tiene un acto que la reconoce), `422` (falta
+`version`), `428` (tiene notificaciones y no se confirmó).
 
 ### A.5 Descarga del expediente completo (lectura)
 
@@ -268,6 +279,12 @@ decreta, concepto técnico y anexos; acto que lo resuelve) → memorias de cálc
 (informes, conceptos, requerimiento, acto). Solo documentos finales (no las
 versiones en revisión). Un archivo repetido aparece una vez.
 
+El PDF lo arma app-docs y se reenvía por bloques (no se carga en memoria).
+Un documento que no esté en el gestor documental se omite y sigue el
+siguiente. Cada descarga queda en la auditoría (`DESCARGAR_EXPEDIENTE`).
+Errores: `403`, `404` (expediente inexistente o sin documentos), `502`
+(«No se pudo generar el PDF del expediente»).
+
 Errores: `403`, `404` (expediente inexistente o sin documentos), `502`
 (app-docs no generó el PDF).
 
@@ -287,10 +304,11 @@ Reglas comunes:
 
   | tipo_documento | etapa_tipo | Pasos |
   |---|---|---|
-  | `AUTO_ADMITE`, `REQUERIMIENTO`, `APRUEBA_MEMORIAS` | acto_admite / requerimiento / memorias_calculo | líder jurídico → líder del proyecto |
-  | `DECISION`, `RECURSO`, `AUTO_PRUEBAS` | decision / recurso_reposicion / practica_pruebas | líder jurídico → líder del proyecto **y** asesora de subdirección |
+  | `AUTO_ADMITE`, `REQUERIMIENTO`, `APRUEBA_MEMORIAS`, `AUTO_PRUEBAS` | acto_admite / requerimiento / memorias_calculo / practica_pruebas | líder jurídico → líder del proyecto |
+  | `DECISION`, `RECURSO` | decision / recurso_reposicion | líder jurídico → líder del proyecto **y** asesora de subdirección |
   | `RECONOCE_TERCERO`, `APRUEBA_OBRAS` | expediente_involucrado / recibo_satisfaccion_obras | provisional: como AUTO_ADMITE (`TODO(negocio)`) |
-  | `CONCEPTO_ETAPA2`, `CONCEPTO_PRUEBAS` | concepto_tecnico | líder técnico **y** SIG → líder del proyecto |
+  | `CONCEPTO_ETAPA2` | concepto_tecnico | líder técnico **y** SIG → líder del proyecto |
+  | `CONCEPTO_PRUEBAS` | concepto_tecnico | líder técnico → líder del proyecto |
   | `CONCEPTO_ADICIONAL`, `CONCEPTO_MEMORIAS`, `CONCEPTO_SUBSANACION`, `CONCEPTO_OBRAS`, `CONCEPTO_OBRAS_SEGUNDO` | concepto_tecnico | líder técnico |
 
 - Flujo: el proceso nace en `pendiente_carga` al asignarse el encargado (lo crea
@@ -451,14 +469,15 @@ Query: `rol` = `encargado` | `revisor` (opcional); `solo_accion` (bool, default
 listado de informes de infraction.
 
 Orden: primero los que requieren mi acción; luego por `fecha_ultima_actualizacion` desc.
-`conteos` es sobre todo el conjunto filtrado (antes de `solo_accion` y de
-paginar); `total` / `total_pages` son de la lista paginada (después de `solo_accion`).
+Respuesta paginada estándar (`data`, `total`, `page`, `limit`, `total_pages`)
+más `conteos` y `filtros`. `conteos` es sobre todo el conjunto filtrado (antes
+de `solo_accion` y de paginar); `total` / `total_pages` son de la lista
+paginada (después de `solo_accion`).
 
 ```json
 {
   "ok": true,
-  "data": {
-    "documentos": [{
+  "data": [{
       "proceso_id": 7, "rol": "encargado", "roles": ["encargado"],
       "accion_pendiente": "Subir la versión corregida",
       "tipo_documento": "DECISION", "tipo_documento_etiqueta": "Decisión",
@@ -471,13 +490,12 @@ paginar); `total` / `total_pages` son de la lista paginada (después de `solo_ac
       "etapa_padre": "decision", "etapa_padre_etiqueta": "...", "sub_proceso": null,
       "nombre": "Decisión - Expediente CA 012-26",
       "fecha_creacion": "...", "fecha_ultima_actualizacion": "..."
-    }],
-    "conteos": {"total": 12, "requieren_accion": 3},
-    "filtros": {"tipos_documento": [{"codigo": "AUTO_ADMITE", "etiqueta": "Auto que admite"}],
-                "estados": [{"codigo": "pendiente_carga", "etiqueta": "Pendiente de carga", "tono": "neutral"}],
-                "roles": [{"codigo": "encargado", "etiqueta": "Encargado"}, {"codigo": "revisor", "etiqueta": "Revisor"}]}
-  },
-  "total": 12, "page": 1, "limit": 20, "total_pages": 1
+  }],
+  "total": 12, "page": 1, "limit": 20, "total_pages": 1,
+  "conteos": {"total": 12, "requieren_accion": 3},
+  "filtros": {"tipos_documento": [{"codigo": "AUTO_ADMITE", "etiqueta": "Auto que admite"}],
+              "estados": [{"codigo": "pendiente_carga", "etiqueta": "Pendiente de carga", "tono": "neutral"}],
+              "roles": [{"codigo": "encargado", "etiqueta": "Encargado"}, {"codigo": "revisor", "etiqueta": "Revisor"}]}
 }
 ```
 
@@ -914,10 +932,10 @@ al crear el recurso (los recursos anteriores al campo quedan en «No»):
 
 - **No**: un abogado se asigna directo el acto que resuelve.
 - **Sí**: cualquier abogado se asigna el **auto que admite y decreta práctica de pruebas**
-  (fila `practica_pruebas`, proceso `AUTO_PRUEBAS`, mismos revisores que el acto que
-  resuelve; el acto **solo se comunica**). Su versión final lleva técnico y fecha de visita
+  (fila `practica_pruebas`, proceso `AUTO_PRUEBAS`, revisan líder jurídico → líder del
+  proyecto; el acto **solo se comunica**). Su versión final lleva técnico y fecha de visita
   (sin aviso de plazo) y hace nacer el **concepto técnico de pruebas** (`tipo = pruebas`,
-  proceso `CONCEPTO_PRUEBAS`, mismos revisores que el de la etapa 2; su versión final solo
+  proceso `CONCEPTO_PRUEBAS`, revisan líder técnico → líder del proyecto; su versión final solo
   pide el PDF y la fecha del concepto). Mientras ese concepto no esté firmado, asignarse o
   cargar el acto que resuelve → 400 "Primero debe cargarse el concepto técnico de la
   práctica de pruebas" (en el árbol: `motivos_bloqueo` del nodo `recurso`, aunque exista).
@@ -1000,7 +1018,7 @@ Respuesta: `{"ok": true, "message", "data": {id, version, acto_id?}}`.
 | GET | `/terceros/expediente/{exp}` | lectura | lista con la forma de `etapas.terceros` |
 | POST | `/terceros` | gestión | `{expediente_id, involucrado_id, representante_id?}` → `201` + vínculo (V14; 409 si ya está vinculado) |
 | PATCH | `/terceros/{vinculo_id}/representante` | gestión | `{representante_id, version}` |
-| DELETE | `/terceros/{vinculo_id}?version=N` | gestión | 409 si tiene acto, notificaciones o el acto en proyección |
+| DELETE | `/terceros/{vinculo_id}?version=N[&confirmar_eliminar_notificaciones=true]` | gestión | 409 si tiene acto o el acto en proyección; 428 si tiene notificaciones sin confirmar (igual que solicitantes) |
 | POST | `/terceros/{vinculo_id}/asignarme` | gestión | crea el proceso `RECONOCE_TERCERO` (encargado = quien se asigna) |
 | POST | `/terceros/{vinculo_id}/version-final` | encargado | `ActoFinal` → acto en `expediente_involucrado.acto_admin_id` |
 
@@ -1037,3 +1055,24 @@ Las filas de `GET /mis-documentos` y el detalle `GET /revision-documentos/{id}` 
   `requerimiento_etapa3` | `requerimiento_memorias` | `requerimiento_obras`, `decision`,
   `recurso`, `auto_pruebas`, `concepto_pruebas`, `concepto_memorias`, `concepto_subsanacion`, `concepto_obras`,
   `concepto_obras_segundo`, `aprobacion`, `reconoce_tercero`.
+
+---
+
+## D — Alertas — `/recurso/alertas`
+
+Reglas y plazos en `services/alertas.py`; inventario en `documentacion/ALERTAS_RECURSO.md`.
+
+| Método | Ruta | Permiso | Qué hace |
+|---|---|---|---|
+| GET | `/alertas/todas?alcance=mios\|todos&page&limit&radicado&estado&tipo` | `recurso_alertas` | Pestaña Alertas, paginada (contrato de `satc_shared.alertas`: `alertas`, `total`, `page`, `limit`, `total_pages`, `tipos_disponibles`, `estadisticas_semaforo`). |
+| GET | `/alertas/aviso-visita?fecha_numerado&fecha_visita` | gestión | Fecha límite de la visita técnica y aviso (no bloquea). |
+| GET | `/alertas/{expediente_id}` | lectura | Alertas de un expediente. |
+
+Cada alerta trae, además de `tipo`, `etapa`, `semaforo`, `expediente_id` y `proceso_id`:
+
+- `encargado_id`: persona a cargo de la tarea.
+- `roles_responsables`: `[{permiso, etiqueta}]`. Con elementos solo mientras el documento está **en revisión**: los roles del paso actual que aún no revisan. Vacío en los demás estados.
+- `estado_documento`: estado del proceso de revisión (informativo; `null` si aún no hay proceso).
+- `es_responsable`: si `roles_responsables` tiene elementos, el usuario tiene alguno de esos permisos; si no, es el `encargado_id`. `alcance=mios` filtra por este campo.
+
+**Correo semanal** (sin endpoint): los lunes 8:00 cada usuario recibe su "Mis alertas" con la misma regla de `es_responsable` (`services/alertas_correo.py`, envío por `users_client.send_alert_report`). Un solo envío por semana entre todos los workers (tabla `envio_alertas_semanal`). `ALERTAS_CORREO_SEMANAL=false` lo apaga.

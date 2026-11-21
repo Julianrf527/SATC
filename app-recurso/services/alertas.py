@@ -1,74 +1,16 @@
 """Alertas de vencimiento de Concesiones de Aguas (pestaña Alertas).
 
-Se calculan al vuelo (sin tabla), igual que en infraction, con el mismo
-formato de alerta y semáforo para reutilizar ``satc_shared.alertas`` y la
-feature ``alertas`` del frontend. Los plazos son en días hábiles (Colombia:
-sin sábados, domingos ni festivos) salvo los del recurso de reposición, que
-son en días calendario.
+Se calculan al vuelo (sin tabla), con el mismo formato de alerta y semáforo que
+infraction (``satc_shared.alertas`` y la feature ``alertas`` del frontend).
+Plazos en días hábiles de Colombia, salvo el recurso de reposición (calendario).
+Cada alerta vive solo mientras su hito no se cumple, sobre el proceso de
+revisión ACTIVO de la etapa; las devoluciones no reinician el conteo.
 
-Reglas (cada alerta vive solo mientras su hito no se cumple y solo sobre el
-proceso de revisión ACTIVO de la etapa; las devoluciones no reinician el
-conteo):
+El inventario completo (alertas, plazos, desde cuándo cuentan, encargado y a
+dónde lleva el botón) está en ``documentacion/ALERTAS_RECURSO.md``.
 
-Auto que admite (proceso ``AUTO_ADMITE``)
-  - ``admite_primera_version``: 4 días desde que nace el proceso (encargado
-    asignado) hasta que existe la versión 1.
-  - ``admite_revision``: 3 días desde la versión 1 hasta "aprobado para firma".
-  - ``admite_version_final``: 3 días desde "aprobado para firma" hasta que se
-    carga el acto (``acto_admite.acto_admin_id``).
-  - ``admite_aviso_publicado``: informativa; cuenta los 10 días del aviso desde
-    que se registra la comunicación del auto y desaparece al cumplirlos.
-
-Concepto técnico de la etapa 2 (proceso ``CONCEPTO_ETAPA2``)
-  - ``concepto_primera_version``: 16 días desde la fecha de visita técnica
-    hasta que existe la versión 1.
-  - ``concepto_version_final``: 5 días desde la versión 1 hasta que se carga
-    la versión final (``concepto_tecnico.doc_concepto_tecnico_id``).
-
-Acto del requerimiento de la etapa 3 (proceso ``REQUERIMIENTO``; solo si el
-concepto de la etapa 2 no dice ``DECIDE``)
-  - ``requerimiento_primera_version``: 6 días desde la versión final del
-    concepto de la etapa 2 hasta la versión 1 (corre aunque nadie se haya
-    asignado el requerimiento).
-  - ``requerimiento_revision``: 4 días desde la versión 1 hasta "aprobado para firma".
-  - ``requerimiento_version_final``: 2 días desde "aprobado para firma" hasta
-    que se carga el acto.
-
-Concepto técnico adicional (proceso ``CONCEPTO_ADICIONAL``)
-  - ``concepto_adicional_tecnico``: 5 días desde que se registra la respuesta
-    del usuario al requerimiento hasta que se asigna el técnico.
-  - ``concepto_adicional_primera_version``: 5 días desde la asignación del
-    técnico hasta la versión 1.
-  - ``concepto_adicional_revision``: 2 días desde la versión 1 hasta "aprobado para firma".
-  - ``concepto_adicional_version_final``: 1 día desde "aprobado para firma"
-    hasta la versión final.
-
-Acto de decisión (proceso ``DECISION``)
-  - ``decision_primera_version``: 6 días desde la versión final del concepto
-    adicional (o, si el concepto de la etapa 2 dice ``DECIDE``, desde la del
-    concepto de la etapa 2) hasta la versión 1.
-  - ``decision_revision``: 4 días; ``decision_version_final``: 2 días.
-
-Recurso de reposición (días CALENDARIO, desde que se registra el recurso)
-  - Con práctica de pruebas: ``recurso_concepto_pruebas`` (30 días hasta la
-    versión final del concepto técnico de pruebas) y luego
-    ``recurso_acto_tras_pruebas`` (30 días desde esa versión final hasta el
-    acto que resuelve el recurso).
-  - Sin práctica de pruebas: ``recurso_acto`` (60 días hasta el acto que
-    resuelve el recurso).
-  Si cambia «¿requiere práctica de pruebas?», se aplica la regla nueva sin
-  reiniciar el conteo (siempre desde que se registró el recurso).
-
-Los requerimientos de memorias y obras no tienen alertas (pendientes de definir).
-
-La regla "visita técnica dentro de los 10 días hábiles siguientes al numerado
-del auto" NO es una alerta de esta pestaña: es un aviso que no bloquea al
-cargar el auto (``advertencia_visita``).
-
-Cada alerta trae ``encargado_id`` (de quién es la tarea; None si aún nadie la
-tomó), ``expediente_id`` y ``proceso_id`` (el proceso de revisión donde se hace
-la tarea, para abrirlo desde Mis actuaciones; None si aún no existe). Las alertas las ve todo el que abre la pestaña; el
-encargado solo decide "Mis alertas" y si el botón es Gestionar o Consultar.
+Cada alerta trae ``encargado_id`` (None si aún nadie tomó la tarea),
+``expediente_id`` y ``proceso_id`` (None si el proceso aún no existe).
 """
 from __future__ import annotations
 
@@ -89,12 +31,15 @@ from db.models.concepto_tecnico import ConceptoTecnico
 from db.models.documento_proceso import (
     DocumentoProceso,
     DocumentoProcesoAuditoria,
+    DocumentoProcesoRevision,
     DocumentoProcesoVersion,
 )
 from db.models.decision import Decision
 from db.models.practica_pruebas import PracticaPruebas
 from db.models.recurso_reposicion import RecursoReposicion
 from db.models.requerimiento import Requerimiento
+from satc_shared.review_process import EN_REVISION
+from services.revision_documentos import CADENAS, etiqueta_permiso
 
 BOGOTA = ZoneInfo("America/Bogota")
 
@@ -254,6 +199,10 @@ class _Proceso:
     fecha_creacion: date
     primera_version: Optional[date] = None
     aprobado_firma: Optional[date] = None
+    estado: Optional[str] = None
+    paso_actual: int = 0
+    # Permisos del paso actual que aún no revisan (solo en revisión).
+    roles_pendientes: tuple[str, ...] = ()
 
 
 def _reglas_admite(p: Optional[_Proceso], admite, comunicacion: Optional[date], hoy: date) -> dict:
@@ -458,8 +407,12 @@ async def calcular_alertas(
 ) -> dict[int, dict[str, dict]]:
     """``{expediente_id: {clave: alerta}}`` (solo expedientes con alertas).
 
-    Sin ``expediente_id`` calcula todos los expedientes con 7 consultas en
-    total (no depende de cuántos haya); con él, las mismas 7 filtradas.
+    Sin ``expediente_id`` calcula todos los expedientes con 8 consultas en
+    total (no depende de cuántos haya); con él, las mismas 8 filtradas.
+
+    Responsable: la alerta es del encargado (``encargado_id``), salvo cuando
+    su documento está en revisión: entonces es de los roles del paso actual
+    que aún no revisan (``roles_responsables``, ver ``satc_shared.alertas``).
     """
     def por_exp(stmt, col):
         return stmt.where(col == expediente_id) if expediente_id is not None else stmt
@@ -470,11 +423,12 @@ async def calcular_alertas(
         select(
             DocumentoProceso.id, DocumentoProceso.expediente_id, DocumentoProceso.tipo_documento,
             DocumentoProceso.etapa_ref_id, DocumentoProceso.creador_id, DocumentoProceso.fecha_creacion,
+            DocumentoProceso.estado, DocumentoProceso.paso_actual,
         ).where(DocumentoProceso.activo.is_(True), DocumentoProceso.tipo_documento.in_(TIPOS_PROCESO)),
         DocumentoProceso.expediente_id,
     ))).all():
         procesos[r.id] = _Proceso(r.id, r.expediente_id, r.tipo_documento, r.etapa_ref_id, r.creador_id,
-                                  fecha_local(r.fecha_creacion))
+                                  fecha_local(r.fecha_creacion), estado=r.estado, paso_actual=r.paso_actual or 0)
 
     if procesos:
         filtro = DocumentoProceso.id.in_(list(procesos))
@@ -493,6 +447,24 @@ async def calcular_alertas(
             .group_by(DocumentoProcesoAuditoria.proceso_id)
         )).all():
             procesos[pid].aprobado_firma = fecha_local(fecha)
+        # 3b. Quién ya revisó en el paso actual de los documentos en revisión.
+        en_revision = [p for p in procesos.values() if p.estado == EN_REVISION]
+        if en_revision:
+            revisados: dict[int, set[str]] = {}
+            for pid, paso, permiso in (await db.execute(
+                select(DocumentoProcesoRevision.proceso_id, DocumentoProcesoRevision.paso,
+                       DocumentoProcesoRevision.permiso)
+                .where(DocumentoProcesoRevision.proceso_id.in_([p.id for p in en_revision]),
+                       DocumentoProcesoRevision.permiso.is_not(None))
+            )).all():
+                if paso == procesos[pid].paso_actual:
+                    revisados.setdefault(pid, set()).add(permiso)
+            for p in en_revision:
+                cadena = CADENAS.get(p.tipo_documento)
+                if cadena is not None:
+                    p.roles_pendientes = tuple(
+                        perm for perm in cadena.permisos_paso(p.paso_actual) if perm not in revisados.get(p.id, ())
+                    )
 
     por_etapa = {(p.tipo_documento, p.etapa_ref_id): p for p in procesos.values()}
 
@@ -565,7 +537,18 @@ async def calcular_alertas(
         alertas = _reglas_recurso(d, por_etapa, hoy)
         if alertas:
             resultado.setdefault(d.expediente_id, {}).update(alertas)
+    for alertas in resultado.values():
+        for a in alertas.values():
+            _asignar_responsables(a, procesos.get(a.get("proceso_id")))
     return resultado
+
+
+def _asignar_responsables(alerta: dict, p: Optional[_Proceso]) -> None:
+    """``estado_documento`` y ``roles_responsables`` según el proceso de la
+    alerta (sin proceso o fuera de revisión: del encargado)."""
+    alerta["estado_documento"] = p.estado if p is not None else None
+    roles = p.roles_pendientes if p is not None and p.estado == EN_REVISION else ()
+    alerta["roles_responsables"] = [{"permiso": r, "etiqueta": etiqueta_permiso(r)} for r in roles]
 
 
 def estadisticas(alertas) -> dict[str, int]:

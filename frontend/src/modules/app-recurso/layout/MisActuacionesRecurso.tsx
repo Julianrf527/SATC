@@ -47,8 +47,8 @@ export default function MisActuacionesRecurso({ setToast }: { setToast: SetToast
     }
   }, [location.state]);
 
-  const documentos = data?.data.documentos ?? SIN_DOCUMENTOS;
-  const conteos = data?.data.conteos;
+  const documentos = data?.data ?? SIN_DOCUMENTOS;
+  const conteos = data?.conteos;
   const totalPages = data?.total_pages ?? 1;
   const hayFiltros = hayFiltrosActivos(filtros);
 
@@ -82,7 +82,7 @@ export default function MisActuacionesRecurso({ setToast }: { setToast: SetToast
           <MisDocumentosFiltros
             filtros={filtros}
             onChange={cambiarFiltros}
-            opciones={data?.data.filtros}
+            opciones={data?.filtros}
             onActualizar={() => void refetch()}
             actualizando={isFetching}
           />

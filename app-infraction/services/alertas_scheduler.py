@@ -1,6 +1,8 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from datetime import date, timedelta
 from typing import Iterable, Optional
 from dotenv import load_dotenv
 import os
@@ -8,6 +10,7 @@ import logging
 
 
 #DB MODELS Y PERMISOS
+from db.models.envio_alertas_semanal import EnvioAlertasSemanal
 from services.users import get_users_by_permission, users_client
 from services.alertas import agrupar_alertas, calcular_alertas_activas, hoy_bogota
 from satc_shared.alertas import permisos_de_roles
@@ -155,37 +158,76 @@ async def tarea_envio_alertas_semanal(db: AsyncSession):
         logger.error(f"Error en tarea de envio: {e}", exc_info=True)
 
 
-async def ejecutar_tarea_con_db(get_db):
-    """Helper para ejecutar la tarea con DB"""
+def lunes_de(dia: date) -> date:
+    return dia - timedelta(days=dia.weekday())
+
+
+async def reclamar_envio(db: AsyncSession, semana: date) -> bool:
+    """True si este proceso queda a cargo del envío de ``semana``.
+
+    Gunicorn corre varios workers y cada uno tiene su scheduler: todos
+    disparan el job a la misma hora. El INSERT sobre la clave primaria lo
+    gana uno solo; los demás (y un reinicio posterior) no envían.
+    """
+    fila = await db.execute(
+        pg_insert(EnvioAlertasSemanal)
+        .values(semana=semana)
+        .on_conflict_do_nothing(index_elements=["semana"])
+        .returning(EnvioAlertasSemanal.semana)
+    )
+    reclamado = fila.scalar_one_or_none() is not None
+    await db.commit()
+    return reclamado
+
+
+async def ejecutar_envio_semanal(get_db) -> bool:
+    """Job del lunes: envía el reporte si este worker reclama la semana.
+    Devuelve si envió."""
     async for db in get_db():
+        semana = lunes_de(hoy_bogota())
+        if not await reclamar_envio(db, semana):
+            logger.info(f"Reporte semanal de alertas {semana} ya enviado por otro proceso")
+            return False
         await tarea_envio_alertas_semanal(db)
-        break
+        return True
+    return False
 
 
 def configurar_scheduler_alertas(app, get_db):
+    """Registra el envío semanal (lunes 8:00, America/Bogota).
+
+    El job debe ser una función ``async``: APScheduler solo espera las
+    corrutinas si la función registrada es corrutina (con una ``lambda`` que
+    devuelve una corrutina, esta se crea y nunca se ejecuta).
+
+    ``ALERTAS_CORREO_SEMANAL=false`` lo apaga (p. ej. en entornos de prueba),
+    igual que en app-recurso.
     """
-    Configura el scheduler en FastAPI
-    """
+    if os.getenv("ALERTAS_CORREO_SEMANAL", "true").lower() == "false":
+        logger.info("Correo semanal de alertas de infracciones desactivado (ALERTAS_CORREO_SEMANAL=false)")
+        return
+
+    async def job_envio_semanal():
+        await ejecutar_envio_semanal(get_db)
+
     @app.on_event("startup")
     async def start_scheduler():
-        # Ejecutar cada lunes a las 8:00 AM
         scheduler.add_job(
-            func=lambda: ejecutar_tarea_con_db(get_db),
-            trigger=CronTrigger(
-                day_of_week="mon",
-                hour=8,
-                minute=0,
-                timezone="America/Bogota"
-            ),
+            job_envio_semanal,
+            trigger=CronTrigger(day_of_week="mon", hour=8, minute=0, timezone="America/Bogota"),
             id="envio_alertas_semanal_infraccion",
             name="Envío semanal de alertas - Infracciones",
             replace_existing=True,
+            # Si el servicio estaba caído o reiniciando a las 8:00, se envía al
+            # volver (hasta 12 h después); varias ejecuciones atrasadas = una.
+            misfire_grace_time=12 * 3600,
+            coalesce=True,
+            max_instances=1,
         )
-
         scheduler.start()
         logger.info("Scheduler de alertas de infracciones iniciado - Lunes 8:00 AM")
 
     @app.on_event("shutdown")
     async def stop_scheduler():
         scheduler.shutdown()
-        logger.info("⛔ Scheduler de alertas de infracciones detenido")
+        logger.info("Scheduler de alertas de infracciones detenido")

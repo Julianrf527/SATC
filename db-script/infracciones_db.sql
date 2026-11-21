@@ -206,6 +206,17 @@ ALTER SEQUENCE public.etapa_cierre_id_seq OWNED BY public.etapa_cierre.id;
 
 
 --
+-- Name: envio_alertas_semanal; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.envio_alertas_semanal (
+    semana date NOT NULL,
+    fecha_inicio timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT envio_alertas_semanal_pkey PRIMARY KEY (semana)
+);
+
+
+--
 -- Name: etapa_respuesta; Type: TABLE; Schema: public; Owner: -
 --
 

@@ -91,11 +91,14 @@ export function useCambiarRepresentanteMutation(expedienteId: number) {
   });
 }
 
+/** Vínculo a desvincular; `confirmar` acepta eliminar sus notificaciones (tras el 428). */
+export type Desvincular = { id: number; version: number; confirmar?: boolean };
+
 /** DELETE del vínculo (con `version`). No borra la persona de app-involved. */
 export function useDesvincularMutation(expedienteId: number) {
   return useMutation({
-    mutationFn: (vinculo: VinculoInvolucrado) =>
-      apiRequest(RECURSO_ENDPOINTS.RECURSO_VINCULO_DELETE(vinculo.id, vinculo.version), { method: "DELETE" }),
+    mutationFn: ({ id, version, confirmar }: Desvincular) =>
+      apiRequest(RECURSO_ENDPOINTS.RECURSO_VINCULO_DELETE(id, version, confirmar), { method: "DELETE" }),
     ...useInvalidacion(expedienteId),
   });
 }
@@ -130,11 +133,11 @@ export function useCambiarRepresentanteTerceroMutation(expedienteId: number) {
   });
 }
 
-/** DELETE del tercero (con `version`; 409 si ya tiene acto o notificaciones). */
+/** DELETE del tercero (con `version`; 409 si ya tiene acto, 428 si tiene notificaciones sin confirmar). */
 export function useDesvincularTerceroMutation(expedienteId: number) {
   return useMutation({
-    mutationFn: (vinculo: Pick<VinculoInvolucrado, "id" | "version">) =>
-      apiRequest(RECURSO_ENDPOINTS.RECURSO_TERCERO_DELETE(vinculo.id, vinculo.version), { method: "DELETE" }),
+    mutationFn: ({ id, version, confirmar }: Desvincular) =>
+      apiRequest(RECURSO_ENDPOINTS.RECURSO_TERCERO_DELETE(id, version, confirmar), { method: "DELETE" }),
     ...useInvalidacion(expedienteId),
   });
 }

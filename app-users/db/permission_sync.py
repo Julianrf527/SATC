@@ -42,7 +42,14 @@ import logging
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from db.permission_catalog import DEPENDENCIAS, DESCRIPCIONES_ANTERIORES, INCOMPATIBLES, PERMISOS, RENOMBRES
+from db.permission_catalog import (
+    DEPENDENCIAS,
+    DESCRIPCIONES_ANTERIORES,
+    INCOMPATIBLES,
+    OTORGAR_AL_CREAR,
+    PERMISOS,
+    RENOMBRES,
+)
 from utils.permission_dependencies import roles_que_incumplen
 
 logger = logging.getLogger(__name__)
@@ -240,6 +247,29 @@ async def _descripcion_obligatoria(conn: AsyncConnection, resumen: dict) -> None
     await conn.execute(text("ALTER TABLE permiso ALTER COLUMN descripcion SET NOT NULL"))
 
 
+async def _otorgar_al_crear(conn: AsyncConnection, resumen: dict) -> None:
+    """Da cada permiso recién creado de ``OTORGAR_AL_CREAR`` a los roles que
+    tienen alguno de sus permisos de origen (solo en la corrida que lo crea)."""
+    for nombre in resumen["insertados"]:
+        origen = OTORGAR_AL_CREAR.get(nombre)
+        if not origen:
+            continue
+        roles = (await conn.execute(
+            text(
+                "INSERT INTO rol_permiso (rol_id, permiso_id) "
+                "SELECT DISTINCT rp.rol_id, nuevo.id FROM rol_permiso rp "
+                "JOIN permiso p ON p.id = rp.permiso_id "
+                "JOIN permiso nuevo ON nuevo.nombre = :nuevo "
+                "WHERE p.nombre = ANY(:origen) "
+                "ON CONFLICT DO NOTHING RETURNING rol_id"
+            ),
+            {"nuevo": nombre, "origen": list(origen)},
+        )).scalars().all()
+        if roles:
+            resumen["otorgados_al_crear"][nombre] = sorted(roles)
+            logger.info("[permisos] %s otorgado a los roles %s (tenían %s)", nombre, sorted(roles), ", ".join(origen))
+
+
 async def sincronizar_permisos(conn: AsyncConnection) -> dict:
     """Aplica el catálogo sobre `conn`. El llamador maneja la transacción (begin/commit)."""
     resumen = {
@@ -247,6 +277,7 @@ async def sincronizar_permisos(conn: AsyncConnection) -> dict:
         "insertados": [],
         "actualizados": [],
         "otorgados_a_roles": [],
+        "otorgados_al_crear": {},
         "otorgados_a_admin": 0,
         "dependencias_agregadas": 0,
         "dependencias_quitadas": 0,
@@ -283,8 +314,8 @@ async def sincronizar_permisos(conn: AsyncConnection) -> dict:
                 "todos los permisos. Asígnelos a un rol administrador.", resumen["insertados"],
             )
 
+    await _otorgar_al_crear(conn, resumen)
     await _completar_admin(conn, resumen)
-
     await _sincronizar_dependencias(conn, resumen)
     await _sincronizar_incompatibles(conn, resumen)
     await _descripcion_obligatoria(conn, resumen)

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   construirQueryLista,
   contarFiltrosActivos,
+  cambioDeTexto,
   FILTROS_LISTA_INICIALES,
-  totalPaginas,
 } from "./listaParams";
 
 describe("construirQueryLista", () => {
@@ -34,14 +34,17 @@ describe("construirQueryLista", () => {
   });
 });
 
-describe("contarFiltrosActivos / totalPaginas", () => {
+describe("contarFiltrosActivos / cambioDeTexto", () => {
   it("cuenta solo filtros con valor", () => {
     expect(contarFiltrosActivos(FILTROS_LISTA_INICIALES)).toBe(0);
     expect(contarFiltrosActivos({ ...FILTROS_LISTA_INICIALES, radicado: "x", vereda_id: 2, page: 5 })).toBe(2);
   });
 
-  it("calcula páginas con mínimo 1", () => {
-    expect(totalPaginas(0, 20)).toBe(1);
-    expect(totalPaginas(41, 20)).toBe(3);
+  it("solo los textos esperan; página y selectores se aplican de inmediato", () => {
+    const base = FILTROS_LISTA_INICIALES;
+    expect(cambioDeTexto(base, { ...base, radicado: "2026" })).toBe(true);
+    expect(cambioDeTexto(base, { ...base, numero_vital: "V" })).toBe(true);
+    expect(cambioDeTexto(base, { ...base, page: 3 })).toBe(false);
+    expect(cambioDeTexto(base, { ...base, municipio_id: 2, vereda_id: 5 })).toBe(false);
   });
 });

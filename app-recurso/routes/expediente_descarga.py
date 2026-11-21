@@ -1,11 +1,11 @@
-"""Descarga del expediente completo en un único PDF (plan fase 11, pestaña Consulta).
+"""Descarga del expediente completo en un único PDF (pestaña Consulta).
 
 Prefijo en main.py: ``/expedientes``. Lectura (``requiere_lectura``).
 El orden de los documentos está en ``services/expediente_documentos.py``.
 """
 import logging
 import re
-from io import BytesIO
+from contextlib import AsyncExitStack
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -14,8 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.acceso import requiere_lectura
 from db.deps import get_db_managed
 from db.models import Expediente
-from services.docs import download_unified_pdf
+from satc_shared.clients import ServiceClientError
+import services.docs as docs_svc
 from services.expediente_documentos import documentos_del_expediente
+from services.expediente_involucrados import datos_cliente
+from utils.log import insert_log
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -46,25 +49,46 @@ async def descargar_expediente_completo(
     expediente_id: int,
     db: AsyncSession = Depends(get_db_managed),
 ):
-    await requiere_lectura(request)
+    """PDF único del expediente. app-docs lo arma y aquí se reenvía por bloques,
+    sin cargarlo en memoria. Queda registro en la auditoría."""
+    usuario = await requiere_lectura(request)
     expediente = await _expediente(db, expediente_id)
 
     documentos = await documentos_del_expediente(db, expediente)
     if not documentos:
         raise HTTPException(status_code=404, detail="No se encontraron documentos para este expediente")
     file_ids = [d["file_id"] for d in documentos]
-    logger.info(f"[DOWNLOAD] Expediente {expediente.expediente}: {len(file_ids)} documentos a combinar")
 
-    resultado = await download_unified_pdf(file_ids=file_ids, cookies=dict(request.cookies))
-    if not resultado.get("ok"):
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error generando PDF: {resultado.get('message', 'Error desconocido')}",
+    pila = AsyncExitStack()
+    try:
+        respuesta = await pila.enter_async_context(docs_svc.files_client.download_unified_stream(file_ids))
+    except ServiceClientError as e:
+        await pila.aclose()
+        logger.error(f"Error generando el PDF del expediente {expediente.id}: {e}")
+        raise HTTPException(status_code=502, detail="No se pudo generar el PDF del expediente")
+
+    try:
+        await insert_log(
+            db=db, tipo_evento="DESCARGAR_EXPEDIENTE", resultado="EXITOSO", usuario_id=usuario.user_id,
+            expediente_id=expediente.id, expediente_radicado=expediente.radicado,
+            detalle=f"Descarga del expediente completo {expediente.expediente} ({len(file_ids)} documentos)",
+            **datos_cliente(request),
         )
+        await db.commit()
+    except BaseException:
+        await pila.aclose()
+        raise
+
+    async def _contenido():
+        try:
+            async for bloque in respuesta.aiter_bytes():
+                yield bloque
+        finally:
+            await pila.aclose()
 
     nombre = re.sub(r"[^A-Za-z0-9_-]+", "_", expediente.expediente).strip("_")
     return StreamingResponse(
-        BytesIO(resultado["content"]),
+        _contenido(),
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="concesion_{nombre}_completo.pdf"'},
     )

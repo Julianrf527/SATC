@@ -15,7 +15,8 @@ incremento se confirma o se deshace con el mismo commit que la versión/revisió
 from collections import Counter
 
 from fastapi import HTTPException
-from sqlalchemy import func, update
+from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from satc_shared.review_process import (
@@ -34,6 +35,7 @@ from db.models.asignaciones_revisores import AsignacionRevisor
 from db.models.auditoria_documentos import AuditoriaDocumento
 from db.models.documentos import Documento
 from db.models.file_hash import FileHash
+from db.models.file_uso import FileUso
 from db.models.revisiones import Revision
 from db.models.versiones_documento import VersionDocumento
 from services.users import verify_permission
@@ -61,8 +63,17 @@ class FlujoDocumentos(FlujoRevision):
 FLUJO = FlujoDocumentos()
 
 
+# Nombre con el que el propio módulo Documentos figura en file_uso/file_subida.
+SERVICIO_DOCS = "docs"
+
+
 class UsoArchivosLocal:
-    """``FileUsageTracker`` sobre ``file_hash`` en la sesión de la petición."""
+    """``FileUsageTracker`` sobre ``file_hash`` en la sesión de la petición.
+
+    Además registra el dueño en ``file_uso`` (servicio "docs", entidad
+    "documento"): el servicio de revisión llama a increment_usage después del
+    flush, así que la versión o revisión que referencia el archivo ya existe y
+    de ahí sale el documento."""
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -74,8 +85,25 @@ class UsoArchivosLocal:
                 nuevo = func.greatest(nuevo, 0)
             await self.db.execute(update(FileHash).where(FileHash.id == file_id).values(numero_usos=nuevo))
 
+    async def _registrar_duenos(self, file_ids: list[int]) -> None:
+        ids = {f for f in file_ids if f}
+        if not ids:
+            return
+        documentos = (await self.db.execute(
+            select(VersionDocumento.file_id, VersionDocumento.proceso_id).where(VersionDocumento.file_id.in_(ids))
+            .union(select(Revision.adjunto_file_id, Revision.proceso_id).where(Revision.adjunto_file_id.in_(ids)))
+        )).all()
+        for file_id, documento_id in documentos:
+            await self.db.execute(
+                pg_insert(FileUso)
+                .values(file_id=file_id, servicio=SERVICIO_DOCS, entidad="documento",
+                        entidad_id=str(documento_id), creado_en=func.now())
+                .on_conflict_do_nothing(constraint="uq_file_uso")
+            )
+
     async def increment_usage(self, file_ids: list[int]) -> dict:
         await self._ajustar(file_ids, +1)
+        await self._registrar_duenos(file_ids)
         return {"ok": True}
 
     async def decrement_usage(self, file_ids: list[int]) -> dict:

@@ -539,6 +539,8 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDIS_DB_SESSIONS: 1
+      # Versión global de permisos (satc_shared.permisos_version)
+      REDIS_DB_PERMISOS: 2
 
       # JWT
       SECRET_KEY: ${SECRET_KEY}
@@ -691,6 +693,16 @@ services:
       # File Security (Caso 8)
       MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-10}
       UPLOAD_DIR: /app/secure-uploads
+      # Horas que se conserva un archivo sin uso desde su última subida
+      LIMPIEZA_GRACIA_HORAS: ${LIMPIEZA_GRACIA_HORAS:-24}
+      # Asociar archivos ajenos: off | log (solo avisa) | on (rechaza con 403)
+      ARCHIVOS_VALIDAR_ASOCIACION: ${ARCHIVOS_VALIDAR_ASOCIACION:-log}
+      ARCHIVOS_VENTANA_SUBIDA_HORAS: ${ARCHIVOS_VENTANA_SUBIDA_HORAS:-24}
+      # Fase 4 (activar según scripts/reporte_archivos.py):
+      #   false = los usuarios ya no leen /files/{id} ni /files/download/{id}; descargan por su módulo
+      ARCHIVOS_ACCESO_DIRECTO_USUARIOS: ${ARCHIVOS_ACCESO_DIRECTO_USUARIOS:-true}
+      #   contador = sin uso si numero_usos=0 y sin dueños | duenos = solo sin dueños en file_uso
+      LIMPIEZA_CRITERIO: ${LIMPIEZA_CRITERIO:-contador}
 
       # ClamAV Antivirus
       CLAMAV_ENABLED: ${CLAMAV_ENABLED:-true}
@@ -872,6 +884,12 @@ services:
       GATEWAY_URL: http://api-gateway:8000
       USER_SERVICE_URL: http://app-users:8001
       DOCS_SERVICE_URL: http://app-docs:8003
+
+      # Versión global de permisos: invalida la caché al cambiar roles (satc_shared.permisos_version)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_DB_PERMISOS: 2
 
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8000}

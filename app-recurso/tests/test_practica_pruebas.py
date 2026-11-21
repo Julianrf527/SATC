@@ -113,11 +113,13 @@ async def test_flujo_con_pruebas(client, rv_permisos, con_decision, catalogo, db
     assert datos["resultado"] == "REPONE"
 
 
-async def test_concepto_pruebas_mismos_revisores_que_etapa2():
-    from services.revision_documentos import CADENAS
+async def test_revisores_de_la_practica_de_pruebas():
+    from services.revision_documentos import CADENAS, Permission
 
-    assert CADENAS["CONCEPTO_PRUEBAS"].pasos == CADENAS["CONCEPTO_ETAPA2"].pasos
-    assert CADENAS["AUTO_PRUEBAS"].pasos == CADENAS["RECURSO"].pasos
+    # Auto: líder jurídico → líder del proyecto (sin la asesora del recurso).
+    assert CADENAS["AUTO_PRUEBAS"].pasos == ((Permission.LIDER_JURIDICO,), (Permission.LIDER_PROYECTO,))
+    # Concepto: líder técnico → líder del proyecto (sin el SIG de la etapa 2).
+    assert CADENAS["CONCEPTO_PRUEBAS"].pasos == ((Permission.LIDER_TECNICO,), (Permission.LIDER_PROYECTO,))
     assert CADENAS["AUTO_PRUEBAS"].etapa_tipo == "practica_pruebas"
 
 

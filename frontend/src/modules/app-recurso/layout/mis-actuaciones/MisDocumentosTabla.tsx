@@ -19,7 +19,7 @@ export default function MisDocumentosTabla({ documentos, onProceso, onPrecargarP
       <table className="table table-sm w-full">
         <thead className="bg-base-200">
           <tr>
-            <th className="text-xs">Expediente</th>
+            <th className="text-xs min-w-[8.5rem]">Expediente</th>
             <th className="text-xs">Documento</th>
             <th className="text-xs">Rol</th>
             <th className="text-xs">Etapa</th>
@@ -35,9 +35,9 @@ export default function MisDocumentosTabla({ documentos, onProceso, onPrecargarP
             const codigo = doc.expediente_codigo ?? doc.expediente_radicado ?? `#${doc.expediente_id}`;
             return (
               <tr key={doc.proceso_id} className={`border-b border-base-200 ${doc.requiere_mi_accion ? "bg-info/5" : ""}`}>
-                <td className="font-mono text-xs font-semibold">
+                <td className="font-mono text-xs font-semibold whitespace-nowrap">
                   {onExpediente ? (
-                    <button type="button" onClick={() => onExpediente(doc)} className="btn btn-ghost btn-xs gap-1 text-primary">
+                    <button type="button" onClick={() => onExpediente(doc)} className="btn btn-ghost btn-xs gap-1 text-primary flex-nowrap whitespace-nowrap">
                       {codigo}
                       <ExternalLink size={10} />
                     </button>

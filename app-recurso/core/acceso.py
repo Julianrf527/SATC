@@ -9,6 +9,7 @@ Uso en una ruta::
 indica si además tiene ``recurso_super_gestion``: ese usuario omite las
 validaciones de negocio (§2.1), nunca las restricciones de la BD.
 """
+import asyncio
 from dataclasses import dataclass
 
 from fastapi import HTTPException, Request
@@ -30,20 +31,24 @@ async def usuario_actual(request: Request) -> Usuario:
     return Usuario(user_id=token["user_id"], rol_id=token["rol_id"])
 
 
+async def _consultar(user_id: int, permisos: tuple[str, ...]) -> dict[str, bool]:
+    """Consulta los permisos en paralelo (cacheados por ``services.users``)."""
+    unicos = tuple(dict.fromkeys(permisos))
+    resultados = await asyncio.gather(*(verify_permission(user_id, p) for p in unicos))
+    return dict(zip(unicos, resultados))
+
+
 async def tiene_permiso(user_id: int, *permisos: str) -> bool:
-    for permiso in permisos:
-        if await verify_permission(user_id, permiso):
-            return True
-    return False
+    return any((await _consultar(user_id, permisos)).values())
 
 
 async def requiere_permiso(request: Request, *permisos: str) -> Usuario:
     """403 si el usuario no tiene ninguno de ``permisos``."""
     usuario = await usuario_actual(request)
-    if permisos and not await tiene_permiso(usuario.user_id, *permisos):
+    tiene = await _consultar(usuario.user_id, (*permisos, Permission.SUPER_MANAGE))
+    if permisos and not any(tiene[p] for p in permisos):
         raise HTTPException(status_code=403, detail="No tienes permiso para esta acción")
-    super_gestion = await verify_permission(usuario.user_id, Permission.SUPER_MANAGE)
-    return Usuario(usuario.user_id, usuario.rol_id, super_gestion)
+    return Usuario(usuario.user_id, usuario.rol_id, tiene[Permission.SUPER_MANAGE])
 
 
 async def requiere_lectura(request: Request) -> Usuario:

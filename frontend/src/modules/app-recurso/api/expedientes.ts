@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, jsonBody, RECURSO_ENDPOINTS } from "@shared/lib/api";
 import { downloadBlobFile } from "@shared/lib/downloadFile";
@@ -12,18 +13,33 @@ import { invalidarExpediente } from "./invalidar";
 import { construirQueryLista, type FiltrosListaExpedientes } from "./listaParams";
 import { recursoKeys } from "./queryKeys";
 
-/** Listado paginado con filtros en el backend (Gestionar y Consulta comparten caché). */
-export function useExpedientesQuery(filtros: FiltrosListaExpedientes, enabled = true) {
-  return useQuery({
+function opcionesLista(filtros: FiltrosListaExpedientes) {
+  return {
     queryKey: recursoKeys.lista(filtros),
     queryFn: () =>
       apiRequest<ListaExpedientesResponse>(
         `${RECURSO_ENDPOINTS.RECURSO_EXPEDIENTES}?${construirQueryLista(filtros)}`,
       ),
+  };
+}
+
+/** Listado paginado con filtros en el backend (Gestionar y Consulta comparten caché). */
+export function useExpedientesQuery(filtros: FiltrosListaExpedientes, enabled = true) {
+  return useQuery({
+    ...opcionesLista(filtros),
     enabled,
     placeholderData: keepPreviousData,
     staleTime: 0,
   });
+}
+
+/** Precarga una página para que "siguiente" se vea al instante (válida 30 s). */
+export function usePrecargarListaExpedientes() {
+  const queryClient = useQueryClient();
+  return useCallback(
+    (filtros: FiltrosListaExpedientes) => queryClient.prefetchQuery({ ...opcionesLista(filtros), staleTime: 30_000 }),
+    [queryClient],
+  );
 }
 
 /**

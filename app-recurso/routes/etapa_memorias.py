@@ -1,4 +1,4 @@
-"""Etapa 5 · Memorias de cálculo (plan §4-Etapa 5, fase 9; V9, V11, V12).
+"""Etapa 5 · Memorias de cálculo (plan §4-Etapa 5; V9, V11, V12).
 
 Ciclo: radicado de planos → concepto sin visita (``/conceptos/memorias``) →
 si no cumple, requerimiento (``/requerimientos/memorias``) → subsanación →
@@ -49,8 +49,6 @@ def msg_radicado(radicado: str) -> str:
 async def registrar_planos(
     request: Request, expediente_id: int, body: RadicadoIn, db: AsyncSession = Depends(get_db_managed),
 ):
-    # TODO(negocio): el plan no dice quién registra los radicados del usuario
-    # (planos, subsanación, informes): cualquier usuario con recurso_gestionar.
     usuario = await requiere_gestion(request)
     exp = await bloquear_expediente(db, expediente_id)
     e = await cargar_estado(db, exp)

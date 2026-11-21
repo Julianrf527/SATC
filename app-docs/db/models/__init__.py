@@ -5,6 +5,7 @@ from .revisiones import Revision
 from .asignaciones_revisores import AsignacionRevisor
 from .auditoria_documentos import AuditoriaDocumento
 from .file_hash import FileHash
+from .file_uso import FileSubida, FileUso
 from .v_documentos_detalle import VDocumentoDetalle
 
 __all__ = [
@@ -15,5 +16,7 @@ __all__ = [
     "AsignacionRevisor",
     "AuditoriaDocumento",
     "FileHash",
+    "FileSubida",
+    "FileUso",
     "VDocumentoDetalle",
 ]

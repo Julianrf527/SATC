@@ -66,6 +66,7 @@ Fixtures de uso común
 - ``db_session``: sesión para preparar/verificar datos (hacer ``commit`` o
   ``refresh`` según el caso; usa ``expire_on_commit=False``).
 """
+import contextlib
 import os
 from urllib.parse import quote
 
@@ -197,8 +198,8 @@ class Permisos:
     def _limpiar_cache(self) -> None:
         from utils.cache import permission_cache, users_cache
 
-        permission_cache.cache.clear()
-        users_cache.cache.clear()
+        permission_cache._datos.clear()
+        users_cache._datos.clear()
 
     def dar(self, user_id: int, *permisos: str) -> None:
         self._por_usuario.setdefault(user_id, set()).update(permisos)
@@ -222,6 +223,10 @@ class UsersClientStub:
     def __init__(self, permisos: Permisos):
         self.permisos = permisos
         self.notificaciones: list[dict] = []
+        self.reportes_alertas: list[dict] = []
+
+    async def send_alert_report(self, emails, alertas_data, *, title, timeout=30.0):
+        self.reportes_alertas.append({"emails": list(emails), "datos": alertas_data, "title": title})
 
     async def verify_permission(self, user_id, permission):
         return self.permisos.tiene(user_id, permission)
@@ -262,6 +267,7 @@ class FilesClientStub:
         self.decrementados: list[int] = []
         self.unificados: list[list[int]] = []
         self.fallar_incremento = False
+        self.fallar_unificado = False
 
     def registrar(self, content: bytes = b"%PDF-1.4", content_type: str = "application/pdf") -> int:
         """Simula un archivo ya subido a app-docs; devuelve su id."""
@@ -280,9 +286,20 @@ class FilesClientStub:
     async def batch(self, file_ids):
         return [await self.get(f) for f in file_ids if f in self.contenidos]
 
-    async def download_unified(self, file_ids, *, cookies=None, timeout=120.0):
+    @contextlib.asynccontextmanager
+    async def download_unified_stream(self, file_ids, *, timeout=300.0):
+        from satc_shared.clients import ServiceClientError
+
+        if self.fallar_unificado:
+            raise ServiceClientError("app-docs caído", service="app-docs", status_code=503)
         self.unificados.append(list(file_ids))
-        return b"%PDF-unificado"
+
+        class _Respuesta:
+            async def aiter_bytes(self):
+                for bloque in (b"%PDF-", b"unificado"):
+                    yield bloque
+
+        yield _Respuesta()
 
     async def upload(self, filename, content, content_type="application/octet-stream", *, timeout=60.0):
         from satc_shared.clients import UploadResult
