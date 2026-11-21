@@ -1,7 +1,7 @@
 """satc_shared.alertas.paginar_alertas: orden, filtros y paginación."""
 import pytest
 
-from satc_shared.alertas import paginar_alertas
+from satc_shared.alertas import marcar_responsable, paginar_alertas, permisos_de_roles
 
 
 def _a(tipo, estado, urgencia, pct):
@@ -53,3 +53,26 @@ def test_vacio():
 def test_parametros_invalidos(page, limit):
     with pytest.raises(ValueError):
         paginar_alertas(ALERTAS, page=page, limit=limit)
+
+
+LIDER = {"permiso": "x_lider", "etiqueta": "Líder"}
+ASIGNA = {"permiso": "x_asignar", "etiqueta": "Asigna"}
+
+
+def test_responsable_por_encargado_sin_roles():
+    assert marcar_responsable({"encargado_id": 7}, 7, ["x_lider"])["es_responsable"] is True
+    assert marcar_responsable({"encargado_id": 7}, 8, ["x_lider"])["es_responsable"] is False
+    assert marcar_responsable({"encargado_id": None}, None, [])["es_responsable"] is False
+    assert marcar_responsable({"encargado_id": 7, "roles_responsables": []}, 7, [])["es_responsable"] is True
+
+
+def test_responsable_por_rol_ignora_al_encargado():
+    alerta = {"encargado_id": 7, "roles_responsables": [LIDER, ASIGNA]}
+    assert marcar_responsable(dict(alerta), 7, [])["es_responsable"] is False
+    assert marcar_responsable(dict(alerta), 9, {"x_asignar"})["es_responsable"] is True
+    assert marcar_responsable(dict(alerta), 9, ("otro",))["es_responsable"] is False
+
+
+def test_permisos_de_roles():
+    alertas = [{"roles_responsables": [LIDER]}, {"encargado_id": 1}, {"roles_responsables": [LIDER, ASIGNA]}]
+    assert permisos_de_roles(alertas) == {"x_lider", "x_asignar"}
