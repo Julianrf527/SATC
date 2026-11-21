@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, FileText, Search } from "lucide-react";
 import { useErrorToast } from "@shared/hooks/useErrorToast";
-import { useExpedientesQuery } from "../api/expedientes";
-import { FILTROS_LISTA_INICIALES, totalPaginas, type FiltrosListaExpedientes } from "../api/listaParams";
+import { useExpedientesQuery, usePrecargarListaExpedientes } from "../api/expedientes";
+import { cambioDeTexto, FILTROS_LISTA_INICIALES, type FiltrosListaExpedientes } from "../api/listaParams";
 import type { CatalogosRecurso, SetToast } from "../types";
 import ExpedienteCard from "./lista/ExpedienteCard";
 import FiltrosListaPanel from "./lista/FiltrosListaPanel";
@@ -40,18 +40,33 @@ function EstadoVacio({ icono, titulo, texto }: { icono: ReactNode; titulo: strin
 export default function ExpedienteList({ catalogos, setToast, seleccionadoId, onSeleccionar, puedeCrear }: Props) {
   const [filtros, setFiltros] = useState<FiltrosListaExpedientes>(FILTROS_LISTA_INICIALES);
   const [creando, setCreando] = useState(false);
-  const filtrosConsulta = useValorDiferido(filtros);
+  // Solo los textos esperan a que se deje de escribir; página y selectores van de inmediato.
+  const filtrosConsulta = useValorDiferido(filtros, 350, cambioDeTexto);
 
   const lista = useExpedientesQuery(filtrosConsulta);
   useErrorToast(lista.error, setToast, "Error al cargar los expedientes");
+  const precargar = usePrecargarListaExpedientes();
 
   const expedientes = lista.data?.data ?? [];
-  const total = lista.data?.totalCount ?? 0;
-  const paginas = totalPaginas(total, filtros.limit);
+  const total = lista.data?.total ?? 0;
+  const paginas = lista.data?.total_pages ?? 1;
   const hayFiltros = JSON.stringify({ ...filtros, page: 1 }) !== JSON.stringify(FILTROS_LISTA_INICIALES);
 
   const cambiarFiltros = (cambio: Partial<FiltrosListaExpedientes>) =>
     setFiltros((prev) => ({ ...prev, ...cambio, page: cambio.page ?? 1 }));
+
+  // Si la lista se encoge, no quedarse en una página vacía.
+  const fueraDeRango = !lista.isPlaceholderData && !!lista.data && filtrosConsulta.page > paginas;
+  useEffect(() => {
+    if (fueraDeRango) setFiltros((prev) => ({ ...prev, page: paginas }));
+  }, [fueraDeRango, paginas]);
+
+  // Precarga la página siguiente: "siguiente" se ve al instante.
+  useEffect(() => {
+    if (!lista.isPlaceholderData && lista.data && filtrosConsulta.page < lista.data.total_pages) {
+      void precargar({ ...filtrosConsulta, page: filtrosConsulta.page + 1 });
+    }
+  }, [lista.data, lista.isPlaceholderData, filtrosConsulta, precargar]);
 
   const oculto = creando ? "hidden" : "block";
 

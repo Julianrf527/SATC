@@ -64,12 +64,17 @@ export type ExpedienteResumen = {
   involucrados: InvolucradoResumen[];
 };
 
-export type ListaExpedientesResponse = {
-  data: ExpedienteResumen[];
+/** Respuesta paginada estándar de app-recurso. */
+export type RespuestaPaginada<T> = {
+  ok: boolean;
+  data: T[];
+  total: number;
   page: number;
   limit: number;
-  totalCount: number;
+  total_pages: number;
 };
+
+export type ListaExpedientesResponse = RespuestaPaginada<ExpedienteResumen>;
 
 /** Códigos de acción por vínculo (A.2). */
 export type AccionVinculo = "editar_representante" | "desvincular" | (string & {});
@@ -547,16 +552,9 @@ export type FiltrosMisDocumentosOpciones = {
 };
 
 /** B.2: una lista paginada; `conteos` es de todo el conjunto filtrado. */
-export type MisDocumentosResponse = {
-  data: {
-    documentos: MiDocumento[];
-    conteos: { total: number; requieren_accion: number };
-    filtros: FiltrosMisDocumentosOpciones;
-  };
-  total: number;
-  page: number;
-  limit: number;
-  total_pages: number;
+export type MisDocumentosResponse = RespuestaPaginada<MiDocumento> & {
+  conteos: { total: number; requieren_accion: number };
+  filtros: FiltrosMisDocumentosOpciones;
 };
 
 // ─── Navegación entre pestañas ──────────────────────────────────────────────

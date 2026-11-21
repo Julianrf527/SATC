@@ -6,15 +6,15 @@ from tests.fixtures_revision import *  # noqa: F401,F403
 async def _mis(client, user, **params):
     r = await client.get("/mis-documentos", params=params, headers=headers(user))
     assert r.status_code == 200, r.text
-    return r.json()["data"]
+    return r.json()
 
 
 def _ids(d: dict) -> set[int]:
-    return {f["proceso_id"] for f in d["documentos"]}
+    return {f["proceso_id"] for f in d["data"]}
 
 
 def _fila(d: dict, pid: int) -> dict:
-    return next(f for f in d["documentos"] if f["proceso_id"] == pid)
+    return next(f for f in d["data"] if f["proceso_id"] == pid)
 
 
 async def test_encargado_ve_sus_documentos_en_todos_los_estados(client, rv_proceso, crear_expediente):
@@ -34,8 +34,8 @@ async def test_encargado_ve_sus_documentos_en_todos_los_estados(client, rv_proce
     assert fila["etapa_tipo"] == "acto_admite"
     assert "primera versión" in fila["accion_pendiente"]
     assert _ids(await _mis(client, TECNICO)) == {concepto.id}
-    assert (await _mis(client, JURIDICO))["documentos"] == []
-    assert (await _mis(client, PROYECTO))["documentos"] == []
+    assert (await _mis(client, JURIDICO))["data"] == []
+    assert (await _mis(client, PROYECTO))["data"] == []
 
     # Sube versiones: siguen en su lista, en revisión y sin acción suya.
     await subir(client, auto.id)
@@ -43,16 +43,16 @@ async def test_encargado_ve_sus_documentos_en_todos_los_estados(client, rv_proce
     await subir(client, concepto.id, user=TECNICO)
     d = await _mis(client, ABOGADO)
     assert _ids(d) == {auto.id, decision.id}
-    assert all(f["estado_proceso"]["codigo"] == "en_revision" and not f["requiere_mi_accion"] for f in d["documentos"])
-    assert all(f["accion_pendiente"] is None for f in d["documentos"])
+    assert all(f["estado_proceso"]["codigo"] == "en_revision" and not f["requiere_mi_accion"] for f in d["data"])
+    assert all(f["accion_pendiente"] is None for f in d["data"])
     assert d["conteos"] == {"total": 2, "requieren_accion": 0}
 
     # Devuelto: vuelve a requerir acción y va primero.
     await revisar(client, auto.id, "devuelto", JURIDICO, comentario="corregir")
     d = await _mis(client, ABOGADO)
-    assert d["documentos"][0]["proceso_id"] == auto.id
-    assert d["documentos"][0]["estado_proceso"]["codigo"] == "rechazado"
-    assert d["documentos"][0]["requiere_mi_accion"] is True
+    assert d["data"][0]["proceso_id"] == auto.id
+    assert d["data"][0]["estado_proceso"]["codigo"] == "rechazado"
+    assert d["data"][0]["requiere_mi_accion"] is True
 
     # Aprobado para firma: requiere cargar la versión final.
     await revisar(client, decision.id, "aprobado", JURIDICO)
@@ -80,7 +80,7 @@ async def test_revisor_solo_donde_participo_o_le_toca(client, rv_proceso, crear_
         assert fila["accion_pendiente"] == "Revisar el documento"
         assert fila["permisos_pendientes"] == [{"permiso": "recurso_lider_juridico", "etiqueta": "Líder jurídico"}]
         assert fila["paso_actual"] == 1 and fila["total_pasos"] == 2
-    assert (await _mis(client, PROYECTO))["documentos"] == []  # aún no es su paso
+    assert (await _mis(client, PROYECTO))["data"] == []  # aún no es su paso
     assert _ids(await _mis(client, SIG)) == {concepto.id}
 
     # JURIDICO aprueba la decisión: la sigue viendo (participó) sin acción;
@@ -89,7 +89,7 @@ async def test_revisor_solo_donde_participo_o_le_toca(client, rv_proceso, crear_
     d = await _mis(client, JURIDICO)
     assert _ids(d) == {auto.id, decision.id}
     assert _fila(d, decision.id)["requiere_mi_accion"] is False
-    assert d["documentos"][0]["proceso_id"] == auto.id  # lo que requiere acción va primero
+    assert d["data"][0]["proceso_id"] == auto.id  # lo que requiere acción va primero
     assert _ids(await _mis(client, JURIDICO2)) == {auto.id}
     # Paso paralelo: líder del proyecto y asesora.
     assert _ids(await _mis(client, PROYECTO)) == {decision.id}
@@ -98,13 +98,13 @@ async def test_revisor_solo_donde_participo_o_le_toca(client, rv_proceso, crear_
     # SIG revisa el concepto: sigue en su lista, sin acción; al líder técnico le toca.
     await revisar(client, concepto.id, "aprobado", SIG)
     d = await _mis(client, SIG)
-    assert _ids(d) == {concepto.id} and d["documentos"][0]["requiere_mi_accion"] is False
+    assert _ids(d) == {concepto.id} and d["data"][0]["requiere_mi_accion"] is False
     assert _fila(await _mis(client, LIDER_TECNICO), concepto.id)["requiere_mi_accion"] is True
 
     # Devuelto por JURIDICO: él lo sigue viendo (participó); JURIDICO2 no.
     await revisar(client, auto.id, "devuelto", JURIDICO, comentario="corregir")
     assert _fila(await _mis(client, JURIDICO), auto.id)["requiere_mi_accion"] is False
-    assert (await _mis(client, JURIDICO2))["documentos"] == []
+    assert (await _mis(client, JURIDICO2))["data"] == []
 
 
 async def test_filtros_rol_y_solo_accion(client, rv_proceso, crear_expediente, rv_permisos):
@@ -122,7 +122,7 @@ async def test_filtros_rol_y_solo_accion(client, rv_proceso, crear_expediente, r
     d = await _mis(client, ABOGADO, solo_accion="true")
     assert _ids(d) == {auto.id}
     assert d["conteos"] == {"total": 2, "requieren_accion": 1}
-    assert (await _mis(client, ABOGADO, rol="revisor"))["documentos"] == []
+    assert (await _mis(client, ABOGADO, rol="revisor"))["data"] == []
     assert _ids(await _mis(client, ABOGADO, rol="encargado")) == {auto.id, decision.id}
 
     # Encargado y revisor a la vez: una sola fila con los dos roles.
@@ -131,7 +131,7 @@ async def test_filtros_rol_y_solo_accion(client, rv_proceso, crear_expediente, r
     fila = _fila(d, decision.id)
     assert fila["roles"] == ["encargado", "revisor"] and fila["rol"] == "encargado"
     assert fila["requiere_mi_accion"] is True and fila["accion_pendiente"] == "Revisar el documento"
-    assert len(d["documentos"]) == 2
+    assert len(d["data"]) == 2
     fila = _fila(await _mis(client, ABOGADO, rol="revisor"), decision.id)
     assert fila["roles"] == ["revisor"] and fila["requiere_mi_accion"] is True
     # Con rol=encargado la acción de revisor no cuenta.
@@ -140,7 +140,7 @@ async def test_filtros_rol_y_solo_accion(client, rv_proceso, crear_expediente, r
 
     # Usuario sin nada a cargo: lista vacía (no 403).
     d = await _mis(client, EXTRANO)
-    assert d["documentos"] == [] and d["conteos"] == {"total": 0, "requieren_accion": 0}
+    assert d["data"] == [] and d["conteos"] == {"total": 0, "requieren_accion": 0}
     assert {r["codigo"] for r in d["filtros"]["roles"]} == {"encargado", "revisor"}
     assert "finalizado" in {e["codigo"] for e in d["filtros"]["estados"]}
 
@@ -170,17 +170,17 @@ async def test_historico_no_vigente_y_paginacion(client, rv_proceso, crear_exped
     assert d["conteos"] == {"total": 3, "requieren_accion": 1}
     # El revisor que participó lo conserva; el que solo tenía el turno de un no vigente, no.
     assert _ids(await _mis(client, JURIDICO)) == {auto.id}
-    assert (await _mis(client, JURIDICO2))["documentos"] == []
+    assert (await _mis(client, JURIDICO2))["data"] == []
 
     # Paginación como infraction: total / page / limit / total_pages; conteos de todo el conjunto.
     r = await client.get("/mis-documentos", params={"limit": 2, "page": 1}, headers=headers(ABOGADO))
     body = r.json()
     assert (body["total"], body["page"], body["limit"], body["total_pages"]) == (3, 1, 2, 2)
-    assert body["data"]["documentos"][0]["proceso_id"] == otro.id  # requiere acción, primero
-    assert len(body["data"]["documentos"]) == 2
+    assert body["data"][0]["proceso_id"] == otro.id  # requiere acción, primero
+    assert len(body["data"]) == 2
     r = await client.get("/mis-documentos", params={"limit": 2, "page": 2}, headers=headers(ABOGADO))
     body = r.json()
-    assert len(body["data"]["documentos"]) == 1 and body["data"]["conteos"]["total"] == 3
-    assert body["data"]["documentos"][0]["expediente_codigo"].startswith("CA ")
+    assert len(body["data"]) == 1 and body["conteos"]["total"] == 3
+    assert body["data"][0]["expediente_codigo"].startswith("CA ")
     r = await client.get("/mis-documentos", params={"solo_accion": "true"}, headers=headers(ABOGADO))
-    assert r.json()["total"] == 1 and r.json()["data"]["conteos"] == {"total": 3, "requieren_accion": 1}
+    assert r.json()["total"] == 1 and r.json()["conteos"] == {"total": 3, "requieren_accion": 1}

@@ -88,7 +88,7 @@ async def test_tecnico_sin_gestionar_desde_mis_actuaciones(client, rv_permisos, 
     exp_id = expediente.id
     await admite_firmado(client, stubs, exp_id)
     r = await client.get("/mis-documentos", headers=headers(TECNICO))
-    fila = r.json()["data"]["documentos"][0]
+    fila = r.json()["data"][0]
     assert fila["etapa_padre"] == "concepto_tecnico" and fila["sub_proceso"] == "concepto_etapa2"
     concepto_id = fila["etapa_ref_id"]
     # Sin lectura de expedientes, pero sí su concepto

@@ -24,6 +24,13 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
+-- Name: pg_trgm; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;
+
+
+--
 -- Name: resultado_recurso; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -2999,6 +3006,13 @@ CREATE INDEX ix_documentos_anexos_etapa ON public.documentos_anexos USING btree 
 
 
 --
+-- Name: ix_expediente_expediente_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_expediente_expediente_trgm ON public.expediente USING gin (expediente public.gin_trgm_ops);
+
+
+--
 -- Name: ix_expediente_fecha_radicado; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3024,6 +3038,20 @@ CREATE INDEX ix_expediente_involucrado_involucrado ON public.expediente_involucr
 --
 
 CREATE INDEX ix_expediente_numero_vital ON public.expediente USING btree (numero_vital);
+
+
+--
+-- Name: ix_expediente_numero_vital_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_expediente_numero_vital_trgm ON public.expediente USING gin (numero_vital public.gin_trgm_ops);
+
+
+--
+-- Name: ix_expediente_radicado_trgm; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_expediente_radicado_trgm ON public.expediente USING gin (radicado public.gin_trgm_ops);
 
 
 --
