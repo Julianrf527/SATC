@@ -97,6 +97,28 @@ async def test_descarga_solo_informacion_base(client, h_consultor, crear_expedie
     assert stubs.files.unificados == [[exp.doc_comprobante_pago_id]]
 
 
+async def test_descarga_queda_auditada(client, h_consultor, crear_expediente, db_session):
+    from sqlalchemy import select
+
+    from db.models.auditoria import Auditoria
+
+    exp = await crear_expediente()
+    r = await client.get(f"/expedientes/{exp.id}/descargar", headers=h_consultor)
+    assert r.status_code == 200
+    eventos = (await db_session.execute(
+        select(Auditoria.tipo_evento).where(Auditoria.expediente_id == exp.id)
+    )).scalars().all()
+    assert "DESCARGAR_EXPEDIENTE" in eventos
+
+
+async def test_descarga_app_docs_caido_502_sin_detalles(client, h_consultor, crear_expediente, stubs):
+    exp = await crear_expediente()
+    stubs.files.fallar_unificado = True
+    r = await client.get(f"/expedientes/{exp.id}/descargar", headers=h_consultor)
+    assert r.status_code == 502
+    assert r.json()["detail"] == "No se pudo generar el PDF del expediente"
+
+
 async def test_descarga_inexistente_404(client, h_consultor):
     r = await client.get("/expedientes/9999/descargar", headers=h_consultor)
     assert r.status_code == 404
