@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query, Path, Body
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, or_, func, false
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +16,7 @@ from db.models.involucrado import Involucrado
 from services.auditoria import insert_auditoria
 from services.users import get_user_info, verify_permission
 from utils.functions import (
+    buscar_por_documento,
     format_involucrado_response,
     format_auditoria_response,
     resolver_identidad_usuario,
@@ -48,9 +49,6 @@ BUSCAR_O_CREAR_INVOLUCRADO = [
     Permisos.RECURSO_SUPER_MANAGE,
 ]
 
-# Techo duro para el filtrado en memoria del log de auditoría (ver obtener_auditoria).
-MAX_FILAS_POST_FILTRO = 5000
-
 
 async def _exigir_permiso(request: Request, permiso: str, mensaje: str) -> dict:
     """Valida gateway + permiso y devuelve la identidad del usuario.
@@ -82,6 +80,26 @@ async def _registrar_auditoria_o_fallar(db: AsyncSession, **kwargs) -> None:
     if not resultado.get("ok"):
         logger.error(f"Error al guardar auditoría: {resultado.get('error')}")
         raise HTTPException(status_code=500, detail="Error al guardar registro de auditoría")
+
+
+async def _flush_o_409(db: AsyncSession, mensaje: str) -> None:
+    """Flush que traduce la violación del UNIQUE de documento a 409.
+
+    El chequeo previo de duplicados no cierra la ventana de carrera entre dos
+    escrituras concurrentes: la constraint es la fuente de verdad, y la segunda
+    request cae acá como 409 en vez de un 500 crudo de asyncpg.
+    """
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=mensaje)
+
+
+def _dv_segun_tipo(tipo_documento: str | None, digito_verificacion: str | None) -> str | None:
+    """El dígito de verificación solo existe en NIT: para cualquier otro tipo se
+    descarta lo que mande el cliente."""
+    return digito_verificacion if tipo_documento == "NIT" else None
 
 
 def _contexto_peticion(request: Request) -> dict:
@@ -237,6 +255,31 @@ async def obtener_auditoria(
         except ValueError:
             raise HTTPException(status_code=400, detail="Formato de fecha_fin inválido. Use YYYY-MM-DD")
 
+    # nombre_usuario/documento_usuario viven en app-users, no en esta BD. Como
+    # los autores distintos del log son pocos (usuarios del sistema, no filas),
+    # se resuelven primero a la lista de usuario_id que coinciden y el filtro
+    # vuelve a SQL: paginación y conteo exactos, sin cargar el log en memoria.
+    users_info: dict = {}
+    if documento_usuario or nombre_usuario:
+        autores = (await db.execute(select(Auditoria.usuario_id).distinct())).scalars().all()
+        ids_conocidos = [uid for uid in autores if uid]
+        users_info = await get_user_info(ids_conocidos) if ids_conocidos else {}
+
+        def _coincide(uid) -> bool:
+            nombre, documento = resolver_identidad_usuario(uid, users_info.get(uid, {}))
+            if nombre_usuario and nombre_usuario.lower() not in nombre.lower():
+                return False
+            if documento_usuario and documento_usuario.strip() not in documento:
+                return False
+            return True
+
+        coincidentes = [uid for uid in autores if _coincide(uid)]
+        ids = [uid for uid in coincidentes if uid]
+        filtro_usuario = Auditoria.usuario_id.in_(ids) if ids else false()
+        if None in coincidentes:
+            filtro_usuario = or_(filtro_usuario, Auditoria.usuario_id.is_(None))
+        conditions.append(filtro_usuario)
+
     query = select(Auditoria)
     count_query = select(func.count()).select_from(Auditoria)
     if conditions:
@@ -246,37 +289,14 @@ async def obtener_auditoria(
     total_count = await db.scalar(count_query) or 0
     effective_offset = offset if offset is not None else (page - 1) * limit
 
-    # nombre_usuario/documento_usuario viven en app-users, no en esta BD, así que
-    # solo se pueden aplicar después de resolver los usuarios. Eso obliga a traer
-    # más filas de las que se devuelven; MAX_FILAS_POST_FILTRO acota el costo para
-    # que el endpoint no cargue la tabla de auditoría entera en memoria.
-    filtra_en_memoria = bool(documento_usuario or nombre_usuario)
-    query = query.order_by(Auditoria.fecha.desc())
-    if filtra_en_memoria:
-        query = query.limit(MAX_FILAS_POST_FILTRO)
-    else:
-        query = query.offset(effective_offset).limit(limit)
-
+    query = query.order_by(Auditoria.fecha.desc(), Auditoria.id.desc()).offset(effective_offset).limit(limit)
     auditorias = (await db.execute(query)).scalars().all()
 
-    user_ids = list({aud.usuario_id for aud in auditorias if aud.usuario_id})
-    users_info = await get_user_info(user_ids) if user_ids else {}
+    faltantes = list({aud.usuario_id for aud in auditorias if aud.usuario_id} - users_info.keys())
+    if faltantes:
+        users_info = {**users_info, **await get_user_info(faltantes)}
 
-    data = []
-    for aud in auditorias:
-        user_info = users_info.get(aud.usuario_id, {})
-        usuario_nombre, usuario_documento = resolver_identidad_usuario(aud.usuario_id, user_info)
-
-        if nombre_usuario and nombre_usuario.lower() not in usuario_nombre.lower():
-            continue
-        if documento_usuario and documento_usuario.strip() not in usuario_documento:
-            continue
-
-        data.append(format_auditoria_response(aud, user_info))
-
-    if filtra_en_memoria:
-        total_count = len(data)
-        data = data[effective_offset:effective_offset + limit]
+    data = [format_auditoria_response(aud, users_info.get(aud.usuario_id, {})) for aud in auditorias]
 
     return {
         "ok": True,
@@ -328,7 +348,7 @@ async def obtener_involucrados_bulk(
     status_code=201,
     responses={
         201: {"description": "Involucrado creado"},
-        400: {"description": "El involucrado ya existe"},
+        409: {"description": "El involucrado ya existe"},
         403: {"description": "No tiene permisos para gestionar involucrados"},
     },
 )
@@ -339,21 +359,15 @@ async def crear_involucrado(
 ):
     token_data = await _exigir_alguno(request, BUSCAR_O_CREAR_INVOLUCRADO, "No tiene permisos para gestionar involucrados")
 
-    existing = await verificar_involucrado_existe(
-        db=db,
-        numero_documento=involucrado.numero_documento,
-        tipo_documento=involucrado.tipo_documento,
-        digito_verificacion=involucrado.digito_verificacion,
+    mensaje_duplicado = (
+        f"Ya existe un involucrado con documento {involucrado.numero_documento} ({involucrado.tipo_documento})"
     )
-    if existing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Ya existe un involucrado con documento {involucrado.numero_documento} ({involucrado.tipo_documento})",
-        )
+    if await buscar_por_documento(db, involucrado.numero_documento, involucrado.tipo_documento):
+        raise HTTPException(status_code=409, detail=mensaje_duplicado)
 
     nuevo = Involucrado(
         numero_documento=involucrado.numero_documento,
-        digito_verificacion=involucrado.digito_verificacion,
+        digito_verificacion=_dv_segun_tipo(involucrado.tipo_documento, involucrado.digito_verificacion),
         tipo_documento=involucrado.tipo_documento,
         nombre=involucrado.nombre,
         celular=involucrado.celular,
@@ -361,17 +375,7 @@ async def crear_involucrado(
         direccion=involucrado.direccion,
     )
     db.add(nuevo)
-    try:
-        await db.flush()
-    except IntegrityError:
-        # El check previo no cierra la ventana de carrera entre dos altas
-        # concurrentes: la constraint UNIQUE es la fuente de verdad, y la
-        # segunda request cae acá como 409 en vez de un 500 crudo de asyncpg.
-        await db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail=f"Ya existe un involucrado con documento {involucrado.numero_documento} ({involucrado.tipo_documento})",
-        )
+    await _flush_o_409(db, mensaje_duplicado)
 
     datos_involucrado = format_involucrado_response(nuevo)
 
@@ -386,7 +390,8 @@ async def crear_involucrado(
     )
 
     await db.commit()
-    logger.info(f"Involucrado creado: {involucrado.tipo_documento}-{involucrado.numero_documento} (ID: {nuevo.id})")
+    # Solo el id: el documento es dato personal y ya queda en la auditoría.
+    logger.info(f"Involucrado creado ID={nuevo.id}")
 
     return {"ok": True, "data": datos_involucrado, "msg": "Involucrado creado exitosamente"}
 
@@ -426,7 +431,8 @@ async def obtener_involucrado_por_id(
     tags=["Involucrados - Gestión"],
     responses={
         200: {"description": "Involucrado actualizado"},
-        400: {"description": "El documento nuevo ya pertenece a otro involucrado"},
+        409: {"description": "El documento nuevo ya pertenece a otro involucrado"},
+        422: {"description": "Datos inválidos (incluye vaciar numero_documento o tipo_documento)"},
         403: {"description": "No tiene permisos para gestionar involucrados"},
         404: {"description": "Involucrado no encontrado"},
     },
@@ -452,24 +458,21 @@ async def actualizar_involucrado(
     # los ausentes se guardarían como None y borrarían celular/correo/dirección.
     cambios = involucrado_update.model_dump(exclude_unset=True)
 
-    nuevo_num_doc = cambios.get("numero_documento")
-    nuevo_tipo_doc = cambios.get("tipo_documento")
-    doc_cambio = (
-        (nuevo_num_doc is not None and nuevo_num_doc != involucrado.numero_documento)
-        or (nuevo_tipo_doc is not None and nuevo_tipo_doc != involucrado.tipo_documento)
-    )
+    num_final = cambios.get("numero_documento", involucrado.numero_documento)
+    tipo_final = cambios.get("tipo_documento", involucrado.tipo_documento)
+    mensaje_duplicado = "Ya existe otro involucrado con ese documento"
+
+    doc_cambio = (num_final, tipo_final) != (involucrado.numero_documento, involucrado.tipo_documento)
     if doc_cambio:
-        existing = await verificar_involucrado_existe(
-            db=db,
-            numero_documento=nuevo_num_doc if nuevo_num_doc is not None else involucrado.numero_documento,
-            tipo_documento=nuevo_tipo_doc if nuevo_tipo_doc is not None else involucrado.tipo_documento,
-            digito_verificacion=cambios.get("digito_verificacion", involucrado.digito_verificacion),
-        )
+        existing = await buscar_por_documento(db, num_final, tipo_final)
         if existing and existing.id != involucrado_id:
-            raise HTTPException(
-                status_code=400,
-                detail="Ya existe otro involucrado con ese documento",
-            )
+            raise HTTPException(status_code=409, detail=mensaje_duplicado)
+
+    # DV coherente con el tipo FINAL: pasar de NIT a otro tipo lo limpia aunque
+    # el cliente no lo mande.
+    cambios["digito_verificacion"] = _dv_segun_tipo(
+        tipo_final, cambios.get("digito_verificacion", involucrado.digito_verificacion)
+    )
 
     if "correo" in cambios and cambios["correo"]:
         cambios["correo"] = cambios["correo"].lower()
@@ -477,7 +480,7 @@ async def actualizar_involucrado(
     for campo, valor in cambios.items():
         setattr(involucrado, campo, valor)
 
-    await db.flush()
+    await _flush_o_409(db, mensaje_duplicado)
     datos_nuevos = format_involucrado_response(involucrado)
 
     await _registrar_auditoria_o_fallar(

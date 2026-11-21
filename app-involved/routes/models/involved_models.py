@@ -110,11 +110,18 @@ class InvolucradoUpdate(BaseModel):
             raise ValueError('El celular debe tener entre 7 y 15 dígitos')
         return v
 
+    @field_validator('numero_documento', 'tipo_documento')
+    @classmethod
+    def no_vaciar_documento(cls, v, info):
+        # Pydantic no valida los defaults: esto solo se dispara con un null
+        # explícito. Omitir el campo sigue significando "no cambiarlo".
+        if v is None:
+            raise ValueError(f'{info.field_name} no puede quedar vacío')
+        return v
+
     @field_validator('numero_documento')
     @classmethod
     def validate_documento(cls, v):
-        if v is None:
-            return v
         doc_str = str(v)
         if len(doc_str) < 6 or len(doc_str) > 15:
             raise ValueError('El documento debe tener entre 6 y 15 dígitos')

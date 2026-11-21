@@ -183,3 +183,47 @@ async def test_log_mapea_tipo_operacion(client, con_auditoria, sin_usuarios, mak
     r = await client.get("/involved/log", headers=gateway_headers())
     assert r.json()["data"][0]["tipo_operacion"] == "INSERT"
     assert r.json()["data"][0]["tabla_afectada"] == "Involucrado"
+
+
+async def test_log_filtro_por_nombre_pagina_y_cuenta_en_sql(client, con_auditoria, make_auditoria, monkeypatch):
+    """El filtro por nombre ya no trae filas a memoria: total exacto y la
+    segunda página trae el resto."""
+    async def _fake_get_user_info(user_ids):
+        return {1: {"nombre": "Laura Diaz", "correo": "", "numero_documento": 111},
+                2: {"nombre": "Mario Solis", "correo": "", "numero_documento": 222}}
+
+    import routes.involved as rutas
+    monkeypatch.setattr(rutas, "get_user_info", _fake_get_user_info)
+
+    for _ in range(3):
+        await make_auditoria(usuario_id=1)
+    await make_auditoria(usuario_id=2)
+
+    r1 = await client.get("/involved/log?nombre_usuario=laura&limit=2&page=1", headers=gateway_headers())
+    r2 = await client.get("/involved/log?nombre_usuario=laura&limit=2&page=2", headers=gateway_headers())
+    assert r1.json()["pagination"]["total"] == 3
+    assert r1.json()["pagination"]["pages"] == 2
+    assert len(r1.json()["data"]) == 2
+    assert len(r2.json()["data"]) == 1
+    assert {d["usuario_id"] for d in r1.json()["data"] + r2.json()["data"]} == {1}
+
+
+async def test_log_filtro_por_nombre_sin_coincidencias(client, con_auditoria, make_auditoria, monkeypatch):
+    async def _fake_get_user_info(user_ids):
+        return {1: {"nombre": "Laura Diaz", "correo": "", "numero_documento": 111}}
+
+    import routes.involved as rutas
+    monkeypatch.setattr(rutas, "get_user_info", _fake_get_user_info)
+    await make_auditoria(usuario_id=1)
+    r = await client.get("/involved/log?nombre_usuario=zzz", headers=gateway_headers())
+    assert r.status_code == 200
+    assert r.json()["data"] == []
+    assert r.json()["pagination"]["total"] == 0
+
+
+async def test_log_filtro_por_nombre_casa_con_placeholder(client, con_auditoria, sin_usuarios, make_auditoria):
+    """Si app-users no conoce al autor se busca sobre "Usuario <id>", igual que
+    lo que muestra la tabla."""
+    await make_auditoria(usuario_id=777)
+    r = await client.get("/involved/log?nombre_usuario=usuario 777", headers=gateway_headers())
+    assert r.json()["pagination"]["total"] == 1

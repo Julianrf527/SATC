@@ -8,6 +8,20 @@ choques de "otra operación en progreso".
 
 verify_permission sale por HTTP hacia app-users, que no existe durante los
 tests; se sustituye por un doble controlable en cada test (fixture `permisos`).
+
+Cómo correrla
+-------------
+- Dependencias: ``pip install -r requirements-dev.txt`` (más el paquete
+  ``shared/``), o el ``.venv`` de la raíz del repo, que ya las trae.
+- Variables obligatorias (las del ``.env`` raíz): ``POSTGRES_PASSWORD``,
+  ``SECRET_GATEWAY`` y ``SANCTIONING_SERVICE_SECRET``; sin ellas el import
+  falla. ``TEST_DATABASE_URL`` reemplaza la URL por defecto.
+- La base ``involved_test_db`` se crea sola si no existe (ver
+  ``_asegurar_base_de_pruebas``), conectando a la base ``postgres`` del mismo
+  servidor.
+- Los Postgres de docker-compose no publican puertos: o se corre dentro de la
+  red ``satc_satc-private`` (contenedor efímero con la imagen de app-involved y
+  el código montado), o contra el Postgres portable con ``TEST_DATABASE_URL``.
 """
 import itertools
 import os
@@ -29,6 +43,7 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from jose import jwt
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -54,8 +69,28 @@ USER_ID = 42
 ROL_ID = 1
 
 
+async def _asegurar_base_de_pruebas() -> None:
+    """Crea la base de pruebas si no existe.
+
+    CREATE DATABASE no puede ir dentro de una transacción, así que se usa una
+    conexión AUTOCOMMIT a la base de mantenimiento ``postgres``.
+    """
+    url = make_url(TEST_DATABASE_URL)
+    admin = create_async_engine(url.set(database="postgres"), isolation_level="AUTOCOMMIT")
+    try:
+        async with admin.connect() as conn:
+            existe = await conn.scalar(
+                text("SELECT 1 FROM pg_database WHERE datname = :n"), {"n": url.database}
+            )
+            if not existe:
+                await conn.execute(text(f'CREATE DATABASE "{url.database}"'))
+    finally:
+        await admin.dispose()
+
+
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _crear_esquema():
+    await _asegurar_base_de_pruebas()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
